@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
-import { ArrowUp, ChevronDown, Square, Zap } from 'lucide-react';
+import { ArrowUp, ChevronDown, Square } from 'lucide-react';
 import { RemoteModelSelector, type ModelOption } from '../../components/RemoteModelSelector';
 import { getModelIcon } from '../../components/cards/ModelCard';
 import { PendingChipsRow } from '../../components/PendingChipsRow';
@@ -501,21 +501,26 @@ function ParasitePicker({ locale, available, current, onChange, disabled }: Para
     onChange(active ? null : CLAUDE_CODE_ID);
   };
 
+  // Match the RemoteModelSelector's chrome exactly (font-mono, px-2 py-1, no
+  // border, hover-bg lift) so the two chips read as siblings in the same
+  // toolbar. State is communicated only by text colour:
+  //   • muted + opacity-50 + not-allowed cursor when CC isn't installed
+  //   • normal text + hover bg lift when installed but not active
+  //   • accent colour when active (parasiting CC)
+  const buttonClass = !installed
+    ? 'text-cyber-text-muted opacity-50 cursor-not-allowed'
+    : active
+      ? 'text-cyber-accent hover:bg-cyber-elevated cursor-pointer'
+      : 'text-cyber-text hover:bg-cyber-elevated cursor-pointer';
+
   return (
     <div className="relative flex items-center gap-1">
       <button
         onClick={handleClick}
         disabled={!canClick}
-        className={`flex items-center gap-1 px-2 h-7 rounded-lg text-xs border transition-colors ${
-          !installed
-            ? 'bg-cyber-surface/40 border-cyber-border/40 text-cyber-text-muted cursor-not-allowed'
-            : active
-              ? 'bg-cyber-accent text-cyber-bg border-cyber-accent'
-              : 'bg-cyber-surface border-cyber-accent/60 text-cyber-accent hover:bg-cyber-accent/10'
-        }`}
+        className={`px-2 py-1 text-xs font-mono transition-colors rounded ${buttonClass}`}
       >
-        <Zap size={12} className={active ? 'fill-current' : ''} />
-        <span className="font-medium">Claude Code</span>
+        Claude Code
       </button>
       {/* Themed help glyph — same shape as AppManager's relay-mode "?". */}
       <span className="group relative inline-flex items-center">
