@@ -1,5 +1,5 @@
 {
   "version": "4.8.4",
   "releaseDate": "2026-05-18",
-  "releaseNotes": "1. 修复了与 Claude Desktop 新版本(1.7.x)的兼容性问题\n2. macOS:关闭到托盘后 Dock 图标会同步隐藏\n3. 优化了本地大模型引擎的升级提示交互\n4. 托盘菜单与悬停提示不再显示版本号"
+  "releaseNotes": "1. 新增了对 Claude Desktop 新版本(1.7.x)的兼容\n2. macOS:关闭到托盘后 Dock 图标会同步隐藏\n3. 优化了本地大模型引擎的升级提示交互\n4. 托盘菜单与悬停提示不再显示版本号"
 }
