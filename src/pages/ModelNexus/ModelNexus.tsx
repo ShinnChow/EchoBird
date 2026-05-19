@@ -835,14 +835,16 @@ export function AddModelModal() {
                   </button>
                 )}
               </div>
-              <div className="min-h-[36px] mt-1">
-                {newModelForm.apiKey.startsWith('enc:v1:') && (
-                  <div
-                    className={`text-xs leading-tight ${keyDestroyed ? 'text-red-400' : 'text-cyber-text/60'}`}
-                  >
-                    {keyDestroyed ? t('key.destroyed') : t('key.encrypted')}
-                  </div>
-                )}
+              {/* Encryption hint — always rendered (locale-aware exact
+                  height, no residual space) and toggled via visibility
+                  so the form doesn't shift on encrypt / destroy. */}
+              <div
+                aria-hidden={!newModelForm.apiKey.startsWith('enc:v1:')}
+                className={`mt-1 text-xs leading-tight ${
+                  keyDestroyed ? 'text-red-400' : 'text-cyber-text/60'
+                } ${!newModelForm.apiKey.startsWith('enc:v1:') ? 'invisible' : ''}`}
+              >
+                {keyDestroyed ? t('key.destroyed') : t('key.encrypted')}
               </div>
             </div>
           </div>

@@ -260,12 +260,16 @@ export function MotherAgentPanel() {
                       )}
                     </button>
                   </div>
-                  <div className="min-h-[36px] mt-1">
-                    {sshForm.password.startsWith('enc:v1:') && (
-                      <div className="text-xs leading-tight text-cyber-text/60">
-                        {t('mother.encrypted')}
-                      </div>
-                    )}
+                  {/* Encryption hint — always rendered (locale-aware exact
+                      height, no residual space) and toggled via visibility
+                      so the form doesn't shift when the user encrypts. */}
+                  <div
+                    aria-hidden={!sshForm.password.startsWith('enc:v1:')}
+                    className={`mt-1 text-xs leading-tight text-cyber-text/60 ${
+                      !sshForm.password.startsWith('enc:v1:') ? 'invisible' : ''
+                    }`}
+                  >
+                    {t('mother.encrypted')}
                   </div>
                 </div>
               </div>
