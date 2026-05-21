@@ -129,16 +129,22 @@ Any fork, modification, or hosted service derived from this code must also be
 released under AGPL-3.0 — including SaaS deployments. See [LICENSE](LICENSE)
 for the full text and [NOTICE](NOTICE) for attribution requirements.
 
-**Brand** — *EchoBird* and *Model Nexus* (模型中心) are common-law trademarks
-of edison7009. **Forks are welcome — no need to scrub our name and logo.** If
-your fork honestly credits EchoBird as upstream (README, About screen, or
-product page), you may keep our identity visible (e.g. "EchoBird Community
-Edition by X"). If you prefer to rebrand entirely, that's also fine — just
-keep the NOTICE attribution. The hard line is **commercial SaaS / app-store
-products literally branded with our marks** without permission, or
-**presenting the code as your own from-scratch original work**. Genuinely
-original code you add on top of either path belongs to you, named however
-you like. See [TRADEMARKS.md](TRADEMARKS.md) for the full policy.
+**Trade dress + brand** — EchoBird's primary protection is its **UI / UX trade
+dress**: the specific combination of four user-facing surfaces sharing one
+central model hub, plus the bundling of two complete reference applications
+(Reversi + AI Translator) as user tutorial templates. The wordmark **EchoBird**
+is a common-law trademark of edison7009; feature labels like *Model Nexus* /
+*模型中心* are descriptive and protected only as part of the trade dress.
+**Forks are welcome — no need to scrub our name and logo.** If your fork
+honestly credits EchoBird as upstream, you may keep our identity visible
+(e.g. "EchoBird Community Edition by X"). If you prefer to rebrand entirely,
+that's also fine — just keep the NOTICE attribution. The hard lines are:
+**commercial SaaS / app-store products literally branded "EchoBird"**
+without permission; **presenting the code as your own from-scratch original
+work**; and **adopting three or more of our four UI surfaces side-by-side in
+a competing product without independent prior-work documentation** (see
+[NOTICE](NOTICE) for the formal threshold). See [TRADEMARKS.md](TRADEMARKS.md)
+for the full policy.
 
 ---
 

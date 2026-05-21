@@ -3,18 +3,21 @@
 > **Plain-English summary / 一句话**: EchoBird's primary defense is its
 > **UI / UX trade dress** — the specific way four user-facing surfaces
 > share one central model hub, and the unique pattern of bundling two
-> complete reference applications as the user's tutorial. Brand-name
-> trademarks (EchoBird, Model Nexus / 模型中心) are the secondary,
-> traditional layer. Forks are welcome — honest attribution is enough.
+> complete reference applications as the user's tutorial. The **EchoBird**
+> wordmark is the secondary, traditional layer — feature names like
+> *Model Nexus* / *模型中心* are descriptive labels, not trademarks, and
+> are protected only as part of the trade dress. Forks are welcome —
+> honest attribution is enough.
 > The hard line is copying multiple UI surfaces side-by-side without
 > documented independent prior work.
 >
 > EchoBird 的**首要保护**是 **UI / UX 商业外观(trade dress)** —— 四个
 > 用户界面与中央模型枢纽的关系,以及在产品里**嵌两个完整开源 AI 应用
-> 作为用户教程模板** 这种前无古人的具体做法。**商标名字**(EchoBird、
-> Model Nexus / 模型中心)是次要的、传统的那一层。Fork 欢迎 —— 诚实标
-> 注上游即可。硬底线只有一条:**在没有独立留存先创证据的情况下,在同
-> 一个产品里并列采用多个 EchoBird UI 界面**。
+> 作为用户教程模板** 这种前无古人的具体做法。**EchoBird 这一个文字商标**
+> 是次要的、传统的那一层 —— 功能名(如 *Model Nexus* / *模型中心*)是
+> 描述性标签,不主张为商标,只作为 trade dress 的一部分受保护。Fork 欢
+> 迎 —— 诚实标注上游即可。硬底线只有一条:**在没有独立留存先创证据的
+> 情况下,在同一个产品里并列采用多个 EchoBird UI 界面**。
 
 ---
 
@@ -33,9 +36,14 @@ for the full timeline and §4 for the specific creative points; the
 formal trade-dress declaration with the "three-or-more" threshold lives
 in [NOTICE](NOTICE).
 
-**Layer B — Brand-name trademarks (secondary).**
-The names *EchoBird* and *Model Nexus* / *模型中心* are claimed as
-common-law trademarks of edison7009 based on first use. See §6 below.
+**Layer B — Brand wordmark (secondary).**
+A single wordmark — *EchoBird* — is claimed as a common-law trademark
+of edison7009 based on first use. Feature labels such as *Model Nexus*
+/ *模型中心*, *Mother Agent* / *安装与修复*, *App Manager* / *应用管理*,
+and *LocalServer* / *一键本地大模型* are **descriptive labels** for the
+UI surfaces they identify, not separately claimed trademarks; they are
+protected only as part of the Layer A trade dress (see §3–§5). See §6
+below for the brand wordmark detail.
 
 We are explicit about the ordering because EchoBird's true originality
 is in the **product format** — the specific UI surfaces and their
@@ -147,15 +155,23 @@ presumption of derivation from EchoBird's trade dress unless the
 implementer can produce independently-documented prior work. A single
 isolated pattern, by itself, is not treated as infringement.
 
-### 6. Brand marks claimed (Layer B)
+### 6. Brand wordmark claimed (Layer B)
 
-The following names and logos are claimed as common-law trademarks of
-edison7009, based on first use in commerce:
+A single wordmark is claimed as a common-law trademark of edison7009,
+based on first use in commerce:
 
-| Mark                            | First public use | Class of goods/services                          |
-| ------------------------------- | ---------------- | ------------------------------------------------ |
-| **EchoBird** (word mark)        | 2026-03-02       | Computer software; AI agent integration platform |
-| **Model Nexus** / **模型中心**  | 2026-03-26       | Software UI feature; unified model data hub      |
+| Mark                       | First public use | Class of goods/services                          |
+| -------------------------- | ---------------- | ------------------------------------------------ |
+| **EchoBird** (word mark)   | 2026-03-02       | Computer software; AI agent integration platform |
+
+We deliberately keep the wordmark claim narrow to a single, distinctive
+name. Feature labels — *Model Nexus*, *Mother Agent*, *App Manager*,
+*LocalServer*, *My AI Projects*, and their Chinese equivalents — are
+descriptive compound words (e.g., "a nexus for models", "an agent that
+mothers other agents") and are **not** separately claimed as trademarks.
+This avoids the common over-claiming trap where weak marks dilute a
+strong one's enforceability. The same feature labels remain protected
+as part of the trade dress in §3–§5.
 
 Common-law rights apply automatically in jurisdictions that recognize
 them (US, UK, Canada, Australia, Hong Kong, …). In first-to-file
@@ -184,10 +200,10 @@ You must obtain written permission before:
   advertising, app-store listings, merchandise, or other commercial
   product marketing. Non-commercial fork attribution per §10 Option A
   does not require permission.
-- Operating a commercial SaaS or hosted service that uses any of the
-  marks as its headline brand.
-- Registering any of the marks, or confusingly similar variants, as
-  trademarks, domain names, company names, or product names in any
+- Operating a commercial SaaS or hosted service that uses the
+  EchoBird wordmark as its headline brand.
+- Registering EchoBird (or any confusingly similar variant) as a
+  trademark, domain name, company name, or product name in any
   jurisdiction.
 - Re-implementing three or more of the §3 UI surfaces side-by-side in
   a competing product without independently-documented prior work
@@ -256,9 +272,12 @@ EchoBird 在两个法律层面主张保护,按战略重要性排序:
 **产品形态抄袭**的那一层。详见 §3 时间线 + §4 创意点 + §5 阈值。
 正式的「三项或以上」侵权阈值声明在 [NOTICE](NOTICE) 文件中。
 
-**B 层 —— 品牌商标(辅助)**
-*EchoBird* 与 *Model Nexus* / *模型中心* 作为 edison7009 的普通法
-商标,基于「商业中首次使用」原则主张权利。详见 §6。
+**B 层 —— 品牌文字商标(辅助)**
+**单一文字商标 EchoBird** 作为 edison7009 的普通法商标,基于「商业
+中首次使用」原则主张权利。功能名(如 *Model Nexus* / *模型中心*、
+*Mother Agent* / *安装与修复*、*App Manager* / *应用管理*、
+*LocalServer* / *一键本地大模型*)是**描述性标签**,不单独主张为商
+标,只作为 A 层 trade dress 的一部分受保护。详见 §6。
 
 我们**明确把 A 层放在 B 层之前** —— 因为 EchoBird 真正的原创性在
 **产品形态**,不在文字商标。假设有人完全改名换 Logo 但 1:1 复制我们
@@ -356,15 +375,20 @@ AI 项目」面板里。
 出示独立留存的更早原创证据的情况下,推定为对 EchoBird 商业外观的衍生
 使用。**单独采用其中某一项**本身不视为侵权。
 
-### 6. 主张的商标(B 层)
+### 6. 主张的文字商标(B 层)
 
-以下名称、标识与 Logo 作为 edison7009 的普通法商标,基于「商业中首次
-使用」原则主张:
+**单一文字商标**作为 edison7009 的普通法商标,基于「商业中首次使用」
+原则主张:
 
-| 标识                            | 首次公开使用 | 商品/服务类别              |
-| ------------------------------ | ------------ | ------------------------- |
-| **EchoBird**(文字商标)        | 2026-03-02   | 计算机软件;AI Agent 集成平台 |
-| **Model Nexus** / **模型中心** | 2026-03-26   | 软件 UI 功能;统一模型数据枢纽 |
+| 标识                       | 首次公开使用 | 商品/服务类别              |
+| -------------------------- | ------------ | ------------------------- |
+| **EchoBird**(文字商标)   | 2026-03-02   | 计算机软件;AI Agent 集成平台 |
+
+我们刻意把文字商标主张**收敛到一个独特名字**。功能名 —— *Model Nexus*、
+*Mother Agent*、*App Manager*、*LocalServer*、*My AI Projects* 及其中
+文等价词 —— 是描述性复合词(例:「模型的枢纽」、「妈妈式 agent」),
+**不另行主张为商标**。这样做是为了避免「弱商标稀释强商标可执行性」的常
+见过度主张陷阱。同一批功能名作为 §3-§5 trade dress 的一部分继续受保护。
 
 普通法商标权在承认该制度的法域(美、英、加、澳、香港等)凭「商业中
 首次使用」自动产生。在中国大陆、欧盟、日本等先申请制法域,本项目将在
@@ -388,8 +412,8 @@ AI 项目」面板里。
 - 在**付费广告、应用商店上架、周边商品或其他商业产品宣传**中使用
   EchoBird 的文字商标、Logo 或独特商业外观。非商业 fork 在 README /
   About 页面按 §10 方案 A 署名**无需**授权。
-- 运营**字面挂任何标识作为头牌品牌**的商业 SaaS 或托管服务。
-- 在任何法域将任何标识(或近似变体)注册为**商标、域名、公司名或
+- 运营**字面挂 EchoBird 作为头牌品牌**的商业 SaaS 或托管服务。
+- 在任何法域将 EchoBird(或近似变体)注册为**商标、域名、公司名或
   产品名**。
 - 在没有独立留存先创证据的情况下,在一个竞争性产品中**并列实现 §3 所
   列三个或更多 UI 界面**(详见 [NOTICE](NOTICE))。

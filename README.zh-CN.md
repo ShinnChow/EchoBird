@@ -127,13 +127,17 @@ curl -fsSL https://echobird.ai/install.sh | sh
 任何 fork、修改版本或基于本代码部署的托管服务,都必须同样以 AGPL-3.0 开源 ——
 **SaaS 部署也不例外**。完整文本见 [LICENSE](LICENSE),署名要求见 [NOTICE](NOTICE)。
 
-**品牌** —— *EchoBird* 与 *Model Nexus / 模型中心* 为 edison7009 的普通法商标。
-**Fork 欢迎 —— 无需抹掉我们的名字和 Logo**。如果你的 fork 在 README / About 页面 /
-产品页诚实标注 EchoBird 为上游,可以保留我们的身份可见(例:"EchoBird 社区版 by X");
-如果你坚持完全重新品牌化也可以,改名 + 替换 Logo,但 NOTICE 中保留致谢。硬底线只有
-两条:**未授权的商业 SaaS / 应用商店产品字面挂我们的商标**;以及**把代码当作你
-从零写的原创发布**。Fork 之上你新增的原创代码归你,你想怎么命名都行。完整政策见
-[TRADEMARKS.md](TRADEMARKS.md)。
+**商业外观 + 品牌** —— EchoBird 的主防线是 **UI / UX 商业外观(trade dress)**:
+四个用户面向界面共享同一个中央模型枢纽的具体组合,以及内置两个完整可运行的
+参考应用(黑白棋 + AI 翻译)作为用户教程模板。**EchoBird** 是 edison7009 的
+单一普通法文字商标;*Model Nexus / 模型中心* 等功能名是描述性标签,**不单独
+主张为商标**,只作为 trade dress 的一部分受保护。**Fork 欢迎 —— 无需抹掉我们
+的名字和 Logo**。如果你的 fork 在 README / About 页面 / 产品页诚实标注 EchoBird
+为上游,可以保留我们的身份可见(例:"EchoBird 社区版 by X");完全重新品牌化
+也可以,改名 + 替换 Logo,但 NOTICE 中保留致谢。硬底线有三条:**未授权的商业
+SaaS / 应用商店产品字面挂 EchoBird**;**把代码当作你从零写的原创发布**;以及
+**在没有独立先创证据的情况下,在一个竞争性产品中并列采用我们四个 UI 界面中的
+三个或以上**(详见 [NOTICE](NOTICE) 阈值)。完整政策见 [TRADEMARKS.md](TRADEMARKS.md)。
 
 ---
 
