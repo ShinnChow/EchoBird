@@ -25,9 +25,9 @@
 
 <p align="center"><sub><em>If EchoBird helped solve a problem, you can <a href="https://echobird.ai/support/">buy the dev a coffee ☕</a>.</em></sub></p>
 
-> **Note** — This repository is a source archive, download channel, and
-> issue tracker. For product information, announcements, and commercial
-> inquiries, visit [echobird.ai](https://echobird.ai).
+> **Note** — This repository is just one of several download channels
+> and an issue tracker. For product information, announcements, and
+> commercial inquiries, visit [echobird.ai](https://echobird.ai).
 
 ---
 
