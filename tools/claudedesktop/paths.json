@@ -13,6 +13,7 @@
     "configDir": "~/.claude",
     "configFile": "~/.claude/settings.json",
     "requireConfigFile": false,
+    "launchUri": "shell:AppsFolder\\Claude_pzs8sxrjxfjjc!Claude",
     "paths": {
         "win32": [
             "%LOCALAPPDATA%/AnthropicClaude/Claude.exe",
