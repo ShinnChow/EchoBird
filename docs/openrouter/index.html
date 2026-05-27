@@ -529,11 +529,13 @@
                             在弹出的「编辑模型配置」窗口里:
                         </p>
                         <p>
-                            ① <strong>名称</strong> 和 <strong>模型 ID</strong> 都填刚才复制的那个,例如
-                            <code>deepseek/deepseek-v4-flash</code> —— <strong>不要加 <code>:free</code> 后缀</strong>。<br>
-                            ② <strong>OpenAI 地址</strong> 已经自动填好,无需改动。<br>
-                            ③ <strong>API 密钥</strong> 粘贴你在 OpenRouter 申请的那个 Key。<br>
-                            ④ 点 <strong>保存</strong>。
+                            ① <strong>名称</strong> 就是个标签,你能认出来就行,随便起。<br>
+                            ② <strong>模型 ID</strong> 才是真正传给 API 的字段,粘贴刚才复制的那个,例如
+                            <code>deepseek/deepseek-v4-flash</code>,<strong>把结尾的 <code>:free</code> 去掉</strong> ——
+                            EchoBird 会自动帮你走免费通道。<br>
+                            ③ <strong>OpenAI 地址</strong> 已经自动填好,无需改动。<br>
+                            ④ <strong>API 密钥</strong> 粘贴你在 OpenRouter 申请的那个 Key。<br>
+                            ⑤ 点 <strong>保存</strong>。
                         </p>
                         <div class="callout">
                             <strong>提示:</strong>同一个 API Key 可以反复添加不同的模型,每个模型独立配置一行,
@@ -661,7 +663,7 @@
                         </div>
                     </div>
                     <div class="shot-wrap">
-                        <img src="./1.png" alt="Sign up on OpenRouter and search for free models" loading="lazy">
+                        <img src="./1en.png" alt="Sign up on OpenRouter and search for free models" loading="lazy">
                         <div class="caption">Fig 1 · Search "free" on OpenRouter and create an API Key</div>
                     </div>
                 </article>
@@ -678,18 +680,20 @@
                     <div class="step-body">
                         <p>
                             Open EchoBird, go to <strong>Model Nexus</strong> in the left sidebar, then switch the
-                            right-side pane to the <strong>API Router</strong> tab. <strong>OpenRouter</strong> is the
-                            first entry. Click the <code>+</code> button next to it.
+                            right-side pane to the <strong>Model Relays</strong> tab. <strong>OpenRouter</strong> is
+                            the first entry. Click the <code>+</code> button next to it.
                         </p>
                         <p>
-                            In the "Edit Model" dialog:
+                            In the "Edit Model Config" dialog:
                         </p>
                         <p>
-                            ① <strong>Name</strong> and <strong>Model ID</strong> are both the ID you just copied,
-                            e.g. <code>deepseek/deepseek-v4-flash</code> — <strong>no <code>:free</code> suffix</strong>.<br>
-                            ② <strong>OpenAI Endpoint</strong> is pre-filled — leave it alone.<br>
-                            ③ <strong>API Key</strong>: paste the OpenRouter key.<br>
-                            ④ Hit <strong>Save</strong>.
+                            ① <strong>Name</strong> is just a label — type anything you'll recognise.<br>
+                            ② <strong>Model ID</strong> is the field that gets sent to the API — paste the ID you
+                            copied, e.g. <code>deepseek/deepseek-v4-flash</code>, and
+                            <strong>strip the <code>:free</code> suffix</strong>. EchoBird routes free traffic for you.<br>
+                            ③ <strong>OpenAI URL</strong> is pre-filled — leave it alone.<br>
+                            ④ <strong>API Key</strong>: paste the OpenRouter key.<br>
+                            ⑤ Hit <strong>Save</strong>.
                         </p>
                         <div class="callout">
                             <strong>Tip:</strong> One key can back as many models as you want — add a separate row per
@@ -699,12 +703,12 @@
                     <div class="shot-wrap">
                         <div class="shot-grid">
                             <div>
-                                <img src="./2.png" alt="Model Nexus → API Router → OpenRouter" loading="lazy">
-                                <div class="caption">Fig 2 · Model Nexus → API Router → OpenRouter → hit +</div>
+                                <img src="./2en.png" alt="Model Nexus → Model Relays → OpenRouter" loading="lazy">
+                                <div class="caption">Fig 2 · Model Nexus → Model Relays → OpenRouter → hit +</div>
                             </div>
                             <div>
-                                <img src="./3.png" alt="Fill in the model ID and API key" loading="lazy">
-                                <div class="caption">Fig 3 · Paste the model ID and key — no :free suffix</div>
+                                <img src="./3en.png" alt="Fill in the Model ID and API Key" loading="lazy">
+                                <div class="caption">Fig 3 · Model ID must drop the :free suffix</div>
                             </div>
                         </div>
                     </div>
@@ -732,7 +736,7 @@
                         </p>
                     </div>
                     <div class="shot-wrap">
-                        <img src="./4.png" alt="Test the OpenRouter model inside Install & Repair" loading="lazy">
+                        <img src="./4en.png" alt="Test the OpenRouter model inside Install & Repair" loading="lazy">
                         <div class="caption">Fig 4 · Chat directly with the OpenRouter model you just configured</div>
                     </div>
                 </article>
