@@ -1,0 +1,40 @@
+{
+    "id": "opencodedesktop",
+    "displayName": "OpenCode Desktop",
+    "homepage": "https://opencode.ai/",
+    "docs": "https://opencode.ai/docs",
+    "github": "https://github.com/anomalyco/opencode",
+    "kind": "desktop_app",
+    "platforms": ["windows", "macos", "linux"],
+    "install": {
+        "macos_brew_cask": "brew install --cask opencode-desktop",
+        "macos_download": "Open https://opencode.ai/download in the browser, click the macOS download (.dmg, Apple Silicon or Intel). Saves to ~/Downloads by default.",
+        "windows_download": "Open https://opencode.ai/download in the browser, click the Windows (x64) download — a one-click NSIS .exe installer. Saves to %USERPROFILE%\\Downloads by default.",
+        "linux_download": "Open https://opencode.ai/download in the browser, download the .deb / .rpm / AppImage and install it.",
+        "note": "GUI desktop application (Electron). It shares config under ~/.config/opencode with the OpenCode CLI, so a model configured for one applies to both. Always tell the user the download location and ask them to run the installer themselves."
+    },
+    "install_flow": {
+        "summary": "Download installer -> user double-clicks -> installer finishes (Windows is a one-click NSIS installer; macOS/Linux follow the wizard or drag-to-Applications)",
+        "agent_steps": [
+            "Detect OS first.",
+            "macOS: prefer `brew install --cask opencode-desktop` when Homebrew is available; otherwise download the .dmg from https://opencode.ai/download and open it.",
+            "Windows / Linux: download the installer from https://opencode.ai/download to the Downloads folder.",
+            "After the download finishes, tell the user the EXACT file path.",
+            "Open the installer (`Start-Process` on Windows, `open` on macOS).",
+            "Tell the user to follow the installer to finish; the Windows NSIS build installs in one click with no directory prompt.",
+            "Do NOT try to automate the GUI wizard."
+        ],
+        "tell_user": [
+            "Download location (full path)",
+            "That the installer was opened",
+            "That OpenCode Desktop shares model config with the OpenCode CLI"
+        ]
+    },
+    "identity_guard": {
+        "description": "OpenCode Desktop is the GUI app for OpenCode (the open-source AI coding agent by Anomaly). It is DIFFERENT from the OpenCode CLI (npm `opencode-ai`). Both can coexist and share config under ~/.config/opencode, so a model set for one applies to both."
+    },
+    "network_requirements": {
+        "test_urls": ["https://opencode.ai", "https://github.com"],
+        "mirrors": {}
+    }
+}

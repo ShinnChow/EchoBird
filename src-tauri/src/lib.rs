@@ -83,6 +83,10 @@ static BUNDLED: BundledAssets = BundledAssets {
             include_str!("../../docs/api/tools/install/geminidesktop.json"),
         ),
         (
+            "opencodedesktop",
+            include_str!("../../docs/api/tools/install/opencodedesktop.json"),
+        ),
+        (
             "coffeecli",
             include_str!("../../docs/api/tools/install/coffeecli.json"),
         ),
