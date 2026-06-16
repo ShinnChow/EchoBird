@@ -1,26 +1,28 @@
 name: Sync Version Manifest
 
-# Triggered when a GitHub Release is published — i.e. when the operator
-# flips a draft release to public (the final step of the release flow).
-# At that moment we bump docs/api/version/index.json so the in-app
-# auto-updater sees the new version + downloadable artifacts together.
+# Bumps docs/api/version/index.json — the manifest the in-app updater polls.
+# Bumping `.version` here is the SINGLE trigger that makes every installed app
+# show "update available" AND (since the in-app auto-download landed,
+# 2026-06-16) one-click download + launch the installer. Because that is now
+# an auto-install for users, the bump must be the DELIBERATE FINAL STEP of a
+# release — run manually by the operator ONLY AFTER:
+#   1. the GitHub Release is published and its assets are confirmed
+#      downloadable, and
+#   2. the operator has personally tested the built installer end-to-end.
 #
-# Previously this lived inside release.yml as a job that ran right after
-# the tag-push build. With release.yml since v4.8.6 publishing as draft,
-# that timing was wrong — the manifest bumped before the release was
-# downloadable, opening a window where users saw "update available" but
-# `gh release view` 404'd. Splitting the workflow ties the bump to the
-# publish event so the two changes land atomically from the user's POV.
+# It deliberately does NOT trigger on `release: published` (that trigger was
+# removed 2026-06-16) so that flipping the draft release to public — needed so
+# the operator can download + test it — does NOT, by itself, notify users.
+#
+# Run it from the Actions tab (workflow_dispatch) with the release tag once
+# testing succeeds. It refreshes version + date and preserves whatever Chinese
+# `releaseNotes` the release commit already wrote into the manifest.
 
 on:
-  release:
-    types: [published]
-  # Manual trigger for re-running this against a specific tag (e.g. if
-  # the original event fired before the release body was finalised).
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to sync (e.g. v4.8.6)"
+        description: "Release tag to sync (e.g. v5.2.8)"
         required: true
 
 jobs:
