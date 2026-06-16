@@ -6,6 +6,7 @@
 // so consumers can continue to use  `import * as api from '../api/tauri'`.
 
 import { invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { DetectedTool, ApplyModelInput, AppSettings } from './types';
 
 // ─── Re-export domain modules ───
@@ -42,6 +43,30 @@ export async function restoreToolToOfficial(
 
 export async function startTool(toolId: string, startCommand?: string): Promise<void> {
   return invoke('start_tool', { toolId, startCommand: startCommand || null });
+}
+
+// ─── In-app self-update (Windows): download installer, launch it, exit ───
+
+export interface SelfUpdateProgress {
+  status: 'speed_test' | 'downloading' | 'launching' | 'error';
+  percent: number;
+}
+
+/// Windows-only. Downloads the installer (fastest of GitHub / echobird.cn),
+/// launches its wizard, then exits so the installer can replace our files.
+/// Rejects on non-Windows or download failure — the caller falls back to
+/// opening the download page in the browser.
+export async function downloadAndInstallUpdate(version: string): Promise<void> {
+  return invoke('download_and_install_update', { version });
+}
+
+/// Subscribe to self-update progress while downloadAndInstallUpdate runs.
+export function onSelfUpdateProgress(
+  callback: (data: SelfUpdateProgress) => void
+): Promise<UnlistenFn> {
+  return listen<SelfUpdateProgress>('self-update-progress', (event) => {
+    callback(event.payload);
+  });
 }
 
 // ─── Shell APIs (uses Tauri shell plugin) ───

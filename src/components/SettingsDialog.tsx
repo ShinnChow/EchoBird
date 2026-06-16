@@ -31,11 +31,15 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 }) => {
   const { t } = useI18n();
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
-  const [updateStatus, setUpdateStatus] = useState<
-    'idle' | 'checking' | 'latest' | 'available' | 'error'
-  >('idle');
+  const [updateStatus, setUpdateStatus] = useState<'latest' | 'available'>('latest');
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [appVersion, setAppVersion] = useState<string>('');
+  // In-app self-update (Windows) progress state.
+  const [installing, setInstalling] = useState(false);
+  const [installPhase, setInstallPhase] = useState<
+    'speed_test' | 'downloading' | 'launching' | 'error' | null
+  >(null);
+  const [installPct, setInstallPct] = useState(0);
   const [closeToTray, setCloseToTray] = useState<boolean | null>(false);
   const themeMode = useThemeStore((s) => s.mode);
   const setThemeMode = useThemeStore((s) => s.setMode);
@@ -90,40 +94,67 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     return () => window.removeEventListener('keydown', handler);
   }, [isOpen, handleClose]);
 
-  // Check for updates via public version API
-  const checkForUpdates = useCallback(async () => {
-    setUpdateStatus('checking');
-    try {
-      const res = await fetch('https://echobird.ai/api/version/index.json');
-      if (!res.ok) {
-        setUpdateStatus('error');
-        return;
-      }
-      const data = await res.json();
-      if (data.version && appVersion && isNewerVersion(data.version, appVersion)) {
-        setLatestVersion(data.version);
-        setUpdateStatus('available');
-      } else {
-        setUpdateStatus('latest');
-      }
-    } catch {
-      setUpdateStatus('error');
-    }
-  }, [appVersion]);
-
-  // Reset status when dialog opens — fresh state each time the user
-  // re-opens settings. Critical: depend ONLY on `isOpen`. Listing
-  // `updateStatus` here makes the effect re-fire on every transition
-  // (idle → checking → ...) and immediately snap status back to idle,
-  // which is exactly the "check-for-updates button looks dead" bug:
-  // the click *does* fire, but the effect clobbers the 'checking'
-  // state before React can render it.
+  // Auto-check for updates when the dialog opens — no manual button. Version
+  // truth is the canonical manifest (echobird.ai/api/version/index.json); the
+  // China route is a download MIRROR only, so we never parse a second version
+  // source. Any failure (offline / unreachable) silently stays on "latest" —
+  // no error UI, just no update offered.
   useEffect(() => {
-    if (isOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setUpdateStatus('idle');
+    if (!isOpen || !appVersion) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch('https://echobird.ai/api/version/index.json');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.version && isNewerVersion(data.version, appVersion)) {
+          setLatestVersion(data.version);
+          setUpdateStatus('available');
+        } else {
+          setUpdateStatus('latest');
+        }
+      } catch {
+        /* offline / unreachable — stay on "latest", no update offered */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, appVersion]);
+
+  // Click "Update to vX": on Windows, download + launch the installer in-app
+  // (the app exits as the wizard opens); elsewhere — or if the download fails —
+  // open the locale-routed download page in the browser instead.
+  const handleUpdate = useCallback(async () => {
+    if (!latestVersion) return;
+    const downloadPage = locale.startsWith('zh')
+      ? 'https://echobird.cn/download/'
+      : 'https://echobird.ai/';
+    if (!navigator.userAgent.includes('Windows')) {
+      await api.openExternal(downloadPage);
+      return;
     }
-  }, [isOpen]);
+    setInstalling(true);
+    setInstallPhase('speed_test');
+    setInstallPct(0);
+    let unlisten: (() => void) | undefined;
+    try {
+      unlisten = await api.onSelfUpdateProgress((p) => {
+        setInstallPhase(p.status);
+        setInstallPct(p.percent);
+      });
+      await api.downloadAndInstallUpdate(latestVersion);
+      // Success: the installer launched and the app is about to exit — leave
+      // the progress UI as-is until the window closes.
+    } catch {
+      await api.openExternal(downloadPage);
+      setInstalling(false);
+      setInstallPhase(null);
+    } finally {
+      unlisten?.();
+    }
+  }, [latestVersion, locale]);
 
   if (!isOpen) return null;
 
@@ -262,43 +293,39 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             </div>
 
             <div className="h-10 flex items-center">
-              {updateStatus === 'idle' && (
-                <button
-                  onClick={checkForUpdates}
-                  className="w-full h-10 text-[14px] font-semibold border border-cyber-border/50 bg-cyber-input/50 text-cyber-text hover:bg-cyber-input hover:border-cyber-border transition-colors rounded-button"
-                >
-                  {t('settings.checkForUpdates')}
-                </button>
-              )}
-
-              {updateStatus === 'checking' && (
-                <div className="w-full h-10 flex items-center justify-center text-[14px] text-cyber-text-secondary border border-cyber-border/30 bg-cyber-input/30 rounded-button">
-                  {t('settings.checking')}
+              {installing ? (
+                <div className="relative w-full h-10 overflow-hidden border border-cyber-accent/40 bg-cyber-input/30 rounded-button">
+                  <div
+                    className="absolute inset-y-0 left-0 bg-cyber-accent/20 transition-[width] duration-200"
+                    style={{
+                      width: `${
+                        installPhase === 'launching'
+                          ? 100
+                          : installPhase === 'speed_test'
+                            ? 8
+                            : installPct
+                      }%`,
+                    }}
+                  />
+                  <div className="relative flex items-center justify-center h-full text-[13px] font-medium text-cyber-text">
+                    {installPhase === 'launching'
+                      ? t('settings.updateLaunching')
+                      : installPhase === 'speed_test'
+                        ? `${t('settings.updateDownloading')}…`
+                        : `${t('settings.updateDownloading')} ${installPct}%`}
+                  </div>
                 </div>
-              )}
-
-              {updateStatus === 'latest' && (
+              ) : updateStatus === 'available' ? (
+                <button
+                  onClick={handleUpdate}
+                  className="flex items-center justify-center gap-1.5 w-full h-10 text-[14px] font-semibold border border-cyber-accent/50 bg-cyber-accent/10 text-cyber-accent hover:bg-cyber-accent/20 hover:border-cyber-accent transition-colors rounded-button"
+                >
+                  {t('settings.updateTo')} v{latestVersion} <Download size={13} />
+                </button>
+              ) : (
                 <div className="w-full h-10 flex items-center justify-center gap-1.5 text-[14px] text-cyber-text border border-cyber-border/30 bg-cyber-input/30 rounded-button">
                   <span className="text-cyber-accent">✓</span> {t('settings.latestVersion')}
                 </div>
-              )}
-
-              {updateStatus === 'available' && (
-                <button
-                  onClick={() => api.openExternal('https://echobird.ai/')}
-                  className="flex items-center justify-center gap-1.5 w-full h-10 text-[14px] font-semibold border border-cyber-accent/50 bg-cyber-accent/10 text-cyber-accent hover:bg-cyber-accent/20 hover:border-cyber-accent transition-colors rounded-button"
-                >
-                  Update to v{latestVersion} <ExternalLink size={13} />
-                </button>
-              )}
-
-              {updateStatus === 'error' && (
-                <button
-                  onClick={checkForUpdates}
-                  className="w-full h-10 text-[14px] font-semibold border border-cyber-error/40 bg-cyber-error/5 text-cyber-error hover:bg-cyber-error/10 hover:border-cyber-error/60 transition-colors rounded-button"
-                >
-                  {t('settings.checkFailed')}
-                </button>
               )}
             </div>
           </div>
