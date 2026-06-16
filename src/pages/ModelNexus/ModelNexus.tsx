@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { readText as readClipboardText } from '@tauri-apps/plugin-clipboard-manager';
-import { X, Box, ExternalLink, Plus, Lock, Unlock, Clipboard } from 'lucide-react';
+import { X, Box, ExternalLink, Plus, Lock, Unlock, ClipboardPaste } from 'lucide-react';
 import { ModelCard, ModelCardSkeleton, getModelIcon } from '../../components';
 import { useI18n } from '../../hooks/useI18n';
 import * as api from '../../api/tauri';
@@ -808,7 +808,7 @@ export function AddModelModal() {
                     }}
                     className="absolute right-9 top-1/2 -translate-y-1/2 text-cyber-text/70 transition-colors hover:opacity-80"
                   >
-                    <Clipboard size={14} />
+                    <ClipboardPaste size={14} />
                   </button>
                 )}
                 {newModelForm.apiKey !== 'local' && (
