@@ -449,8 +449,9 @@ export function MotherAgentMain() {
 const PARASITE_CLAUDE_ID = 'claudecode';
 
 // Mirrors `MAX_CONTEXT_BYTES` in echobird_core (services/agent_loop.rs).
-// Used only for visualization — the actual trim happens server-side.
-const MA_CONTEXT_MAX_BYTES = 150_000;
+// Used only for visualization — the actual trim happens server-side. Keep
+// this value in sync with the Rust constant whenever it changes.
+const MA_CONTEXT_MAX_BYTES = 300_000;
 
 // Rough UTF-8 byte estimate of what gets serialized into the LLM payload.
 // Doesn't have to match Rust's tally exactly — it just needs to grow at the
