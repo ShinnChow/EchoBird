@@ -12,6 +12,7 @@ import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { useI18n } from '../../hooks/useI18n';
 import { useToast } from '../../components/Toast';
 import { readLogTail } from '../../api/tauri';
+import { copyText } from '../../utils/copyText';
 
 const GITHUB_ISSUES_URL = 'https://github.com/edison7009/EchoBird/issues/new';
 // Mainland China users frequently can't reach github.com — Gitcode mirror
@@ -40,7 +41,7 @@ export function FeedbackMain() {
         showToast('warning', t('feedback.step1.empty'));
         return;
       }
-      await navigator.clipboard.writeText(text);
+      if (!(await copyText(text))) throw new Error('clipboard unavailable');
       setJustCopied(true);
       window.setTimeout(() => setJustCopied(false), 2000);
       showToast('success', t('feedback.step1.copied'));
@@ -107,10 +108,12 @@ export function FeedbackMain() {
                 // Copy the email address to clipboard rather than firing a
                 // mailto: URL — most users don't have a desktop mail client
                 // configured, and a missing handler launches OS picker noise.
-                navigator.clipboard
-                  .writeText(SUPPORT_EMAIL)
-                  .then(() => showToast('success', t('feedback.step1.copied')))
-                  .catch(() => showToast('error', t('feedback.step1.failed')));
+                void copyText(SUPPORT_EMAIL).then((ok) =>
+                  showToast(
+                    ok ? 'success' : 'error',
+                    t(ok ? 'feedback.step1.copied' : 'feedback.step1.failed')
+                  )
+                );
               }}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-cyber-bg-secondary/60 hover:bg-cyber-bg-secondary border border-cyber-border text-cyber-text-secondary hover:text-cyber-text transition-colors text-sm font-medium"
             >

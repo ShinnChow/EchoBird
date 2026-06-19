@@ -1,5 +1,6 @@
 import { Component, type CSSProperties, type ErrorInfo, type ReactNode } from 'react';
 import { ERROR_MESSAGES, pickErrorLang } from './errorMessages';
+import { copyText } from '../utils/copyText';
 
 interface Props {
   children: ReactNode;
@@ -47,20 +48,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleCopy = (): void => {
-    const text = this.details();
-    navigator.clipboard?.writeText(text).catch(() => {
-      // Fallback for older WebKit / clipboard-permission failures.
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      try {
-        document.execCommand('copy');
-      } catch {
-        /* ignore */
-      }
-      ta.remove();
-    });
+    void copyText(this.details());
   };
 
   render(): ReactNode {
