@@ -99,9 +99,14 @@ export function ModelIdCombobox({
 
   const pick = (id: string) => {
     onChange(id);
+    // Commit and exit input state: close the list AND drop focus. Switching
+    // again is then a single click on the field — a fresh focus that reopens
+    // the list (onFocus fires), with no "already-focused, click does nothing"
+    // dead end.
     setIsOpen(false);
     setSearching(false);
     setActiveIdx(-1);
+    inputRef.current?.blur();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -148,6 +153,12 @@ export function ModelIdCombobox({
             setSearching(false);
             setActiveIdx(-1);
           }
+        }}
+        // Clicking the input always (re)opens the list — even when it already
+        // has focus (where onFocus won't fire again), so a closed list is
+        // never stuck shut.
+        onClick={() => {
+          if (hasOptions) setIsOpen(true);
         }}
         onKeyDown={handleKeyDown}
         className={`w-full bg-cyber-input border border-cyber-border ${hasOptions ? 'pr-8' : ''} px-2 py-1.5 text-xs text-cyber-text font-mono focus:border-cyber-border focus:outline-none rounded-button`}
