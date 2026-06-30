@@ -188,6 +188,9 @@ const ja: Partial<Translations> = {
   'agent.codexResponsesLabel': 'Responses',
   'agent.codexResponsesHint':
     'サードパーティモデルが Responses に対応していれば、有効化してネイティブに接続できます。（購入したモデルの公式ドキュメントをよく読み、Responses プロトコルに対応しているか確認してください。）',
+  'agent.codexWebSearchLabel': 'Web Search',
+  'agent.codexWebSearchHint':
+    '一部のサードパーティモデルでは web_search の個別の有効化または追加課金が必要です（購入したモデルの公式ドキュメントをよく読み、web_search への対応可否と有効化方法を確認してください）',
   'agent.claude1mHint':
     '1M コンテキストを有効化。Claude Code は自動適用、Claude デスクトップでは次を手動入力：',
   'agent.installViaMother': 'AI 自動インストール',

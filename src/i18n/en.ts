@@ -185,6 +185,9 @@ const en: Translations = {
   'agent.codexResponsesLabel': 'Responses',
   'agent.codexResponsesHint':
     'Enable this if your third-party model supports the Responses protocol for native integration. (Carefully read the official documentation of the model you purchased to confirm whether it supports the Responses protocol.)',
+  'agent.codexWebSearchLabel': 'Web Search',
+  'agent.codexWebSearchHint':
+    'Some third-party models require web_search to be separately enabled or billed. (Carefully read the official documentation of the model you purchased to confirm whether web_search is supported and how to enable it.)',
   'agent.claude1mHint':
     'Enable 1M context. Claude Code applies it automatically; in Claude Desktop, enter this manually:',
   'agent.installViaMother': 'AI Auto-Install',

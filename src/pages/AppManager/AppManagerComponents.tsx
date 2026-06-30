@@ -557,10 +557,10 @@ export const AppManagerPanel: React.FC = () => {
     handleSelectModel,
     modelProtocolSelection,
     setModelProtocolSelection,
-    codexRelayMode,
-    setCodexRelayMode,
     codexResponsesPassthrough,
     setCodexResponsesPassthrough,
+    codexWebSearch,
+    setCodexWebSearch,
     claudeDesktopRelayMode,
     setClaudeDesktopRelayMode,
     claudeCodeRelayMode,
@@ -569,32 +569,20 @@ export const AppManagerPanel: React.FC = () => {
     setClaude1mMode,
   } = useAppManager();
 
-  // Relay-mode ("API Router") toggle: shown for Codex CLI / Codex Desktop
-  // (shared ~/.codex/config.toml, single codexRelayMode flag) AND for Claude
-  // Desktop (separate claudeDesktopRelayMode flag, different protocol and
-  // relay-station compat). The toggle binds to whichever flag matches the
-  // currently selected app; other apps render an empty fixed-height slot so
-  // the model list below doesn't jitter on switch.
-  //
-  // The "Responses" passthrough toggle sits next to it but is Codex-only
-  // (the Responses protocol is OpenAI-specific; Claude Desktop's analogous
-  // passthrough is its default). The two are mutually exclusive — the
-  // provider's setters auto-flip so at most one is ever on.
+  // API Router ("relay-mode") toggle: shown for Claude Desktop AND Claude Code
+  // (each binds its own relay flag). Codex CLI / Codex Desktop instead show the
+  // Responses + Web Search toggles below. All of these toggles are
+  // independent — there is no mutual exclusion among them.
   const isCodexApp = selectedTool === 'codex' || selectedTool === 'codexdesktop';
   const isClaudeDesktopApp = selectedTool === 'claudedesktop';
   const isClaudeCodeApp = selectedTool === 'claudecode';
-  const showRelayToggle = isCodexApp || isClaudeDesktopApp || isClaudeCodeApp;
+  // Codex dropped the API Router toggle (it has Web Search now); relay is shown
+  // for Claude Desktop + Claude Code, each binding its own flag.
+  const showRelayToggle = isClaudeDesktopApp || isClaudeCodeApp;
+  const showWebSearchToggle = isCodexApp;
   const showResponsesToggle = isCodexApp;
-  const relayModeValue = isClaudeDesktopApp
-    ? claudeDesktopRelayMode
-    : isClaudeCodeApp
-      ? claudeCodeRelayMode
-      : codexRelayMode;
-  const setRelayModeValue = isClaudeDesktopApp
-    ? setClaudeDesktopRelayMode
-    : isClaudeCodeApp
-      ? setClaudeCodeRelayMode
-      : setCodexRelayMode;
+  const relayModeValue = isClaudeDesktopApp ? claudeDesktopRelayMode : claudeCodeRelayMode;
+  const setRelayModeValue = isClaudeDesktopApp ? setClaudeDesktopRelayMode : setClaudeCodeRelayMode;
   // 1M-context toggle: Claude Desktop + Claude Code.
   const show1mToggle = isClaudeDesktopApp || isClaudeCodeApp;
 
@@ -612,15 +600,15 @@ export const AppManagerPanel: React.FC = () => {
         )}
       </div>
 
-      {/* Toggle row: mounted when ANY toggle applies — the API Router toggle
-          (Codex, Claude Desktop, Claude Code), the Responses passthrough
-          toggle (Codex only), or the 1M toggle (Claude Desktop, Claude Code).
-          Each toggle inside is INDIVIDUALLY gated and binds to the flag for the
-          selected app (relayModeValue / setRelayModeValue resolve per-app), so
-          no cross-wiring between Codex / Claude Desktop / Claude Code. For apps
-          with no toggles nothing renders and the model list below claims the
-          space — the user preferred no reserved gap when toggles are absent. */}
-      {(showRelayToggle || show1mToggle) && (
+      {/* Toggle row: mounted when ANY toggle applies — Codex shows the
+          Responses + Web Search toggles; Claude Desktop and Claude Code show the
+          API Router toggle and the 1M toggle. Each toggle inside is INDIVIDUALLY
+          gated and binds to the flag for the selected app (relayModeValue /
+          setRelayModeValue resolve per-app), so no cross-wiring between Codex /
+          Claude Desktop / Claude Code. For apps with no toggles nothing renders
+          and the model list below claims the space — the user preferred no
+          reserved gap when toggles are absent. */}
+      {(showResponsesToggle || showWebSearchToggle || showRelayToggle || show1mToggle) && (
         <div className="px-3 h-9 flex items-center gap-2">
           {showResponsesToggle && (
             <RoutingToggle
@@ -629,6 +617,15 @@ export const AppManagerPanel: React.FC = () => {
               hint={t('agent.codexResponsesHint')}
               checked={codexResponsesPassthrough}
               onChange={setCodexResponsesPassthrough}
+            />
+          )}
+          {showWebSearchToggle && (
+            <RoutingToggle
+              key="websearch"
+              label={t('agent.codexWebSearchLabel')}
+              hint={t('agent.codexWebSearchHint')}
+              checked={codexWebSearch}
+              onChange={setCodexWebSearch}
             />
           )}
           {show1mToggle && (

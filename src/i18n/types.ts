@@ -146,6 +146,8 @@ export type TKey =
   | 'agent.codexRelayHint'
   | 'agent.codexResponsesLabel'
   | 'agent.codexResponsesHint'
+  | 'agent.codexWebSearchLabel'
+  | 'agent.codexWebSearchHint'
   | 'agent.claude1mHint'
   // Tool categories
   | 'toolCat.all'

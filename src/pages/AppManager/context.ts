@@ -31,14 +31,13 @@ export interface AppManagerContextType {
   setModelProtocolSelection: React.Dispatch<
     React.SetStateAction<Record<string, 'openai' | 'anthropic'>>
   >;
-  /** Codex routing toggle (shared between Codex CLI and Codex Desktop —
-   *  they share ~/.codex/config.toml so a single flag is correct). */
-  codexRelayMode: boolean;
-  setCodexRelayMode: (v: boolean) => void;
-  /** Codex-only "Responses passthrough" toggle. Mutually exclusive with
-   *  codexRelayMode — the App Manager auto-flips so at most one is on. */
+  /** Codex-only "Responses passthrough" toggle. */
   codexResponsesPassthrough: boolean;
   setCodexResponsesPassthrough: (v: boolean) => void;
+  /** Codex-only web-search toggle. OFF ⇒ apply writes web_search="disabled" so
+   *  Codex won't offer its built-in search tool; default ON (Codex "cached"). */
+  codexWebSearch: boolean;
+  setCodexWebSearch: (v: boolean) => void;
   /** Claude Desktop routing toggle. Kept separate from Codex because the
    *  two apps target different protocols / different relay-station compat. */
   claudeDesktopRelayMode: boolean;
