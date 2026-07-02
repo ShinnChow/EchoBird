@@ -68,6 +68,41 @@ function notesForLocale(m: Manifest, locale: string): string {
   return '';
 }
 
+// The shared Mother-Agent markdown components (mdComponents) are tuned for
+// compact chat bubbles — they define no paragraph margins (Tailwind's preflight
+// zeroes them) and use tight list spacing. In a changelog that reads as
+// everything crammed together, so we spread the base set and override the block
+// elements with comfortable reading room. `first:mt-0 last:mb-0` keeps the gaps
+// between blocks without padding the very top/bottom of the scroll area.
+const changelogMdComponents = {
+  ...mdComponents,
+  p: ({ children }: { children?: React.ReactNode }) => (
+    <p className="my-3 leading-relaxed first:mt-0 last:mb-0">{children}</p>
+  ),
+  ul: ({ children }: { children?: React.ReactNode }) => (
+    <ul className="list-disc list-outside pl-5 my-3 space-y-1.5 first:mt-0 last:mb-0">
+      {children}
+    </ul>
+  ),
+  ol: ({ children }: { children?: React.ReactNode }) => (
+    <ol className="list-decimal list-outside pl-5 my-3 space-y-1.5 first:mt-0 last:mb-0">
+      {children}
+    </ol>
+  ),
+  li: ({ children }: { children?: React.ReactNode }) => (
+    <li className="leading-relaxed">{children}</li>
+  ),
+  h1: ({ children }: { children?: React.ReactNode }) => (
+    <h1 className="text-lg font-bold text-cyber-text mt-5 mb-2 first:mt-0">{children}</h1>
+  ),
+  h2: ({ children }: { children?: React.ReactNode }) => (
+    <h2 className="text-base font-bold text-cyber-text mt-5 mb-2 first:mt-0">{children}</h2>
+  ),
+  h3: ({ children }: { children?: React.ReactNode }) => (
+    <h3 className="text-sm font-bold text-cyber-text mt-4 mb-1.5 first:mt-0">{children}</h3>
+  ),
+};
+
 interface ChangelogDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -185,8 +220,8 @@ export const ChangelogDialog: React.FC<ChangelogDialogProps> = ({ isOpen, onClos
           )}
           {status === 'ready' &&
             (notes ? (
-              <div className="text-sm leading-relaxed">
-                <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+              <div className="text-sm leading-relaxed text-cyber-text">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={changelogMdComponents}>
                   {notes}
                 </ReactMarkdown>
               </div>
