@@ -15,6 +15,7 @@ import { DownloadProvider } from './components/DownloadContext';
 import { DownloadBar } from './components/DownloadBar';
 import { TitleBar } from './components/TitleBar';
 import { SettingsDialog } from './components/SettingsDialog';
+import { ChangelogDialog } from './components/ChangelogDialog';
 import { getSettings } from './api/tauri';
 
 import { useI18n } from './hooks/useI18n';
@@ -92,6 +93,7 @@ const pageScroll = (active: boolean) => (active ? 'flex-1 overflow-y-auto pulse-
 function App() {
   const { t, locale, setLocale } = useI18n();
   const [showSettings, setShowSettings] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
 
   // Stores — selector form so App.tsx (the root of the entire tree) only
   // re-renders when activePage flips, not on every motherNewMessage tick.
@@ -117,11 +119,28 @@ function App() {
       } catch {
         /* continue anyway */
       }
+      // Resolve the installed version first (local, instant). The changelog
+      // auto-open is a purely local decision so it still fires when offline
+      // (the dialog then shows its own error state); the update check below
+      // needs the network.
+      const appVersion = await getVersion().catch(() => '');
+      if (appVersion) {
+        try {
+          const seen = localStorage.getItem('echobird-changelog-seen');
+          // Auto-open only on a genuine version change (an update), not on the
+          // first-ever install — there we just record the baseline silently.
+          if (seen && seen !== appVersion) {
+            setShowChangelog(true);
+          }
+          if (seen !== appVersion) {
+            localStorage.setItem('echobird-changelog-seen', appVersion);
+          }
+        } catch {
+          /* localStorage unavailable — skip the auto-open */
+        }
+      }
       try {
-        const [appVersion, res] = await Promise.all([
-          getVersion().catch(() => ''),
-          fetch('https://echobird.ai/api/version/index.json'),
-        ]);
+        const res = await fetch('https://echobird.ai/api/version/index.json');
         if (res.ok && appVersion) {
           const data = await res.json();
           if (data.version && isNewerVersion(data.version, appVersion)) {
@@ -230,6 +249,7 @@ function App() {
                         <TitleBar
                           onSettingsClick={() => setShowSettings(true)}
                           onFeedbackClick={() => setActivePage('feedback')}
+                          onChangelogClick={() => setShowChangelog(true)}
                         />
                         <div className="flex flex-1 overflow-hidden text-cyber-text font-sans p-4 gap-0 relative isolate">
                           {/* Sidebar */}
@@ -401,6 +421,9 @@ function App() {
             locale={locale}
             onLocaleChange={setLocale}
           />
+
+          {/* Changelog dialog */}
+          <ChangelogDialog isOpen={showChangelog} onClose={() => setShowChangelog(false)} />
         </DownloadProvider>
       </ConfirmDialogProvider>
     </ToastProvider>

@@ -12,6 +12,10 @@ const en: Translations = {
   'nav.localServer': 'Local LLM',
   'nav.motherAgent': 'Install & Repair',
   'nav.feedback': 'Feedback',
+  'nav.changelog': 'Changelog',
+  'changelog.loading': 'Loading…',
+  'changelog.error': "Couldn't load the changelog — check your connection and try again.",
+  'changelog.empty': 'No changelog available.',
   'nav.aiCareer': 'My AI Career',
   // Page titles
   'page.news': 'AI NEWS',

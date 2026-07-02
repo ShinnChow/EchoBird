@@ -10,9 +10,14 @@ import { IS_MACOS } from '../utils/platform';
 interface TitleBarProps {
   onSettingsClick?: () => void;
   onFeedbackClick?: () => void;
+  onChangelogClick?: () => void;
 }
 
-export const TitleBar: React.FC<TitleBarProps> = ({ onSettingsClick, onFeedbackClick }) => {
+export const TitleBar: React.FC<TitleBarProps> = ({
+  onSettingsClick,
+  onFeedbackClick,
+  onChangelogClick,
+}) => {
   const { t } = useI18n();
   const handleMinimize = () => getCurrentWindow().minimize();
   const [isMaximized, setIsMaximized] = useState(false);
@@ -124,6 +129,12 @@ export const TitleBar: React.FC<TitleBarProps> = ({ onSettingsClick, onFeedbackC
           className="flex items-center h-full"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
+          <button
+            onClick={onChangelogClick}
+            className="h-full px-3 flex items-center justify-center text-[12px] font-mono text-cyber-text-secondary hover:bg-cyber-text/20 hover:text-cyber-text transition-colors"
+          >
+            {t('nav.changelog')}
+          </button>
           <button
             onClick={onFeedbackClick}
             className="h-full px-3 flex items-center justify-center text-[12px] font-mono text-cyber-text-secondary hover:bg-cyber-text/20 hover:text-cyber-text transition-colors"

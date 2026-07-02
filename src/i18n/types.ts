@@ -11,6 +11,10 @@ export type TKey =
   | 'nav.projects'
   | 'nav.courses'
   | 'nav.feedback'
+  | 'nav.changelog'
+  | 'changelog.loading'
+  | 'changelog.error'
+  | 'changelog.empty'
   // Page titles
   | 'page.modelNexus'
   | 'page.appManager'
