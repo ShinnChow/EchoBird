@@ -38,6 +38,28 @@ const synthesiseToolFromProject = (id: string, name: string): LocalTool => ({
   noModelConfig: false,
 });
 
+// Render a hint string with any bare http(s) URL turned into an external-open
+// link (Tauri shell:open, not in-webview navigation). Only zh-Hans's hint
+// currently carries a URL — the echobird.cn/apps publish CTA — so other
+// locales split to a single plain-text chunk and render unchanged. The split
+// stops at whitespace and CJK sentence punctuation so a trailing 。 stays out
+// of the link.
+const linkifyHint = (text: string): React.ReactNode =>
+  text.split(/(https?:\/\/[^\s，。]+)/g).map((part, i) =>
+    /^https?:\/\//.test(part) ? (
+      <button
+        key={i}
+        type="button"
+        onClick={() => api.openExternal(part)}
+        className="cursor-pointer p-0 align-baseline text-cyber-accent underline underline-offset-2 hover:text-cyber-accent-secondary"
+      >
+        {part}
+      </button>
+    ) : (
+      <React.Fragment key={i}>{part}</React.Fragment>
+    )
+  );
+
 export const MyProjectsPanel: React.FC = () => {
   const { t } = useI18n();
   const selectedUserProjectId = useMyProjectsStore((s) => s.selectedUserProjectId);
@@ -212,7 +234,7 @@ export const MyProjectsBottom: React.FC = () => {
       <div className="mx-2 border-t border-cyber-border"></div>
       <div className="flex items-center justify-end gap-8 px-6 py-5">
         <div className="flex-1 text-[15px] font-medium text-cyber-accent">
-          {t('hint.myProjects')}
+          {linkifyHint(t('hint.myProjects'))}
         </div>
         <button
           onClick={handleLaunch}
