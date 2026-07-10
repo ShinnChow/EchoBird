@@ -813,10 +813,7 @@ export function SkillsPanel() {
   }, [lang, catalog, selectedCategory, setSelectedCategory]);
 
   const categories = catalog.categoriesByLang[lang] || [];
-  const langSkills = useMemo(
-    () => catalog.skills.filter((c) => c.lang === lang),
-    [catalog, lang]
-  );
+  const langSkills = useMemo(() => catalog.skills.filter((c) => c.lang === lang), [catalog, lang]);
   const total = langSkills.length;
   const countByCat = useMemo(() => {
     const m = new Map<string, number>();

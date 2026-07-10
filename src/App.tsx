@@ -55,12 +55,7 @@ import {
   AiProjectsMain,
   AiPulsePanel,
 } from './pages/AiPulse';
-import {
-  SkillsProvider,
-  SkillsTitleActions,
-  SkillsMain,
-  SkillsPanel,
-} from './pages/Skills';
+import { SkillsProvider, SkillsTitleActions, SkillsMain, SkillsPanel } from './pages/Skills';
 import { FeedbackMain } from './pages/Feedback';
 import { MyProjectsMain, MyProjectsPanel, MyProjectsBottom } from './pages/MyProjects';
 import { AiCareerMain, AiCareerPanel, AiCareerTitleActions } from './pages/AiCareer';
