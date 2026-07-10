@@ -74,7 +74,7 @@ Then verify compatibility:
 | Hermes Desktop | Windows, macOS, Linux | Desktop app — ONE install gives the Electron GUI + `hermes` CLI. In mainland China the official installer FAILS (its bootstrapper hits the GFW-blocked raw.githubusercontent.com); drive the China-mirror flow in the Hermes install reference (`install_flow.agent_steps`), do NOT refuse Windows. |
 | Claude Code (CLI) | All platforms (macOS/Linux: curl or brew; Windows: powershell or winget — npm is DEPRECATED) | Supported everywhere, choose install method by OS |
 | Codex (CLI) | All platforms (npm: `npm i -g @openai/codex`) | Verify Node.js is present; on Windows the global npm path resolves via `%APPDATA%\npm`. |
-| Codex Desktop | macOS, Windows only | Install via the official installer or Microsoft Store — see Desktop App section below. |
+| ChatGPT (formerly Codex Desktop) | macOS, Windows only | Install via the official installer or Microsoft Store — see Desktop App section below. |
 
 **Windows install UX rule**: When the user is on Windows, do NOT present A/B option choices. Instead:
 1. Default to native Windows installation — show what will be installed and how
@@ -154,7 +154,7 @@ Ask: **"Ready to install? (Y/N)"** — then proceed only after confirmation.
 
 ## Desktop App Install (kind: desktop_app)
 
-When the install JSON has `"kind": "desktop_app"` (Claude Desktop, Codex Desktop, Gemini Desktop, Coffee CLI desktop build, etc.) the rules differ from CLI tools:
+When the install JSON has `"kind": "desktop_app"` (Claude Desktop, ChatGPT, Gemini Desktop, Coffee CLI desktop build, etc.) the rules differ from CLI tools:
 
 1. **Local machine only.** Desktop apps must install on the user's local machine — NEVER on a remote SSH server. If the user is currently connected to a remote server, switch them to the **local** server (server id `local`) before proceeding.
 
@@ -167,7 +167,7 @@ When the install JSON has `"kind": "desktop_app"` (Claude Desktop, Codex Desktop
 
 4. **Do NOT automate the GUI wizard.** No silent-install flags, no AutoHotkey, no `/S /VERYSILENT` unless the install JSON explicitly says so.
 
-5. **Prefer package managers when available.** On Windows, `winget install --id <id>` (Anthropic.Claude / OpenAI.Codex) is silent and faster than the manual download flow — try it first when winget is on PATH.
+5. **Prefer package managers when available.** On Windows, `winget install --id <id> --source msstore` or `winget install --id <publisher>.<app>` (Anthropic.Claude / 9PLM9XGG6VKS for ChatGPT) is silent and faster than the manual download flow — try it first when winget is on PATH.
 
 6. **One-line install scripts** (e.g. Coffee CLI's `iwr | iex` / `curl | sh`) — prefer these over manual download when the install JSON exposes one.
 
@@ -335,14 +335,14 @@ When the user sends "Help me install CUDA modules" (or the localized equivalent:
 
 ---
 
-## Quick Action: Set Codex Desktop UI Language
+## Quick Action: Set ChatGPT UI Language
 
-When the user asks to set the **Codex Desktop** display/UI language (triggers like "设置 Codex 桌面端为简体中文" / "設定 Codex 桌面端為繁體中文" / "Codex デスクトップの表示言語を日本語に設定" / "Set Codex Desktop to English", or any language they typed):
+When the user asks to set the **ChatGPT** display/UI language (triggers like "设置 ChatGPT 为简体中文" / "設定 ChatGPT 為繁體中文" / "ChatGPT の表示言語を日本語に設定" / "Set ChatGPT to English", or any language they typed):
 
-1. **This is a LANGUAGE task, not just an install.** Installing Codex alone does NOT change its language — you MUST write the override in step 3.
-2. **Ensure Codex Desktop is installed.** If it isn't, install it (Desktop App Install above — `winget install --id OpenAI.Codex` on Windows), then continue **in the same turn**.
+1. **This is a LANGUAGE task, not just an install.** Installing ChatGPT alone does NOT change its language — you MUST write the override in step 3.
+2. **Ensure ChatGPT is installed.** If it isn't, install it (Desktop App Install above — `winget install --id 9PLM9XGG6VKS --source msstore` on Windows), then continue **in the same turn**.
 3. **Edit `~/.codex/config.toml`**: set `localeOverride = "<code>"` under the `[desktop]` table — create the table if absent, **preserve every other key/table**, and overwrite any existing `localeOverride`. Map language → code: 简体中文→`zh-CN`, 繁體中文→`zh-TW`, 香港→`zh-HK`, 日本語→`ja-JP`, 한국어→`ko-KR`, English→`en-US` (closest BCP-47 otherwise).
-4. **Tell the user to fully quit and reopen Codex Desktop** for it to take effect, then stop.
+4. **Tell the user to fully quit and reopen ChatGPT** for it to take effect, then stop.
 5. Reply in the user's language.
 
 ---
@@ -371,12 +371,12 @@ Claude Desktop ships no Chinese UI. Use the community patch **`javaht/claude-des
 
 ---
 
-## Quick Action: Unlock / Add Codex Desktop Plugins
+## Quick Action: Unlock / Add ChatGPT Plugins
 
-When the user sends "Help me unlock Codex Desktop plugins" (or the localized equivalent: "帮我解锁 Codex 桌面端的插件" / "幫我解鎖 Codex 桌面端的插件" / "Codex デスクトップのプラグインを解放する"):
+When the user sends "Help me unlock ChatGPT plugins" (or the localized equivalent: "帮我解锁 ChatGPT 的插件" / "幫我解鎖 ChatGPT 的插件" / "ChatGPT のプラグインを解放する"):
 
 1. **Read the instruction prompt** from the **Embedded Install References → Quick-Action Task Scripts → `codex-plugins.md`** block appended below. Do NOT `web_fetch` echobird.ai — the script is already in this prompt.
 2. **Follow the script** — on a third-party-API Codex (how EchoBird users run it) there is NO plugin marketplace until one is added, so the script's core job is to add the right complete market (by the user's language: Chinese → our localized 国内线路 mirror, otherwise → official `openai/plugins`), then discover more GitHub marketplaces (ONLY repos with `.agents/plugins/marketplace.json`; the small official extra is `openai/role-specific-plugins`), then ask the user their plugin direction + whether to auto-add.
-3. **If the user wants you to add them**: surgically write `[marketplaces.<name>]` into `~/.codex/config.toml` (`source_type = "git"`), preserving every other table, then tell the user to fully restart Codex Desktop so it git-clones and syncs.
+3. **If the user wants you to add them**: surgically write `[marketplaces.<name>]` into `~/.codex/config.toml` (`source_type = "git"`), preserving every other table, then tell the user to fully restart ChatGPT so it git-clones and syncs.
 4. **Safety**: verify the manifest exists before adding, warn that plugins execute scripts, never add 0★ placeholder repos. Never add `openai/codex` (it is the app source, not a marketplace).
 5. Reply in the user's language.

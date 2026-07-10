@@ -189,7 +189,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   // model-id rewrite keeps happening), but the proxy forwards to the upstream's
   // native /responses endpoint verbatim instead of translating down to Chat.
   // For third-party models that natively speak Responses. Shared across Codex
-  // CLI + Codex Desktop (both read ~/.codex/config.toml).
+  // CLI + ChatGPT desktop (both read ~/.codex/config.toml).
   const [codexResponsesPassthrough, setCodexResponsesPassthroughRaw] = useState<boolean>(() =>
     readBool('echobird_codex_responses_passthrough', false)
   );

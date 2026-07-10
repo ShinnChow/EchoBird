@@ -11,8 +11,8 @@ export const FRONTEND_HINTS: MotherHint[] = [
   // Shown only for zh-Hans / zh-Hant (hidden elsewhere via an empty en label,
   // since the upstream patch only ships Simplified/Traditional Chinese).
   { action: 'setClaudeLocale' },
-  // Set Codex Desktop UI language — text: `mother.hintSetCodexLocale`.
+  // Set ChatGPT UI language — text: `mother.hintSetCodexLocale`.
   { action: 'setCodexLocale' },
-  // Find & add Codex Desktop plugin marketplaces — text: `mother.hintUnlockCodexPlugins`.
+  // Find & add ChatGPT plugin marketplaces — text: `mother.hintUnlockCodexPlugins`.
   { action: 'unlockCodexPlugins' },
 ];

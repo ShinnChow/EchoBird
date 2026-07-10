@@ -104,7 +104,7 @@ const ja: Partial<Translations> = {
   'settings.easterEgg': 'イースターエッグ',
   'closeDialog.title': 'ウィンドウの閉じ方',
   'closeDialog.hint':
-    '注意：Codex デスクトップ版 / Codex CLI / Claude デスクトップ版 / Claude Code のモデルを切り替えている場合、終了すると使用できなくなります。',
+    '注意：ChatGPT / Codex CLI / Claude デスクトップ版 / Claude Code のモデルを切り替えている場合、終了すると使用できなくなります。',
   'btn.addModel': 'モデル追加',
   'btn.save': '保存',
   'btn.close': '閉じる',
@@ -230,7 +230,7 @@ const ja: Partial<Translations> = {
   'key.encrypted': '全体暗号化済み — 環境が変化すると API キーは自動消去されます',
   'key.destroyed': '環境の変化を検出。API キーが自動消去されました。再度入力してください',
   'hint.devInvite':
-    'Codex Desktop / Codex CLI / Claude Desktop / Claude Code のモデルを切り替えた後は、EchoBird を起動したままにしてください。',
+    'ChatGPT / Codex CLI / Claude Desktop / Claude Code のモデルを切り替えた後は、EchoBird を起動したままにしてください。',
   'hint.myProjects':
     'Vibe Coding したアプリ / ゲームのモデルを切り替え。リバーシ / AI 翻訳 の models.json を参考にするか、あなたのプロジェクトにコピーしてください。',
   'mother.selectModel': 'モデルを選択',
@@ -306,8 +306,8 @@ const ja: Partial<Translations> = {
   'mother.hintDetectCuda': 'CUDA モジュールの状態を確認',
   'mother.hintInstallCuda': 'CUDA モジュールのインストールを支援',
   'mother.hintInstallGit': 'Git のインストールを支援',
-  'mother.hintSetCodexLocale': 'Codex デスクトップを日本語に設定',
-  'mother.hintUnlockCodexPlugins': 'Codex デスクトップのプラグインを解放する',
+  'mother.hintSetCodexLocale': 'ChatGPT を日本語に設定',
+  'mother.hintUnlockCodexPlugins': 'ChatGPT のプラグインを解放する',
   'mother.parasiteTipInstalled':
     'AI アシスタントです。短い記憶と確かなインストール能力で、AI の世界へのスタートをお手伝いします。Claude Code にモデルを設定済みであれば、右側で選択すると会話を続けられます。',
   'mother.parasiteTipNotInstalled':

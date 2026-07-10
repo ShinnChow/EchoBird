@@ -11,11 +11,13 @@
 //     directly; if the npm install isn't where we expect, we fall back
 //     to the .cmd shim (which works in most non-TTY cases).
 //
-//   Desktop (Codex Desktop app):
+//   Desktop (ChatGPT desktop app — formerly "Codex Desktop"):
 //     Independent of npm. Standalone installer drops a .exe at the
-//     usual Programs path; Microsoft Store install exposes an alias
-//     under %LOCALAPPDATA%\Microsoft\WindowsApps. macOS ships as a .app
-//     bundle under /Applications. Linux: no desktop build as of 2026-05.
+//     usual Programs path (named ChatGPT.exe post-merge, Codex.exe before);
+//     Microsoft Store install exposes an alias under
+//     %LOCALAPPDATA%\Microsoft\WindowsApps. macOS ships as a .app
+//     bundle under /Applications (ChatGPT.app post-merge, Codex.app before).
+//     Linux: no desktop build as of 2026-07.
 //
 // All public functions return Option<PathBuf> with `None` meaning
 // "not found via the standard search path" — caller decides whether to
@@ -24,13 +26,13 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-/// Resolve the standalone Codex Desktop binary path. Returns None on
+/// Resolve the standalone ChatGPT desktop binary path. Returns None on
 /// Linux (no desktop build) or when the standard install locations
 /// don't exist.
 pub fn resolve_desktop_binary() -> Option<PathBuf> {
     let candidates: Vec<PathBuf> = {
         // `mut` is genuinely required on Windows / macOS where the cfg
-        // blocks below push into `c`. On Linux there's no Codex Desktop
+        // blocks below push into `c`. On Linux there's no ChatGPT desktop
         // build, so neither cfg matches and `c` stays empty — clippy's
         // `unused_mut` is the expected state on that target, not a bug.
         #[allow(unused_mut)]
@@ -39,15 +41,31 @@ pub fn resolve_desktop_binary() -> Option<PathBuf> {
         #[cfg(windows)]
         {
             if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-                // 1. Standalone installer default location.
+                // 1. Standalone installer default location. OpenAI merged the
+                //    Codex desktop app into ChatGPT (late 2026); the install
+                //    dir + exe are now ChatGPT. Keep the legacy Codex path as a
+                //    fallback for users who haven't upgraded yet — first hit wins.
+                c.push(
+                    PathBuf::from(&local_app_data)
+                        .join("Programs")
+                        .join("ChatGPT")
+                        .join("ChatGPT.exe"),
+                );
                 c.push(
                     PathBuf::from(&local_app_data)
                         .join("Programs")
                         .join("Codex")
                         .join("Codex.exe"),
                 );
-                // 2. Microsoft Store executable alias — Windows 10+
-                //    exposes a shim here that resolves to the Store package.
+                // 2. Microsoft Store executable alias — Windows 10+ exposes a
+                //    shim here that resolves to the Store package. Same rename:
+                //    prefer ChatGPT.exe, fall back to the legacy Codex.exe alias.
+                c.push(
+                    PathBuf::from(&local_app_data)
+                        .join("Microsoft")
+                        .join("WindowsApps")
+                        .join("ChatGPT.exe"),
+                );
                 c.push(
                     PathBuf::from(&local_app_data)
                         .join("Microsoft")
@@ -56,17 +74,29 @@ pub fn resolve_desktop_binary() -> Option<PathBuf> {
                 );
             }
             // 3. PATH lookup via `where` as a last resort.
-            if let Some(p) = which_first("Codex.exe") {
+            if let Some(p) = which_first("ChatGPT.exe").or_else(|| which_first("Codex.exe")) {
                 c.push(p);
             }
         }
 
         #[cfg(target_os = "macos")]
         {
+            // ChatGPT.app is the post-merge name; keep Codex.app for un-upgraded
+            // installs. The executable inside the bundle mirrors the app name.
+            c.push(PathBuf::from(
+                "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT",
+            ));
             c.push(PathBuf::from(
                 "/Applications/Codex.app/Contents/MacOS/Codex",
             ));
             if let Some(home) = dirs::home_dir() {
+                c.push(
+                    home.join("Applications")
+                        .join("ChatGPT.app")
+                        .join("Contents")
+                        .join("MacOS")
+                        .join("ChatGPT"),
+                );
                 c.push(
                     home.join("Applications")
                         .join("Codex.app")
@@ -77,14 +107,14 @@ pub fn resolve_desktop_binary() -> Option<PathBuf> {
             }
         }
 
-        // Linux: no Codex Desktop build exists; `c` stays empty.
+        // Linux: no ChatGPT desktop build exists; `c` stays empty.
         c
     };
 
     candidates.into_iter().find(|c| c.exists())
 }
 
-/// Resolve the `shell:AppsFolder\<AUMID>` launch URI for Codex Desktop
+/// Resolve the `shell:AppsFolder\<AUMID>` launch URI for ChatGPT desktop
 /// on Windows Store installs. Reads from `tools/codexdesktop/paths.json`
 /// — the file shipped in the EchoBird tools directory.
 #[cfg(windows)]
@@ -127,7 +157,7 @@ fn find_codex_store_family_in(packages_dir: &std::path::Path) -> Option<String> 
     beta
 }
 
-/// Resolve the Codex Desktop launch URI from the actually-installed Store
+/// Resolve the ChatGPT desktop launch URI from the actually-installed Store
 /// package (stable or beta), independent of the publisher hash. Preferred
 /// over the hardcoded `paths.json` URI: beta-channel users were previously
 /// undetectable and launched the wrong (stable) AUMID. Returns None when no

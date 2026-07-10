@@ -237,7 +237,7 @@ pub async fn apply_model_to_tool(tool_id: &str, model_info: ModelInfo) -> ApplyR
         // ~/.zcode/v2/config.json.
         "zcode" => return apply_zcode(&model_info),
 
-        // Codex CLI and Codex Desktop share ~/.codex/config.toml.
+        // Codex CLI and ChatGPT desktop share ~/.codex/config.toml.
         "codex" | "codexdesktop" => return apply_codex(tool_id, &model_info),
 
         // Claude Desktop 3P profile (Anthropic-native providers only)
@@ -1808,7 +1808,7 @@ fn restore_openscience_to_official() -> ApplyResult {
 //  Type 4a: Aider �?~/.aider.conf.yml (simple YAML key: value)
 // ════════════════════════════════════════════════════════════════
 
-// Codex CLI and Codex Desktop share ~/.codex/config.toml.
+// Codex CLI and ChatGPT desktop share ~/.codex/config.toml.
 
 /// Apply our 11 canonical Codex fields surgically — overwrite if
 /// present, insert if missing — and return the rewritten content.
@@ -2038,7 +2038,7 @@ fn apply_codex(tool_id: &str, model_info: &ModelInfo) -> ApplyResult {
     let _ = write_json_file(&relay_path, &relay);
 
     let display = if tool_id == "codexdesktop" {
-        "Codex Desktop"
+        "ChatGPT"
     } else {
         "Codex CLI"
     };
@@ -2163,7 +2163,7 @@ fn read_codex_auth_key(codex_dir: &Path) -> Option<String> {
 }
 
 fn restore_codex_to_official(tool_id: &str, config_path: &Path) -> ApplyResult {
-    // Full-file overwrite. Codex Desktop's model picker shows the
+    // Full-file overwrite. ChatGPT's model picker shows the
     // `model_provider` id VERBATIM, so the built-in lowercase id
     // "openai" rendered as a lowercase "openai" chip — inconsistent with
     // the third-party path, which uses a capitalized "OpenAI" provider.
@@ -2234,7 +2234,7 @@ fn restore_codex_to_official(tool_id: &str, config_path: &Path) -> ApplyResult {
                 message: format!(
                     "{} restored to OpenAI official provider.",
                     if tool_id == "codexdesktop" {
-                        "Codex Desktop"
+                        "ChatGPT"
                     } else {
                         "Codex CLI"
                     }

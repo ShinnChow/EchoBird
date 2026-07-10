@@ -135,7 +135,7 @@ impl ProcessManager {
         // is configured — that's the only case where the proxy is
         // actually needed. Skipping otherwise preserves Desktop's normal
         // launchUri path (Priority 2.9), which is the *only* way to
-        // start a Microsoft Store install of Codex Desktop; direct-exe
+        // start a Microsoft Store install of ChatGPT; direct-exe
         // spawn would fail with "not found" because Store packages live
         // under \\WindowsApps\... not \\Programs\\.
         //
@@ -247,7 +247,7 @@ impl ProcessManager {
     }
 
     /// True iff ~/.echobird/codex.json points at a non-OpenAI endpoint.
-    /// Used to decide whether Codex Desktop needs to route through the
+    /// Used to decide whether ChatGPT desktop needs to route through the
     /// dual-spoof launcher (third-party endpoints only) or can take the
     /// normal launchUri / GUI-exe path.
     fn codex_has_third_party_relay() -> bool {
@@ -366,21 +366,21 @@ impl ProcessManager {
         }
     }
 
-    /// Codex Desktop: try direct .exe spawn first, fall back to the
+    /// ChatGPT desktop: try direct .exe spawn first, fall back to the
     /// Windows Store shell URI if the binary lookup misses.
     fn start_codex_desktop_native(&mut self, tool_id: &str) -> Result<(), String> {
         use crate::services::codex_proxy;
 
         if let Some(exe) = codex_proxy::resolve_desktop_binary() {
             log::info!(
-                "[ProcessManager] Launching Codex Desktop (native exe): {:?}",
+                "[ProcessManager] Launching ChatGPT desktop (native exe): {:?}",
                 exe
             );
             return self.spawn_codex_desktop_exe(tool_id, &exe);
         }
 
         // MSIX / Microsoft Store install — launch via the shell:AppsFolder
-        // URI. Codex Desktop no longer needs any command-line arguments,
+        // URI. ChatGPT desktop no longer needs any command-line arguments,
         // so the plain shell URI is sufficient.
         // Prefer the actually-installed Store package (stable OR beta, any
         // publisher hash) over the hardcoded paths.json URI, so beta-channel
@@ -394,19 +394,19 @@ impl ProcessManager {
         });
         if let Some(uri) = uri {
             log::info!(
-                "[ProcessManager] Launching Codex Desktop via Store URI: {}",
+                "[ProcessManager] Launching ChatGPT desktop via Store URI: {}",
                 uri
             );
             return self.start_shell_uri(tool_id, &uri);
         }
 
         Err(
-            "Codex Desktop not found. Install it from https://openai.com/codex or the Microsoft Store."
+            "ChatGPT not found. Install it from https://openai.com/codex or the Microsoft Store."
                 .to_string(),
         )
     }
 
-    /// Spawn the Codex Desktop binary detached so EchoBird isn't pinned
+    /// Spawn the ChatGPT desktop binary detached so EchoBird isn't pinned
     /// to the GUI process lifetime.
     fn spawn_codex_desktop_exe(
         &mut self,
@@ -428,12 +428,12 @@ impl ProcessManager {
             match cmd.spawn() {
                 Ok(child) => {
                     let pid = child.id();
-                    log::info!("[ProcessManager] Codex Desktop PID: {pid}");
+                    log::info!("[ProcessManager] ChatGPT desktop PID: {pid}");
                     self.processes
                         .insert(tool_id.to_string(), ProcessInfo::new(pid));
                     Ok(())
                 }
-                Err(e) => Err(format!("Failed to spawn Codex Desktop: {e}")),
+                Err(e) => Err(format!("Failed to spawn ChatGPT desktop: {e}")),
             }
         }
 
@@ -447,21 +447,21 @@ impl ProcessManager {
             match cmd.spawn() {
                 Ok(child) => {
                     let pid = child.id();
-                    log::info!("[ProcessManager] Codex Desktop PID: {pid}");
+                    log::info!("[ProcessManager] ChatGPT desktop PID: {pid}");
                     self.processes
                         .insert(tool_id.to_string(), ProcessInfo::new(pid));
                     Ok(())
                 }
-                Err(e) => Err(format!("Failed to spawn Codex Desktop: {e}")),
+                Err(e) => Err(format!("Failed to spawn ChatGPT desktop: {e}")),
             }
         }
 
         #[cfg(target_os = "linux")]
         {
-            // No Codex Desktop Linux build as of 2026-05; this branch
+            // No ChatGPT desktop Linux build as of 2026-07; this branch
             // exists for completeness only.
             let _ = (tool_id, exe, home);
-            Err("Codex Desktop is not available on Linux.".to_string())
+            Err("ChatGPT desktop is not available on Linux.".to_string())
         }
     }
 

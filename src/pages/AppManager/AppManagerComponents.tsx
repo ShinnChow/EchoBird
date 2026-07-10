@@ -598,7 +598,7 @@ export const AppManagerPanel: React.FC = () => {
   } = useAppManager();
 
   // API Router ("relay-mode") toggle: shown for Claude Desktop AND Claude Code
-  // (each binds its own relay flag). Codex CLI / Codex Desktop instead show the
+  // (each binds its own relay flag). Codex CLI / ChatGPT desktop instead show the
   // Responses + Web Search toggles below. All of these toggles are
   // independent — there is no mutual exclusion among them.
   const isCodexApp = selectedTool === 'codex' || selectedTool === 'codexdesktop';

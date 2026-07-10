@@ -45,7 +45,7 @@ Tools that are installed as separate executables:
 Tools that are desktop applications:
 
 - **claudedesktop**: Claude Desktop
-- **codexdesktop**: Codex Desktop
+- **codexdesktop**: ChatGPT (formerly Codex Desktop)
 - **geminidesktop**: Gemini Desktop
 
 ### 3. Embedded Tools

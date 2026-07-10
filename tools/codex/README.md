@@ -1,6 +1,6 @@
 # Codex Integration
 
-This directory holds the **assets** EchoBird's Rust-native Codex proxy uses at runtime: the global config (`config.json`) and the Codex Desktop launch metadata (`paths.json`).
+This directory holds the **assets** EchoBird's Rust-native Codex proxy uses at runtime: the global config (`config.json`) and the ChatGPT (formerly Codex Desktop) launch metadata (`paths.json`).
 
 The proxy itself — Responses ↔ Chat Completions translation, model-id rewrite, session history, onboarding bypass, binary resolution, and process spawn — lives entirely inside the Rust source tree under `src-tauri/src/services/codex_proxy/`. No Node.js, no `.cjs` files, no external process.
 
@@ -10,7 +10,7 @@ The proxy itself — Responses ↔ Chat Completions translation, model-id rewrit
                                                                    
    Codex CLI       Responses API    EchoBird Rust    Chat Completions   LLM Provider 
                  ─────────────►     (codex_proxy)   ───────────────►   (DeepSeek/    
-   Codex Desktop                    127.0.0.1:53682                     Moonshot/etc)
+   ChatGPT desktop                   127.0.0.1:53682                     Moonshot/etc)
                  ◄─────────────                     ◄───────────────                 
                   Responses SSE                       Chat SSE                       
 ```
@@ -23,7 +23,7 @@ The proxy itself — Responses ↔ Chat Completions translation, model-id rewrit
 ## Files in this directory
 
 - `config.json` — global toggles read by `tool_config_manager`
-- `paths.json` — Codex Desktop install hints (Programs paths, Microsoft Store AUMID for `shell:AppsFolder`)
+- `paths.json` — ChatGPT desktop install hints (Programs paths, Microsoft Store AUMID for `shell:AppsFolder`)
 - `README.md` — this file
 
 ## Why not Node?
@@ -67,9 +67,9 @@ EchoBird couldn't locate the npm-bundled native Codex binary and fell back to th
 npm i -g @openai/codex
 ```
 
-### Codex Desktop won't launch
+### ChatGPT (desktop) won't launch
 
-Install Codex Desktop from <https://openai.com/codex> or the Microsoft Store. EchoBird looks for it at the standard install locations and falls back to the Store activation URI in `paths.json`.
+Install ChatGPT from <https://openai.com/codex> or the Microsoft Store. EchoBird looks for it at the standard install locations and falls back to the Store activation URI in `paths.json`.
 
 ## Related
 

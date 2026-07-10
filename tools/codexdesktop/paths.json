@@ -1,8 +1,5 @@
 {
-    "name": "Codex Desktop",
-    "names": {
-        "zh-Hans": "Codex 桌面端"
-    },
+    "name": "ChatGPT",
     "category": "Desktop",
     "apiProtocol": [
         "openai"
@@ -16,16 +13,18 @@
     "launchUri": "shell:AppsFolder\\OpenAI.Codex_2p2nqsd0c76g0!App",
     "paths": {
         "win32": [
+            "%LOCALAPPDATA%\\Programs\\ChatGPT\\ChatGPT.exe",
             "%LOCALAPPDATA%\\Programs\\Codex\\Codex.exe"
         ],
         "darwin": [
+            "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT",
             "/Applications/Codex.app/Contents/MacOS/Codex"
         ],
         "linux": []
     },
     "installHints": {
-        "windowsDisplayNames": ["Codex"],
+        "windowsDisplayNames": ["ChatGPT", "Codex"],
         "windowsPublisher": "OpenAI",
-        "macosAppName": "Codex"
+        "macosAppName": "ChatGPT"
     }
 }

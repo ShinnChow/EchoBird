@@ -81,7 +81,7 @@ const zhHans: Partial<Translations> = {
   'settings.easterEgg': '彩蛋',
   'closeDialog.title': '窗口关闭方式',
   'closeDialog.hint':
-    '注意:如果你的 Codex 桌面端 / Codex CLI / Claude 桌面端 / Claude Code 已切换模型，退出会导致无法使用。',
+    '注意:如果你的 ChatGPT / Codex CLI / Claude 桌面端 / Claude Code 已切换模型，退出会导致无法使用。',
   'btn.addModel': '添加模型',
   'btn.save': '保存',
   'btn.close': '关闭',
@@ -205,7 +205,7 @@ const zhHans: Partial<Translations> = {
   'key.encrypted': '已全局加密，任何环境改变 API Key 将自毁',
   'key.destroyed': '检测到环境已改变，API Key 已自毁，请重新输入',
   'hint.devInvite':
-    '切换 Codex 桌面端 / Codex CLI / Claude 桌面端 / Claude Code 的模型后，请保持 EchoBird 运行。',
+    '切换 ChatGPT / Codex CLI / Claude 桌面端 / Claude Code 的模型后，请保持 EchoBird 运行。',
   'hint.myProjects':
     '给你 Vibe Coding 的应用或游戏切换模型，参考黑白棋和 AI 翻译的 models.json 或复制它到你的项目。你可以在 https://echobird.cn/apps 发布你的 AI 应用或 AI 游戏。',
   'mother.selectModel': '选择模型',
@@ -281,8 +281,8 @@ const zhHans: Partial<Translations> = {
   'mother.hintDetectCuda': '检测CUDA模块状态',
   'mother.hintInstallCuda': '帮我安装CUDA模块',
   'mother.hintInstallGit': '帮我安装 Git',
-  'mother.hintSetCodexLocale': '设置 Codex 桌面端为简体中文',
-  'mother.hintUnlockCodexPlugins': '帮我解锁 Codex 桌面端的插件',
+  'mother.hintSetCodexLocale': '设置 ChatGPT 为简体中文',
+  'mother.hintUnlockCodexPlugins': '帮我解锁 ChatGPT 的插件',
   'mother.hintSetClaudeLocale': '设置 Claude 桌面端为简体中文',
   'mother.parasiteTipInstalled':
     '我是 AI 助手，只有短暂的记忆和娴熟的安装能力，助你在 AI 领域启航。如果你的 Claude Code 配好了模型，在右侧选择它继续和你对话。',

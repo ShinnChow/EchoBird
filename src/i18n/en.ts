@@ -90,7 +90,7 @@ const en: Translations = {
   // Close Dialog
   'closeDialog.title': 'CLOSE BEHAVIOR',
   'closeDialog.hint':
-    'Note: If your Codex Desktop / Codex CLI / Claude Desktop / Claude Code has switched models, quitting will make it unusable.',
+    'Note: If your ChatGPT / Codex CLI / Claude Desktop / Claude Code has switched models, quitting will make it unusable.',
   // Buttons
   'btn.addModel': 'ADD MODEL',
   'btn.save': 'Save',
@@ -233,7 +233,7 @@ const en: Translations = {
   'key.encrypted': 'Encrypted globally — API Key will self-destruct if environment changes',
   'key.destroyed': 'Environment change detected — API Key has self-destructed, please re-enter',
   'hint.devInvite':
-    'After switching the Codex Desktop / Codex CLI / Claude Desktop / Claude Code model, keep EchoBird running.',
+    'After switching the ChatGPT / Codex CLI / Claude Desktop / Claude Code model, keep EchoBird running.',
   'hint.myProjects':
     "Swap the model on your vibe-coded app or game — reference Reversi's and AI Translator's models.json, or just copy it to your project.",
   // Mother Agent
@@ -332,8 +332,8 @@ const en: Translations = {
   'mother.hintDetectCuda': 'Detect CUDA module status',
   'mother.hintInstallCuda': 'Help me install CUDA modules',
   'mother.hintInstallGit': 'Help me install Git',
-  'mother.hintSetCodexLocale': 'Set Codex Desktop to English',
-  'mother.hintUnlockCodexPlugins': 'Help me unlock Codex Desktop plugins',
+  'mother.hintSetCodexLocale': 'Set ChatGPT to English',
+  'mother.hintUnlockCodexPlugins': 'Help me unlock ChatGPT plugins',
   // Intentionally empty: the Claude Chinese-patch chip is shown only for
   // zh-Hans / zh-Hant. An empty label makes translate() fall through to the
   // raw key, which the hint renderer treats as "no translation → hide".
