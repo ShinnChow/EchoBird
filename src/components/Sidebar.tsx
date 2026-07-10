@@ -22,7 +22,7 @@ const isFullEdition = __APP_EDITION__ === 'full';
 export type PageType =
   | 'news'
   | 'projects'
-  | 'courses'
+  | 'skills'
   | 'models'
   | 'apps'
   | 'aiCareer'
@@ -104,9 +104,9 @@ export const Sidebar = ({
         />
         <NavItem
           icon={<GraduationCap size={20} />}
-          label={t('nav.courses')}
-          active={activePage === 'courses'}
-          onClick={() => onPageChange('courses')}
+          label={t('nav.skills')}
+          active={activePage === 'skills'}
+          onClick={() => onPageChange('skills')}
         />
         <NavItem
           icon={<Box size={20} />}

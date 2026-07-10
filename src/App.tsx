@@ -56,11 +56,11 @@ import {
   AiPulsePanel,
 } from './pages/AiPulse';
 import {
-  AiCoursesProvider,
-  AiCoursesTitleActions,
-  AiCoursesMain,
-  AiCoursesPanel,
-} from './pages/AiCourses';
+  SkillsProvider,
+  SkillsTitleActions,
+  SkillsMain,
+  SkillsPanel,
+} from './pages/Skills';
 import { FeedbackMain } from './pages/Feedback';
 import { MyProjectsMain, MyProjectsPanel, MyProjectsBottom } from './pages/MyProjects';
 import { AiCareerMain, AiCareerPanel, AiCareerTitleActions } from './pages/AiCareer';
@@ -245,7 +245,7 @@ function App() {
           <MotherAgentProvider>
             <ModelNexusProvider>
               <AiPulseProvider>
-                <AiCoursesProvider>
+                <SkillsProvider>
                   <AppManagerProvider>
                     <LocalServerProvider>
                       <div
@@ -273,7 +273,7 @@ function App() {
                                       <h2 className="cjk-title flex-shrink-0">
                                         {is('news') && t('page.news')}
                                         {is('projects') && t('page.projects')}
-                                        {is('courses') && t('page.courses')}
+                                        {is('skills') && t('page.skills')}
                                         {is('models') && t('page.modelNexus')}
 
                                         {is('apps') && t('page.appManager')}
@@ -286,7 +286,7 @@ function App() {
                                       <div className="page-kicker truncate" aria-hidden="true">
                                         {is('news') && 'PULSE'}
                                         {is('projects') && 'RISING'}
-                                        {is('courses') && 'ACADEMY'}
+                                        {is('skills') && 'POPULAR'}
                                         {is('models') && 'ROSTER'}
                                         {is('apps') && 'STUDIO'}
                                         {is('myProjects') && 'VIBE CODING'}
@@ -301,8 +301,8 @@ function App() {
                                     <span className={page(is('news') || is('projects'))}>
                                       <AiPulseTitleActions />
                                     </span>
-                                    <span className={page(is('courses'))}>
-                                      <AiCoursesTitleActions />
+                                    <span className={page(is('skills'))}>
+                                      <SkillsTitleActions />
                                     </span>
                                     <span className={page(is('models'))}>
                                       <ModelNexusTitleActions />
@@ -336,8 +336,8 @@ function App() {
                                   <div className={pageScroll(is('projects'))}>
                                     <AiProjectsMain />
                                   </div>
-                                  <div className={pageScroll(is('courses'))}>
-                                    <AiCoursesMain />
+                                  <div className={pageScroll(is('skills'))}>
+                                    <SkillsMain />
                                   </div>
                                   <div className={pageScroll(is('models'))}>
                                     <ModelNexusMain />
@@ -371,8 +371,8 @@ function App() {
                                 <div className={page(is('news') || is('projects'))}>
                                   <AiPulsePanel variant={is('projects') ? 'projects' : 'news'} />
                                 </div>
-                                <div className={page(is('courses'))}>
-                                  <AiCoursesPanel />
+                                <div className={page(is('skills'))}>
+                                  <SkillsPanel />
                                 </div>
                                 <div className={page(is('models'))}>
                                   <ModelNexusPanel />
@@ -415,7 +415,7 @@ function App() {
                       <AppManagerErrorModal />
                     </LocalServerProvider>
                   </AppManagerProvider>
-                </AiCoursesProvider>
+                </SkillsProvider>
               </AiPulseProvider>
             </ModelNexusProvider>
           </MotherAgentProvider>

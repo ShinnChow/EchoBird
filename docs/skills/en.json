@@ -1,0 +1,12 @@
+{
+  "categories": ["AI Coding"],
+  "skills": [
+    {
+      "id": "en-superpowers",
+      "name": "Superpowers",
+      "url": "https://github.com/obra/superpowers",
+      "description": "Superpowers is a complete software development methodology for your coding agents, built on top of a set of composable skills and some initial instructions that make sure your agent uses them.",
+      "category": "AI Coding"
+    }
+  ]
+}

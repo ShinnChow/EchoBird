@@ -10,6 +10,7 @@ export type TKey =
   | 'nav.news'
   | 'nav.projects'
   | 'nav.courses'
+  | 'nav.skills'
   | 'nav.feedback'
   | 'nav.changelog'
   | 'changelog.loading'
@@ -23,6 +24,7 @@ export type TKey =
   | 'page.news'
   | 'page.projects'
   | 'page.courses'
+  | 'page.skills'
   | 'page.feedback'
   // Feedback page
   | 'feedback.title'
@@ -41,6 +43,8 @@ export type TKey =
   // AI Courses
   | 'courses.filter'
   | 'courses.cat.all'
+  | 'skills.filter'
+  | 'skills.cat.all'
   // AI Pulse (News + Projects shared)
   | 'pulse.archive'
   | 'pulse.fetchFailed'

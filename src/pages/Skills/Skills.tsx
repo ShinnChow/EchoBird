@@ -1,13 +1,13 @@
-// AI Courses — Curated, application-oriented AI courses for builders, indie hackers,
+// AI Skills — Curated, application-oriented AI skills for builders, indie hackers,
 // and creators. Focus: "how to USE AI to ship things" (vibe coding, agent orchestration,
 // content creation, AI-powered startups) — NOT how to research/train LLMs.
 //
-// Both lists live as JSON on echobird.ai/courses (CF Worker), with GitHub raw at
-// docs/courses/{cn,en}.json as the secondary mirror. Edit those files to add/remove
+// Both lists live as JSON on echobird.ai/skills (CF Worker), with GitHub raw at
+// docs/skills/{cn,en}.json as the secondary mirror. Edit those files to add/remove
 // entries without shipping a release; users pull fresh data within the 6h cache window
 // (or instantly via the refresh button).
 //
-// The bundled CN_COURSES / EN_COURSES arrays below are the offline floor: shown on
+// The bundled CN_SKILLS / EN_SKILLS arrays below are the offline floor: shown on
 // cold start before remote fetch completes and as a fallback when both mirrors fail.
 
 import {
@@ -28,22 +28,22 @@ import { usePulseScroll } from '../../hooks/usePulseScroll';
 
 // Both langs share the same mirror chain; only the file name differs. Primary is
 // echobird.ai's CF Worker; GitHub raw is the cold backup that auto-tracks main.
-const COURSES_MIRRORS: { name: string; base: string }[] = [
-  { name: 'echobird', base: 'https://echobird.ai/courses' },
+const SKILLS_MIRRORS: { name: string; base: string }[] = [
+  { name: 'echobird', base: 'https://echobird.ai/skills' },
   {
     name: 'github',
-    base: 'https://raw.githubusercontent.com/edison7009/EchoBird/main/docs/courses',
+    base: 'https://raw.githubusercontent.com/edison7009/EchoBird/main/docs/skills',
   },
 ];
 
-const COURSES_FILE_EN = 'en.json';
-const COURSES_FILE_CN = 'cn.json';
+const SKILLS_FILE_EN = 'en.json';
+const SKILLS_FILE_CN = 'cn.json';
 
 // ===== Types =====
 
 type Lang = 'zh' | 'en';
 
-interface Course {
+interface Skill {
   id: string;
   name: string;
   url: string;
@@ -53,31 +53,31 @@ interface Course {
 }
 
 interface CachedEn {
-  enCourses: Course[];
+  enSkills: Skill[];
   enCategories: string[];
   fetchedAt: number;
 }
 
 interface CachedZh {
-  zhCourses: Course[];
+  zhSkills: Skill[];
   zhCategories: string[];
   fetchedAt: number;
 }
 
 interface Catalog {
-  courses: Course[];
+  skills: Skill[];
   categoriesByLang: Record<Lang, string[]>;
   fetchedAt: number;
 }
 
 // ===== Bundled CN fallback =====
 //
-// Mirror of docs/courses/cn.json — manually kept in sync when shipping a release
+// Mirror of docs/skills/cn.json — manually kept in sync when shipping a release
 // so first-launch / offline users see content immediately.
 
 const CN_CATEGORIES = ['AI 创业', 'AI 编程', 'Prompt 与 Agent', '学习平台'];
 
-const CN_COURSES: Course[] = [
+const CN_SKILLS: Skill[] = [
   {
     id: 'cn-echobird-openrouter-guide',
     name: '白嫖 OpenRouter 免费模型',
@@ -89,7 +89,7 @@ const CN_COURSES: Course[] = [
   {
     id: 'cn-claude-code-quickstart',
     name: 'Claude Code 快速上手',
-    url: 'https://coffeecli.com/courses/claude-code',
+    url: 'https://coffeecli.com/skills/claude-code',
     description:
       'Claude Code 入门实战:环境配置、核心工作流、常用技巧,几分钟带你跑通第一个 AI 编程闭环',
     category: 'AI 编程',
@@ -98,7 +98,7 @@ const CN_COURSES: Course[] = [
   {
     id: 'cn-claude-founders-playbook',
     name: 'Claude 教你用 AI 创业',
-    url: 'https://coffeecli.com/courses/founders-playbook',
+    url: 'https://coffeecli.com/skills/founders-playbook',
     description:
       '面向独立开发者与创业者的 AI 实战课,讲解如何用 Claude 等大模型搭建产品并跑通商业闭环',
     category: 'AI 创业',
@@ -235,17 +235,17 @@ const CN_COURSES: Course[] = [
     lang: 'zh',
   },
   {
-    id: 'cn-platform-coursera-cn',
-    name: 'Coursera 中文站',
-    url: 'https://www.coursera.org/zh-CN',
+    id: 'cn-platform-skillra-cn',
+    name: 'Skillra 中文站',
+    url: 'https://www.skillra.org/zh-CN',
     description: '国际公开课中文界面入口,大量斯坦福 / DeepLearning.AI 课程有中文字幕',
     category: '学习平台',
     lang: 'zh',
   },
   {
-    id: 'cn-platform-icourse163',
+    id: 'cn-platform-iskill163',
     name: '中国大学 MOOC',
-    url: 'https://www.icourse163.org/search.htm?search=人工智能',
+    url: 'https://www.iskill163.org/search.htm?search=人工智能',
     description: '清华 / 北大 / 浙大 / 中科大 / 复旦等顶尖高校 AI 公开课聚合入口',
     category: '学习平台',
     lang: 'zh',
@@ -262,7 +262,7 @@ const CN_COURSES: Course[] = [
 
 // ===== Bundled EN fallback =====
 //
-// Mirror of docs/courses/en.json — same role as CN_COURSES, just for non-CN locales.
+// Mirror of docs/skills/en.json — same role as CN_SKILLS, just for non-CN locales.
 
 const EN_CATEGORIES = [
   'AI Founders',
@@ -272,7 +272,7 @@ const EN_CATEGORIES = [
   'Learning Hubs',
 ];
 
-const EN_COURSES: Course[] = [
+const EN_SKILLS: Skill[] = [
   {
     id: 'en-echobird-openrouter-guide',
     name: 'Free LLMs on OpenRouter',
@@ -285,7 +285,7 @@ const EN_COURSES: Course[] = [
   {
     id: 'en-claude-code-quickstart',
     name: 'Claude Code Quickstart',
-    url: 'https://coffeecli.com/courses/claude-code',
+    url: 'https://coffeecli.com/skills/claude-code',
     description:
       'Fast-track guide to Claude Code — setup, core workflows, and practical tips for shipping with AI in minutes.',
     category: 'AI Coding',
@@ -294,7 +294,7 @@ const EN_COURSES: Course[] = [
   {
     id: 'en-coffeecli-founders-playbook',
     name: 'Founders Playbook with Claude',
-    url: 'https://coffeecli.com/courses/founders-playbook',
+    url: 'https://coffeecli.com/skills/founders-playbook',
     description:
       'AI startup playbook for indie builders — using Claude to ship products and validate businesses end-to-end.',
     category: 'AI Founders',
@@ -332,7 +332,7 @@ const EN_COURSES: Course[] = [
     name: 'Anthropic Academy',
     url: 'https://anthropic.skilljar.com/',
     description:
-      'Official Anthropic courses — Claude Code 101, Claude Code in Action, Agent Skills, Subagents. Free with certificates.',
+      'Official Anthropic skills — Claude Code 101, Claude Code in Action, Agent Skills, Subagents. Free with certificates.',
     category: 'AI Coding',
     lang: 'en',
   },
@@ -348,7 +348,7 @@ const EN_COURSES: Course[] = [
   {
     id: 'en-deeplearning-langgraph',
     name: 'DeepLearning.AI · AI Agents in LangGraph',
-    url: 'https://www.deeplearning.ai/courses/ai-agents-in-langgraph',
+    url: 'https://www.deeplearning.ai/skills/ai-agents-in-langgraph',
     description: 'Harrison Chase walks through the agent loop in 1.5 hours. Free.',
     category: 'AI Coding',
     lang: 'en',
@@ -376,14 +376,14 @@ const EN_COURSES: Course[] = [
     name: 'LangChain Academy',
     url: 'https://academy.langchain.com/',
     description:
-      'Official free courses on LangGraph, Deep Agents, and Deep Research with LangGraph.',
+      'Official free skills on LangGraph, Deep Agents, and Deep Research with LangGraph.',
     category: 'Prompts & Agents',
     lang: 'en',
   },
   {
     id: 'en-deeplearning-prompt',
     name: 'DeepLearning.AI · Prompt Engineering for Developers',
-    url: 'https://www.deeplearning.ai/short-courses/chatgpt-prompt-engineering-for-developers',
+    url: 'https://www.deeplearning.ai/short-skills/chatgpt-prompt-engineering-for-developers',
     description:
       'Andrew Ng + Isa Fulford — the non-negotiable starting point for prompt engineering.',
     category: 'Prompts & Agents',
@@ -394,16 +394,16 @@ const EN_COURSES: Course[] = [
     name: 'Hugging Face · Learn',
     url: 'https://huggingface.co/learn',
     description:
-      "Free courses on NLP, Deep RL, Audio, ML for Games — paired with the Hub's models and datasets.",
+      "Free skills on NLP, Deep RL, Audio, ML for Games — paired with the Hub's models and datasets.",
     category: 'Learning Hubs',
     lang: 'en',
   },
   {
     id: 'en-deeplearning-catalog',
-    name: 'DeepLearning.AI · Short Courses',
-    url: 'https://www.deeplearning.ai/courses/',
+    name: 'DeepLearning.AI · Short Skills',
+    url: 'https://www.deeplearning.ai/skills/',
     description:
-      'Catalog of free hands-on courses covering RAG, agents, evaluation, fine-tuning, and more.',
+      'Catalog of free hands-on skills covering RAG, agents, evaluation, fine-tuning, and more.',
     category: 'Learning Hubs',
     lang: 'en',
   },
@@ -412,9 +412,9 @@ const EN_COURSES: Course[] = [
 // ===== Local cache =====
 //
 // `:v2` bump invalidates the old dair-ai academic content that used to live under
-// `courses:cache:en` so users instantly see the new applied-direction list after upgrade.
-const CACHE_KEY_EN = 'courses:cache:en:v2';
-const CACHE_KEY_ZH = 'courses:cache:zh';
+// `skills:cache:en` so users instantly see the new applied-direction list after upgrade.
+const CACHE_KEY_EN = 'skills:cache:en:v2';
+const CACHE_KEY_ZH = 'skills:cache:zh';
 const REFRESH_AFTER_MS = 6 * 3600 * 1000;
 
 const loadCachedEn = (): CachedEn | null => {
@@ -422,7 +422,7 @@ const loadCachedEn = (): CachedEn | null => {
     const raw = localStorage.getItem(CACHE_KEY_EN);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed?.enCourses) || !Array.isArray(parsed?.enCategories)) return null;
+    if (!Array.isArray(parsed?.enSkills) || !Array.isArray(parsed?.enCategories)) return null;
     return parsed as CachedEn;
   } catch {
     return null;
@@ -441,7 +441,7 @@ const loadCachedZh = (): CachedZh | null => {
     const raw = localStorage.getItem(CACHE_KEY_ZH);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed?.zhCourses) || !Array.isArray(parsed?.zhCategories)) return null;
+    if (!Array.isArray(parsed?.zhSkills) || !Array.isArray(parsed?.zhCategories)) return null;
     return parsed as CachedZh;
   } catch {
     return null;
@@ -458,12 +458,12 @@ const saveCachedZh = (c: CachedZh) => {
 // Each lang has both a remote source and a bundled fallback now — buildCatalog
 // merges remote-or-bundled per lang.
 const buildCatalog = (en: CachedEn | null, zh: CachedZh | null): Catalog => {
-  const enCourses = en?.enCourses?.length ? en.enCourses : EN_COURSES;
+  const enSkills = en?.enSkills?.length ? en.enSkills : EN_SKILLS;
   const enCategories = en?.enCategories?.length ? en.enCategories : EN_CATEGORIES;
-  const zhCourses = zh?.zhCourses?.length ? zh.zhCourses : CN_COURSES;
+  const zhSkills = zh?.zhSkills?.length ? zh.zhSkills : CN_SKILLS;
   const zhCategories = zh?.zhCategories?.length ? zh.zhCategories : CN_CATEGORIES;
   return {
-    courses: [...enCourses, ...zhCourses],
+    skills: [...enSkills, ...zhSkills],
     categoriesByLang: { en: enCategories, zh: zhCategories },
     fetchedAt: Math.max(en?.fetchedAt ?? 0, zh?.fetchedAt ?? 0) || Date.now(),
   };
@@ -471,7 +471,7 @@ const buildCatalog = (en: CachedEn | null, zh: CachedZh | null): Catalog => {
 
 // ===== Network: mirror-aware JSON fetch =====
 //
-// Same shape for both lists: { courses: Omit<Course, 'lang'>[], categories: string[] }.
+// Same shape for both lists: { skills: Omit<Skill, 'lang'>[], categories: string[] }.
 // No preferredMirror optimization — VPN switches change which mirror works, so don't
 // cache the choice.
 
@@ -480,12 +480,12 @@ const looksLikeHtml = (s: string): boolean => {
   return head.startsWith('<!doctype html') || head.startsWith('<html');
 };
 
-async function fetchCoursesJson(
+async function fetchSkillsJson(
   file: string,
   lang: Lang
-): Promise<{ courses: Course[]; categories: string[] }> {
+): Promise<{ skills: Skill[]; categories: string[] }> {
   let lastErr: unknown = null;
-  for (const mirror of COURSES_MIRRORS) {
+  for (const mirror of SKILLS_MIRRORS) {
     try {
       const res = await fetch(`${mirror.base}/${file}`, { cache: 'no-cache' });
       if (!res.ok) {
@@ -498,15 +498,15 @@ async function fetchCoursesJson(
         continue;
       }
       const json = JSON.parse(text);
-      if (!Array.isArray(json?.courses) || !Array.isArray(json?.categories)) {
+      if (!Array.isArray(json?.skills) || !Array.isArray(json?.categories)) {
         lastErr = new Error(`${mirror.name} invalid shape`);
         continue;
       }
-      const courses: Course[] = json.courses.map((c: Omit<Course, 'lang'>) => ({
+      const skills: Skill[] = json.skills.map((c: Omit<Skill, 'lang'>) => ({
         ...c,
         lang,
       }));
-      return { courses, categories: json.categories as string[] };
+      return { skills, categories: json.categories as string[] };
     } catch (e) {
       lastErr = e;
     }
@@ -527,7 +527,7 @@ const hostnameOf = (url: string): string => {
 
 // ===== Context =====
 
-interface AiCoursesContextValue {
+interface SkillsContextValue {
   catalog: Catalog;
   initialLoading: boolean;
   syncing: boolean;
@@ -537,17 +537,17 @@ interface AiCoursesContextValue {
   retry: () => void;
 }
 
-const AiCoursesContext = createContext<AiCoursesContextValue | null>(null);
+const SkillsContext = createContext<SkillsContextValue | null>(null);
 
-function useAiCourses() {
-  const ctx = useContext(AiCoursesContext);
-  if (!ctx) throw new Error('AiCourses context missing');
+function useSkills() {
+  const ctx = useContext(SkillsContext);
+  if (!ctx) throw new Error('Skills context missing');
   return ctx;
 }
 
 // ===== Provider =====
 
-export function AiCoursesProvider({ children }: { children: React.ReactNode }) {
+export function SkillsProvider({ children }: { children: React.ReactNode }) {
   // Hydrate caches once on mount so re-renders don't re-read localStorage.
   const initialCachedEn = useMemo(() => loadCachedEn(), []);
   const initialCachedZh = useMemo(() => loadCachedZh(), []);
@@ -594,11 +594,11 @@ export function AiCoursesProvider({ children }: { children: React.ReactNode }) {
 
     if (!enFresh) {
       tasks.push(
-        fetchCoursesJson(COURSES_FILE_EN, 'en')
-          .then(({ courses, categories }) => {
+        fetchSkillsJson(SKILLS_FILE_EN, 'en')
+          .then(({ skills, categories }) => {
             if (my !== seq.current) return;
             const fresh: CachedEn = {
-              enCourses: courses,
+              enSkills: skills,
               enCategories: categories,
               fetchedAt: Date.now(),
             };
@@ -613,11 +613,11 @@ export function AiCoursesProvider({ children }: { children: React.ReactNode }) {
 
     if (!zhFresh) {
       tasks.push(
-        fetchCoursesJson(COURSES_FILE_CN, 'zh')
-          .then(({ courses, categories }) => {
+        fetchSkillsJson(SKILLS_FILE_CN, 'zh')
+          .then(({ skills, categories }) => {
             if (my !== seq.current) return;
             const fresh: CachedZh = {
-              zhCourses: courses,
+              zhSkills: skills,
               zhCategories: categories,
               fetchedAt: Date.now(),
             };
@@ -650,7 +650,7 @@ export function AiCoursesProvider({ children }: { children: React.ReactNode }) {
     sync();
   }, [sync]);
 
-  const value = useMemo<AiCoursesContextValue>(
+  const value = useMemo<SkillsContextValue>(
     () => ({
       catalog,
       initialLoading,
@@ -663,14 +663,14 @@ export function AiCoursesProvider({ children }: { children: React.ReactNode }) {
     [catalog, initialLoading, syncing, error, selectedCategory, retry]
   );
 
-  return <AiCoursesContext.Provider value={value}>{children}</AiCoursesContext.Provider>;
+  return <SkillsContext.Provider value={value}>{children}</SkillsContext.Provider>;
 }
 
 // ===== Title actions =====
 
-export function AiCoursesTitleActions() {
+export function SkillsTitleActions() {
   const { t } = useI18n();
-  const { syncing, retry } = useAiCourses();
+  const { syncing, retry } = useSkills();
   return (
     <div className="ml-auto flex-shrink-0 flex items-center gap-2">
       <button
@@ -691,28 +691,28 @@ export function AiCoursesTitleActions() {
 
 // ===== Card =====
 
-function CourseCard({ course }: { course: Course }) {
+function SkillCard({ skill }: { skill: Skill }) {
   return (
     <button
-      onClick={() => openExternal(course.url)}
+      onClick={() => openExternal(skill.url)}
       className="group w-full text-left bg-cyber-surface rounded-card border border-cyber-border/15 hover:border-cyber-border/40 hover:bg-cyber-elevated transition-colors p-5 flex flex-col h-full"
     >
       <div className="text-xs text-cyber-text-secondary tracking-wide mb-2 truncate">
-        {course.category}
+        {skill.category}
       </div>
       <div className="text-[17px] font-bold text-cyber-text leading-snug mb-3 group-hover:text-cyber-accent transition-colors line-clamp-2">
-        {course.name}
+        {skill.name}
       </div>
 
-      {course.description && (
+      {skill.description && (
         <div className="text-[13px] text-cyber-text-secondary leading-relaxed flex-1 line-clamp-3">
-          {course.description}
+          {skill.description}
         </div>
       )}
 
       <div className="mt-4 pt-3 border-t border-cyber-border/10 flex items-center gap-2">
         <span className="text-xs font-mono text-cyber-text-muted truncate flex-1">
-          {hostnameOf(course.url)}
+          {hostnameOf(skill.url)}
         </span>
         <ExternalLink
           size={13}
@@ -725,9 +725,9 @@ function CourseCard({ course }: { course: Course }) {
 
 // ===== Main =====
 
-export function AiCoursesMain() {
+export function SkillsMain() {
   const { t, locale } = useI18n();
-  const { catalog, initialLoading, syncing, error, selectedCategory, retry } = useAiCourses();
+  const { catalog, initialLoading, syncing, error, selectedCategory, retry } = useSkills();
   const scrollRef = usePulseScroll<HTMLDivElement>();
   // Only zh-Hans gets the CN list (Bilibili / Datawhale / 飞桨 etc. on CN-domestic
   // platforms). zh-Hant (TW/HK/MO) and ja users see the EN list — TW/HK builders
@@ -736,7 +736,7 @@ export function AiCoursesMain() {
   const lang: Lang = locale === 'zh-Hans' ? 'zh' : 'en';
 
   const visible = useMemo(() => {
-    const langMatched = catalog.courses.filter((c) => c.lang === lang);
+    const langMatched = catalog.skills.filter((c) => c.lang === lang);
     if (selectedCategory === 'all') return langMatched;
     return langMatched.filter((c) => c.category === selectedCategory);
   }, [catalog, selectedCategory, lang]);
@@ -789,7 +789,7 @@ export function AiCoursesMain() {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {visible.map((c) => (
-          <CourseCard key={c.id} course={c} />
+          <SkillCard key={c.id} skill={c} />
         ))}
       </div>
     </div>
@@ -798,11 +798,11 @@ export function AiCoursesMain() {
 
 // ===== Right panel: category filter =====
 
-export function AiCoursesPanel() {
+export function SkillsPanel() {
   const { t, locale } = useI18n();
-  const { catalog, selectedCategory, setSelectedCategory } = useAiCourses();
+  const { catalog, selectedCategory, setSelectedCategory } = useSkills();
   const scrollRef = usePulseScroll<HTMLDivElement>();
-  // Same lang fork as AiCoursesMain — see comment there.
+  // Same lang fork as SkillsMain — see comment there.
   const lang: Lang = locale === 'zh-Hans' ? 'zh' : 'en';
 
   // Reset filter when categories of the current lang don't include the selection
@@ -813,21 +813,21 @@ export function AiCoursesPanel() {
   }, [lang, catalog, selectedCategory, setSelectedCategory]);
 
   const categories = catalog.categoriesByLang[lang] || [];
-  const langCourses = useMemo(
-    () => catalog.courses.filter((c) => c.lang === lang),
+  const langSkills = useMemo(
+    () => catalog.skills.filter((c) => c.lang === lang),
     [catalog, lang]
   );
-  const total = langCourses.length;
+  const total = langSkills.length;
   const countByCat = useMemo(() => {
     const m = new Map<string, number>();
-    for (const c of langCourses) m.set(c.category, (m.get(c.category) || 0) + 1);
+    for (const c of langSkills) m.set(c.category, (m.get(c.category) || 0) + 1);
     return m;
-  }, [langCourses]);
+  }, [langSkills]);
 
   return (
     <>
       <div className="px-3 py-2 mb-1 flex items-center justify-between bg-transparent">
-        <div className="text-[15px] font-semibold text-cyber-text">{t('courses.filter')}</div>
+        <div className="text-[15px] font-semibold text-cyber-text">{t('skills.filter')}</div>
         {total > 0 && <span className="text-[13px] font-mono text-cyber-text-muted">{total}</span>}
       </div>
       <div ref={scrollRef} className="flex-1 px-2 overflow-y-auto pb-4 space-y-1 pulse-scroll">
@@ -839,7 +839,7 @@ export function AiCoursesPanel() {
               : 'text-cyber-text-secondary hover:bg-cyber-surface hover:text-cyber-text'
           }`}
         >
-          <span>{t('courses.cat.all')}</span>
+          <span>{t('skills.cat.all')}</span>
           <span className="text-[13px] font-mono text-cyber-text-muted">{total}</span>
         </button>
         {categories.map((cat) => (
