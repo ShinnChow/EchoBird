@@ -338,7 +338,9 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     (v: boolean) => {
       setCodexResponsesPassthroughRaw(v);
       writeBool('echobird_codex_responses_passthrough', v);
-      const codexToolId = (['codex', 'chatgptdesktop'] as const).find((id) => !!toolModelConfig[id]);
+      const codexToolId = (['codex', 'chatgptdesktop'] as const).find(
+        (id) => !!toolModelConfig[id]
+      );
       if (!codexToolId) return;
       const pendingInternalId = toolModelConfig[codexToolId];
       if (!pendingInternalId || isOfficialModelSentinel(pendingInternalId)) return;
@@ -358,7 +360,9 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     (v: boolean) => {
       setCodexWebSearchRaw(v);
       writeBool('echobird_codex_web_search', v);
-      const codexToolId = (['codex', 'chatgptdesktop'] as const).find((id) => !!toolModelConfig[id]);
+      const codexToolId = (['codex', 'chatgptdesktop'] as const).find(
+        (id) => !!toolModelConfig[id]
+      );
       if (!codexToolId) return;
       const pendingInternalId = toolModelConfig[codexToolId];
       if (!pendingInternalId || isOfficialModelSentinel(pendingInternalId)) return;
