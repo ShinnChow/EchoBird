@@ -282,7 +282,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     // right panel. Other tools ignore the field — apply_codex and
     // apply_claudedesktop are the only consumers and short-circuit on
     // tool_id mismatch.
-    const isCodexApp = toolId === 'codex' || toolId === 'codexdesktop';
+    const isCodexApp = toolId === 'codex' || toolId === 'chatgptdesktop';
     const isClaudeDesktopApp = toolId === 'claudedesktop';
     const isClaudeCodeApp = toolId === 'claudecode';
     const isClaudeApp = isClaudeDesktopApp || isClaudeCodeApp;
@@ -338,7 +338,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     (v: boolean) => {
       setCodexResponsesPassthroughRaw(v);
       writeBool('echobird_codex_responses_passthrough', v);
-      const codexToolId = (['codex', 'codexdesktop'] as const).find((id) => !!toolModelConfig[id]);
+      const codexToolId = (['codex', 'chatgptdesktop'] as const).find((id) => !!toolModelConfig[id]);
       if (!codexToolId) return;
       const pendingInternalId = toolModelConfig[codexToolId];
       if (!pendingInternalId || isOfficialModelSentinel(pendingInternalId)) return;
@@ -358,7 +358,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     (v: boolean) => {
       setCodexWebSearchRaw(v);
       writeBool('echobird_codex_web_search', v);
-      const codexToolId = (['codex', 'codexdesktop'] as const).find((id) => !!toolModelConfig[id]);
+      const codexToolId = (['codex', 'chatgptdesktop'] as const).find((id) => !!toolModelConfig[id]);
       if (!codexToolId) return;
       const pendingInternalId = toolModelConfig[codexToolId];
       if (!pendingInternalId || isOfficialModelSentinel(pendingInternalId)) return;

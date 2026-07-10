@@ -83,8 +83,8 @@ static BUNDLED: BundledAssets = BundledAssets {
             include_str!("../../docs/api/tools/install/claudedesktop.json"),
         ),
         (
-            "codexdesktop",
-            include_str!("../../docs/api/tools/install/codexdesktop.json"),
+            "chatgptdesktop",
+            include_str!("../../docs/api/tools/install/chatgptdesktop.json"),
         ),
         (
             "geminidesktop",

@@ -74,7 +74,7 @@ Then verify compatibility:
 | Hermes Desktop | Windows, macOS, Linux | Desktop app — ONE install gives the Electron GUI + `hermes` CLI. In mainland China the official installer FAILS (its bootstrapper hits the GFW-blocked raw.githubusercontent.com); drive the China-mirror flow in the Hermes install reference (`install_flow.agent_steps`), do NOT refuse Windows. |
 | Claude Code (CLI) | All platforms (macOS/Linux: curl or brew; Windows: powershell or winget — npm is DEPRECATED) | Supported everywhere, choose install method by OS |
 | Codex (CLI) | All platforms (npm: `npm i -g @openai/codex`) | Verify Node.js is present; on Windows the global npm path resolves via `%APPDATA%\npm`. |
-| ChatGPT (formerly Codex Desktop) | macOS, Windows only | Install via the official installer or Microsoft Store — see Desktop App section below. |
+| ChatGPT | macOS, Windows only | Install via the official installer or Microsoft Store — see Desktop App section below. |
 
 **Windows install UX rule**: When the user is on Windows, do NOT present A/B option choices. Instead:
 1. Default to native Windows installation — show what will be installed and how

@@ -145,7 +145,7 @@ impl ProcessManager {
         // Codex binary in-process. Users no longer need Node installed.
         let needs_native_path = match tool_id {
             "codex" => true,
-            "codexdesktop" => Self::codex_has_third_party_relay(),
+            "chatgptdesktop" => Self::codex_has_third_party_relay(),
             _ => false,
         };
         if needs_native_path {
@@ -181,7 +181,7 @@ impl ProcessManager {
         // Priority 2.9: MSIX / Store app — Windows-only. shell:AppsFolder\<AUMID>
         // is UWP-specific; on macOS/Linux this would shadow the platform-correct
         // GUI exe path below (paths.darwin / paths.linux). claudedesktop and
-        // codexdesktop ship with both an AUMID and a valid .app / Linux path.
+        // chatgptdesktop ship with both an AUMID and a valid .app / Linux path.
         #[cfg(windows)]
         if let Some(uri) = crate::services::tool_manager::get_tool_launch_uri(tool_id) {
             // Prefer a directly-launchable exe on disk over the Store AUMID.
@@ -313,7 +313,7 @@ impl ProcessManager {
     /// Spawn:
     ///   • Desktop mode tries the standalone .exe first (Programs install
     ///     or PATH), then falls back to the Microsoft Store shell URI
-    ///     from tools/codexdesktop/paths.json.
+    ///     from tools/chatgptdesktop/paths.json.
     ///   • CLI mode tries the bundled native binary inside
     ///     @openai/codex-<triple>/vendor/... so the Rust TUI keeps a real
     ///     TTY. If that's missing we fall back to `codex.cmd` (loses TTY
@@ -352,7 +352,7 @@ impl ProcessManager {
             crate::services::codex_session_merge::merge_codex_history(&codex_dir);
         }
 
-        if tool_id == "codexdesktop" {
+        if tool_id == "chatgptdesktop" {
             self.start_codex_desktop_native(tool_id)
         } else {
             // Codex CLI launches through the SAME generic path as claude /

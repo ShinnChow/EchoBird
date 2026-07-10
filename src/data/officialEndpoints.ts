@@ -51,7 +51,7 @@ export const OFFICIAL_ENDPOINTS: Record<string, OfficialEndpoint> = {
     protocol: 'openai',
     modelId: 'gpt-4o',
   },
-  codexdesktop: {
+  chatgptdesktop: {
     name: 'OpenAI Official',
     baseUrl: 'https://api.openai.com/v1',
     protocol: 'openai',

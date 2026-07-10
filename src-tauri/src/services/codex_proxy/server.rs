@@ -53,13 +53,22 @@ const UPSTREAM_ERROR_BODY_CAP: usize = 16 * 1024;
 /// worst observed real-world request while still bounding memory.
 const MAX_REQUEST_BODY_BYTES: usize = 64 * 1024 * 1024;
 
-/// Maximum time we'll wait for the upstream to deliver the next chunk
-/// of a streaming response. A stalled upstream (TCP open but silent)
-/// would otherwise hold a reqwest connection + spawned tokio task open
-/// forever, leaking file descriptors over many sessions. 5 minutes is
-/// generous enough to cover slow thinking-model warmups but tight
-/// enough that a truly dead connection releases its resources.
-const UPSTREAM_CHUNK_TIMEOUT: Duration = Duration::from_secs(300);
+/// Max wait for the upstream to deliver the FIRST chunk of a streaming
+/// response. Guards against "upstream accepted the request but never
+/// started replying", which would otherwise pin a reqwest connection +
+/// spawned tokio task forever.
+///
+/// Only the first read is bounded. Once the first byte arrives the
+/// stream runs free - thinking models (grok / o-series / DeepSeek-R1 /
+/// QwQ) legitimately go silent for many minutes between chunks while
+/// they reason, and a per-chunk gap timeout there was the #1 cause of
+/// mid-turn disconnects: the proxy would `fail()` the stream on a long
+/// thinking pause, Codex would receive `response.failed`, and the turn
+/// would collapse in the UI ("chat a bit then it folds"). Dead
+/// connections mid-stream are detected by TCP keepalive (see the http
+/// client builder), which surfaces as a stream error rather than a
+/// silent gap.
+const UPSTREAM_FIRST_BYTE_TIMEOUT: Duration = Duration::from_secs(120);
 
 #[derive(Clone)]
 pub struct AppState {
@@ -72,8 +81,13 @@ pub async fn run(port: u16) -> Result<(), String> {
 
     let http_client = reqwest::Client::builder()
         // No global timeout: streaming responses can run for many minutes.
-        // We rely on TCP-level disconnect detection instead.
+        // We rely on TCP-level disconnect detection instead - both at
+        // connect time (connect_timeout) and mid-stream (tcp_keepalive:
+        // the OS probes idle connections and surfaces a dead peer as a
+        // stream error, which is how we detect stalls WITHOUT capping
+        // inter-chunk gaps that thinking models legitimately stretch).
         .connect_timeout(Duration::from_secs(30))
+        .tcp_keepalive(Duration::from_secs(60))
         .build()
         .map_err(|e| format!("reqwest client build failed: {e}"))?;
 
@@ -975,6 +989,64 @@ fn build_error_sse_events(envelope: &Value, response_id: &str) -> Vec<SseEvent> 
 // Streaming path
 // ---------------------------------------------------------------------------
 
+/// Outcome of pulling one chunk from the upstream stream with the
+/// disconnect-safe timeout policy in `next_chunk_with_policy` applied.
+#[derive(Debug)]
+enum NextChunkResult<T, E> {
+    /// A chunk arrived.
+    Item(T),
+    /// The stream surfaced an error mid-read. With TCP keepalive enabled
+    /// this is how we learn about dead peers - the OS probe fails and
+    /// reqwest reports it here instead of the stream hanging silently.
+    Error(E),
+    /// Clean end of stream.
+    Eof,
+    /// Only yielded on the first read: the upstream never delivered any
+    /// bytes within `UPSTREAM_FIRST_BYTE_TIMEOUT`. Never produced for
+    /// subsequent reads - see `next_chunk_with_policy`.
+    FirstByteTimeout,
+}
+
+/// Pull the next item from `stream` with the disconnect policy:
+///
+/// - **First chunk** (`is_first = true`): bounded by `first_byte_timeout`
+///   (callers pass `UPSTREAM_FIRST_BYTE_TIMEOUT` in production), so a
+///   totally unresponsive upstream can't pin a task + connection forever.
+/// - **Subsequent chunks** (`is_first = false`): no timeout. A
+///   stalled-but-alive connection is detected by TCP keepalive on the
+///   http client, which surfaces here as `Error`. This deliberately does
+///   NOT cap inter-chunk gaps: thinking models pause for many minutes
+///   between chunks while reasoning, and capping those gaps was the #1
+///   cause of mid-turn disconnects (the stream got `fail()`ed on a long
+///   thinking pause and Codex collapsed the turn - "chat a bit then it
+///   folds").
+///
+/// Generic over the item/error types so the loop logic is unit-testable
+/// without a real `reqwest` response.
+async fn next_chunk_with_policy<S, T, E>(
+    stream: &mut S,
+    is_first: bool,
+    first_byte_timeout: Duration,
+) -> NextChunkResult<T, E>
+where
+    S: Stream<Item = Result<T, E>> + Unpin,
+{
+    if is_first {
+        match tokio::time::timeout(first_byte_timeout, stream.next()).await {
+            Ok(Some(Ok(item))) => NextChunkResult::Item(item),
+            Ok(Some(Err(e))) => NextChunkResult::Error(e),
+            Ok(None) => NextChunkResult::Eof,
+            Err(_elapsed) => NextChunkResult::FirstByteTimeout,
+        }
+    } else {
+        match stream.next().await {
+            Some(Ok(item)) => NextChunkResult::Item(item),
+            Some(Err(e)) => NextChunkResult::Error(e),
+            None => NextChunkResult::Eof,
+        }
+    }
+}
+
 /// Start an async task that consumes the upstream byte stream, drives a
 /// StreamState through it, and pipes the emitted SseEvents into a
 /// channel. Returns the channel as an SSE response.
@@ -1005,14 +1077,13 @@ fn stream_response(
         // at packet boundaries. We feed only the validated prefix and
         // carry the trailing partial bytes into the next chunk.
         let mut carry: Vec<u8> = Vec::new();
+        let mut is_first = true;
         loop {
-            // Per-chunk timeout: if the upstream goes silent for longer
-            // than UPSTREAM_CHUNK_TIMEOUT we close the stream rather than
-            // leak the connection / task / FD indefinitely.
-            let next_chunk =
-                tokio::time::timeout(UPSTREAM_CHUNK_TIMEOUT, bytes_stream.next()).await;
-            match next_chunk {
-                Ok(Some(Ok(b))) => {
+            match next_chunk_with_policy(&mut bytes_stream, is_first, UPSTREAM_FIRST_BYTE_TIMEOUT)
+                .await
+            {
+                NextChunkResult::Item(b) => {
+                    is_first = false;
                     let bytes: &[u8] = if carry.is_empty() {
                         &b
                     } else {
@@ -1051,7 +1122,7 @@ fn stream_response(
                         return;
                     }
                 }
-                Ok(Some(Err(e))) => {
+                NextChunkResult::Error(e) => {
                     state.fail(
                         &format!("Upstream stream error: {e}"),
                         "upstream_stream_error",
@@ -1059,18 +1130,20 @@ fn stream_response(
                     let _ = forward_events(&mut state, &tx).await;
                     return;
                 }
-                Ok(None) => {
+                NextChunkResult::Eof => {
                     // Clean EOF — break out so finish() runs below.
                     break;
                 }
-                Err(_elapsed) => {
-                    // Read timeout — upstream went silent past the cap.
+                NextChunkResult::FirstByteTimeout => {
+                    // Upstream accepted the request but never started
+                    // streaming. Close the stream so Codex gets a
+                    // response.failed instead of hanging forever.
                     state.fail(
                         &format!(
-                            "Upstream stream stalled (no data for {}s)",
-                            UPSTREAM_CHUNK_TIMEOUT.as_secs()
+                            "Upstream did not start streaming within {}s",
+                            UPSTREAM_FIRST_BYTE_TIMEOUT.as_secs()
                         ),
-                        "upstream_stall",
+                        "upstream_first_byte_timeout",
                     );
                     let _ = forward_events(&mut state, &tx).await;
                     return;
@@ -1319,11 +1392,13 @@ fn stream_passthrough(upstream_resp: reqwest::Response, client_model: Option<Str
         // chunk boundary otherwise).
         let mut carry: Vec<u8> = Vec::new();
         let mut line_buf = String::new();
+        let mut is_first = true;
         loop {
-            let next_chunk =
-                tokio::time::timeout(UPSTREAM_CHUNK_TIMEOUT, bytes_stream.next()).await;
-            match next_chunk {
-                Ok(Some(Ok(b))) => {
+            match next_chunk_with_policy(&mut bytes_stream, is_first, UPSTREAM_FIRST_BYTE_TIMEOUT)
+                .await
+            {
+                NextChunkResult::Item(b) => {
+                    is_first = false;
                     let bytes: &[u8] = if carry.is_empty() {
                         &b
                     } else {
@@ -1358,7 +1433,7 @@ fn stream_passthrough(upstream_resp: reqwest::Response, client_model: Option<Str
                         }
                     }
                 }
-                Ok(Some(Err(e))) => {
+                NextChunkResult::Error(e) => {
                     log::error!("[CodexProxy] Passthrough stream error: {e}");
                     let _ = tx
                         .send(Ok(Bytes::from(sse_failed_event(
@@ -1368,22 +1443,22 @@ fn stream_passthrough(upstream_resp: reqwest::Response, client_model: Option<Str
                         .await;
                     return;
                 }
-                Ok(None) => {
+                NextChunkResult::Eof => {
                     if !line_buf.is_empty() {
                         let out = rewrite_sse_model_line(&line_buf, client_model.as_deref());
                         let _ = tx.send(Ok(Bytes::from(out))).await;
                     }
                     break;
                 }
-                Err(_elapsed) => {
-                    log::error!("[CodexProxy] Passthrough stream stalled");
+                NextChunkResult::FirstByteTimeout => {
+                    log::error!("[CodexProxy] Passthrough upstream never started streaming");
                     let _ = tx
                         .send(Ok(Bytes::from(sse_failed_event(
                             &format!(
-                                "Upstream stream stalled (no data for {}s)",
-                                UPSTREAM_CHUNK_TIMEOUT.as_secs()
+                                "Upstream did not start streaming within {}s",
+                                UPSTREAM_FIRST_BYTE_TIMEOUT.as_secs()
                             ),
-                            "upstream_stall",
+                            "upstream_first_byte_timeout",
                         ))))
                         .await;
                     return;
@@ -1753,5 +1828,62 @@ mod tests {
         // round-trip via the wire format.
         let formatted = format!("{axum:?}");
         assert!(formatted.contains("response.created"), "got: {formatted}");
+    }
+
+    // ---- Disconnect-safe streaming timeout policy ----
+    //
+    // Regression coverage for the "chat a bit then it folds" root cause:
+    // the old per-chunk gap timeout (300s) killed thinking-model turns
+    // that paused between chunks. The new policy bounds only the first
+    // byte; subsequent gaps are unbounded (dead peers surface via TCP
+    // keepalive -> stream error).
+
+    #[tokio::test]
+    async fn first_byte_timeout_fires_when_upstream_never_responds() {
+        // A stream that never yields - simulates an upstream that accepted
+        // the request but never sends the first byte. We pass a tiny
+        // timeout (real wall-clock, not the 120s production value) so the
+        // test resolves in milliseconds.
+        let (_tx, rx) = mpsc::channel::<Result<Bytes, String>>(1);
+        let mut stream = ReceiverStream::new(rx);
+        let res = next_chunk_with_policy(&mut stream, true, Duration::from_millis(50)).await;
+        assert!(
+            matches!(res, NextChunkResult::FirstByteTimeout),
+            "expected FirstByteTimeout, got {res:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn subsequent_chunk_survives_long_thinking_pause() {
+        // Core regression: after the first chunk, the upstream goes silent
+        // past the first-byte timeout (thinking models do this between
+        // reasoning and answer), then resumes. The gap must NOT time out -
+        // that was the "chat a bit then it folds" root cause.
+        let (tx, rx) = mpsc::channel::<Result<Bytes, String>>(4);
+        let timeout = Duration::from_millis(50);
+        tokio::spawn(async move {
+            // First byte arrives promptly.
+            let _ = tx.send(Ok(Bytes::from("data: {\"a\":1}\n\n"))).await;
+            // Pause that exceeds the first-byte timeout - proves subsequent
+            // reads ignore it. (200ms >> 50ms; production thinking pauses
+            // are minutes.)
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            let _ = tx.send(Ok(Bytes::from("data: {\"b\":2}\n\n"))).await;
+        });
+        let mut stream = ReceiverStream::new(rx);
+
+        // First chunk - arrives immediately, is_first=true.
+        match next_chunk_with_policy(&mut stream, true, timeout).await {
+            NextChunkResult::Item(b) => assert_eq!(b, Bytes::from("data: {\"a\":1}\n\n")),
+            other => panic!("expected first Item, got {other:?}"),
+        }
+
+        // Second chunk - after a 200ms pause that exceeds the 50ms timeout.
+        // is_first=false -> no timeout. Old per-chunk code would fail here;
+        // the new policy must hand back the item so the turn survives.
+        match next_chunk_with_policy(&mut stream, false, timeout).await {
+            NextChunkResult::Item(b) => assert_eq!(b, Bytes::from("data: {\"b\":2}\n\n")),
+            other => panic!("expected Item after thinking pause, got {other:?}"),
+        }
     }
 }

@@ -115,11 +115,11 @@ pub fn resolve_desktop_binary() -> Option<PathBuf> {
 }
 
 /// Resolve the `shell:AppsFolder\<AUMID>` launch URI for ChatGPT desktop
-/// on Windows Store installs. Reads from `tools/codexdesktop/paths.json`
+/// on Windows Store installs. Reads from `tools/chatgptdesktop/paths.json`
 /// — the file shipped in the EchoBird tools directory.
 #[cfg(windows)]
 pub fn resolve_desktop_launch_uri(tools_dir: &std::path::Path) -> Option<String> {
-    let path = tools_dir.join("codexdesktop").join("paths.json");
+    let path = tools_dir.join("chatgptdesktop").join("paths.json");
     let content = std::fs::read_to_string(&path).ok()?;
     let cfg: serde_json::Value = serde_json::from_str(&content).ok()?;
     cfg.get("launchUri")
@@ -162,8 +162,18 @@ fn find_codex_store_family_in(packages_dir: &std::path::Path) -> Option<String> 
 /// over the hardcoded `paths.json` URI: beta-channel users were previously
 /// undetectable and launched the wrong (stable) AUMID. Returns None when no
 /// Codex Store package is present.
+///
+/// Data source order: the registry-backed AppX inventory (`Get-AppxPackage`,
+/// the authoritative source Windows itself uses and what CodexPlusPlus
+/// consults) first, then a directory scan of `%LOCALAPPDATA%\Packages` as a
+/// fallback when PowerShell is unavailable. Previously this only did the
+/// directory scan - "guess path" mode that missed installs whose
+/// package-data dir lives elsewhere; the registry query is authoritative.
 #[cfg(windows)]
 pub fn resolve_desktop_launch_uri_scanned() -> Option<String> {
+    if let Some(pfn) = find_codex_store_family_via_appx() {
+        return Some(format!("shell:AppsFolder\\{pfn}!App"));
+    }
     let local = std::env::var("LOCALAPPDATA").ok()?;
     let packages = std::path::Path::new(&local).join("Packages");
     let pfn = find_codex_store_family_in(&packages)?;
@@ -173,6 +183,49 @@ pub fn resolve_desktop_launch_uri_scanned() -> Option<String> {
 #[cfg(not(windows))]
 pub fn resolve_desktop_launch_uri_scanned() -> Option<String> {
     None
+}
+
+/// Query the AppX package inventory via `Get-AppxPackage` (backed by the
+/// Windows registry / COM package store - the authoritative source, vs. a
+/// filesystem directory scan). Returns the installed Codex Store package
+/// family name (`<identity>_<publisherhash>`), preferring the stable
+/// channel (`OpenAI.Codex`) over beta (`OpenAI.CodexBeta`), newest version
+/// first. Returns None when PowerShell is missing/fails or no package is
+/// installed.
+#[cfg(windows)]
+fn find_codex_store_family_via_appx() -> Option<String> {
+    // Prefer stable: query OpenAI.Codex first, fall back to OpenAI.CodexBeta
+    // only when stable isn't installed. Sort by version desc so the newest
+    // install wins when several are present. Output is a single PFN line.
+    let script = "if($p=Get-AppxPackage -Name OpenAI.Codex -ErrorAction SilentlyContinue | Sort-Object Version -Descending | Select-Object -First 1){$p.PackageFamilyName}elseif($p=Get-AppxPackage -Name OpenAI.CodexBeta -ErrorAction SilentlyContinue | Sort-Object Version -Descending | Select-Object -First 1){$p.PackageFamilyName}";
+    // CREATE_NO_WINDOW: this proxy runs inside a GUI process, so spawning
+    // powershell.exe without the flag flashes a console window (the
+    // "terminal opens then closes before ChatGPT launches" symptom).
+    // Same pattern as spawn_codex_desktop_exe / agent_tools / gpu.
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    let mut cmd = std::process::Command::new("powershell");
+    cmd.args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .creation_flags(CREATE_NO_WINDOW);
+    let output = cmd.output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    parse_appx_package_family_name(&String::from_utf8_lossy(&output.stdout))
+}
+
+/// Parse the PackageFamilyName from `Get-AppxPackage` stdout. Pure string
+/// logic so it's unit-testable on every platform without spawning PowerShell.
+/// Accepts the first non-empty trimmed line and requires a `<identity>_<hash>`
+/// shape so a malformed PowerShell response can't become a bogus AUMID.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn parse_appx_package_family_name(output: &str) -> Option<String> {
+    let pfn = output.lines().map(str::trim).find(|l| !l.is_empty())?;
+    if pfn.contains('_') {
+        Some(pfn.to_string())
+    } else {
+        None
+    }
 }
 
 /// Resolve the native Codex CLI binary (the platform-specific Rust exe
@@ -412,8 +465,35 @@ mod tests {
     }
 
     #[test]
+    fn parse_appx_pfn_extracts_family_name_from_stdout() {
+        // Get-AppxPackage emits the PFN on its own line (with a trailing
+        // CRLF on Windows). We take the first non-empty trimmed line.
+        assert_eq!(
+            parse_appx_package_family_name("OpenAI.Codex_2p2nqsd0c76g0\r\n"),
+            Some("OpenAI.Codex_2p2nqsd0c76g0".to_string())
+        );
+        // Leading blank line (PowerShell sometimes emits one) is skipped.
+        assert_eq!(
+            parse_appx_package_family_name("\n\nOpenAI.CodexBeta_ab12cd34ef56\n"),
+            Some("OpenAI.CodexBeta_ab12cd34ef56".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_appx_pfn_rejects_empty_and_malformed() {
+        // Empty / whitespace-only output -> no package found.
+        assert_eq!(parse_appx_package_family_name(""), None);
+        assert_eq!(parse_appx_package_family_name("   \r\n  \n"), None);
+        // A PFN must contain the `<identity>_<publisherhash>` underscore;
+        // a bare token can't form a valid AUMID, so reject it rather than
+        // emit a bogus shell:AppsFolder URI.
+        assert_eq!(parse_appx_package_family_name("OpenAI"), None);
+        assert_eq!(parse_appx_package_family_name("not-a-pfn"), None);
+    }
+
+    #[test]
     fn resolve_desktop_launch_uri_reads_uri_from_paths_json() {
-        // Build a fake tools dir with codexdesktop/paths.json holding a
+        // Build a fake tools dir with chatgptdesktop/paths.json holding a
         // launchUri. Verify we extract it.
         use std::sync::atomic::{AtomicU64, Ordering};
         static N: AtomicU64 = AtomicU64::new(0);
@@ -422,7 +502,7 @@ mod tests {
             std::process::id(),
             N.fetch_add(1, Ordering::Relaxed)
         ));
-        let cd_dir = dir.join("codexdesktop");
+        let cd_dir = dir.join("chatgptdesktop");
         std::fs::create_dir_all(&cd_dir).unwrap();
         std::fs::write(
             cd_dir.join("paths.json"),

@@ -238,7 +238,7 @@ pub async fn apply_model_to_tool(tool_id: &str, model_info: ModelInfo) -> ApplyR
         "zcode" => return apply_zcode(&model_info),
 
         // Codex CLI and ChatGPT desktop share ~/.codex/config.toml.
-        "codex" | "codexdesktop" => return apply_codex(tool_id, &model_info),
+        "codex" | "chatgptdesktop" => return apply_codex(tool_id, &model_info),
 
         // Claude Desktop 3P profile (Anthropic-native providers only)
         "claudedesktop" => return apply_claudedesktop(&model_info),
@@ -314,7 +314,7 @@ pub async fn restore_tool_to_official(tool_id: &str) -> ApplyResult {
         }
     };
 
-    if matches!(tool_id, "codex" | "codexdesktop") {
+    if matches!(tool_id, "codex" | "chatgptdesktop") {
         return restore_codex_to_official(tool_id, &config_path);
     }
     if tool_id == "claudedesktop" {
@@ -395,7 +395,7 @@ pub async fn get_tool_model_info(tool_id: &str) -> Option<ModelInfo> {
         "mimocode" => return read_mimocode(),
         "openscience" => return read_openscience(),
         "zcode" => return read_zcode(),
-        "codex" | "codexdesktop" => return read_codex(),
+        "codex" | "chatgptdesktop" => return read_codex(),
         "claudedesktop" => return read_claudedesktop(),
         "claudecode" => return read_claudecode(),
         "aider" => return read_aider(),
@@ -2037,7 +2037,7 @@ fn apply_codex(tool_id: &str, model_info: &ModelInfo) -> ApplyResult {
     });
     let _ = write_json_file(&relay_path, &relay);
 
-    let display = if tool_id == "codexdesktop" {
+    let display = if tool_id == "chatgptdesktop" {
         "ChatGPT"
     } else {
         "Codex CLI"
@@ -2233,7 +2233,7 @@ fn restore_codex_to_official(tool_id: &str, config_path: &Path) -> ApplyResult {
                 success: true,
                 message: format!(
                     "{} restored to OpenAI official provider.",
-                    if tool_id == "codexdesktop" {
+                    if tool_id == "chatgptdesktop" {
                         "ChatGPT"
                     } else {
                         "Codex CLI"

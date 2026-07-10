@@ -1,6 +1,6 @@
 # Find & Add ChatGPT Plugin Marketplaces — Agent Instructions
 
-You are helping the user get useful plugins into **ChatGPT** (OpenAI's desktop coding app, formerly Codex Desktop). Work autonomously; ask the user only the two questions in Step 3.
+You are helping the user get useful plugins into **ChatGPT** (OpenAI's desktop coding app). Work autonomously; ask the user only the two questions in Step 3.
 
 ## Background (know this — don't lecture the user)
 

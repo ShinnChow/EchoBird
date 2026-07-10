@@ -149,7 +149,7 @@ pub const INSTALLABLE_TOOL_IDS: &[&str] = &[
     "mimocode",
     "kimicode",
     "claudedesktop",
-    "codexdesktop",
+    "chatgptdesktop",
     "geminidesktop",
     "opencodedesktop",
     "coffeecli",

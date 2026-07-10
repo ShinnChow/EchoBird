@@ -152,7 +152,7 @@ export const AppManagerMain: React.FC = () => {
                 if (a.category === 'Desktop' && b.category === 'Desktop') {
                   const desktopOrder: Record<string, number> = {
                     claudedesktop: 0,
-                    codexdesktop: 1,
+                    chatgptdesktop: 1,
                     geminidesktop: 2,
                     coffeecli: 99,
                   };
@@ -601,7 +601,7 @@ export const AppManagerPanel: React.FC = () => {
   // (each binds its own relay flag). Codex CLI / ChatGPT desktop instead show the
   // Responses + Web Search toggles below. All of these toggles are
   // independent — there is no mutual exclusion among them.
-  const isCodexApp = selectedTool === 'codex' || selectedTool === 'codexdesktop';
+  const isCodexApp = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
   const isClaudeDesktopApp = selectedTool === 'claudedesktop';
   const isClaudeCodeApp = selectedTool === 'claudecode';
   // Codex dropped the API Router toggle (it has Web Search now); relay is shown
