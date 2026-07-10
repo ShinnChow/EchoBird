@@ -7,7 +7,7 @@ import {
   Activity,
   Newspaper,
   Star,
-  GraduationCap,
+  Sparkles,
   FolderHeart,
   Trophy,
 } from 'lucide-react';
@@ -103,7 +103,7 @@ export const Sidebar = ({
           onClick={() => onPageChange('projects')}
         />
         <NavItem
-          icon={<GraduationCap size={20} />}
+          icon={<Sparkles size={20} />}
           label={t('nav.skills')}
           active={activePage === 'skills'}
           onClick={() => onPageChange('skills')}

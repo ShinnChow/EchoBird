@@ -286,7 +286,7 @@ function App() {
                                       <div className="page-kicker truncate" aria-hidden="true">
                                         {is('news') && 'PULSE'}
                                         {is('projects') && 'RISING'}
-                                        {is('skills') && 'POPULAR'}
+                                        {is('skills') && 'GRIMOIRE'}
                                         {is('models') && 'ROSTER'}
                                         {is('apps') && 'STUDIO'}
                                         {is('myProjects') && 'VIBE CODING'}
