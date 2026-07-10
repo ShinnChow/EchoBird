@@ -1,5 +1,5 @@
 {
-  "version": "5.4.9",
+  "version": "5.5.0",
   "releaseDate": "2026-07-10",
   "releaseNotes": "## 更新\n\n`Codex 桌面端` 与 `ChatGPT` 合并，EchoBird 同步更新支持。**如果不想更新 Codex 桌面端，EchoBird 继续使用 5.5.0 之前版本**（5.5.0 及以后仅识别新版 ChatGPT 桌面端）。\n\n## 优化\n\n马斯克旗下公司 xAI 推出模型 `Grok 4.5`，多榜单力压 Claude 和 GPT 系列模型登顶，价格约为 Opus 4.8 五分之一\n\n- 优化 `Grok 4.5` 在模型中心,一键接入其他工具,一键写入 OpenAI / Anthropic 协议地址\n- 优化 `Grok Build` 在应用管理,一键安装、一键接入第三方模型(Claude Code 平替编程平台)\n\n## 科研\n\n新增 AI 科研工作站 OpenScience：一键安装、一键切换模型、一键启动，协助科研人员完成完整的科研流程（Claude Science 开源平替）\n  - 生物学与基因组学：单细胞分析（`scanpy`、`scVI`）、序列分析（`BioPython`）、蛋白质结构预测（`AlphaFold`）等\n  - 化学与药物发现：分子性质预测、虚拟筛选、分子对接（`RDKit`、`DeepChem`、`DiffDock`）等\n  - 机器学习训练与微调：SFT/LoRA（`TRL`、`Unsloth`、`Axolotl`）、RL 后训练（GRPO、PPO、DPO）等\n  - 文献调研及论文写作：PRISMA 系统综述、多数据库交叉检索、BibTeX 自动生成、LaTeX 排版、期刊模板匹配、图表生成等\n",
   "releaseNotesI18n": {
