@@ -4,41 +4,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EchoBird — 像专家一样部署 AI Agent · 一键安装 Claude Code、OpenClaw、本地大模型</title>
+    <title>EchoBird — 让 AI 的橄榄枝抵达千家万户</title>
     <meta name="description"
-        content="EchoBird — 一键安装 AI Agent,统一的模型数据中枢,一键部署本地大模型。不打开终端,不写配置文件。Windows / macOS / Linux 全平台。">
+        content="EchoBird — 在神话中，衔着橄榄枝的飞鸟，把幸福送入千家万户。而 EchoBird 把 AI 工具带到每一台电脑上。">
     <meta name="keywords"
         content="EchoBird,AI Agent,Claude Code,OpenClaw,Codex,本地大模型,llama.cpp,vLLM,Qwen,DeepSeek,模型管理,一键安装">
-    <meta property="og:title" content="EchoBird — 像专家一样部署 AI Agent">
-    <meta property="og:description" content="一键安装 Agent · 模型数据中枢 · 一键部署本地大模型">
+    <meta property="og:title" content="EchoBird — 让 AI 的橄榄枝抵达千家万户">
+    <meta property="og:description" content="一键安装 Agent · 模型中枢 · 一键部署本地大模型">
     <meta property="og:image" content="./icon.png">
     <link rel="icon" href="./icon.png" type="image/png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" media="screen" href="https://fontlibrary.org//face/cmu-concrete">
     <link
-        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Noto+Serif+SC:wght@500;600;700;900&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <style>
         :root {
-            /* Claude Desktop palette — matches the app's dark theme. Coral
-               accent is used sparingly: brand mark, primary CTA, link hover. */
-            --bg: #121212;
-            --bg2: #1A1A1C;
-            --bg3: #222224;
-            --bg-card: rgba(28, 28, 30, 0.85);
-            --neon: #D97757;          /* Claude coral */
-            --neon2: #E89F7A;         /* warm amber for gradient pair */
-            --neon-soft: rgba(217, 119, 87, 0.12);
-            --neon-line: rgba(217, 119, 87, 0.22);
-            --white: #ECECEE;
-            --text: #B5B5B7;
-            --dim: #7A7A7C;
-            --border: rgba(255, 255, 255, 0.06);
-            --border-strong: rgba(255, 255, 255, 0.12);
+            --bg: #14120f;
+            --bg2: #1c1711;
+            --bg3: #2a2218;
+            --bg-card: rgba(26, 21, 16, 0.82);
+            --neon: #d7b06f;
+            --neon2: #f2e6c7;
+            --neon-soft: rgba(215, 176, 111, 0.13);
+            --neon-line: rgba(215, 176, 111, 0.25);
+            --white: #eee9dd;
+            --text: #c9bda7;
+            --dim: #8f8069;
+            --border: rgba(238, 233, 221, 0.09);
+            --border-strong: rgba(238, 233, 221, 0.18);
+            --serif: 'Noto Serif SC', 'Cormorant Garamond', 'Songti SC', 'STSong', 'SimSun', Georgia, serif;
             --sans: 'Inter', -apple-system, 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
             --mono: 'JetBrains Mono', monospace;
-            --display: 'Orbitron', var(--mono);
+            --display: 'Cormorant Garamond', 'Noto Serif SC', Georgia, serif;
+        }
+
+        html[lang="en"] {
+            --serif: 'CMU Concrete', 'CMUConcreteRoman', 'Computer Modern Concrete', 'Cormorant Garamond', Georgia, serif;
+            --display: 'CMU Concrete', 'CMUConcreteRoman', 'Computer Modern Concrete', 'Cormorant Garamond', Georgia, serif;
         }
 
         * {
@@ -61,33 +66,27 @@
             -moz-osx-font-smoothing: grayscale;
         }
 
-        /* ── Subtle dotted background — Claude Desktop style ── */
         .bg-grid {
             position: fixed;
             inset: 0;
             z-index: 0;
             pointer-events: none;
             background-image:
-                radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-            background-size: 24px 24px;
-            mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 80%);
-            -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 80%);
+                linear-gradient(90deg, rgba(238, 233, 221, 0.035) 1px, transparent 1px),
+                linear-gradient(0deg, rgba(238, 233, 221, 0.025) 1px, transparent 1px),
+                repeating-linear-gradient(0deg, rgba(238, 233, 221, 0.035) 0 1px, transparent 1px 4px);
+            background-size: 64px 64px, 64px 64px, 100% 4px;
+            opacity: 0.38;
         }
 
-        /* Single restrained warm halo behind the hero — replaces the old
-           cyberpunk matrix rain + dual neon orbs. */
         .glow-orb {
             position: fixed;
-            border-radius: 50%;
-            filter: blur(140px);
+            inset: 0;
             pointer-events: none;
             z-index: 0;
-            top: -240px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 720px;
-            height: 480px;
-            background: rgba(217, 119, 87, 0.08);
+            background:
+                radial-gradient(ellipse at 70% 18%, rgba(242, 230, 199, 0.12), transparent 30%),
+                linear-gradient(180deg, rgba(20, 18, 15, 0.08), #14120f 92%);
         }
 
         /* ── Nav ── */
@@ -101,7 +100,7 @@
             align-items: center;
             justify-content: space-between;
             padding: 14px 32px;
-            background: rgba(18, 18, 18, 0.78);
+            background: rgba(20, 18, 15, 0.74);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border-bottom: 1px solid var(--border);
@@ -110,22 +109,16 @@
         .nav-logo {
             display: flex;
             align-items: center;
-            gap: 10px;
             text-decoration: none;
         }
 
-        .nav-logo img {
-            width: 26px;
-            height: 26px;
-            border-radius: 6px;
-        }
-
         .nav-logo span {
-            font-family: var(--mono);
-            font-weight: 600;
-            font-size: 15px;
+            font-family: var(--display);
+            font-weight: 700;
+            font-size: 25px;
             color: var(--neon);
-            letter-spacing: 0.5px;
+            letter-spacing: 0;
+            line-height: 1;
         }
 
         .nav-r {
@@ -154,13 +147,13 @@
             font-family: var(--mono);
             font-weight: 600;
             font-size: 12px;
-            letter-spacing: 0.5px;
+            letter-spacing: 0;
             transition: all 0.2s;
         }
 
         .nav-r .nav-cta:hover {
             color: var(--bg);
-            box-shadow: 0 0 24px rgba(217, 119, 87, 0.5);
+            box-shadow: 0 0 24px rgba(215, 176, 111, 0.32);
             transform: translateY(-1px);
         }
 
@@ -168,26 +161,55 @@
         .hero {
             position: relative;
             z-index: 1;
-            padding: 140px 32px 60px;
-            max-width: 860px;
-            margin: 0 auto;
+            padding: 116px clamp(24px, 8vw, 112px) 76px;
+            min-height: 100svh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            overflow: hidden;
             text-align: left;
+        }
+
+        .hero::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: -3;
+            background-image: url("./assets/echobird-dove-hero-engraved.png");
+            background-size: cover;
+            background-position: 70% 42%;
+            transform: scale(1.03);
+            filter: contrast(1.08) brightness(0.94);
+        }
+
+        .hero::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: -2;
+            background:
+                linear-gradient(90deg, rgba(20, 18, 15, 0.94) 0%, rgba(20, 18, 15, 0.72) 42%, rgba(20, 18, 15, 0.05) 72%, rgba(20, 18, 15, 0.32) 100%),
+                linear-gradient(180deg, rgba(20, 18, 15, 0.1) 0%, rgba(20, 18, 15, 0.12) 56%, #14120f 100%),
+                repeating-linear-gradient(0deg, rgba(242, 230, 199, 0.08) 0 1px, transparent 1px 3px);
+            mix-blend-mode: normal;
         }
 
         .hero .badge {
             display: inline-flex;
             align-items: center;
             gap: 8px;
+            width: fit-content;
             font-family: var(--mono);
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
-            color: var(--neon);
-            letter-spacing: 1.5px;
-            margin-bottom: 28px;
+            color: var(--neon2);
+            letter-spacing: 0;
+            margin-bottom: 24px;
             padding: 6px 14px;
             border: 1px solid var(--border-strong);
-            border-radius: 20px;
-            background: var(--neon-soft);
+            border-radius: 999px;
+            background: rgba(20, 18, 15, 0.58);
+            box-shadow: inset 0 0 24px rgba(215, 176, 111, 0.08);
         }
 
         .hero .badge .dot {
@@ -195,7 +217,7 @@
             height: 6px;
             border-radius: 50%;
             background: var(--neon);
-            box-shadow: 0 0 8px var(--neon);
+            box-shadow: 0 0 12px rgba(215, 176, 111, 0.9);
             animation: pulse 2s ease-in-out infinite;
         }
 
@@ -212,20 +234,20 @@
         }
 
         .hero h1 {
-            font-family: var(--sans);
-            font-size: clamp(36px, 6.5vw, 68px);
-            font-weight: 800;
-            line-height: 1.05;
-            letter-spacing: -1.5px;
+            max-width: 820px;
+            font-family: var(--serif);
+            font-size: clamp(42px, 6.6vw, 78px);
+            font-weight: 900;
+            line-height: 1.03;
+            letter-spacing: 0;
             margin-bottom: 24px;
             color: var(--white);
+            text-shadow: 0 2px 28px rgba(0, 0, 0, 0.55);
         }
 
         .hero h1 .gradient {
-            background: linear-gradient(135deg, var(--neon) 0%, var(--neon2) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: var(--neon2);
+            -webkit-text-fill-color: currentColor;
         }
 
         /* English line 2 is the long canonical riddle ("Which came first, the
@@ -233,23 +255,25 @@
            it still fits without wrapping awkwardly. Chinese H1 stays at the
            full hero size. */
         [lang="en"] .hero h1 .gradient {
-            font-size: 0.5em;
-            line-height: 1.2;
-            letter-spacing: -0.3px;
+            font-size: 0.72em;
+            line-height: 1.05;
+            letter-spacing: 0;
             display: inline-block;
             margin-top: 8px;
-            white-space: nowrap;
         }
 
         .hero .lede {
-            font-size: clamp(15px, 1.6vw, 18px);
+            max-width: 700px;
+            font-family: var(--serif);
+            font-size: clamp(17px, 1.7vw, 22px);
             color: var(--text);
-            line-height: 1.85;
-            margin-bottom: 20px;
+            line-height: 1.8;
+            margin-bottom: 22px;
+            text-shadow: 0 2px 20px rgba(0, 0, 0, 0.55);
         }
 
         .hero .lede strong {
-            color: var(--neon);
+            color: var(--neon2);
             font-weight: 600;
         }
 
@@ -257,8 +281,8 @@
             font-family: var(--mono);
             font-size: 12px;
             color: var(--dim);
-            margin-bottom: 36px;
-            letter-spacing: 0.5px;
+            margin-bottom: 26px;
+            letter-spacing: 0;
         }
 
         .hero .platforms .macos-hint code {
@@ -266,42 +290,46 @@
             background: rgba(255, 255, 255, 0.06);
             padding: 1px 6px;
             border-radius: 3px;
-            color: var(--accent);
+            color: var(--neon2);
             user-select: all;
         }
 
         .hero .cta-row {
             display: flex;
+            align-items: center;
             gap: 14px;
             flex-wrap: wrap;
-            margin-bottom: 24px;
+            margin-bottom: 0;
         }
 
         .btn {
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            padding: 13px 26px;
-            border-radius: 8px;
+            min-height: 48px;
+            padding: 13px 22px;
+            border-radius: 6px;
             font-weight: 600;
             font-size: 14px;
             text-decoration: none;
             transition: all 0.2s;
             font-family: var(--mono);
-            letter-spacing: 0.3px;
+            letter-spacing: 0;
             cursor: pointer;
             border: none;
         }
 
         .btn-primary {
-            background: var(--neon);
+            background: rgba(238, 233, 221, 0.96);
             color: var(--bg);
-            box-shadow: 0 0 0 1px var(--neon), 0 8px 32px rgba(217, 119, 87, 0.22);
+            border: 1px solid rgba(242, 230, 199, 0.75);
+            box-shadow: 0 14px 38px rgba(0, 0, 0, 0.28);
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 0 0 1px var(--neon), 0 12px 40px rgba(217, 119, 87, 0.4);
+            background: #fff7df;
+            box-shadow: 0 18px 46px rgba(0, 0, 0, 0.34);
         }
 
         .btn-ghost {
@@ -313,15 +341,15 @@
         .btn-ghost:hover {
             border-color: var(--neon);
             color: var(--neon);
-            background: rgba(217, 119, 87, 0.06);
+            background: rgba(215, 176, 111, 0.08);
             transform: translateY(-2px);
         }
 
         /* Chinese-only mirror download channels (Baidu / Quark / 123pan).
            Hidden on English via the html[lang="en"] rule below. */
         .mirror-downloads {
-            margin-top: -8px;
-            margin-bottom: 24px;
+            margin-top: 22px;
+            margin-bottom: 8px;
             font-size: 13px;
             color: var(--dim);
             display: flex;
@@ -349,7 +377,7 @@
             font-size: 12px;
             color: var(--dim);
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0;
             padding: 0 2px;
             align-self: center;
         }
@@ -359,45 +387,59 @@
         .install-cmd-row {
             display: inline-flex;
             align-items: center;
-            gap: 10px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border-strong);
-            border-radius: 8px;
-            padding: 0 14px;
-            height: 46px; /* match .btn (13px padding + 14px font + 6px line ≈ 46px) */
+            gap: 12px;
+            background: rgba(20, 18, 15, 0.52);
+            border: 1px solid rgba(238, 233, 221, 0.2);
+            border-radius: 6px;
+            padding: 0 10px 0 14px;
+            height: 48px;
             font-family: var(--mono);
             font-size: 13px;
-            transition: border-color 0.15s;
+            box-shadow: inset 0 1px 0 rgba(238, 233, 221, 0.06), 0 12px 34px rgba(0, 0, 0, 0.22);
+            transition: border-color 0.15s, background 0.15s;
         }
 
         .install-cmd-row:hover {
-            border-color: rgba(217, 119, 87, 0.4);
+            border-color: rgba(215, 176, 111, 0.42);
+            background: rgba(20, 18, 15, 0.68);
         }
 
         .install-cmd-row .label {
             color: var(--dim);
             font-size: 11px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0;
+            border-right: 1px solid rgba(238, 233, 221, 0.12);
+            padding-right: 12px;
         }
 
         .install-cmd-row code {
             color: var(--white);
             background: transparent;
             white-space: nowrap;
+            overflow-x: auto;
+            max-width: min(58vw, 420px);
+            min-width: 0;
+            scrollbar-width: none;
+        }
+
+        .install-cmd-row code::-webkit-scrollbar {
+            display: none;
         }
 
         .install-cmd-row .copy-btn {
             background: transparent;
-            border: 1px solid var(--border-strong);
-            color: var(--dim);
+            border: 1px solid rgba(238, 233, 221, 0.16);
+            color: var(--text);
             font-family: var(--mono);
             font-size: 11px;
             padding: 4px 10px;
-            border-radius: 4px;
+            border-radius: 5px;
             cursor: pointer;
-            letter-spacing: 0.5px;
+            letter-spacing: 0;
             transition: all 0.15s;
+            white-space: nowrap;
+            min-width: 46px;
         }
 
         .install-cmd-row .copy-btn:hover {
@@ -432,7 +474,7 @@
         .showcase-section {
             position: relative;
             z-index: 1;
-            padding: 80px 32px 40px;
+            padding: 96px 32px 40px;
             max-width: 1200px;
             margin: 0 auto;
         }
@@ -497,7 +539,7 @@
             font-family: var(--mono);
             font-size: 12px;
             font-weight: 600;
-            letter-spacing: 0.5px;
+            letter-spacing: 0;
             padding: 8px 10px;
             border-radius: 5px;
             cursor: pointer;
@@ -547,7 +589,7 @@
 
         .showcase-tab.active {
             border-color: var(--neon);
-            background: rgba(217, 119, 87, 0.08);
+            background: rgba(215, 176, 111, 0.1);
             transform: translateX(-2px);
         }
 
@@ -555,8 +597,8 @@
             width: 32px;
             height: 32px;
             border-radius: 8px;
-            background: linear-gradient(135deg, rgba(217, 119, 87, 0.18), rgba(232, 159, 122, 0.06));
-            border: 1px solid rgba(217, 119, 87, 0.25);
+            background: linear-gradient(135deg, rgba(215, 176, 111, 0.2), rgba(242, 230, 199, 0.06));
+            border: 1px solid rgba(215, 176, 111, 0.28);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -584,7 +626,7 @@
             font-size: 11px;
             color: var(--dim);
             font-family: var(--mono);
-            letter-spacing: 0.2px;
+            letter-spacing: 0;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -613,7 +655,7 @@
 
         @media (max-width: 600px) {
             .showcase-section {
-                padding: 40px 16px 20px;
+                padding: 78px 16px 20px;
             }
             .showcase-frame {
                 margin-top: 36px;
@@ -640,16 +682,16 @@
             font-size: 12px;
             font-weight: 600;
             color: var(--neon);
-            letter-spacing: 2px;
+            letter-spacing: 0;
             margin-bottom: 16px;
             text-transform: uppercase;
         }
 
         .section-title {
-            font-family: var(--sans);
+            font-family: var(--serif);
             font-size: clamp(28px, 4vw, 44px);
-            font-weight: 800;
-            letter-spacing: -1px;
+            font-weight: 900;
+            letter-spacing: 0;
             color: var(--white);
             margin-bottom: 14px;
             line-height: 1.15;
@@ -673,7 +715,7 @@
         .feature-card {
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 14px;
+            border-radius: 8px;
             padding: 32px 28px;
             backdrop-filter: blur(8px);
             transition: all 0.3s;
@@ -691,14 +733,14 @@
             width: 52px;
             height: 52px;
             border-radius: 12px;
-            background: linear-gradient(135deg, rgba(217, 119, 87, 0.2), rgba(232, 159, 122, 0.06));
+            background: linear-gradient(135deg, rgba(215, 176, 111, 0.22), rgba(242, 230, 199, 0.06));
             display: flex;
             align-items: center;
             justify-content: center;
             color: var(--neon);
             font-size: 22px;
             margin-bottom: 22px;
-            border: 1px solid rgba(217, 119, 87, 0.25);
+            border: 1px solid rgba(215, 176, 111, 0.28);
         }
 
         .feature-num {
@@ -706,7 +748,7 @@
             font-size: 11px;
             font-weight: 700;
             color: var(--neon);
-            letter-spacing: 3px;
+            letter-spacing: 0;
             margin-bottom: 10px;
         }
 
@@ -714,7 +756,7 @@
             font-family: var(--sans);
             font-size: 22px;
             font-weight: 800;
-            letter-spacing: -0.4px;
+            letter-spacing: 0;
             margin-bottom: 14px;
             line-height: 1.25;
             color: var(--white);
@@ -757,7 +799,7 @@
 
         /* ── Tools grid ── */
         .tools-section {
-            background: linear-gradient(180deg, transparent, rgba(217, 119, 87, 0.02), transparent);
+            background: linear-gradient(180deg, transparent, rgba(215, 176, 111, 0.035), transparent);
         }
 
         .tools-grid {
@@ -788,7 +830,7 @@
             width: 36px;
             height: 36px;
             border-radius: 8px;
-            background: linear-gradient(135deg, rgba(217, 119, 87, 0.18), rgba(232, 159, 122, 0.08));
+            background: linear-gradient(135deg, rgba(215, 176, 111, 0.2), rgba(242, 230, 199, 0.08));
             display: flex;
             align-items: center;
             justify-content: center;
@@ -820,8 +862,8 @@
             font-family: var(--mono);
             font-size: 10px;
             color: var(--neon);
-            background: rgba(217, 119, 87, 0.1);
-            border: 1px solid rgba(217, 119, 87, 0.3);
+            background: rgba(215, 176, 111, 0.12);
+            border: 1px solid rgba(215, 176, 111, 0.32);
             padding: 2px 7px;
             border-radius: 4px;
             flex-shrink: 0;
@@ -876,7 +918,7 @@
 
         /* ── Local LLM strip ── */
         .local-strip {
-            background: linear-gradient(135deg, rgba(217, 119, 87, 0.05), rgba(255, 255, 255, 0.02));
+            background: linear-gradient(135deg, rgba(215, 176, 111, 0.07), rgba(255, 255, 255, 0.02));
             border: 1px solid var(--border-strong);
             border-radius: 16px;
             padding: 40px;
@@ -892,7 +934,7 @@
             font-weight: 700;
             color: var(--neon);
             margin-bottom: 8px;
-            letter-spacing: 1px;
+            letter-spacing: 0;
         }
 
         .local-stat .desc {
@@ -919,7 +961,7 @@
 
         .download-card {
             background:
-                linear-gradient(135deg, rgba(217, 119, 87, 0.06), rgba(255, 255, 255, 0.02)),
+                linear-gradient(135deg, rgba(215, 176, 111, 0.08), rgba(255, 255, 255, 0.02)),
                 var(--bg2);
             border: 1px solid var(--border-strong);
             border-radius: 20px;
@@ -933,7 +975,7 @@
             content: '';
             position: absolute;
             inset: 0;
-            background: radial-gradient(ellipse at 50% 0%, rgba(217, 119, 87, 0.12), transparent 60%);
+            background: radial-gradient(ellipse at 50% 0%, rgba(215, 176, 111, 0.14), transparent 60%);
             pointer-events: none;
         }
 
@@ -946,7 +988,7 @@
             font-family: var(--sans);
             font-size: clamp(28px, 4vw, 40px);
             font-weight: 800;
-            letter-spacing: -1px;
+            letter-spacing: 0;
             margin-bottom: 14px;
         }
 
@@ -979,7 +1021,7 @@
 
         .dl-btn:hover {
             border-color: var(--neon);
-            background: rgba(217, 119, 87, 0.06);
+            background: rgba(215, 176, 111, 0.08);
             transform: translateY(-2px);
         }
 
@@ -992,7 +1034,7 @@
             font-size: 11px;
             font-family: var(--mono);
             color: var(--dim);
-            letter-spacing: 0.5px;
+            letter-spacing: 0;
             margin-bottom: 2px;
         }
 
@@ -1052,7 +1094,7 @@
             font-size: 11px;
             font-weight: 600;
             color: var(--neon);
-            letter-spacing: 1.5px;
+            letter-spacing: 0;
             margin-bottom: 14px;
             text-transform: uppercase;
         }
@@ -1104,6 +1146,26 @@
 
         /* ── Responsive ── */
         @media (max-width: 900px) {
+            .hero {
+                min-height: 100svh;
+                padding: 118px 28px 72px;
+            }
+
+            .hero::before {
+                background-position: 72% 34%;
+            }
+
+            .hero::after {
+                background:
+                    linear-gradient(90deg, rgba(20, 18, 15, 0.94) 0%, rgba(20, 18, 15, 0.78) 58%, rgba(20, 18, 15, 0.42) 100%),
+                    linear-gradient(180deg, rgba(20, 18, 15, 0.22) 0%, rgba(20, 18, 15, 0.2) 52%, #14120f 100%),
+                    repeating-linear-gradient(0deg, rgba(242, 230, 199, 0.08) 0 1px, transparent 1px 3px);
+            }
+
+            .hero h1 {
+                max-width: 720px;
+            }
+
             .features-grid {
                 grid-template-columns: 1fr;
                 gap: 16px;
@@ -1138,7 +1200,50 @@
             }
 
             .hero {
-                padding: 110px 20px 40px;
+                padding: 104px 18px 64px;
+                min-height: 100svh;
+            }
+
+            .hero::before {
+                background-size: auto 100%;
+                background-position: 78% 24%;
+                filter: sepia(0.9) saturate(0.65) contrast(1.18) brightness(0.44);
+            }
+
+            .hero::after {
+                background:
+                    linear-gradient(90deg, rgba(20, 18, 15, 0.96) 0%, rgba(20, 18, 15, 0.88) 72%, rgba(20, 18, 15, 0.62) 100%),
+                    linear-gradient(180deg, rgba(20, 18, 15, 0.18) 0%, rgba(20, 18, 15, 0.3) 58%, #14120f 100%),
+                    repeating-linear-gradient(0deg, rgba(242, 230, 199, 0.08) 0 1px, transparent 1px 3px);
+            }
+
+            .hero h1 {
+                font-size: clamp(34px, 10.5vw, 44px);
+            }
+
+            .hero .lede {
+                font-size: 16px;
+                line-height: 1.75;
+            }
+
+            .hero .cta-row {
+                align-items: stretch;
+            }
+
+            .cta-or {
+                display: none;
+            }
+
+            .install-cmd-row {
+                width: 100%;
+                height: auto;
+                min-height: 46px;
+                justify-content: space-between;
+                padding: 10px 12px;
+            }
+
+            .install-cmd-row code {
+                max-width: 100%;
             }
 
             .section {
@@ -1167,7 +1272,7 @@
         /* Language toggle button */
         .lang-toggle {
             background: transparent;
-            border: 1px solid rgba(217, 119, 87, 0.35);
+            border: 1px solid rgba(215, 176, 111, 0.38);
             color: var(--neon);
             padding: 6px 12px;
             border-radius: 4px;
@@ -1179,7 +1284,7 @@
             margin-left: 10px;
         }
         .lang-toggle:hover {
-            background: rgba(217, 119, 87, 0.1);
+            background: rgba(215, 176, 111, 0.12);
             border-color: var(--neon);
         }
     </style>
@@ -1187,10 +1292,10 @@
         // i18n translations
         const I18N = {
             'zh-CN': {
-                'meta.title': 'EchoBird — 一键安装 AI Agent · Claude Code、OpenClaw、本地大模型',
-                'meta.desc': 'EchoBird — 一键安装 AI Agent,统一的模型数据中枢,一键部署本地大模型。Windows / macOS / Linux 全平台。',
-                'meta.ogTitle': 'EchoBird — AI 部署不再是先有鸡先有蛋',
-                'meta.ogDesc': '一键安装 Agent · 模型数据中枢 · 一键部署本地大模型',
+                'meta.title': 'EchoBird — 让 AI 的橄榄枝抵达千家万户',
+                'meta.desc': 'EchoBird — 在神话中，衔着橄榄枝的飞鸟，把幸福送入千家万户。而 EchoBird 把 AI 工具带到每一台电脑上。',
+                'meta.ogTitle': 'EchoBird — 让 AI 的橄榄枝抵达千家万户',
+                'meta.ogDesc': '一键安装 Agent · 模型中枢 · 一键部署本地大模型',
                 'nav.brand': 'EchoBird',
                 'nav.showcase': '界面',
                 'nav.features': '功能',
@@ -1198,9 +1303,9 @@
                 'nav.feedback': '问题反馈',
                 'nav.support': '请喝咖啡',
                 'nav.download': '下载',
-                'hero.h1.line1': 'AI 部署不再是:',
-                'hero.h1.line2': '先有鸡,还是先有蛋',
-                'hero.lede.html': '很多朋友让我帮他们安装 <strong>Claude Code</strong>、<strong>OpenClaw</strong>、<strong>Hermes Agent</strong>……不但每个人的系统都不一样,甚至有些人还抠门到不愿花钱买大模型,安装和解释起来都特别费劲。于是我开发了这个叫<strong>「EchoBird」</strong>的 Agent —— 灵感来自《赛博朋克 2077》里那位聪慧过人、总能帮主角搞定一切技术难题的天才女助理 <strong>Songbird</strong><span style="color: var(--neon)">…</span>',
+                'hero.h1.line1': '让 AI 的橄榄枝',
+                'hero.h1.line2': '抵达千家万户',
+                'hero.lede.html': '在神话中，衔着橄榄枝的飞鸟，把幸福送入千家万户。而 EchoBird 帮你把 <strong>Claude Code</strong>、<strong>ChatGPT</strong>、<strong>本地大模型</strong> 和模型切换，都化成一次幸福的点击。',
                 'showcase.eyebrow': '界面预览',
                 'showcase.title': '看看 EchoBird 长啥样',
                 'showcase.sub': '浅色 / 深色双主题,中英文界面,所有 AI 工具集中在一个地方。',
@@ -1213,7 +1318,9 @@
                 'showcase.agent': '安装与修复 — 用对话搞定部署和排障',
                 'hero.platforms': 'Windows · macOS · Linux · 免费',
                 'hero.macosHint': 'macOS 首次启动',
-                'hero.btn.download': '立即下载',
+                'hero.btn.download': '获取 EchoBird',
+                'hero.btn.copy': '复制',
+                'hero.btn.copied': '已复制',
                 'hero.or': '或',
                 'features.title': '三个"一键",搞定整个 AI Agent 工作流',
                 'features.sub': '从安装到运行,从切换到部署,EchoBird把每一个原本需要看十篇文档的步骤,压缩成了一次点击。',
@@ -1257,10 +1364,10 @@
                 'footer.tagline': 'Made with ❤ by EchoBird Team',
             },
             'en': {
-                'meta.title': 'EchoBird — 1-Click Install AI Agents · Claude Code, OpenClaw, Local LLMs',
-                'meta.desc': 'EchoBird — 1-Click install AI Agents, unified model data hub, 1-Click deploy local LLMs. Windows / macOS / Linux.',
-                'meta.ogTitle': 'EchoBird — AI deployment, no more chicken-and-egg',
-                'meta.ogDesc': '1-Click install · Model data hub · 1-Click deploy',
+                'meta.title': 'EchoBird — Let the olive branch of AI reach every home',
+                'meta.desc': 'In myth, a bird carrying an olive branch brings happiness home. EchoBird turns Claude Code, ChatGPT, local LLMs, and model switching into one happy click.',
+                'meta.ogTitle': 'EchoBird — Let the olive branch of AI reach every home',
+                'meta.ogDesc': 'Claude Code · ChatGPT · Local LLMs · Model switching',
                 'nav.brand': 'EchoBird',
                 'nav.showcase': 'Tour',
                 'nav.features': 'Features',
@@ -1268,9 +1375,9 @@
                 'nav.feedback': 'Feedback',
                 'nav.support': 'Coffee ☕',
                 'nav.download': 'Download',
-                'hero.h1.line1': 'AI deploys AI.',
-                'hero.h1.line2': 'Which came first, the chicken or the egg?',
-                'hero.lede.html': 'Friends kept asking me to install <strong>Claude Code</strong>, <strong>OpenClaw</strong>, <strong>Hermes Agent</strong>… every machine was different, and some refused to pay for an LLM. Setup and explanations took forever. So I built <strong>EchoBird</strong> — an Agent inspired by <strong>Songbird</strong>, the genius netrunner from <em>Cyberpunk 2077</em> who solves any tech problem for V<span style="color: var(--neon)">…</span>',
+                'hero.h1.line1': 'Let the olive branch',
+                'hero.h1.line2': 'of AI reach every home.',
+                'hero.lede.html': 'In myth, the bird carrying an olive branch brings happiness into every home. EchoBird helps you turn <strong>Claude Code</strong>, <strong>ChatGPT</strong>, <strong>local LLMs</strong>, and model switching into one happy click.',
                 'showcase.eyebrow': 'PRODUCT TOUR',
                 'showcase.title': 'See EchoBird in action',
                 'showcase.sub': 'Light & dark themes, EN / CN UI — every AI tool in one place.',
@@ -1283,7 +1390,9 @@
                 'showcase.agent': 'Install & Repair Agent — chat-driven setup and troubleshooting',
                 'hero.platforms': 'Windows · macOS · Linux · Free',
                 'hero.macosHint': 'macOS first launch:',
-                'hero.btn.download': 'Download Now',
+                'hero.btn.download': 'Get EchoBird',
+                'hero.btn.copy': 'Copy',
+                'hero.btn.copied': 'Copied',
                 'hero.or': 'or',
                 'features.title': 'Three "1-Clicks" cover the whole AI Agent workflow',
                 'features.sub': 'From install to run, from switch to deploy — EchoBird collapses every step that used to need ten docs into a single click.',
@@ -1387,7 +1496,6 @@
     <!-- Navigation -->
     <nav class="nav">
         <a href="#" class="nav-logo">
-            <img src="./icon.png" alt="EchoBird">
             <span data-i18n="nav.brand">EchoBird</span>
         </a>
         <div class="nav-r">
@@ -1415,13 +1523,12 @@
             <span>Tauri + Rust + llama.cpp</span>
         </div>
         <h1>
-            <span data-i18n="hero.h1.line1">AI 部署不再是:</span><br>
-            <span class="gradient" data-i18n="hero.h1.line2">先有鸡,还是先有蛋</span>
+            <span data-i18n="hero.h1.line1">让 AI 的橄榄枝</span><br>
+            <span class="gradient" data-i18n="hero.h1.line2">抵达千家万户</span>
         </h1>
         <p class="lede" data-i18n-html="hero.lede.html">
-            很多朋友让我帮他们安装 <strong>Claude Code</strong>、<strong>OpenClaw</strong>、<strong>Hermes Agent</strong>……
-            不但每个人的系统都不一样,甚至有些人还抠门到不愿花钱买大模型,安装和解释起来都特别费劲。于是我开发了这个叫<strong>「EchoBird」</strong>的
-            Agent —— 灵感来自《赛博朋克 2077》里那位聪慧过人、总能帮主角搞定一切技术难题的天才女助理 <strong>Songbird</strong><span style="color: var(--neon)">…</span>
+            在神话中，衔着橄榄枝的飞鸟，把幸福送入千家万户。而 EchoBird 帮你把 <strong>Claude Code</strong>、<strong>ChatGPT</strong>、<strong>本地大模型</strong>
+            和模型切换，都化成一次幸福的点击。
         </p>
         <p class="platforms">
             <span data-i18n="hero.platforms">Windows · macOS · Linux · 免费</span><span class="macos-hint" id="macosHint" style="display:none"> · <span data-i18n="hero.macosHint">macOS 首次启动</span> <code>xattr -cr /Applications/EchoBird.app</code></span>
@@ -1431,18 +1538,18 @@
         <div class="cta-row" id="installCmd">
             <a href="https://github.com/edison7009/EchoBird/releases/latest" class="btn btn-primary">
                 <i class="fa-solid fa-download"></i>
-                <span data-i18n="hero.btn.download">立即下载</span>
+                <span data-i18n="hero.btn.download">获取 EchoBird</span>
             </a>
             <span class="cta-or" data-i18n="hero.or">或</span>
             <div class="install-cmd-row" data-os="windows" style="display:none">
                 <span class="label">Windows</span>
                 <code id="cmdWin">irm https://echobird.ai/install.ps1 | iex</code>
-                <button class="copy-btn" data-copy="cmdWin">COPY</button>
+                <button class="copy-btn" data-copy="cmdWin" data-i18n="hero.btn.copy">复制</button>
             </div>
             <div class="install-cmd-row" data-os="unix" style="display:none">
                 <span class="label" id="unixLabel">macOS / Linux</span>
                 <code id="cmdUnix">curl -fsSL https://echobird.ai/install.sh | sh</code>
-                <button class="copy-btn" data-copy="cmdUnix">COPY</button>
+                <button class="copy-btn" data-copy="cmdUnix" data-i18n="hero.btn.copy">复制</button>
             </div>
         </div>
         <div class="mirror-downloads zh-only">
@@ -1453,7 +1560,7 @@
             <span>|</span>
             <a href="https://gitcode.com/edison7009/EchoBird/issues" target="_blank" rel="noopener noreferrer">国内用户问题反馈</a>
             <span>|</span>
-            <a href="/openrouter/">免费模型教程</a>
+            <a href="/support/">请喝咖啡</a>
         </div>
     </section>
 
@@ -1817,7 +1924,7 @@
             const row = wrap.querySelector(`[data-os="${os}"]`);
             if (row) row.style.display = 'inline-flex';
 
-            // Copy button — Clipboard API with a transient "COPIED" affordance
+            // Copy button — Clipboard API with a transient copied affordance
             wrap.querySelectorAll('.copy-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     const target = document.getElementById(btn.getAttribute('data-copy'));
@@ -1825,7 +1932,8 @@
                     try {
                         await navigator.clipboard.writeText(target.textContent.trim());
                         const orig = btn.textContent;
-                        btn.textContent = 'COPIED';
+                        const dict = I18N[document.documentElement.lang.startsWith('zh') ? 'zh-CN' : 'en'] || I18N.en;
+                        btn.textContent = dict['hero.btn.copied'] || 'Copied';
                         btn.classList.add('copied');
                         setTimeout(() => {
                             btn.textContent = orig;
