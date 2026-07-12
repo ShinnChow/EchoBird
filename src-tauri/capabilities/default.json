@@ -21,6 +21,7 @@
     "core:window:allow-start-dragging",
     "shell:allow-open",
     "dialog:allow-open",
-    "clipboard-manager:allow-read-text"
+    "clipboard-manager:allow-read-text",
+    "autostart:default"
   ]
 }

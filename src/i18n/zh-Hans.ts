@@ -83,6 +83,7 @@ const zhHans: Partial<Translations> = {
   'settings.closeToTray': '最小化到托盘',
   'settings.alwaysAsk': '每次询问',
   'settings.easterEgg': '彩蛋',
+  'settings.launchAtStartup': '开机启动',
   'closeDialog.title': '窗口关闭方式',
   'closeDialog.hint':
     '注意:如果你的 ChatGPT / Codex CLI / Claude 桌面端 / Claude Code 已切换模型，退出会导致无法使用。',

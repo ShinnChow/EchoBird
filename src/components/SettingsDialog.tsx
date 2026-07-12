@@ -1,7 +1,18 @@
 // SettingsDialog — Global settings modal (gear button in title bar)
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Globe, Download, ExternalLink, Sun, Moon, Monitor, Sparkles } from 'lucide-react';
+import {
+  X,
+  Globe,
+  Download,
+  ExternalLink,
+  Sun,
+  Moon,
+  Monitor,
+  Sparkles,
+  Power,
+} from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
+import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { MiniSelect } from './MiniSelect';
 import { useI18n } from '../hooks/useI18n';
 import * as api from '../api/tauri';
@@ -55,6 +66,10 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       return true;
     }
   });
+  // Launch-at-startup toggle. Source of truth is the autostart plugin's OS
+  // registration (isEnabled), queried each time the dialog opens, so changes
+  // made outside the app (msconfig, Login Items) are reflected. Default off.
+  const [launchAtStartup, setLaunchAtStartup] = useState(false);
   const themeMode = useThemeStore((s) => s.mode);
   const setThemeMode = useThemeStore((s) => s.setMode);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -69,6 +84,11 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   // Load backend settings each time the dialog opens.
   useEffect(() => {
     if (isOpen) {
+      // Reflect the real OS autostart registration (may have been toggled
+      // outside the app). Default to false if the query fails.
+      isEnabled()
+        .then(setLaunchAtStartup)
+        .catch(() => {});
       api.getSettings().then((settings) => {
         // null ("always ask") is a real selectable value, not a missing
         // field — the backend stores it as Option<bool>=None. When the user
@@ -91,6 +111,17 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       localStorage.setItem(EASTER_EGG_KEY, String(value));
     } catch {
       /* private mode */
+    }
+  }, []);
+
+  // Toggle launch-at-startup: register/unregister the OS autostart entry.
+  // The entry launches with --minimized so a boot start stays in the tray.
+  const handleLaunchAtStartupChange = useCallback((value: boolean) => {
+    setLaunchAtStartup(value);
+    if (value) {
+      enable().catch(() => setLaunchAtStartup(false));
+    } else {
+      disable().catch(() => setLaunchAtStartup(true));
     }
   }, []);
 
@@ -318,14 +349,26 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
           {/* Easter Egg — opt-in playful apply effect + sound (default off). No
               hint on purpose: an easter egg explained is no fun. */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles size={14} className="text-cyber-text-secondary" />
-              <span className="text-[14px] font-medium text-cyber-text-secondary">
-                {t('settings.easterEgg')}
-              </span>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles size={14} className="text-cyber-text-secondary" />
+                <span className="text-[14px] font-medium text-cyber-text-secondary">
+                  {t('settings.easterEgg')}
+                </span>
+              </div>
+              <ToggleSwitch checked={easterEgg} onChange={handleEasterEggChange} />
             </div>
-            <ToggleSwitch checked={easterEgg} onChange={handleEasterEggChange} />
+            {/* Launch at startup - boots hidden in the tray (default off) */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Power size={14} className="text-cyber-text-secondary" />
+                <span className="text-[14px] font-medium text-cyber-text-secondary">
+                  {t('settings.launchAtStartup')}
+                </span>
+              </div>
+              <ToggleSwitch checked={launchAtStartup} onChange={handleLaunchAtStartupChange} />
+            </div>
           </div>
 
           {/* Divider */}

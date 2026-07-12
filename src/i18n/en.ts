@@ -90,6 +90,7 @@ const en: Translations = {
   'settings.closeDirectly': 'Quit directly',
   'settings.closeToTray': 'Minimize to tray',
   'settings.easterEgg': 'Easter Egg',
+  'settings.launchAtStartup': 'Launch at startup',
   'settings.alwaysAsk': 'Always ask',
   // Close Dialog
   'closeDialog.title': 'CLOSE BEHAVIOR',

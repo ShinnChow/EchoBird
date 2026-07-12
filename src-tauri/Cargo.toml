@@ -28,6 +28,11 @@ tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-log = "2"
+# Autostart at OS boot (launch-at-login). Registered with a `--minimized`
+# arg so a boot launch starts hidden in the tray (see app_ready + the 1s
+# fallback show in lib.rs). Exposes JS enable/disable/isEnabled, so it
+# needs the autostart:default capability entry.
+tauri-plugin-autostart = "2"
 # Single-instance guard: focus the running window instead of spawning a
 # second process when EchoBird is launched again (e.g. double-clicking the
 # desktop shortcut while it's minimized to tray). Exposes no JS commands, so

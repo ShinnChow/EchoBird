@@ -106,6 +106,7 @@ const ja: Partial<Translations> = {
   'settings.closeToTray': 'トレイに最小化',
   'settings.alwaysAsk': '毎回確認',
   'settings.easterEgg': 'イースターエッグ',
+  'settings.launchAtStartup': '起動時に開く',
   'closeDialog.title': 'ウィンドウの閉じ方',
   'closeDialog.hint':
     '注意：ChatGPT / Codex CLI / Claude デスクトップ版 / Claude Code のモデルを切り替えている場合、終了すると使用できなくなります。',

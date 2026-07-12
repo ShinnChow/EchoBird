@@ -342,7 +342,7 @@ pub fn rebuild_tray_menu(app: &tauri::AppHandle) {
 /// Hide the main window to the tray. On macOS this also switches the
 /// app to Accessory activation policy so the dock icon disappears
 /// (paired with `show_main_window` which restores Regular policy).
-fn hide_main_window(app_handle: &tauri::AppHandle) {
+pub(crate) fn hide_main_window(app_handle: &tauri::AppHandle) {
     if let Some(window) = app_handle.get_webview_window("main") {
         let _ = window.hide();
     }
@@ -628,6 +628,15 @@ pub fn run() {
             // "我的AI项目" Add dialog for icon / launcher / models.json paths)
             app.handle().plugin(tauri_plugin_dialog::init())?;
 
+            // Register autostart plugin (launch at login). Initialized with a
+            // `--minimized` arg so a boot autostart launches the app hidden to
+            // the tray - app_ready and the 1s fallback show below both check
+            // for that arg and skip showing the window when present.
+            app.handle().plugin(tauri_plugin_autostart::init(
+                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                Some(vec!["--minimized"]),
+            ))?;
+
             // ─── System Tray ───
             let tray_icon = load_tray_icon();
 
@@ -803,20 +812,26 @@ pub fn run() {
             // Uses std::thread to avoid tokio runtime dependency in sync setup().
             #[cfg(not(target_os = "android"))]
             {
-                let fallback_handle = app.handle().clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_millis(1000));
-                    if let Some(win) = fallback_handle.get_webview_window("main") {
-                        if !win.is_visible().unwrap_or(true) {
-                            log::warn!(
-                                "[Safety] appReady() not called after 1s — showing main window"
-                            );
-                            let _ = win.center();
-                            let _ = win.show();
-                            let _ = win.set_focus();
+                // Boot-autostart launches pass `--minimized` and must stay
+                // hidden in the tray - skip the safety fallback so it never
+                // pops the window open 1s after a boot launch.
+                let start_minimized = std::env::args().any(|a| a == "--minimized");
+                if !start_minimized {
+                    let fallback_handle = app.handle().clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(1000));
+                        if let Some(win) = fallback_handle.get_webview_window("main") {
+                            if !win.is_visible().unwrap_or(true) {
+                                log::warn!(
+                                    "[Safety] appReady() not called after 1s — showing main window"
+                                );
+                                let _ = win.center();
+                                let _ = win.show();
+                                let _ = win.set_focus();
+                            }
                         }
-                    }
-                });
+                    });
+                }
             }
 
             Ok(())
