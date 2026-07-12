@@ -50,7 +50,7 @@ pub struct ModelInfo {
     pub web_search: Option<bool>,
     /// Claude Code relay-only. When `Some(true)` AND `relay_mode` is on,
     /// append `[1m]` to the 1M-capable env vars (`ANTHROPIC_MODEL` /
-    /// `ANTHROPIC_DEFAULT_SONNET_MODEL` / `ANTHROPIC_DEFAULT_OPUS_MODEL`)
+    /// `ANTHROPIC_DEFAULT_SONNET_MODEL` / `ANTHROPIC_DEFAULT_OPUS_MODEL` / `ANTHROPIC_DEFAULT_FABLE_MODEL`)
     /// written to ~/.claude/settings.json so Claude Code budgets the 1M
     /// context window. Claude Code strips the suffix before sending the id
     /// upstream, so the provider still sees the bare id. `HAIKU` and

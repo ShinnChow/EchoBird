@@ -48,7 +48,7 @@ export interface AppManagerContextType {
   claudeCodeRelayMode: boolean;
   setClaudeCodeRelayMode: (v: boolean) => void;
   /** Claude Code relay-only 1M-context toggle. When on AND API Router is on,
-   *  apply_claudecode appends `[1m]` to the model id (MODEL / OPUS / SONNET
+   *  apply_claudecode appends `[1m]` to the model id (MODEL / OPUS / SONNET / FABLE
    *  env vars only — HAIKU + SUBAGENT stay bare) so Claude Code budgets the
    *  1M window. CC strips the suffix before sending upstream, so the provider
    *  still sees the bare id. Hidden when API Router is off; no effect in bridge
