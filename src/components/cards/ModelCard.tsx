@@ -39,12 +39,13 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
     [['b.ai', 'bai'], 'b-ai'],
     [['agnes'], 'agnes'],
     // Resellers (pure compute providers that host third-party models, e.g.
-    // Compshare/UCloud 优云智算) go LAST. A model card carries a modelId that
+    // Compshare/UCloud 优云智算, CC Vibe) go LAST. A model card carries a modelId that
     // identifies the actual model brand (glm/kimi/deepseek/minimax), and the
     // model logo must win. The vendor logo only matches when the modelId has no
     // recognized brand — such as provider rows, which pass modelId=''. Model ID
     // and vendor are separate concerns; do not move resellers above model brands.
     [['compshare', '优云智算', '优云'], 'compshare'],
+    [['ccvibe', 'cc vibe', 'cc-vibe'], 'ccvibe'],
   ];
 
   for (const [keywords, icon] of iconMap) {
@@ -53,6 +54,7 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
       if (icon === 'b-ai') return './icons/models/b-ai.ico';
       if (icon === 'agnes') return './icons/models/agnes.png';
       if (icon === 'compshare') return './icons/models/compshare.png';
+      if (icon === 'ccvibe') return './icons/models/ccvibe.png';
       return `./icons/models/${icon}.svg`;
     }
   }

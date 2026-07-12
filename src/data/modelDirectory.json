@@ -271,6 +271,26 @@
         "deepseek-v4-flash"
       ],
       "region": "cn"
+    },
+    {
+      "name": "CC Vibe",
+      "url": "https://cc-vibe.com/",
+      "baseUrl": "https://cc-vibe.com/v1",
+      "anthropicUrl": "https://cc-vibe.com",
+      "modelId": "claude-opus-4-8",
+      "modelIds": [
+        "claude-opus-4-8",
+        "claude-sonnet-5",
+        "claude-fable-5",
+        "claude-haiku-4-5",
+        "gpt-5.5",
+        "gpt-5.6-luna",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "glm-5.2",
+        "kimi-k2.7"
+      ],
+      "region": "cn"
     }
   ],
   "relays": [
