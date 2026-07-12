@@ -20,6 +20,9 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 }) => {
   const { t } = useI18n();
   const handleMinimize = () => getCurrentWindow().minimize();
+  // One-click hide to tray. Reuses the same getCurrentWindow().hide() call as
+  // the X-button's "tray" choice in handleClose, so tray-restore is identical.
+  const handleMinimizeToTray = () => getCurrentWindow().hide();
   const [isMaximized, setIsMaximized] = useState(false);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
 
@@ -147,6 +150,13 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             className="h-full px-4 flex items-center justify-center text-cyber-text-secondary hover:bg-cyber-text/20 hover:text-cyber-text transition-colors"
           >
             <Settings size={13} />
+          </button>
+          <button
+            onClick={handleMinimizeToTray}
+            aria-label={t('settings.closeToTray')}
+            className="h-full px-4 flex items-center justify-center hover:bg-cyber-text/20 transition-colors"
+          >
+            <img src="/brand/bird.png" alt="" draggable={false} className="h-4 w-4 select-none" />
           </button>
           {/* Window controls — Windows/Linux only. macOS uses native traffic
               lights on the left (titleBarStyle: Overlay), so we omit our custom
