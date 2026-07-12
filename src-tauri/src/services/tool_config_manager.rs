@@ -2647,10 +2647,11 @@ fn read_claudedesktop() -> Option<ModelInfo> {
 // upstream model too (otherwise subagents fall back to claude-* ids and
 // bypass the third-party router, breaking the "全量" write-in).
 // https://code.claude.com/docs/en/model-config
-const CLAUDECODE_MODEL_VARS: [&str; 5] = [
+const CLAUDECODE_MODEL_VARS: [&str; 6] = [
     "ANTHROPIC_MODEL",
     "ANTHROPIC_DEFAULT_SONNET_MODEL",
     "ANTHROPIC_DEFAULT_OPUS_MODEL",
+    "ANTHROPIC_DEFAULT_FABLE_MODEL",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL",
     "CLAUDE_CODE_SUBAGENT_MODEL",
 ];
@@ -2663,6 +2664,7 @@ const CLAUDECODE_MODEL_VARS_1M: &[&str] = &[
     "ANTHROPIC_MODEL",
     "ANTHROPIC_DEFAULT_SONNET_MODEL",
     "ANTHROPIC_DEFAULT_OPUS_MODEL",
+    "ANTHROPIC_DEFAULT_FABLE_MODEL",
 ];
 
 /// Value written to a `CLAUDECODE_MODEL_VARS` entry in relay mode. Appends
@@ -2933,7 +2935,7 @@ fn read_claudecode() -> Option<ModelInfo> {
 /// keeps in settings.json — deleting it wholesale would wipe their Claude Code
 /// setup, not just our model config.
 fn restore_claudecode_to_official() -> ApplyResult {
-    const OUR_ENV_KEYS: [&str; 11] = [
+    const OUR_ENV_KEYS: [&str; 12] = [
         "ANTHROPIC_BASE_URL",
         "ANTHROPIC_AUTH_TOKEN",
         "ANTHROPIC_API_KEY",
@@ -2944,6 +2946,7 @@ fn restore_claudecode_to_official() -> ApplyResult {
         "ANTHROPIC_SMALL_FAST_MODEL",
         "ANTHROPIC_DEFAULT_SONNET_MODEL",
         "ANTHROPIC_DEFAULT_OPUS_MODEL",
+        "ANTHROPIC_DEFAULT_FABLE_MODEL",
         "ANTHROPIC_DEFAULT_HAIKU_MODEL",
         // Pins subagents to the upstream model in relay mode (new env var,
         // replaces the small-fast tier's role for subagent selection).
@@ -4559,7 +4562,7 @@ mod tests {
 
     // ── claudecode_env_model_id: [1m] opt-in, 1M-tier-only ──
     // The 1M-context toggle is relay-only and Claude-Code-only. When opted in,
-    // `[1m]` is appended to the 1M-capable tier (MODEL / SONNET / OPUS) so CC
+    // `[1m]` is appended to the 1M-capable tier (MODEL / SONNET / OPUS / FABLE) so CC
     // budgets the 1M window; HAIKU + SUBAGENT stay bare (no 1M concept). CC
     // strips the suffix before sending upstream, so the provider sees the bare id.
     #[test]
