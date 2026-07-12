@@ -350,15 +350,6 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
           {/* Easter Egg — opt-in playful apply effect + sound (default off). No
               hint on purpose: an easter egg explained is no fun. */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles size={14} className="text-cyber-text-secondary" />
-                <span className="text-[14px] font-medium text-cyber-text-secondary">
-                  {t('settings.easterEgg')}
-                </span>
-              </div>
-              <ToggleSwitch checked={easterEgg} onChange={handleEasterEggChange} />
-            </div>
             {/* Launch at startup - boots hidden in the tray (default off) */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -368,6 +359,15 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 </span>
               </div>
               <ToggleSwitch checked={launchAtStartup} onChange={handleLaunchAtStartupChange} />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles size={14} className="text-cyber-text-secondary" />
+                <span className="text-[14px] font-medium text-cyber-text-secondary">
+                  {t('settings.easterEgg')}
+                </span>
+              </div>
+              <ToggleSwitch checked={easterEgg} onChange={handleEasterEggChange} />
             </div>
           </div>
 
