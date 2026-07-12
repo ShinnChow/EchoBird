@@ -10,7 +10,6 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
 
   // Matching rules: keywords -> icon file
   const iconMap: [string[], string][] = [
-    [['compshare', '优云智算', '优云'], 'compshare'],
     [['qwen', '通义', 'tongyi'], 'qwen'],
     [['claude', 'anthropic', 'sonnet', 'opus', 'haiku'], 'claude'],
     [['gpt', 'openai', 'chatgpt', 'o1', 'o3'], 'chatgpt'],
@@ -39,6 +38,13 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
     [['worldrouter'], 'worldrouter'],
     [['b.ai', 'bai'], 'b-ai'],
     [['agnes'], 'agnes'],
+    // Resellers (pure compute providers that host third-party models, e.g.
+    // Compshare/UCloud 优云智算) go LAST. A model card carries a modelId that
+    // identifies the actual model brand (glm/kimi/deepseek/minimax), and the
+    // model logo must win. The vendor logo only matches when the modelId has no
+    // recognized brand — such as provider rows, which pass modelId=''. Model ID
+    // and vendor are separate concerns; do not move resellers above model brands.
+    [['compshare', '优云智算', '优云'], 'compshare'],
   ];
 
   for (const [keywords, icon] of iconMap) {
