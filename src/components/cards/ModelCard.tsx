@@ -98,19 +98,19 @@ export interface ModelCardProps {
 const MATRIX_CHARS = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789';
 const TARGET_TEXT = 'ECHOBIRD';
 
-// Format countdown time (ms to human readable)
-const formatCountdown = (ms: number): string => {
-  const totalSeconds = Math.floor(ms / 1000);
+// Format countdown time (ms to human readable) - i18n aware
+const formatCountdown = (ms: number, t: (key: string, params?: Record<string, string | number>) => string): string => {
+  const totalSeconds = Math.floor(Math.max(0, ms) / 1000);
   const days = Math.floor(totalSeconds / 86400);
   const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
 
   if (days > 0) {
-    return `${days}天${hours}时${minutes}分钟后重置`;
+    return t('model.countdown.days', { d: days, h: hours, m: minutes });
   } else if (hours > 0) {
-    return `${hours}时${minutes}分钟后重置`;
+    return t('model.countdown.hours', { h: hours, m: minutes });
   } else {
-    return `${minutes}分钟后重置`;
+    return t('model.countdown.minutes', { m: minutes });
   }
 };
 
@@ -327,7 +327,7 @@ export const ModelCard = React.memo(
                   {quota.balance !== undefined && quota.balance !== null ? (
                     // Balance display (for providers like DeepSeek) - centered, one line
                     <div className="flex items-center justify-center gap-2">
-                      <span className="text-cyber-text font-bold text-2xl">{quota.label || '余额'}</span>
+                      <span className="text-cyber-text font-bold text-2xl">{quota.label || t('model.balance')}</span>
                       <span className="text-cyber-text font-bold text-2xl">
                         {quota.balance.toFixed(2)} {quota.balanceUnit || 'CNY'}
                       </span>
@@ -338,7 +338,7 @@ export const ModelCard = React.memo(
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-cyber-text font-bold">{quota.percentage.toFixed(1)}%</span>
                         <span className="text-cyber-text-muted text-[10px]">
-                          {formatCountdown(quota.resetAt - Date.now())}
+                          {formatCountdown(quota.resetAt - Date.now(), t)}
                         </span>
                       </div>
                       <div className="h-1.5 bg-cyber-border/30 rounded-full overflow-hidden">

@@ -129,6 +129,10 @@ const en: Translations = {
   'model.config': 'Config',
   'model.usage': 'Usage',
   'model.noUsageData': 'No usage data available',
+  'model.balance': 'Balance',
+  'model.countdown.days': '{d}d {h}h {m}m until reset',
+  'model.countdown.hours': '{h}h {m}m until reset',
+  'model.countdown.minutes': '{m}m until reset',
   'model.escCancel': 'CANCEL',
   'model.enterSave': 'SAVE',
   // App Manager

@@ -137,6 +137,13 @@ export type TKey =
   | 'model.notTested'
   | 'model.providers'
   | 'model.relays'
+  | 'model.config'
+  | 'model.usage'
+  | 'model.noUsageData'
+  | 'model.balance'
+  | 'model.countdown.days'
+  | 'model.countdown.hours'
+  | 'model.countdown.minutes'
   | 'model.cloud'
   | 'model.local'
 
