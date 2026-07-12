@@ -19,5 +19,6 @@ pub mod self_update;
 pub mod tool_config_manager;
 pub mod tool_manager;
 pub mod tool_patcher;
+pub mod usage_providers;
 #[cfg(windows)]
 pub mod windows_path;

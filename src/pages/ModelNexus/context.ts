@@ -17,6 +17,21 @@ export interface NewModelForm {
   modelIdOptions?: string[];
 }
 
+// Model usage quota info (1-3 bars per model)
+export interface UsageQuota {
+  percentage: number; // 0-100 (for progress bar)
+  resetAt: number; // Unix timestamp (ms)
+  label?: string; // Optional label (e.g., "Hourly", "Daily", "Monthly")
+  // Balance display (for providers like DeepSeek that show remaining balance)
+  balance?: number; // Remaining balance (e.g., 10.50 USD)
+  balanceUnit?: string; // Currency unit (e.g., "USD", "CNY", "Credits")
+}
+
+export interface ModelUsageData {
+  quotas: UsageQuota[]; // 1-3 quota bars
+  lastUpdated?: number; // Unix timestamp (ms)
+}
+
 export interface ModelNexusCtx {
   // Models
   userModels: ModelConfig[];
@@ -25,6 +40,13 @@ export interface ModelNexusCtx {
   selectedModel: string | null;
   setSelectedModel: (id: string | null) => void;
   selectedModelData: ModelConfig | undefined;
+  // View mode
+  viewMode: 'config' | 'usage';
+  setViewMode: (mode: 'config' | 'usage') => void;
+  // Usage data
+  modelUsageData: Record<string, ModelUsageData>;
+  setModelUsageData: React.Dispatch<React.SetStateAction<Record<string, ModelUsageData>>>;
+  isRefreshingUsage: boolean;
   // Test
   testInput: string;
   setTestInput: (v: string) => void;
@@ -58,8 +80,15 @@ export interface ModelNexusCtx {
   keyDestroyed: boolean;
   setKeyDestroyed: (v: boolean) => void;
   closeModelModal: () => void;
+  // Usage Config Modal
+  showUsageConfigModal: boolean;
+  setShowUsageConfigModal: (v: boolean) => void;
+  configuringModelId: string | null; // Which model is being configured
+  setConfiguringModelId: (v: string | null) => void;
   // Actions
   pingAllModels: () => Promise<void>;
+  refreshAllUsage: () => Promise<void>;
+  refreshSingleUsage: (modelId: string) => Promise<void>; // Single model refresh
   handleTestModel: () => Promise<void>;
 }
 

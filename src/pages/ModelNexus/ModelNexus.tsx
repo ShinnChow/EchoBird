@@ -4,14 +4,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { readText as readClipboardText } from '@tauri-apps/plugin-clipboard-manager';
-import { X, Box, ExternalLink, Plus, Lock, Unlock } from 'lucide-react';
+import { X, Box, ExternalLink, Plus, Lock, Unlock, RefreshCw } from 'lucide-react';
 import { ModelCard, ModelCardSkeleton, getModelIcon, ModelIdCombobox } from '../../components';
 import { useI18n } from '../../hooks/useI18n';
 import * as api from '../../api/tauri';
 import type { ModelConfig } from '../../api/types';
 import { normalizeAnthropicUrl, normalizeOpenaiUrl } from '../../utils/normalizeUrl';
 import { ModelNexusContext, useModelNexus } from './context';
-import type { NewModelForm } from './context';
+import type { NewModelForm, ModelUsageData, UsageQuota } from './context';
 import modelDirectory from '../../data/modelDirectory.json';
 
 // ===== Provider =====
@@ -22,6 +22,11 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
   const [isLoadingModels, setIsLoadingModels] = useState(true);
   const [selectedModel, setSelectedModel] = useState<string | null>('gpt4o');
   const [pingingModelIds, setPingingModelIds] = useState<Set<string>>(new Set());
+
+  // View mode state
+  const [viewMode, setViewMode] = useState<'config' | 'usage'>('config');
+  const [modelUsageData, setModelUsageData] = useState<Record<string, ModelUsageData>>({});
+  const [isRefreshingUsage, setIsRefreshingUsage] = useState(false);
 
   // Modal state
   const [showAddModelModal, setShowAddModelModal] = useState(false);
@@ -160,6 +165,61 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
     setIsTesting(false);
   };
 
+  // Refresh usage for all models
+  const refreshAllUsage = async () => {
+    if (isRefreshingUsage) return;
+    setIsRefreshingUsage(true);
+
+    const newUsageData: Record<string, ModelUsageData> = {};
+
+    for (const model of userModels) {
+      try {
+        console.log(`[Usage] Querying usage for ${model.name} (${model.internalId})`, {
+          baseUrl: model.baseUrl,
+          hasApiKey: !!model.apiKey
+        });
+        const result = await api.queryModelUsage(model.internalId);
+        console.log(`[Usage] Result for ${model.name}:`, result);
+        if (result.success && result.data) {
+          newUsageData[model.internalId] = result.data;
+        } else {
+          console.warn(`[Usage] No data for ${model.name}:`, result.error);
+        }
+      } catch (error) {
+        console.error(`Failed to query usage for ${model.name}:`, error);
+      }
+    }
+
+    setModelUsageData(newUsageData);
+    setIsRefreshingUsage(false);
+  };
+
+  // Refresh usage for a single model
+  const refreshSingleUsage = async (modelId: string) => {
+    const model = userModels.find((m) => m.internalId === modelId);
+    if (!model) return;
+
+    try {
+      console.log(`[Usage] Querying usage for ${model.name} (${model.internalId})`, {
+        baseUrl: model.baseUrl,
+        hasApiKey: !!model.apiKey
+      });
+      const result = await api.queryModelUsage(model.internalId);
+      console.log(`[Usage] Result for ${model.name}:`, result);
+
+      if (result.success && result.data) {
+        setModelUsageData((prev) => ({
+          ...prev,
+          [model.internalId]: result.data,
+        }));
+      } else {
+        console.warn(`[Usage] No data for ${model.name}:`, result.error);
+      }
+    } catch (error) {
+      console.error(`Failed to query usage for ${model.name}:`, error);
+    }
+  };
+
   // Model test function
   const handleTestModel = async () => {
     if (!testInput.trim() || !selectedModel || isTesting) return;
@@ -235,6 +295,11 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
         selectedModel,
         setSelectedModel,
         selectedModelData,
+        viewMode,
+        setViewMode,
+        modelUsageData,
+        setModelUsageData,
+        isRefreshingUsage,
         testInput,
         setTestInput,
         testOutput,
@@ -265,6 +330,8 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
         setKeyDestroyed,
         closeModelModal,
         pingAllModels,
+        refreshAllUsage,
+        refreshSingleUsage,
         handleTestModel,
       }}
     >
@@ -273,24 +340,67 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
   );
 }
 
-// ===== Title Actions (ping --all button, rendered in page header) =====
+// ===== Title Actions (view mode tabs + ping/refresh button) =====
 
 export function ModelNexusTitleActions() {
   const { t } = useI18n();
-  const { pingAllModels, isTesting } = useModelNexus();
+  const { viewMode, setViewMode, pingAllModels, refreshAllUsage, isTesting, isRefreshingUsage } =
+    useModelNexus();
+
   return (
     <div className="ml-auto flex-shrink-0 flex items-center gap-3">
-      <button
-        onClick={pingAllModels}
-        disabled={isTesting}
-        className={`text-xs font-mono px-2 py-1 border rounded transition-colors ${
-          !isTesting
-            ? 'border-cyber-border/50 text-cyber-text hover:bg-cyber-text/10'
-            : 'border-cyber-border text-cyber-text-muted cursor-not-allowed'
-        }`}
-      >
-        {t('btn.pingAll')}
-      </button>
+      {/* View mode tabs */}
+      <div className="flex gap-1 border border-cyber-border rounded-button overflow-hidden">
+        <button
+          onClick={() => setViewMode('config')}
+          className={`px-3 py-1.5 text-sm font-mono transition-colors ${
+            viewMode === 'config'
+              ? 'bg-cyber-elevated text-cyber-text'
+              : 'text-cyber-text-secondary hover:text-cyber-text'
+          }`}
+        >
+          配置
+        </button>
+        <button
+          onClick={() => setViewMode('usage')}
+          className={`px-3 py-1.5 text-sm font-mono transition-colors ${
+            viewMode === 'usage'
+              ? 'bg-cyber-elevated text-cyber-text'
+              : 'text-cyber-text-secondary hover:text-cyber-text'
+          }`}
+        >
+          用量
+        </button>
+      </div>
+
+      {/* Action button - same height and style as tabs */}
+      {viewMode === 'config' ? (
+        <button
+          onClick={pingAllModels}
+          disabled={isTesting}
+          className={`flex items-center gap-1.5 text-sm font-mono px-3 py-1.5 border rounded-button transition-colors ${
+            !isTesting
+              ? 'border-cyber-border text-cyber-text hover:bg-cyber-text/10'
+              : 'border-cyber-border text-cyber-text-muted cursor-not-allowed'
+          }`}
+        >
+          <RefreshCw size={13} className={isTesting ? 'animate-spin' : ''} />
+          测速
+        </button>
+      ) : (
+        <button
+          onClick={refreshAllUsage}
+          disabled={isRefreshingUsage}
+          className={`flex items-center gap-1.5 text-sm font-mono px-3 py-1.5 border rounded-button transition-colors ${
+            !isRefreshingUsage
+              ? 'border-cyber-border text-cyber-text hover:bg-cyber-text/10'
+              : 'border-cyber-border text-cyber-text-muted cursor-not-allowed'
+          }`}
+        >
+          <RefreshCw size={13} className={isRefreshingUsage ? 'animate-spin' : ''} />
+          刷新
+        </button>
+      )}
     </div>
   );
 }
@@ -304,6 +414,8 @@ export function ModelNexusMain() {
     isLoadingModels,
     selectedModel,
     setSelectedModel,
+    viewMode,
+    modelUsageData,
     testInput,
     setTestOutput: _setTestOutput,
     testProtocol: _testProtocol,
@@ -320,6 +432,7 @@ export function ModelNexusMain() {
     setUserModels,
     keyDestroyed: _keyDestroyed,
     setKeyDestroyed,
+    refreshSingleUsage,
   } = useModelNexus();
 
   // Stable handlers for model card interactions
@@ -405,7 +518,8 @@ export function ModelNexusMain() {
   );
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <>
+      <div className="flex-1 overflow-y-auto">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {/* Show skeleton when loading */}
         {isLoadingModels ? (
@@ -439,10 +553,13 @@ export function ModelNexusMain() {
                   isPinging={pingingModelIds.has(model.internalId)}
                   selected={selectedModel === model.internalId}
                   isActive={selectedModel === model.internalId}
+                  viewMode={viewMode}
+                  usageData={modelUsageData[model.internalId]}
                   onClick={() => handleCardClick(model)}
                   onProtocolClick={(protocol) => handleCardProtocolClick(model, protocol)}
                   onEdit={isDemo ? undefined : () => handleCardEdit(model)}
                   onDelete={isDemo ? undefined : () => handleCardDelete(model.internalId)}
+                  onRefresh={() => refreshSingleUsage(model.internalId)}
                 />
               );
             })}
@@ -468,7 +585,8 @@ export function ModelNexusMain() {
           </>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

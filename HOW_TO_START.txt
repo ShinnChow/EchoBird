@@ -1,0 +1,43 @@
+============================================================
+  EchoBird - How to Start
+============================================================
+
+SIMPLE INSTRUCTIONS:
+
+1. Double-click: start.bat
+
+2. Wait for installation (first time only):
+   - Installing tauri-cli: 5-10 minutes
+   - Compiling Rust code: 5-10 minutes
+   - Total first time: 10-20 minutes
+
+3. After first time, startup is fast (30 seconds)
+
+============================================================
+
+WHAT TO EXPECT:
+
+First time you run start.bat:
+  > Installing tauri-cli... (wait 5-10 min)
+  > Starting development server...
+  > Compiling Rust code... (wait 5-10 min)
+  > Application window opens!
+
+Second time onwards:
+  > Starting development server...
+  > Application window opens! (30 seconds)
+
+============================================================
+
+CURRENT STATUS:
+  [✓] Rust installed
+  [✓] Dependencies ready
+  [X] tauri-cli - will auto-install when you run start.bat
+
+============================================================
+
+JUST RUN: start.bat
+
+That's it! Everything else is automatic.
+
+============================================================

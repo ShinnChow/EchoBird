@@ -55,6 +55,27 @@ export async function isKeyDestroyed(internalId: string): Promise<boolean> {
   return invoke('is_key_destroyed', { internalId });
 }
 
+export interface UsageQuota {
+  percentage: number;
+  resetAt: number;
+  label?: string;
+}
+
+export interface ModelUsageData {
+  quotas: UsageQuota[];
+  lastUpdated?: number;
+}
+
+export interface UsageResult {
+  success: boolean;
+  data?: ModelUsageData;
+  error?: string;
+}
+
+export async function queryModelUsage(internalId: string): Promise<UsageResult> {
+  return invoke('query_model_usage', { internalId });
+}
+
 /** Shape of one entry in the Model Center right-panel Providers/Relays list. */
 export interface ModelDirectoryEntry {
   name: string;

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useConfirm } from '../ConfirmDialog';
 import { useI18n } from '../../hooks/useI18n';
+import type { ModelUsageData } from '../../pages/ModelNexus/context';
 
 // Smart icon detection — match model name/ID to icon file
 export const getModelIcon = (name: string, modelId?: string): string | null => {
@@ -84,15 +85,34 @@ export interface ModelCardProps {
   anthropicTested?: boolean; // Anthropic protocol tested
   isPinging?: boolean; // currently pinging (shows decode animation)
   selected?: boolean;
+  viewMode?: 'config' | 'usage'; // display mode
+  usageData?: ModelUsageData; // usage quota data
   onClick?: () => void;
   onEdit?: () => void; // edit callback
   onDelete?: () => void; // delete callback
+  onRefresh?: () => void; // refresh usage callback (usage mode only)
   onProtocolClick?: (protocol: 'openai' | 'anthropic') => void; // protocol tag click
 }
 
 // Matrix decode animation — characters scramble then lock in sequence
 const MATRIX_CHARS = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789';
 const TARGET_TEXT = 'ECHOBIRD';
+
+// Format countdown time (ms to human readable)
+const formatCountdown = (ms: number): string => {
+  const totalSeconds = Math.floor(ms / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  if (days > 0) {
+    return `${days}天${hours}时${minutes}分钟后重置`;
+  } else if (hours > 0) {
+    return `${hours}时${minutes}分钟后重置`;
+  } else {
+    return `${minutes}分钟后重置`;
+  }
+};
 
 // Generate random character
 const randomChar = () => MATRIX_CHARS[Math.floor(Math.random() * MATRIX_CHARS.length)];
@@ -173,6 +193,7 @@ export const MatrixDecode = ({ duration = 2000 }: { duration?: number }) => {
 // ModelCard component
 export const ModelCard = React.memo(
   ({
+    id,
     name,
     type: _type,
     baseUrl,
@@ -185,14 +206,25 @@ export const ModelCard = React.memo(
     isPinging = false,
     selected = false,
     isActive = false,
+    viewMode = 'config',
+    usageData,
     onClick,
     onEdit,
     onDelete,
+    onRefresh,
     onProtocolClick: _onProtocolClick,
   }: ModelCardProps & { isActive?: boolean }) => {
     const iconPath = getModelIcon(name, modelId);
     const confirm = useConfirm();
     const { t } = useI18n();
+
+    // Real-time countdown update for usage mode
+    const [, setTick] = useState(0);
+    useEffect(() => {
+      if (viewMode !== 'usage' || !usageData) return;
+      const timer = setInterval(() => setTick((prev) => prev + 1), 60000); // Update every minute
+      return () => clearInterval(timer);
+    }, [viewMode, usageData]);
 
     return (
       <div
@@ -203,38 +235,56 @@ export const ModelCard = React.memo(
         } relative overflow-hidden rounded-card cursor-pointer transition-colors flex flex-col`}
         onClick={onClick}
       >
-        {/* Action buttons — top right */}
-        {(onEdit || onDelete) && (
+        {/* Action buttons — top right, different for config vs usage mode */}
+        {viewMode === 'config' ? (
+          // Config mode: [删除] [编辑]
+          (onEdit || onDelete) && (
+            <div className="absolute top-2 right-2 flex gap-1.5">
+              {onDelete && (
+                <button
+                  className="text-xs font-mono text-cyber-text-muted/70 hover:text-red-500 transition-colors"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const ok = await confirm({
+                      title: t('model.deleteTitle'),
+                      message: t('model.deleteConfirm'),
+                      confirmText: t('btn.delete'),
+                      cancelText: t('btn.cancel'),
+                      type: 'danger',
+                    });
+                    if (ok) {
+                      onDelete();
+                    }
+                  }}
+                >
+                  [{t('btn.delete')}]
+                </button>
+              )}
+              {onEdit && (
+                <button
+                  className="text-xs font-mono text-cyber-text-muted/70 hover:text-cyber-text transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit();
+                  }}
+                >
+                  [{t('btn.edit')}]
+                </button>
+              )}
+            </div>
+          )
+        ) : (
+          // Usage mode: [刷新]
           <div className="absolute top-2 right-2 flex gap-1.5">
-            {onDelete && (
-              <button
-                className="text-xs font-mono text-cyber-text-muted/70 hover:text-red-500 transition-colors"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  const ok = await confirm({
-                    title: t('model.deleteTitle'),
-                    message: t('model.deleteConfirm'),
-                    confirmText: t('btn.delete'),
-                    cancelText: t('btn.cancel'),
-                    type: 'danger',
-                  });
-                  if (ok) {
-                    onDelete();
-                  }
-                }}
-              >
-                [{t('btn.delete')}]
-              </button>
-            )}
-            {onEdit && (
+            {onRefresh && (
               <button
                 className="text-xs font-mono text-cyber-text-muted/70 hover:text-cyber-text transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onEdit();
+                  onRefresh();
                 }}
               >
-                [{t('btn.edit')}]
+                [刷新]
               </button>
             )}
           </div>
@@ -246,81 +296,134 @@ export const ModelCard = React.memo(
             return /localhost|127\.0\.0\.1/.test(url) ? t('model.local') : t('model.cloud');
           })()}
         </div>
-        <div className="text-lg font-bold mb-3 truncate h-7">
-          {name || <span className="invisible">-</span>}
+        <div className="flex items-center gap-2 mb-3">
+          {/* Show provider logo in usage mode (based on baseUrl) */}
+          {viewMode === 'usage' && (() => {
+            const url = baseUrl || anthropicUrl || '';
+            const providerIcon = getModelIcon('', url);
+            return providerIcon ? (
+              <img
+                src={providerIcon}
+                alt=""
+                className="w-6 h-6 flex-shrink-0"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            ) : null;
+          })()}
+          <div className="text-lg font-bold truncate h-7 flex-1">
+            {name || <span className="invisible">-</span>}
+          </div>
         </div>
-        <div className="text-xs space-y-1.5 font-mono">
-          <div className="flex items-center gap-1 truncate">
-            <span className="text-cyber-text/60">{t('model.label')}:</span>
-            <span className="truncate text-cyber-text/60">{modelId || '-'}</span>
-          </div>
-          <div className="flex items-center gap-1 truncate">
-            <span className="text-cyber-text/60">{t('model.source')}:</span>
-            <span className="truncate text-cyber-text/60">
-              {(() => {
-                const url = baseUrl || anthropicUrl;
-                if (!url) return '-';
-                try {
-                  return new URL(url).hostname;
-                } catch {
-                  return url;
-                }
-              })()}
-            </span>
-          </div>
 
-          <div className="flex items-center gap-1">
-            <span className="text-cyber-text/60">{t('model.latency')}:</span>
-            {isPinging ? (
-              <MatrixDecode />
-            ) : latency === -1 ? (
-              <span className="text-red-500 font-bold">Error</span>
-            ) : latency !== undefined ? (
-              <span
-                className={
-                  latency < 200
-                    ? 'text-green-500'
-                    : latency < 500
-                      ? 'text-yellow-500'
-                      : 'text-red-500'
-                }
-              >
-                {latency}ms
-              </span>
+        {/* Content area - switches based on viewMode */}
+        {viewMode === 'usage' ? (
+          // Usage mode - show quota bars or balance
+          <div className="flex-1 flex flex-col justify-center space-y-2.5">
+            {usageData?.quotas && usageData.quotas.length > 0 ? (
+              usageData.quotas.map((quota, idx) => (
+                <div key={idx} className="space-y-1">
+                  {quota.balance !== undefined && quota.balance !== null ? (
+                    // Balance display (for providers like DeepSeek) - centered, one line
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-cyber-text font-bold text-2xl">{quota.label || '余额'}</span>
+                      <span className="text-cyber-text font-bold text-2xl">
+                        {quota.balance.toFixed(2)} {quota.balanceUnit || 'CNY'}
+                      </span>
+                    </div>
+                  ) : (
+                    // Percentage progress bar (for quota-based providers)
+                    <>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-cyber-text font-bold">{quota.percentage.toFixed(1)}%</span>
+                        <span className="text-cyber-text-muted text-[10px]">
+                          {formatCountdown(quota.resetAt - Date.now())}
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-cyber-border/30 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-cyber-accent to-cyber-accent/70 rounded-full transition-all duration-300"
+                          style={{ width: `${quota.percentage}%` }}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))
             ) : (
-              <span className="text-cyber-text-muted/70 text-xs">{t('model.notTested')}</span>
+              <div className="text-center text-cyber-text-muted text-xs">
+                {t('model.noUsageData')}
+              </div>
             )}
           </div>
+        ) : (
+          // Config mode - show existing info
+          <div className="text-xs space-y-1.5 font-mono">
+            <div className="flex items-center gap-1 truncate">
+              <span className="text-cyber-text/60">{t('model.label')}:</span>
+              <span className="truncate text-cyber-text/60">{modelId || '-'}</span>
+            </div>
+            <div className="flex items-center gap-1 truncate">
+              <span className="text-cyber-text/60">{t('model.source')}:</span>
+              <span className="truncate text-cyber-text/60">
+                {(() => {
+                  const url = baseUrl || anthropicUrl;
+                  if (!url) return '-';
+                  try {
+                    return new URL(url).hostname;
+                  } catch {
+                    return url;
+                  }
+                })()}
+              </span>
+            </div>
 
-          {/* Protocol row — no label (OpenAI / Anthropic are universally
-              recognized names, so a "Protocol:" prefix would be redundant
-              and would cost an i18n key per locale). [Brackets] are kept
-              from the pre-unification design as a visual anchor for the
-              label-less row — they signal "these are tagged tokens, not
-              free text" so the user's eye doesn't lose the scan rhythm
-              dropping from 延迟: into a naked phrase. All other styling
-              (uppercase / tracking-widest / pulse / drop-shadow) stays
-              off — tested = /60 (parity with the rows above), untested
-              = /30. */}
-          <div className="flex items-center gap-1 truncate">
-            <span className="truncate text-cyber-text/60">
-              {protocols.includes('openai') && (
-                <span className={openaiTested ? 'text-cyber-text/60' : 'text-cyber-text/30'}>
-                  [OpenAI]
+            <div className="flex items-center gap-1">
+              <span className="text-cyber-text/60">{t('model.latency')}:</span>
+              {isPinging ? (
+                <MatrixDecode />
+              ) : latency === -1 ? (
+                <span className="text-red-500 font-bold">Error</span>
+              ) : latency !== undefined ? (
+                <span
+                  className={
+                    latency < 200
+                      ? 'text-green-500'
+                      : latency < 500
+                        ? 'text-yellow-500'
+                        : 'text-red-500'
+                  }
+                >
+                  {latency}ms
                 </span>
+              ) : (
+                <span className="text-cyber-text-muted/70 text-xs">{t('model.notTested')}</span>
               )}
-              {protocols.includes('openai') && protocols.includes('anthropic') && ' '}
-              {protocols.includes('anthropic') && (
-                <span className={anthropicTested ? 'text-cyber-text/60' : 'text-cyber-text/30'}>
-                  [Anthropic]
-                </span>
-              )}
-              {protocols.length === 0 && '-'}
-            </span>
+            </div>
+
+            {/* Protocol row */}
+            <div className="flex items-center gap-1 truncate">
+              <span className="truncate text-cyber-text/60">
+                {protocols.includes('openai') && (
+                  <span className={openaiTested ? 'text-cyber-text/60' : 'text-cyber-text/30'}>
+                    [OpenAI]
+                  </span>
+                )}
+                {protocols.includes('openai') && protocols.includes('anthropic') && ' '}
+                {protocols.includes('anthropic') && (
+                  <span className={anthropicTested ? 'text-cyber-text/60' : 'text-cyber-text/30'}>
+                    [Anthropic]
+                  </span>
+                )}
+                {protocols.length === 0 && '-'}
+              </span>
+            </div>
           </div>
-        </div>
-        {/* Model icon bottom-right */}
-        {iconPath && (
+        )}
+
+        {/* Model icon bottom-right - only show in config mode */}
+        {iconPath && viewMode === 'config' && (
           <img
             src={iconPath}
             alt={name}
@@ -347,6 +450,7 @@ export const ModelCard = React.memo(
       'anthropicTested',
       'isPinging',
       'selected',
+      'viewMode',
     ];
     const p = prev as unknown as Record<string, unknown>;
     const n = next as unknown as Record<string, unknown>;
@@ -358,6 +462,8 @@ export const ModelCard = React.memo(
     const pp = prev.protocols || [],
       np = next.protocols || [];
     if (pp.length !== np.length || pp.some((v, i) => v !== np[i])) return false;
+    // Compare usageData (shallow)
+    if (p.usageData !== n.usageData) return false;
     return true;
   }
 );

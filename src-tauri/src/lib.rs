@@ -840,6 +840,7 @@ pub fn run() {
             model_commands::test_model,
             model_commands::ping_model,
             model_commands::is_key_destroyed,
+            model_commands::query_model_usage,
             process_commands::start_tool,
             process_commands::start_llm_server,
             process_commands::stop_llm_server,

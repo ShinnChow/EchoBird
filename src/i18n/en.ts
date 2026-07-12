@@ -111,6 +111,7 @@ const en: Translations = {
   'btn.stop': 'STOP',
   'btn.remove': 'REMOVE',
   'btn.pingAll': 'Test Latency',
+  'btn.refreshUsage': 'Refresh Usage',
   // Model dialog
   'model.name': 'Name',
   'model.apiKey': 'API Key',
@@ -125,6 +126,9 @@ const en: Translations = {
     'This model configuration will be permanently removed. This action cannot be undone.',
   'model.providers': 'Model Providers',
   'model.relays': 'Model Relays',
+  'model.config': 'Config',
+  'model.usage': 'Usage',
+  'model.noUsageData': 'No usage data available',
   'model.escCancel': 'CANCEL',
   'model.enterSave': 'SAVE',
   // App Manager
