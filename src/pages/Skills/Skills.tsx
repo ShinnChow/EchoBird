@@ -49,10 +49,12 @@ const SKILLS_MIRRORS: { name: string; base: string }[] = [
 
 const SKILLS_FILE_EN = 'en.json';
 const SKILLS_FILE_CN = 'cn.json';
+const SKILLS_FILE_ZH_HANT = 'zh-Hant.json';
+const SKILLS_FILE_JA = 'ja.json';
 
 // ===== Types =====
 
-type Lang = 'zh' | 'en';
+type Lang = 'en' | 'zh-Hans' | 'zh-Hant' | 'ja';
 
 interface Skill {
   id: string;
@@ -84,6 +86,18 @@ interface CachedZh {
   fetchedAt: number;
 }
 
+interface CachedZhHant {
+  zhHantSkills: Skill[];
+  zhHantCategories: string[];
+  fetchedAt: number;
+}
+
+interface CachedJa {
+  jaSkills: Skill[];
+  jaCategories: string[];
+  fetchedAt: number;
+}
+
 interface Catalog {
   skills: Skill[];
   categoriesByLang: Record<Lang, string[]>;
@@ -104,7 +118,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://echobird.ai/openrouter/',
     description: 'EchoBird 官方教程:用 OpenRouter 每天 50 次免费请求,跑遍最新顶尖大模型,不花一分钱',
     category: 'AI 编程',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-claude-code-quickstart',
@@ -113,7 +127,7 @@ const CN_SKILLS: Skill[] = [
     description:
       'Claude Code 入门实战:环境配置、核心工作流、常用技巧,几分钟带你跑通第一个 AI 编程闭环',
     category: 'AI 编程',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-claude-founders-playbook',
@@ -122,7 +136,7 @@ const CN_SKILLS: Skill[] = [
     description:
       '面向独立开发者与创业者的 AI 实战课,讲解如何用 Claude 等大模型搭建产品并跑通商业闭环',
     category: 'AI 创业',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-datawhale-easy-vibe',
@@ -130,7 +144,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://datawhalechina.github.io/easy-vibe/welcome.html',
     description: 'Datawhale 出品的零基础 Vibe Coding 四阶段课程,GitHub 13.9k stars,中文社区背书',
     category: 'AI 编程',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-liyupi-ai-guide',
@@ -139,7 +153,7 @@ const CN_SKILLS: Skill[] = [
     description:
       '程序员鱼皮主理的中文 AI 入门知识库,涵盖 Vibe Coding、Claude 玩法、AI 产品变现等实战路径',
     category: 'AI 编程',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-bilibili-yincode-claude',
@@ -147,7 +161,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://www.bilibili.com/video/BV1SddcBFESs/',
     description: 'B 站 UP 主 Yin_Code,8.7w 播放的 Claude Code 快速上手实战',
     category: 'AI 编程',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-bilibili-qiuzhi-claude-code',
@@ -155,7 +169,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://www.bilibili.com/video/BV1NvRyBzEhq/',
     description: 'B 站 UP 主秋芝出品,从安装到高级用法一次讲全的 Claude Code 保姆级教程',
     category: 'AI 编程',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-bilibili-qiuzhi-codex',
@@ -163,7 +177,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://www.bilibili.com/video/BV1Nd596vEyU/',
     description: 'B 站 UP 主秋芝出品,10 个实战场景带你从 0 拉通 Codex 全流程',
     category: 'AI 编程',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-tukuaiai-vibe-coding',
@@ -171,7 +185,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://github.com/tukuaiai/vibe-coding-cn',
     description: 'Prompt / Skill / Workflow / Codex 实战的中文 Vibe Coding 教程仓库',
     category: 'AI 编程',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-baoyu-share',
@@ -179,7 +193,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://baoyu.io/',
     description: '中文 Prompt 工程头部博主,系统性翻译与整理 Prompt 实战、多 Agent 协作范本',
     category: 'Prompt 与 Agent',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-waytoagi',
@@ -187,7 +201,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://www.waytoagi.com/zh',
     description: '900w 学习者的中文 AI 知识库,含教程、问答、Agent 章节',
     category: 'Prompt 与 Agent',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-langgpt-wonderful-prompts',
@@ -195,7 +209,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://github.com/langgptai/wonderful-prompts',
     description: '中文 Prompt 精选合集,提升 ChatGPT / Claude 实际可用性',
     category: 'Prompt 与 Agent',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   // ── 学习平台 / 资源入口 ──
   {
@@ -204,7 +218,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://ai-bot.cn/',
     description: '1000+ 国内外 AI 工具导航,带教程板块,产品入门必经',
     category: '学习平台',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-platform-atomgit',
@@ -212,7 +226,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://ai.atomgit.com/learn',
     description: 'GitCode 旗下 AI 学习平台,集中各类学习路径与实战教程',
     category: '学习平台',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-platform-aistudio',
@@ -220,7 +234,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://aistudio.baidu.com/learn',
     description: '百度飞桨学习平台,大量免费公开课与可在线运行的实战项目,自带算力',
     category: '学习平台',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-platform-modelscope',
@@ -228,7 +242,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://www.modelscope.cn/learn',
     description: '阿里达摩院出品,模型 / 课程 / 数据集一体化的中文 AI 社区',
     category: '学习平台',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-platform-datawhale',
@@ -236,7 +250,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://datawhale.cn/',
     description: '国内最活跃的 AI 开源学习社区,主打开源教程 / 组队学习 / 入门到进阶',
     category: '学习平台',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-platform-openbayes',
@@ -244,7 +258,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://openbayes.com/console/public/tutorials',
     description: '算力平台开放的公开 Notebook 教程,可一键运行',
     category: '学习平台',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-platform-geektime',
@@ -252,7 +266,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://time.geekbang.org/category/intel-100',
     description: 'AI / ML / 大模型方向收费专栏,内容深度与体系化程度高',
     category: '学习平台',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-platform-skillra-cn',
@@ -260,7 +274,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://www.skillra.org/zh-CN',
     description: '国际公开课中文界面入口,大量斯坦福 / DeepLearning.AI 课程有中文字幕',
     category: '学习平台',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-platform-iskill163',
@@ -268,7 +282,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://www.iskill163.org/search.htm?search=人工智能',
     description: '清华 / 北大 / 浙大 / 中科大 / 复旦等顶尖高校 AI 公开课聚合入口',
     category: '学习平台',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
   {
     id: 'cn-platform-xuetangx',
@@ -276,7 +290,7 @@ const CN_SKILLS: Skill[] = [
     url: 'https://www.xuetangx.com/search?query=人工智能',
     description: '清华出品 MOOC 平台,聚合国内顶尖高校 AI 课程',
     category: '学习平台',
-    lang: 'zh',
+    lang: 'zh-Hans',
   },
 ];
 
@@ -435,6 +449,8 @@ const EN_SKILLS: Skill[] = [
 // `skills:cache:en` so users instantly see the new applied-direction list after upgrade.
 const CACHE_KEY_EN = 'skills:cache:en:v2';
 const CACHE_KEY_ZH = 'skills:cache:zh';
+const CACHE_KEY_ZH_HANT = 'skills:cache:zh-hant';
+const CACHE_KEY_JA = 'skills:cache:ja';
 const REFRESH_AFTER_MS = 6 * 3600 * 1000;
 
 const loadCachedEn = (): CachedEn | null => {
@@ -475,17 +491,79 @@ const saveCachedZh = (c: CachedZh) => {
   }
 };
 
+const loadCachedZhHant = (): CachedZhHant | null => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY_ZH_HANT);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.zhHantSkills) || !Array.isArray(parsed?.zhHantCategories))
+      return null;
+    return parsed as CachedZhHant;
+  } catch {
+    return null;
+  }
+};
+const saveCachedZhHant = (c: CachedZhHant) => {
+  try {
+    localStorage.setItem(CACHE_KEY_ZH_HANT, JSON.stringify(c));
+  } catch {
+    /* quota */
+  }
+};
+
+const loadCachedJa = (): CachedJa | null => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY_JA);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.jaSkills) || !Array.isArray(parsed?.jaCategories)) return null;
+    return parsed as CachedJa;
+  } catch {
+    return null;
+  }
+};
+const saveCachedJa = (c: CachedJa) => {
+  try {
+    localStorage.setItem(CACHE_KEY_JA, JSON.stringify(c));
+  } catch {
+    /* quota */
+  }
+};
+
 // Each lang has both a remote source and a bundled fallback now — buildCatalog
 // merges remote-or-bundled per lang.
-const buildCatalog = (en: CachedEn | null, zh: CachedZh | null): Catalog => {
+const buildCatalog = (
+  en: CachedEn | null,
+  zhHans: CachedZh | null,
+  zhHant: CachedZhHant | null,
+  ja: CachedJa | null
+): Catalog => {
   const enSkills = en?.enSkills?.length ? en.enSkills : EN_SKILLS;
   const enCategories = en?.enCategories?.length ? en.enCategories : EN_CATEGORIES;
-  const zhSkills = zh?.zhSkills?.length ? zh.zhSkills : CN_SKILLS;
-  const zhCategories = zh?.zhCategories?.length ? zh.zhCategories : CN_CATEGORIES;
+  const zhHansSkills = zhHans?.zhSkills?.length ? zhHans.zhSkills : CN_SKILLS;
+  const zhHansCategories = zhHans?.zhCategories?.length ? zhHans.zhCategories : CN_CATEGORIES;
+  // zh-Hant / ja have no bundled fallback - use EN_SKILLS (English) when remote fails.
+  const zhHantSkills = zhHant?.zhHantSkills?.length ? zhHant.zhHantSkills : EN_SKILLS;
+  const zhHantCategories = zhHant?.zhHantCategories?.length
+    ? zhHant.zhHantCategories
+    : EN_CATEGORIES;
+  const jaSkills = ja?.jaSkills?.length ? ja.jaSkills : EN_SKILLS;
+  const jaCategories = ja?.jaCategories?.length ? ja.jaCategories : EN_CATEGORIES;
   return {
-    skills: [...enSkills, ...zhSkills],
-    categoriesByLang: { en: enCategories, zh: zhCategories },
-    fetchedAt: Math.max(en?.fetchedAt ?? 0, zh?.fetchedAt ?? 0) || Date.now(),
+    skills: [...enSkills, ...zhHansSkills, ...zhHantSkills, ...jaSkills],
+    categoriesByLang: {
+      en: enCategories,
+      'zh-Hans': zhHansCategories,
+      'zh-Hant': zhHantCategories,
+      ja: jaCategories,
+    },
+    fetchedAt:
+      Math.max(
+        en?.fetchedAt ?? 0,
+        zhHans?.fetchedAt ?? 0,
+        zhHant?.fetchedAt ?? 0,
+        ja?.fetchedAt ?? 0
+      ) || Date.now(),
   };
 };
 
@@ -535,6 +613,18 @@ async function fetchSkillsJson(
 }
 
 // ===== Helpers =====
+
+// Fisher-Yates shuffle - used to randomize the hot-tab preset order each time
+// the list changes, so the 22 curated skills don't always appear in the same
+// sequence. Returns a new array (does not mutate input).
+const shuffle = <T,>(arr: T[]): T[] => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
 
 const openExternal = (url: string) => shellOpen(url).catch(() => window.open(url, '_blank'));
 const urlPathOf = (url: string): string => {
@@ -590,8 +680,12 @@ export function SkillsProvider({ children }: { children: React.ReactNode }) {
   // Hydrate caches once on mount so re-renders don't re-read localStorage.
   const initialCachedEn = useMemo(() => loadCachedEn(), []);
   const initialCachedZh = useMemo(() => loadCachedZh(), []);
+  const initialCachedZhHant = useMemo(() => loadCachedZhHant(), []);
+  const initialCachedJa = useMemo(() => loadCachedJa(), []);
   const [cachedEn, setCachedEn] = useState<CachedEn | null>(initialCachedEn);
   const [cachedZh, setCachedZh] = useState<CachedZh | null>(initialCachedZh);
+  const [cachedZhHant, setCachedZhHant] = useState<CachedZhHant | null>(initialCachedZhHant);
+  const [cachedJa, setCachedJa] = useState<CachedJa | null>(initialCachedJa);
   // Skeleton only when BOTH caches are cold — bundled arrays still render content
   // for both langs even when nothing is cached, so this is more of a "first sync
   // is in flight" hint than a "we have nothing to show" gate.
@@ -604,14 +698,25 @@ export function SkillsProvider({ children }: { children: React.ReactNode }) {
   const seq = useRef(0);
   const cacheRefEn = useRef(cachedEn);
   const cacheRefZh = useRef(cachedZh);
+  const cacheRefZhHant = useRef(cachedZhHant);
+  const cacheRefJa = useRef(cachedJa);
   useEffect(() => {
     cacheRefEn.current = cachedEn;
   }, [cachedEn]);
   useEffect(() => {
     cacheRefZh.current = cachedZh;
   }, [cachedZh]);
+  useEffect(() => {
+    cacheRefZhHant.current = cachedZhHant;
+  }, [cachedZhHant]);
+  useEffect(() => {
+    cacheRefJa.current = cachedJa;
+  }, [cachedJa]);
 
-  const catalog = useMemo(() => buildCatalog(cachedEn, cachedZh), [cachedEn, cachedZh]);
+  const catalog = useMemo(
+    () => buildCatalog(cachedEn, cachedZh, cachedZhHant, cachedJa),
+    [cachedEn, cachedZh, cachedZhHant, cachedJa]
+  );
 
   // ── User-saved skills (favorites) - persisted to ~/.echobird/config/skills.json ──
   const [userSkills, setUserSkills] = useState<SkillConfig[]>([]);
@@ -779,10 +884,14 @@ export function SkillsProvider({ children }: { children: React.ReactNode }) {
   const sync = useCallback(async (force = false) => {
     const curEn = cacheRefEn.current;
     const curZh = cacheRefZh.current;
+    const curZhHant = cacheRefZhHant.current;
+    const curJa = cacheRefJa.current;
     const enFresh = !force && curEn && Date.now() - curEn.fetchedAt < REFRESH_AFTER_MS;
     const zhFresh = !force && curZh && Date.now() - curZh.fetchedAt < REFRESH_AFTER_MS;
+    const zhHantFresh = !force && curZhHant && Date.now() - curZhHant.fetchedAt < REFRESH_AFTER_MS;
+    const jaFresh = !force && curJa && Date.now() - curJa.fetchedAt < REFRESH_AFTER_MS;
 
-    if (enFresh && zhFresh) {
+    if (enFresh && zhFresh && zhHantFresh && jaFresh) {
       setInitialLoading(false);
       return;
     }
@@ -815,7 +924,7 @@ export function SkillsProvider({ children }: { children: React.ReactNode }) {
 
     if (!zhFresh) {
       tasks.push(
-        fetchSkillsJson(SKILLS_FILE_CN, 'zh')
+        fetchSkillsJson(SKILLS_FILE_CN, 'zh-Hans')
           .then(({ skills, categories }) => {
             if (my !== seq.current) return;
             const fresh: CachedZh = {
@@ -828,6 +937,44 @@ export function SkillsProvider({ children }: { children: React.ReactNode }) {
           })
           .catch((e: unknown) => {
             latestError = e instanceof Error ? e.message : 'CN fetch failed';
+          })
+      );
+    }
+
+    if (!zhHantFresh) {
+      tasks.push(
+        fetchSkillsJson(SKILLS_FILE_ZH_HANT, 'zh-Hant')
+          .then(({ skills, categories }) => {
+            if (my !== seq.current) return;
+            const fresh: CachedZhHant = {
+              zhHantSkills: skills,
+              zhHantCategories: categories,
+              fetchedAt: Date.now(),
+            };
+            saveCachedZhHant(fresh);
+            setCachedZhHant(fresh);
+          })
+          .catch((e: unknown) => {
+            latestError = e instanceof Error ? e.message : 'ZH-Hant fetch failed';
+          })
+      );
+    }
+
+    if (!jaFresh) {
+      tasks.push(
+        fetchSkillsJson(SKILLS_FILE_JA, 'ja')
+          .then(({ skills, categories }) => {
+            if (my !== seq.current) return;
+            const fresh: CachedJa = {
+              jaSkills: skills,
+              jaCategories: categories,
+              fetchedAt: Date.now(),
+            };
+            saveCachedJa(fresh);
+            setCachedJa(fresh);
+          })
+          .catch((e: unknown) => {
+            latestError = e instanceof Error ? e.message : 'JA fetch failed';
           })
       );
     }
@@ -1087,7 +1234,14 @@ export function SkillsMain() {
   // platforms). zh-Hant (TW/HK/MO) and ja users see the EN list — TW/HK builders
   // follow the international AI stack (Anthropic Academy / LangChain / HF), not the
   // CN-domestic ecosystem.
-  const lang: Lang = locale === 'zh-Hans' ? 'zh' : 'en';
+  const lang: Lang =
+    locale === 'zh-Hans'
+      ? 'zh-Hans'
+      : locale === 'zh-Hant'
+        ? 'zh-Hant'
+        : locale === 'ja'
+          ? 'ja'
+          : 'en';
 
   const visible = useMemo(() => {
     if (tab === 'fav') {
@@ -1095,8 +1249,12 @@ export function SkillsMain() {
       return userSkills.filter((s) => s.category === selectedCategory);
     }
     const langMatched = catalog.skills.filter((c) => c.lang === lang);
-    if (selectedCategory === 'all') return langMatched;
-    return langMatched.filter((c) => c.category === selectedCategory);
+    const list =
+      selectedCategory === 'all'
+        ? langMatched
+        : langMatched.filter((c) => c.category === selectedCategory);
+    // Hot tab: shuffle so the curated 22 don't always show in the same order.
+    return shuffle(list);
   }, [tab, catalog, userSkills, selectedCategory, lang]);
 
   if (tab === 'hot' && (initialLoading || syncing) && visible.length === 0) {
@@ -1169,7 +1327,14 @@ export function SkillsPanel() {
   const { catalog, selectedCategory, setSelectedCategory, tab, userSkills } = useSkills();
   const scrollRef = usePulseScroll<HTMLDivElement>();
   // Same lang fork as SkillsMain — see comment there.
-  const lang: Lang = locale === 'zh-Hans' ? 'zh' : 'en';
+  const lang: Lang =
+    locale === 'zh-Hans'
+      ? 'zh-Hans'
+      : locale === 'zh-Hant'
+        ? 'zh-Hant'
+        : locale === 'ja'
+          ? 'ja'
+          : 'en';
 
   // Reset filter when categories of the current lang don't include the selection
   const langSkills = useMemo(() => catalog.skills.filter((c) => c.lang === lang), [catalog, lang]);
@@ -1254,7 +1419,14 @@ export function AddSkillModal() {
 
   // Category suggestions: existing categories for the current locale + categories
   // already used by the user's saved skills (deduped). Free-text still allowed.
-  const lang: Lang = locale === 'zh-Hans' ? 'zh' : 'en';
+  const lang: Lang =
+    locale === 'zh-Hans'
+      ? 'zh-Hans'
+      : locale === 'zh-Hant'
+        ? 'zh-Hant'
+        : locale === 'ja'
+          ? 'ja'
+          : 'en';
   const categoryOptions = useMemo(() => {
     const set = new Set<string>();
     for (const c of catalog.categoriesByLang[lang] || []) set.add(c);

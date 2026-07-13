@@ -1,0 +1,159 @@
+{
+  "categories": ["AI コーディング", "プロンプトとエージェント", "コンテンツ制作"],
+  "skills": [
+    {
+      "id": "en-superpowers",
+      "name": "Superpowers",
+      "url": "https://github.com/obra/superpowers",
+      "description": "エージェントスキルフレームワークとソフトウェア開発手法。",
+      "category": "AI コーディング"
+    },
+    {
+      "id": "en-ecc",
+      "name": "ECC",
+      "url": "https://github.com/affaan-m/ECC",
+      "description": "エージェントハーネスのパフォーマンス最適化システム。Claude Code、Codex、Opencode、Cursor などにスキル、本能、記憶、セキュリティ、研究優先開発を提供。",
+      "category": "AI コーディング"
+    },
+    {
+      "id": "en-andrej-karpathy-skills",
+      "name": "Andrej Karpathy Skills",
+      "url": "https://github.com/multica-ai/andrej-karpathy-skills",
+      "description": "Claude Code の挙動を改善する単一の CLAUDE.md ファイル。Andrej Karpathy の LLM コーディングの落とし穴に関する観察に基づく。",
+      "category": "AI コーディング"
+    },
+    {
+      "id": "en-mattpocock-skills",
+      "name": "Matt Pocock Skills",
+      "url": "https://github.com/mattpocock/skills",
+      "description": "本当のエンジニアのためのスキル。私の .claude ディレクトリから直接。",
+      "category": "AI コーディング"
+    },
+    {
+      "id": "en-anthropics-skills",
+      "name": "Anthropic Skills",
+      "url": "https://github.com/anthropics/skills",
+      "description": "Claude のスキルシステムで可能なことを示すスキル集 - クリエイティブ応用から技術タスク、エンタープライズワークフローまで。",
+      "category": "AI コーディング"
+    },
+    {
+      "id": "en-firecrawl",
+      "name": "Firecrawl",
+      "url": "https://github.com/firecrawl/firecrawl",
+      "description": "大規模にウェブを検索・スクレイピング・操作する API。",
+      "category": "AI コーディング"
+    },
+    {
+      "id": "en-system-prompts",
+      "name": "System Prompts & Models of AI Tools",
+      "url": "https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools",
+      "description": "Augment Code、Claude Code、Cursor、Devin、Lovable、Manus、Replit、Windsurf などの完全なシステムプロンプト、内部ツール、AI モデル。",
+      "category": "プロンプトとエージェント"
+    },
+    {
+      "id": "en-agency-agents",
+      "name": "Agency Agents",
+      "url": "https://github.com/msitarzewski/agency-agents",
+      "description": "完全な AI エージェンシー - フロントエンド wizard、コミュニティ忍者、奇抜さ注入者、現実チェッカー。各 agent は専門家。",
+      "category": "プロンプトとエージェント"
+    },
+    {
+      "id": "en-gstack",
+      "name": "Gstack",
+      "url": "https://github.com/garrytan/gstack",
+      "description": "Garry Tan の Claude Code セットアップ:23 のツールが CEO、デザイナー、エンジニアリングマネージャー、リリースマネージャー、ドキュメントエンジニア、QA を担当。",
+      "category": "AI コーディング"
+    },
+    {
+      "id": "en-spec-kit",
+      "name": "Spec Kit",
+      "url": "https://github.com/github/spec-kit",
+      "description": "スペック駆動開発を始めるためのツールキット。",
+      "category": "AI コーディング"
+    },
+    {
+      "id": "en-awesome-llm-apps",
+      "name": "Awesome LLM Apps",
+      "url": "https://github.com/Shubhamsaboo/awesome-llm-apps",
+      "description": "100+ の実際に動く AI Agent と RAG アプリ - クローン、カスタマイズ、公開。",
+      "category": "AI コーディング"
+    },
+    {
+      "id": "en-browser-use",
+      "name": "Browser Use",
+      "url": "https://github.com/browser-use/browser-use",
+      "description": "ウェブサイトを AI エージェントにアクセス可能に。オンラインタスクを簡単に自動化。",
+      "category": "AI コーディング"
+    },
+    {
+      "id": "en-ui-ux-pro-max-skill",
+      "name": "UI/UX Pro Max Skill",
+      "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+      "description": "複数プラットフォーム向けにプロ品質の UI/UX を構築するための設計知性を提供する AI スキル。",
+      "category": "コンテンツ制作"
+    },
+    {
+      "id": "en-awesome-mcp-servers",
+      "name": "Awesome MCP Servers",
+      "url": "https://github.com/punkpeye/awesome-mcp-servers",
+      "description": "MCP サーバーのコレクション。",
+      "category": "プロンプトとエージェント"
+    },
+    {
+      "id": "en-caveman",
+      "name": "Caveman",
+      "url": "https://github.com/JuliusBrussee/caveman",
+      "description": "Claude Code スキル。原始人のように話すことで 65% のトークンを削減。",
+      "category": "AI コーディング"
+    },
+    {
+      "id": "en-claude-mem",
+      "name": "Claude-Mem",
+      "url": "https://github.com/thedotmack/claude-mem",
+      "description": "すべてのエージェントにセッションをまたぐ永続コンテキストを提供 - 捕捉、圧縮、関連コンテキストを注入。Claude Code、Codex、Gemini、Copilot などに対応。",
+      "category": "AI コーディング"
+    },
+    {
+      "id": "en-graphify",
+      "name": "Graphify",
+      "url": "https://github.com/Graphify-Labs/graphify",
+      "description": "コード、SQL スキーマ、ドキュメント、画像フォルダをクエリ可能なナレッジグラフに変換。アプリコード + DB スキーマ + インフラを一つのグラフに。",
+      "category": "AI コーディング"
+    },
+    {
+      "id": "en-ponytail",
+      "name": "Ponytail",
+      "url": "https://github.com/DietrichGebert/ponytail",
+      "description": "AI エージェントを最も怠惰なシニア開発者のように考えさせる。最高のコードは書かなかったコード。",
+      "category": "AI コーディング"
+    },
+    {
+      "id": "en-agent-skills",
+      "name": "Agent Skills",
+      "url": "https://github.com/addyosmani/agent-skills",
+      "description": "AI コーディングエージェントのための本番級エンジニアリングスキル。",
+      "category": "AI コーディング"
+    },
+    {
+      "id": "en-open-design",
+      "name": "Open Design",
+      "url": "https://github.com/nexu-io/open-design",
+      "description": "オープンソースの Claude Design 代替。ローカルファーストのデスクトップアプリ - コーディングエージェントがデザインエンジンに:プロトタイプ、ランディングページ、ダッシュボード、スライド。",
+      "category": "コンテンツ制作"
+    },
+    {
+      "id": "en-front-end-checklist",
+      "name": "Front-End Checklist",
+      "url": "https://github.com/thedaviddias/Front-End-Checklist",
+      "description": "モダン Web 開発の必須チェックリスト。人間と AI エージェント向け。",
+      "category": "AI コーディング"
+    },
+    {
+      "id": "en-understand-anything",
+      "name": "Understand Anything",
+      "url": "https://github.com/Egonex-AI/Understand-Anything",
+      "description": "あらゆるコードを探索・検索・質問できるインタラクティブなナレッジグラフに変換。Claude Code、Codex、Cursor、Copilot、Gemini CLI などに対応。",
+      "category": "AI コーディング"
+    }
+  ]
+}

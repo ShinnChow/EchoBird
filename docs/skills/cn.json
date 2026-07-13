@@ -1,11 +1,158 @@
 {
-  "categories": ["AI 编程"],
+  "categories": ["AI 编程", "Prompt 与 Agent", "内容创作"],
   "skills": [
     {
-      "id": "cn-superpowers",
+      "id": "en-superpowers",
       "name": "Superpowers",
       "url": "https://github.com/obra/superpowers",
-      "description": "目前最火的 AI 编程 skills 框架,为 AI 编程工具提供系统化的工作方法论。让 Claude Code 等 18 编程工具真正会干活。从头脑风暴到代码审查,从 TDD 到调试,每个 skill 都是经过实战验证的工作方法论。",
+      "description": "一个可用的智能体技能框架与软件开发方法论。",
+      "category": "AI 编程"
+    },
+    {
+      "id": "en-ecc",
+      "name": "ECC",
+      "url": "https://github.com/affaan-m/ECC",
+      "description": "智能体性能优化系统。为 Claude Code、Codex、Opencode、Cursor 等提供技能、本能、记忆、安全与研究优先开发。",
+      "category": "AI 编程"
+    },
+    {
+      "id": "en-andrej-karpathy-skills",
+      "name": "Andrej Karpathy Skills",
+      "url": "https://github.com/multica-ai/andrej-karpathy-skills",
+      "description": "单个 CLAUDE.md 文件改善 Claude Code 行为,源自 Andrej Karpathy 对 LLM 编码陷阱的观察。",
+      "category": "AI 编程"
+    },
+    {
+      "id": "en-mattpocock-skills",
+      "name": "Matt Pocock Skills",
+      "url": "https://github.com/mattpocock/skills",
+      "description": "给真正工程师的技能。直接来自我的 .claude 目录。",
+      "category": "AI 编程"
+    },
+    {
+      "id": "en-anthropics-skills",
+      "name": "Anthropic Skills",
+      "url": "https://github.com/anthropics/skills",
+      "description": "展示 Claude 技能系统能力的技能集合 - 从创意应用到技术任务到企业工作流。",
+      "category": "AI 编程"
+    },
+    {
+      "id": "en-firecrawl",
+      "name": "Firecrawl",
+      "url": "https://github.com/firecrawl/firecrawl",
+      "description": "大规模搜索、抓取并与网页交互的 API。",
+      "category": "AI 编程"
+    },
+    {
+      "id": "en-system-prompts",
+      "name": "System Prompts & Models of AI Tools",
+      "url": "https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools",
+      "description": "Augment Code、Claude Code、Cursor、Devin、Lovable、Manus、Replit、Windsurf 等的完整系统提示词、内部工具与 AI 模型。",
+      "category": "Prompt 与 Agent"
+    },
+    {
+      "id": "en-agency-agents",
+      "name": "Agency Agents",
+      "url": "https://github.com/msitarzewski/agency-agents",
+      "description": "一个完整的 AI 代理机构 - 前端 wizard、社区忍者、奇思妙想注入者、现实检查者。每个 agent 都是专家。",
+      "category": "Prompt 与 Agent"
+    },
+    {
+      "id": "en-gstack",
+      "name": "Gstack",
+      "url": "https://github.com/garrytan/gstack",
+      "description": "Garry Tan 的 Claude Code 配置:23 个工具,担任 CEO、设计师、工程经理、发布经理、文档工程师、QA。",
+      "category": "AI 编程"
+    },
+    {
+      "id": "en-spec-kit",
+      "name": "Spec Kit",
+      "url": "https://github.com/github/spec-kit",
+      "description": "帮助你开始规格驱动开发的工具包。",
+      "category": "AI 编程"
+    },
+    {
+      "id": "en-awesome-llm-apps",
+      "name": "Awesome LLM Apps",
+      "url": "https://github.com/Shubhamsaboo/awesome-llm-apps",
+      "description": "100+ 可直接运行的 AI Agent 与 RAG 应用 - 克隆、定制、发布。",
+      "category": "AI 编程"
+    },
+    {
+      "id": "en-browser-use",
+      "name": "Browser Use",
+      "url": "https://github.com/browser-use/browser-use",
+      "description": "让网站对 AI 智能体可访问。轻松在线自动化任务。",
+      "category": "AI 编程"
+    },
+    {
+      "id": "en-ui-ux-pro-max-skill",
+      "name": "UI/UX Pro Max Skill",
+      "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+      "description": "为多平台构建专业 UI/UX 提供设计智能的 AI 技能。",
+      "category": "内容创作"
+    },
+    {
+      "id": "en-awesome-mcp-servers",
+      "name": "Awesome MCP Servers",
+      "url": "https://github.com/punkpeye/awesome-mcp-servers",
+      "description": "MCP 服务器合集。",
+      "category": "Prompt 与 Agent"
+    },
+    {
+      "id": "en-caveman",
+      "name": "Caveman",
+      "url": "https://github.com/JuliusBrussee/caveman",
+      "description": "Claude Code 技能,用原始人方式说话,削减 65% token。",
+      "category": "AI 编程"
+    },
+    {
+      "id": "en-claude-mem",
+      "name": "Claude-Mem",
+      "url": "https://github.com/thedotmack/claude-mem",
+      "description": "为每个智能体提供跨会话持久上下文 - 捕获、压缩、注入相关上下文。支持 Claude Code、Codex、Gemini、Copilot 等。",
+      "category": "AI 编程"
+    },
+    {
+      "id": "en-graphify",
+      "name": "Graphify",
+      "url": "https://github.com/Graphify-Labs/graphify",
+      "description": "把代码、SQL schema、文档或图片文件夹变成可查询的知识图谱。应用代码 + 数据库 schema + 基础设施一个图谱。",
+      "category": "AI 编程"
+    },
+    {
+      "id": "en-ponytail",
+      "name": "Ponytail",
+      "url": "https://github.com/DietrichGebert/ponytail",
+      "description": "让你的 AI 智能体像最懒的资深开发者思考。最好的代码是你永远没写的代码。",
+      "category": "AI 编程"
+    },
+    {
+      "id": "en-agent-skills",
+      "name": "Agent Skills",
+      "url": "https://github.com/addyosmani/agent-skills",
+      "description": "给 AI 编码智能体的生产级工程技能。",
+      "category": "AI 编程"
+    },
+    {
+      "id": "en-open-design",
+      "name": "Open Design",
+      "url": "https://github.com/nexu-io/open-design",
+      "description": "开源的 Claude Design 替代品。本地优先桌面应用 - 你的编码智能体变成设计引擎:原型、落地页、仪表盘、幻灯片。",
+      "category": "内容创作"
+    },
+    {
+      "id": "en-front-end-checklist",
+      "name": "Front-End Checklist",
+      "url": "https://github.com/thedaviddias/Front-End-Checklist",
+      "description": "现代 Web 开发的必备清单,给人类与 AI 智能体。",
+      "category": "AI 编程"
+    },
+    {
+      "id": "en-understand-anything",
+      "name": "Understand Anything",
+      "url": "https://github.com/Egonex-AI/Understand-Anything",
+      "description": "把任何代码变成可探索、搜索、提问的交互式知识图谱。支持 Claude Code、Codex、Cursor、Copilot、Gemini CLI 等。",
       "category": "AI 编程"
     }
   ]
