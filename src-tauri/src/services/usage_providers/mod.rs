@@ -11,7 +11,6 @@ pub mod novita;
 pub mod openrouter;
 pub mod siliconflow;
 pub mod stepfun;
-pub mod volcengine;
 pub mod zenmux;
 pub mod zhipu;
 
@@ -65,7 +64,6 @@ pub enum Provider {
     OpenRouter(openrouter::OpenRouterProvider),
     SiliconFlow(siliconflow::SiliconFlowProvider),
     StepFun(stepfun::StepFunProvider),
-    Volcengine(volcengine::VolcengineProvider),
     ZenMux(zenmux::ZenMuxProvider),
     Zhipu(zhipu::ZhipuProvider),
 }
@@ -80,7 +78,6 @@ impl Provider {
             Provider::OpenRouter(p) => p.query_usage(api_key, base_url).await,
             Provider::SiliconFlow(p) => p.query_usage(api_key, base_url).await,
             Provider::StepFun(p) => p.query_usage(api_key, base_url).await,
-            Provider::Volcengine(p) => p.query_usage(api_key, base_url).await,
             Provider::ZenMux(p) => p.query_usage(api_key, base_url).await,
             Provider::Zhipu(p) => p.query_usage(api_key, base_url).await,
         }
@@ -111,9 +108,6 @@ pub fn detect_provider(base_url: &str) -> Option<Provider> {
     }
     if stepfun::StepFunProvider.can_handle(&url) {
         return Some(Provider::StepFun(stepfun::StepFunProvider));
-    }
-    if volcengine::VolcengineProvider.can_handle(&url) {
-        return Some(Provider::Volcengine(volcengine::VolcengineProvider));
     }
     if zenmux::ZenMuxProvider.can_handle(&url) {
         return Some(Provider::ZenMux(zenmux::ZenMuxProvider));
