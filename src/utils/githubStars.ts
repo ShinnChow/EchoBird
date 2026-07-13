@@ -62,6 +62,26 @@ export function parseGithubRepo(url: string): { owner: string; repo: string } | 
 
 // Returns the star count, or null when unknown (never throws). Serves stale
 // cache on failure so a rate-limited or offline request keeps the last value.
+// Parse shields.io star badge message: "253k" -> 253000, "1.4M" -> 1400000, "999" -> 999.
+// shields.io formats compactly so we lose sub-k precision (253123 -> "253k" -> 253000),
+// which is fine - the card renders the same "253k" either way via formatStars.
+const parseStarMessage = (msg: unknown): number | null => {
+  if (typeof msg !== 'string') return null;
+  const m = msg
+    .trim()
+    .toLowerCase()
+    .match(/^([\d.]+)\s*([km]?)$/);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  if (Number.isNaN(n)) return null;
+  const mult = m[2] === 'k' ? 1e3 : m[2] === 'm' ? 1e6 : 1;
+  return Math.round(n * mult);
+};
+
+// Star counts via shields.io (not api.github.com) so the 60 req/h/IP GitHub
+// limit never bites star prefetch - shields.io has its own server-side quota
+// and CDN cache. name/description are NOT available here (shields.io is a
+// badge service); fetchGithubRepoInfo still hits api.github.com for those.
 export async function fetchGithubStars(
   owner: string,
   repo: string,
@@ -74,18 +94,18 @@ export async function fetchGithubStars(
     return hit.stars;
   }
   try {
-    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
-      headers: { Accept: 'application/vnd.github+json' },
+    const res = await fetch(`https://img.shields.io/github/stars/${owner}/${repo}.json`, {
+      headers: { Accept: 'application/json' },
     });
     if (!res.ok) return hit?.stars ?? null;
     const json = await res.json();
-    const stars = typeof json?.stargazers_count === 'number' ? json.stargazers_count : null;
+    const stars = parseStarMessage(json?.message);
     if (stars !== null) {
       cache[key] = {
         stars,
         fetchedAt: Date.now(),
-        name: typeof json?.name === 'string' ? json.name : undefined,
-        description: typeof json?.description === 'string' ? json.description : undefined,
+        name: hit?.name,
+        description: hit?.description,
       };
       saveCache(cache);
     }
