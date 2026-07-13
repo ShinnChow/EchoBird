@@ -27,7 +27,7 @@ const en: Translations = {
   'courses.cat.all': 'All',
   'skills.filter': 'CATEGORY',
   'skills.cat.all': 'All',
-  'skills.tab.hot': 'Hot',
+  'skills.tab.hot': 'Popular',
   'skills.tab.fav': 'Favorites',
   'skills.addRepo': 'Add Repo',
   'skills.editRepo': 'Edit Repo',

@@ -839,15 +839,17 @@ function SkillCard({
       <div className="text-xs text-cyber-text-secondary tracking-wide mb-1 truncate">
         {skill.category}
       </div>
-      <div className="text-[15px] font-bold text-cyber-text leading-snug mb-2 group-hover:text-cyber-accent transition-colors line-clamp-2 min-h-[2.5rem]">
-        {skill.name}
-      </div>
-
-      {skill.description && (
-        <div className="text-[13px] text-cyber-text-secondary leading-snug line-clamp-3 min-h-[3.375rem]">
-          {skill.description}
+      <div className="min-h-[6.4375rem]">
+        <div className="text-[15px] font-bold text-cyber-text leading-snug mb-2 group-hover:text-cyber-accent transition-colors line-clamp-2">
+          {skill.name}
         </div>
-      )}
+
+        {skill.description && (
+          <div className="text-[13px] text-cyber-text-secondary leading-snug line-clamp-3">
+            {skill.description}
+          </div>
+        )}
+      </div>
 
       <div className="mt-auto pt-2 border-t border-cyber-border/10 flex items-center gap-2">
         <button
