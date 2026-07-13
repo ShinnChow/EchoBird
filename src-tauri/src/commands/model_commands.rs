@@ -2,6 +2,7 @@
 
 use crate::models::model::{ModelConfig, PingResult, TestResult};
 use crate::services::model_manager::{self, AddModelInput, UpdateModelInput};
+use crate::services::usage_providers::{self, UsageResult};
 
 /// Get all models (user + built-in + local)
 #[tauri::command]
@@ -47,4 +48,28 @@ pub async fn ping_model(internal_id: String) -> Result<PingResult, String> {
 #[tauri::command]
 pub fn is_key_destroyed(internal_id: String) -> bool {
     model_manager::is_key_destroyed(&internal_id)
+}
+
+/// Query model usage (quota/balance)
+#[tauri::command]
+pub async fn query_model_usage(internal_id: String) -> Result<UsageResult, String> {
+    let models = model_manager::get_models();
+    let model = models
+        .iter()
+        .find(|m| m.internal_id == internal_id)
+        .ok_or_else(|| format!("Model not found: {}", internal_id))?;
+
+    // Determine base_url and api_key
+    let base_url = if !model.base_url.is_empty() {
+        &model.base_url
+    } else if let Some(ref url) = model.anthropic_url {
+        url
+    } else {
+        return Err("Model has no base URL configured".to_string());
+    };
+
+    let api_key = &model.api_key;
+
+    // Query usage from provider
+    usage_providers::query_model_usage(base_url, api_key).await
 }

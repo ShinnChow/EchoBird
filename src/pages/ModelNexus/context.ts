@@ -1,6 +1,7 @@
 // context.ts — ModelNexus shared context + types
 import React, { createContext, useContext } from 'react';
 import type { ModelConfig } from '../../api/types';
+import type { ModelUsageData } from '../../api/tauri';
 
 // ===== Types =====
 
@@ -25,6 +26,13 @@ export interface ModelNexusCtx {
   selectedModel: string | null;
   setSelectedModel: (id: string | null) => void;
   selectedModelData: ModelConfig | undefined;
+  // View mode
+  viewMode: 'config' | 'usage';
+  setViewMode: (mode: 'config' | 'usage') => void;
+  // Usage data
+  modelUsageData: Record<string, ModelUsageData>;
+  setModelUsageData: React.Dispatch<React.SetStateAction<Record<string, ModelUsageData>>>;
+  isRefreshingUsage: boolean;
   // Test
   testInput: string;
   setTestInput: (v: string) => void;
@@ -60,6 +68,8 @@ export interface ModelNexusCtx {
   closeModelModal: () => void;
   // Actions
   pingAllModels: () => Promise<void>;
+  refreshAllUsage: () => Promise<void>;
+  refreshSingleUsage: (modelId: string) => Promise<void>; // Single model refresh
   handleTestModel: () => Promise<void>;
 }
 

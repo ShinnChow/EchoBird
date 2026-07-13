@@ -860,6 +860,7 @@ pub fn run() {
             skill_commands::add_skill,
             skill_commands::delete_skill,
             skill_commands::update_skill,
+            model_commands::query_model_usage,
             process_commands::start_tool,
             process_commands::start_llm_server,
             process_commands::stop_llm_server,
