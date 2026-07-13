@@ -61,9 +61,7 @@ impl UsageProvider for SiliconFlowProvider {
         // Assume 100 as total for percentage (arbitrary)
         let assumed_total = 100.0;
         let percentage = if assumed_total > 0.0 {
-            ((assumed_total - total_balance) / assumed_total * 100.0)
-                .min(100.0)
-                .max(0.0)
+            ((assumed_total - total_balance) / assumed_total * 100.0).clamp(0.0, 100.0)
         } else {
             0.0
         };

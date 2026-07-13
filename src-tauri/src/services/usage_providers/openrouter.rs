@@ -51,7 +51,7 @@ impl UsageProvider for OpenRouterProvider {
         let total_usage = data.get("total_usage").and_then(parse_f64).unwrap_or(0.0);
 
         let percentage = if total_credits > 0.0 {
-            (total_usage / total_credits * 100.0).min(100.0).max(0.0)
+            (total_usage / total_credits * 100.0).clamp(0.0, 100.0)
         } else {
             100.0 // No credits = 100% used
         };

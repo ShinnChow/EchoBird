@@ -90,7 +90,7 @@ impl UsageProvider for ZhipuProvider {
                 .unwrap_or_else(|| now_millis() + 24 * 60 * 60 * 1000);
 
             let percentage = if limit > 0.0 {
-                (used / limit * 100.0).min(100.0).max(0.0)
+                (used / limit * 100.0).clamp(0.0, 100.0)
             } else {
                 0.0
             };

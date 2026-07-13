@@ -57,9 +57,7 @@ impl UsageProvider for NovitaProvider {
         // Assume 100 USD as total for percentage calculation
         let assumed_total = 100.0;
         let percentage = if assumed_total > 0.0 {
-            ((assumed_total - available) / assumed_total * 100.0)
-                .min(100.0)
-                .max(0.0)
+            ((assumed_total - available) / assumed_total * 100.0).clamp(0.0, 100.0)
         } else {
             0.0
         };
