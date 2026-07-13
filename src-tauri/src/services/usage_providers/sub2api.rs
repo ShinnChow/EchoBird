@@ -98,26 +98,20 @@ impl UsageProvider for Sub2ApiProvider {
             .unwrap_or("USD")
             .to_string();
         let plan_limit = parse_plan_limit(&plan_name);
+        // Just usage / limit = percentage. No string concatenation, no $.
         let percentage = if plan_limit > 0.0 {
             (actual_cost / plan_limit * 100.0).clamp(0.0, 100.0)
         } else {
             0.0
         };
-        // Label as "$used / $limit" so the card shows e.g. "$200.40 / $200.00".
-        let label = if plan_limit > 0.0 {
-            Some(format!("${:.2} / ${:.2}", actual_cost, plan_limit))
-        } else {
-            Some(plan_name.clone())
-        };
-        // Approximate reset from plan name (日/周/月). sub2api returns no reset time.
+        // Reset window from plan name (日/周/月). sub2api returns no reset time.
         let reset_at = if plan_name.contains('月') {
             now_millis() + 30 * 24 * 60 * 60 * 1000
         } else if plan_name.contains('周') {
             now_millis() + 7 * 24 * 60 * 60 * 1000
         } else {
-            now_millis() + 24 * 60 * 60 * 1000 // 日卡 or unknown -> 24h
+            now_millis() + 24 * 60 * 60 * 1000
         };
-        // unit is unused now (label carries the $ figure).
         let _ = unit;
 
         Ok(UsageResult {
@@ -126,7 +120,7 @@ impl UsageProvider for Sub2ApiProvider {
                 quotas: vec![UsageQuota {
                     percentage,
                     reset_at,
-                    label,
+                    label: None,
                     balance: None,
                     balance_unit: None,
                 }],
