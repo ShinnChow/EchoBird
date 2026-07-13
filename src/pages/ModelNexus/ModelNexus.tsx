@@ -171,20 +171,19 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
     if (isRefreshingUsage) return;
     setIsRefreshingUsage(true);
 
-    const newUsageData: Record<string, ModelUsageData> = {};
-
-    for (const model of userModels) {
-      try {
-        const result = await api.queryModelUsage(model.internalId);
-        if (result.success && result.data) {
-          newUsageData[model.internalId] = result.data;
+    // Parallel fetch; merge into existing so failed models keep their last data.
+    const results = await Promise.allSettled(
+      userModels.map((model) => api.queryModelUsage(model.internalId))
+    );
+    setModelUsageData((prev) => {
+      const next = { ...prev };
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled' && r.value.success && r.value.data) {
+          next[userModels[i].internalId] = r.value.data;
         }
-      } catch {
-        /* silent */
-      }
-    }
-
-    setModelUsageData(newUsageData);
+      });
+      return next;
+    });
     setIsRefreshingUsage(false);
   };
 

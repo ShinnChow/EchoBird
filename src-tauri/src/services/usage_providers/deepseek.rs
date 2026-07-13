@@ -71,7 +71,7 @@ impl UsageProvider for DeepSeekProvider {
                 quotas: vec![UsageQuota {
                     percentage: 0.0,
                     reset_at: now_millis() + 30 * 24 * 60 * 60 * 1000, // 30 days from now
-                    label: Some("余额".to_string()),
+                    label: None,
                     balance: Some(total_balance),
                     balance_unit: Some(currency.to_string()),
                 }],

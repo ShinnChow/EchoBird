@@ -68,8 +68,8 @@ pub async fn query_model_usage(internal_id: String) -> Result<UsageResult, Strin
         return Err("Model has no base URL configured".to_string());
     };
 
-    let api_key = &model.api_key;
+    let api_key = model_manager::decrypt_key_for_use(&model.api_key);
 
     // Query usage from provider
-    usage_providers::query_model_usage(base_url, api_key).await
+    usage_providers::query_model_usage(base_url, &api_key).await
 }
