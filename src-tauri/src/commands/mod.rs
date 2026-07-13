@@ -1,8 +1,8 @@
 pub mod mod_stub;
 pub mod model_commands;
-pub mod skill_commands;
 pub mod process_commands;
 pub mod settings_commands;
+pub mod skill_commands;
 pub mod tool_commands;
 
 pub mod agent_commands;

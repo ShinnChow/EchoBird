@@ -19,7 +19,10 @@ impl UsageProvider for VolcengineProvider {
         Ok(UsageResult {
             success: false,
             data: None,
-            error: Some("火山引擎用量查询需要控制台 AK/SK 认证，暂不支持。请前往火山引擎控制台查看用量。".to_string()),
+            error: Some(
+                "火山引擎用量查询需要控制台 AK/SK 认证，暂不支持。请前往火山引擎控制台查看用量。"
+                    .to_string(),
+            ),
         })
     }
 

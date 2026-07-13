@@ -50,9 +50,7 @@ impl UsageProvider for ZenMuxProvider {
             .map_err(|e| format!("Network error: {}", e))?;
 
         let status = resp.status();
-        if status == reqwest::StatusCode::UNAUTHORIZED
-            || status == reqwest::StatusCode::FORBIDDEN
-        {
+        if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
             return Ok(UsageResult {
                 success: false,
                 data: None,

@@ -19,11 +19,11 @@ pub mod zhipu;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UsageQuota {
-    pub percentage: f64,     // 0-100
-    pub reset_at: i64,       // Unix timestamp (ms)
+    pub percentage: f64,       // 0-100
+    pub reset_at: i64,         // Unix timestamp (ms)
     pub label: Option<String>, // Optional label (e.g., "Hourly", "Daily", "Monthly")
     // Balance display (for providers like DeepSeek that show remaining balance)
-    pub balance: Option<f64>, // Remaining balance (e.g., 10.50 USD)
+    pub balance: Option<f64>,         // Remaining balance (e.g., 10.50 USD)
     pub balance_unit: Option<String>, // Currency unit (e.g., "USD", "CNY", "Credits")
 }
 
@@ -126,10 +126,7 @@ pub fn detect_provider(base_url: &str) -> Option<Provider> {
 }
 
 /// Main entry point - query usage for a model
-pub async fn query_model_usage(
-    base_url: &str,
-    api_key: &str,
-) -> Result<UsageResult, String> {
+pub async fn query_model_usage(base_url: &str, api_key: &str) -> Result<UsageResult, String> {
     if api_key.trim().is_empty() {
         return Ok(UsageResult {
             success: false,

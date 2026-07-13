@@ -33,9 +33,7 @@ impl UsageProvider for SiliconFlowProvider {
             .map_err(|e| format!("Network error: {}", e))?;
 
         let status = resp.status();
-        if status == reqwest::StatusCode::UNAUTHORIZED
-            || status == reqwest::StatusCode::FORBIDDEN
-        {
+        if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
             return Ok(UsageResult {
                 success: false,
                 data: None,
@@ -58,10 +56,7 @@ impl UsageProvider for SiliconFlowProvider {
             .map_err(|e| format!("Failed to parse response: {}", e))?;
 
         let data = body.get("data").ok_or("Missing 'data' field")?;
-        let total_balance = data
-            .get("totalBalance")
-            .and_then(parse_f64)
-            .unwrap_or(0.0);
+        let total_balance = data.get("totalBalance").and_then(parse_f64).unwrap_or(0.0);
 
         // Assume 100 as total for percentage (arbitrary)
         let assumed_total = 100.0;
