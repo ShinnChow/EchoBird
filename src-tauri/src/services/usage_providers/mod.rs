@@ -11,6 +11,7 @@ pub mod novita;
 pub mod openrouter;
 pub mod siliconflow;
 pub mod stepfun;
+pub mod sub2api;
 pub mod zenmux;
 pub mod zhipu;
 
@@ -66,6 +67,7 @@ pub enum Provider {
     StepFun(stepfun::StepFunProvider),
     ZenMux(zenmux::ZenMuxProvider),
     Zhipu(zhipu::ZhipuProvider),
+    Sub2Api(sub2api::Sub2ApiProvider),
 }
 
 impl Provider {
@@ -80,6 +82,7 @@ impl Provider {
             Provider::StepFun(p) => p.query_usage(api_key, base_url).await,
             Provider::ZenMux(p) => p.query_usage(api_key, base_url).await,
             Provider::Zhipu(p) => p.query_usage(api_key, base_url).await,
+            Provider::Sub2Api(p) => p.query_usage(api_key, base_url).await,
         }
     }
 }
@@ -114,6 +117,9 @@ pub fn detect_provider(base_url: &str) -> Option<Provider> {
     }
     if zhipu::ZhipuProvider.can_handle(&url) {
         return Some(Provider::Zhipu(zhipu::ZhipuProvider));
+    }
+    if sub2api::Sub2ApiProvider.can_handle(&url) {
+        return Some(Provider::Sub2Api(sub2api::Sub2ApiProvider));
     }
 
     None
