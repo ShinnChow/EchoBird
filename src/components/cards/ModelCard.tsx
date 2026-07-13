@@ -30,6 +30,7 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
     [['perplexity', 'pplx'], 'perplexity'],
     [['together'], 'together'],
     [['volcengine', 'volces', '火山', 'ark.cn-beijing'], 'volcengine'],
+    [['byteplus', 'bytepluses'], 'byteplus'],
     [['doubao', '豆包', 'bytedance'], 'bytedance'],
     [['xiaomi', '小米', 'mimo'], 'xiaomi'],
     [['nemotron', 'nvidia'], 'nemotron'],
@@ -57,6 +58,7 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
       if (icon === 'agnes') return './icons/models/agnes.png';
       if (icon === 'compshare') return './icons/models/compshare.png';
       if (icon === 'ccvibe') return './icons/models/ccvibe.png';
+      if (icon === 'byteplus') return './icons/models/byteplus.png';
       return `./icons/models/${icon}.svg`;
     }
   }
@@ -100,6 +102,8 @@ export interface ModelCardProps {
   onEdit?: () => void; // edit callback
   onDelete?: () => void; // delete callback
   onRefresh?: () => void; // refresh usage callback (usage mode only)
+  onAccessKey?: () => void; // open AK/SK config modal (Volcengine usage mode)
+  akSkMissing?: boolean; // AK/SK not yet configured -> show hint
   onProtocolClick?: (protocol: 'openai' | 'anthropic') => void; // protocol tag click
 }
 
@@ -223,6 +227,8 @@ export const ModelCard = React.memo(
     onEdit,
     onDelete,
     onRefresh,
+    onAccessKey,
+    akSkMissing,
     onProtocolClick: _onProtocolClick,
   }: ModelCardProps & { isActive?: boolean }) => {
     const iconPath = getModelIcon(name, modelId);
@@ -285,8 +291,19 @@ export const ModelCard = React.memo(
             </div>
           )
         ) : (
-          // Usage mode: [刷新]
+          // Usage mode: [访问权限] [刷新]
           <div className="absolute top-2 right-2 flex gap-1.5">
+            {onAccessKey && (
+              <button
+                className="text-xs font-mono text-cyber-text-muted/70 hover:text-cyber-accent transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAccessKey();
+                }}
+              >
+                [{t('model.accessKey')}]
+              </button>
+            )}
             {onRefresh && (
               <button
                 className="text-xs font-mono text-cyber-text-muted/70 hover:text-cyber-text transition-colors"
@@ -332,7 +349,7 @@ export const ModelCard = React.memo(
         {/* Content area - switches based on viewMode */}
         {viewMode === 'usage' ? (
           // Usage mode - show quota bars or balance
-          <div className="flex-1 flex flex-col justify-center space-y-2.5">
+          <div className="flex-1 flex flex-col justify-center space-y-1">
             {usageData?.quotas && usageData.quotas.length > 0 ? (
               usageData.quotas.map((quota, idx) => (
                 <div key={idx} className="space-y-1">
@@ -373,7 +390,7 @@ export const ModelCard = React.memo(
               ))
             ) : (
               <div className="text-center text-cyber-text-muted text-xs">
-                {t('model.noUsageData')}
+                {akSkMissing ? t('model.akSkRequired') : t('model.noUsageData')}
               </div>
             )}
           </div>
@@ -471,6 +488,7 @@ export const ModelCard = React.memo(
       'isPinging',
       'selected',
       'viewMode',
+      'akSkMissing',
     ];
     const p = prev as unknown as Record<string, unknown>;
     const n = next as unknown as Record<string, unknown>;

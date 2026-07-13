@@ -70,6 +70,50 @@ pub async fn query_model_usage(internal_id: String) -> Result<UsageResult, Strin
 
     let api_key = model_manager::decrypt_key_for_use(&model.api_key);
 
-    // Query usage from provider
-    usage_providers::query_model_usage(base_url, &api_key).await
+    // Query usage from provider (internal_id lets the Volcengine provider look
+    // up per-model AK/SK).
+    usage_providers::query_model_usage(base_url, &api_key, &internal_id).await
+}
+
+/// Save Volcengine IAM Access Key / Secret Access Key (encrypted) for a specific
+/// model's usage queries. One account per model.
+#[tauri::command]
+pub fn save_volc_aksk(
+    internal_id: String,
+    access_key: String,
+    secret_key: String,
+) -> Result<(), String> {
+    if access_key.trim().is_empty() || secret_key.trim().is_empty() {
+        return Err("Access Key and Secret Access Key must not be empty".to_string());
+    }
+    usage_providers::volcengine::write_creds(&internal_id, access_key.trim(), secret_key.trim())
+}
+
+/// Whether Volcengine AK/SK are stored for a specific model.
+#[tauri::command]
+pub fn has_volc_aksk(internal_id: String) -> bool {
+    usage_providers::volcengine::has_creds(&internal_id)
+}
+
+/// Remove stored Volcengine AK/SK for a specific model.
+#[tauri::command]
+pub fn clear_volc_aksk(internal_id: String) -> bool {
+    usage_providers::volcengine::clear_creds(&internal_id);
+    true
+}
+
+/// Stored AK/SK pair (plaintext) returned to the frontend to pre-fill the modal.
+#[derive(serde::Serialize)]
+pub struct VolcAksk {
+    pub access_key: String,
+    pub secret_key: String,
+}
+
+/// Read stored AK/SK (plaintext) for a model, to pre-fill the config modal.
+#[tauri::command]
+pub fn get_volc_aksk(internal_id: String) -> Option<VolcAksk> {
+    usage_providers::volcengine::read_creds(&internal_id).map(|(ak, sk)| VolcAksk {
+        access_key: ak,
+        secret_key: sk,
+    })
 }

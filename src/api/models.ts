@@ -78,6 +78,32 @@ export async function queryModelUsage(internalId: string): Promise<UsageResult> 
   return invoke('query_model_usage', { internalId });
 }
 
+/** Save Volcengine IAM AK/SK (encrypted on the backend) for a specific model. */
+export function saveVolcAksk(
+  internalId: string,
+  accessKey: string,
+  secretKey: string
+): Promise<void> {
+  return invoke('save_volc_aksk', { internalId, accessKey, secretKey });
+}
+
+/** Whether Volcengine AK/SK are stored for a specific model. */
+export function hasVolcAksk(internalId: string): Promise<boolean> {
+  return invoke('has_volc_aksk', { internalId });
+}
+
+/** Remove stored Volcengine AK/SK for a specific model. */
+export function clearVolcAksk(internalId: string): Promise<boolean> {
+  return invoke('clear_volc_aksk', { internalId });
+}
+
+/** Read stored AK/SK (plaintext) for a model, to pre-fill the config modal. */
+export function getVolcAksk(
+  internalId: string
+): Promise<{ access_key: string; secret_key: string } | null> {
+  return invoke('get_volc_aksk', { internalId });
+}
+
 /** Shape of one entry in the Model Center right-panel Providers/Relays list. */
 export interface ModelDirectoryEntry {
   name: string;

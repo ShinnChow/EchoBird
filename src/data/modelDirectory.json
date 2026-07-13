@@ -107,6 +107,28 @@
       "region": "cn"
     },
     {
+      "name": "BytePlus",
+      "url": "https://www.byteplus.com/",
+      "baseUrl": "https://ark.ap-southeast.bytepluses.com/api/coding/v3",
+      "anthropicUrl": "https://ark.ap-southeast.bytepluses.com/api/coding",
+      "modelId": "",
+      "modelIds": [
+        "ark-code-latest",
+        "doubao-seed-2.0-code",
+        "doubao-seed-2.0-pro",
+        "doubao-seed-2.0-lite",
+        "doubao-seed-2.0-mini",
+        "glm-5.2",
+        "kimi-k2.7-code",
+        "deepseek-v4-pro",
+        "deepseek-v4-flash",
+        "minimax-m3",
+        "minimax-m2.7",
+        "kimi-k2.6"
+      ],
+      "region": "global"
+    },
+    {
       "name": "ERNIE 百度千帆",
       "url": "https://console.bce.baidu.com/qianfan/",
       "baseUrl": "https://qianfan.baidubce.com/v2/coding",

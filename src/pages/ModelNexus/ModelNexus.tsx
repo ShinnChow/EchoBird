@@ -6,6 +6,7 @@ import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { readText as readClipboardText } from '@tauri-apps/plugin-clipboard-manager';
 import { X, Box, ExternalLink, Plus, Lock, Unlock, RefreshCw } from 'lucide-react';
 import { ModelCard, ModelCardSkeleton, getModelIcon, ModelIdCombobox } from '../../components';
+import { useToast } from '../../components/Toast';
 import { useI18n } from '../../hooks/useI18n';
 import * as api from '../../api/tauri';
 import type { ModelConfig } from '../../api/types';
@@ -16,6 +17,13 @@ import type { ModelUsageData } from '../../api/tauri';
 import modelDirectory from '../../data/modelDirectory.json';
 
 // ===== Provider =====
+
+/** Whether a model's endpoint is Volcengine (cn) - needs AK/SK for usage.
+ *  Mirrors the backend can_handle + URL-selection (baseUrl if non-empty, else anthropicUrl). */
+const isVolcengineUrl = (baseUrl: string, anthropicUrl?: string | null) => {
+  const url = (baseUrl || anthropicUrl || '').toLowerCase();
+  return url.includes('ark.cn-beijing') || url.includes('volcengine') || url.includes('volces.com');
+};
 
 export function ModelNexusProvider({ children }: { children: React.ReactNode }) {
   // Models state
@@ -28,6 +36,10 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
   const [viewMode, setViewMode] = useState<'config' | 'usage'>('config');
   const [modelUsageData, setModelUsageData] = useState<Record<string, ModelUsageData>>({});
   const [isRefreshingUsage, setIsRefreshingUsage] = useState(false);
+  // Volcengine AK/SK (per-model: one account per model)
+  const { showToast } = useToast();
+  const [volcAkSkMissingIds, setVolcAkSkMissingIds] = useState<Set<string>>(new Set());
+  const [volcAkSkModelId, setVolcAkSkModelId] = useState<string | null>(null);
 
   // Modal state
   const [showAddModelModal, setShowAddModelModal] = useState(false);
@@ -167,7 +179,7 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
   };
 
   // Refresh usage for all models
-  const refreshAllUsage = async () => {
+  const refreshAllUsage = useCallback(async () => {
     if (isRefreshingUsage) return;
     setIsRefreshingUsage(true);
 
@@ -185,7 +197,7 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
       return next;
     });
     setIsRefreshingUsage(false);
-  };
+  }, [isRefreshingUsage, userModels]);
 
   // Refresh usage for a single model
   const refreshSingleUsage = async (modelId: string) => {
@@ -194,15 +206,59 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
 
     try {
       const result = await api.queryModelUsage(model.internalId);
+      if (result.error === 'VOLC_AKSK_REQUIRED') {
+        setVolcAkSkMissingIds((prev) => new Set(prev).add(model.internalId));
+        return;
+      }
       if (result.success && result.data) {
         const data = result.data;
         setModelUsageData((prev) => ({
           ...prev,
           [model.internalId]: data,
         }));
+        setVolcAkSkMissingIds((prev) => {
+          if (!prev.has(model.internalId)) return prev;
+          const next = new Set(prev);
+          next.delete(model.internalId);
+          return next;
+        });
+      } else if (result.error) {
+        showToast('error', result.error);
       }
     } catch {
       /* silent */
+    }
+  };
+
+  // On mount / when models load, mark which Volcengine models lack AK/SK.
+  useEffect(() => {
+    const volcModels = userModels.filter((m) => isVolcengineUrl(m.baseUrl, m.anthropicUrl));
+    Promise.all(
+      volcModels.map(async (m) => {
+        try {
+          return { id: m.internalId, missing: !(await api.hasVolcAksk(m.internalId)) };
+        } catch {
+          return { id: m.internalId, missing: true };
+        }
+      })
+    ).then((results) => {
+      setVolcAkSkMissingIds(new Set(results.filter((r) => r.missing).map((r) => r.id)));
+    });
+  }, [userModels]);
+
+  // Save AK/SK for a specific model, then refresh that model's usage.
+  const saveVolcAksk = async (internalId: string, accessKey: string, secretKey: string) => {
+    try {
+      await api.saveVolcAksk(internalId, accessKey, secretKey);
+      setVolcAkSkMissingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(internalId);
+        return next;
+      });
+      setVolcAkSkModelId(null);
+      await refreshSingleUsage(internalId);
+    } catch (e) {
+      showToast('error', typeof e === 'string' ? e : String(e));
     }
   };
 
@@ -286,6 +342,11 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
         modelUsageData,
         setModelUsageData,
         isRefreshingUsage,
+        volcAkSkMissingIds,
+        setVolcAkSkMissingIds,
+        volcAkSkModelId,
+        setVolcAkSkModelId,
+        saveVolcAksk,
         testInput,
         setTestInput,
         testOutput,
@@ -393,6 +454,141 @@ export function ModelNexusTitleActions() {
 
 // ===== Main Content (model card grid) =====
 
+// Volcengine AK/SK config modal. Two fields, mounted fresh each open.
+function VolcAkskModal({
+  onClose,
+  onSave,
+  initialAk = '',
+  initialSk = '',
+}: {
+  onClose: () => void;
+  onSave: (accessKey: string, secretKey: string) => Promise<void>;
+  initialAk?: string;
+  initialSk?: string;
+}) {
+  const { t } = useI18n();
+  const [ak, setAk] = useState(initialAk);
+  const [sk, setSk] = useState(initialSk);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!ak.trim() || !sk.trim()) return;
+    setSaving(true);
+    await onSave(ak.trim(), sk.trim());
+    setSaving(false);
+  };
+
+  const pasteButton = (setter: (v: string) => void) => (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          const text = (await readClipboardText()).trim();
+          if (text) setter(text);
+        } catch {
+          /* clipboard empty / unreadable - no-op */
+        }
+      }}
+      className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer text-xs text-cyber-text-secondary"
+    >
+      {t('model.paste')}
+    </button>
+  );
+
+  const inputClass =
+    'w-full bg-cyber-input border border-cyber-border px-2 py-1.5 pr-16 text-xs text-cyber-text font-mono focus:border-cyber-border focus:outline-none rounded-button';
+
+  return (
+    <div
+      className="fixed inset-0 z-[9998] flex items-center justify-center"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose();
+      }}
+    >
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="relative w-[450px] max-w-[90vw] border border-cyber-border/30 bg-cyber-surface shadow-2xl rounded-xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="h-px w-full bg-cyber-border" />
+        <div className="px-6 pt-5 pb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-cyber-text font-mono text-sm opacity-60">&gt;_</span>
+            <span className="text-base font-bold text-cyber-text">{t('model.accessKey')}</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-cyber-text-secondary hover:text-cyber-text transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="px-5 pb-5">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs text-cyber-text-secondary mb-1">
+                {t('model.akSkAccessKey')}
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="AK..."
+                  value={ak}
+                  onChange={(e) => setAk(e.target.value)}
+                  autoFocus
+                  className={inputClass}
+                />
+                {pasteButton(setAk)}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-cyber-text-secondary mb-1">
+                {t('model.akSkSecretKey')}
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="SK..."
+                  value={sk}
+                  onChange={(e) => setSk(e.target.value)}
+                  className={inputClass}
+                />
+                {pasteButton(setSk)}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              shellOpen('https://console.volcengine.com/iam/keymanage').catch(() =>
+                window.open('https://console.volcengine.com/iam/keymanage', '_blank')
+              )
+            }
+            className="block text-xs text-cyber-accent hover:opacity-80 pt-3"
+          >
+            https://console.volcengine.com/iam/keymanage
+          </button>
+          <div className="flex justify-end gap-3 pt-5">
+            <button
+              className="text-xs font-mono text-cyber-text-secondary hover:text-cyber-text px-3 py-1"
+              onClick={onClose}
+            >
+              [{t('btn.cancel')}]
+            </button>
+            <button
+              className="text-xs font-mono text-cyber-accent hover:opacity-80 px-3 py-1 disabled:opacity-40"
+              onClick={handleSave}
+              disabled={saving || !ak.trim() || !sk.trim()}
+            >
+              [{t('btn.save')}]
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ModelNexusMain() {
   const { t } = useI18n();
   const {
@@ -419,7 +615,26 @@ export function ModelNexusMain() {
     keyDestroyed: _keyDestroyed,
     setKeyDestroyed,
     refreshSingleUsage,
+    volcAkSkMissingIds,
+    volcAkSkModelId,
+    setVolcAkSkModelId,
+    saveVolcAksk,
   } = useModelNexus();
+
+  // Pre-fill values for the AK/SK modal (fetched when opening for a model).
+  const [volcAkSkInitial, setVolcAkSkInitial] = useState<{
+    access_key: string;
+    secret_key: string;
+  } | null>(null);
+
+  const openAkskModal = async (internalId: string) => {
+    try {
+      setVolcAkSkInitial(await api.getVolcAksk(internalId));
+    } catch {
+      setVolcAkSkInitial(null);
+    }
+    setVolcAkSkModelId(internalId);
+  };
 
   // Stable handlers for model card interactions
   const handleCardClick = useCallback(
@@ -546,6 +761,12 @@ export function ModelNexusMain() {
                     onEdit={isDemo ? undefined : () => handleCardEdit(model)}
                     onDelete={isDemo ? undefined : () => handleCardDelete(model.internalId)}
                     onRefresh={() => refreshSingleUsage(model.internalId)}
+                    onAccessKey={
+                      isVolcengineUrl(model.baseUrl, model.anthropicUrl)
+                        ? () => openAkskModal(model.internalId)
+                        : undefined
+                    }
+                    akSkMissing={volcAkSkMissingIds.has(model.internalId)}
                   />
                 );
               })}
@@ -572,6 +793,14 @@ export function ModelNexusMain() {
           )}
         </div>
       </div>
+      {volcAkSkModelId && (
+        <VolcAkskModal
+          onClose={() => setVolcAkSkModelId(null)}
+          onSave={(ak, sk) => saveVolcAksk(volcAkSkModelId, ak, sk)}
+          initialAk={volcAkSkInitial?.access_key ?? ''}
+          initialSk={volcAkSkInitial?.secret_key ?? ''}
+        />
+      )}
     </>
   );
 }

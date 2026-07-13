@@ -12,6 +12,7 @@ pub mod openrouter;
 pub mod siliconflow;
 pub mod stepfun;
 pub mod sub2api;
+pub mod volcengine;
 pub mod zenmux;
 pub mod zhipu;
 
@@ -68,6 +69,7 @@ pub enum Provider {
     ZenMux(zenmux::ZenMuxProvider),
     Zhipu(zhipu::ZhipuProvider),
     Sub2Api(sub2api::Sub2ApiProvider),
+    Volcengine(volcengine::VolcengineProvider),
 }
 
 impl Provider {
@@ -83,6 +85,7 @@ impl Provider {
             Provider::ZenMux(p) => p.query_usage(api_key, base_url).await,
             Provider::Zhipu(p) => p.query_usage(api_key, base_url).await,
             Provider::Sub2Api(p) => p.query_usage(api_key, base_url).await,
+            Provider::Volcengine(p) => p.query_usage(api_key, base_url).await,
         }
     }
 }
@@ -118,6 +121,9 @@ pub fn detect_provider(base_url: &str) -> Option<Provider> {
     if zhipu::ZhipuProvider.can_handle(&url) {
         return Some(Provider::Zhipu(zhipu::ZhipuProvider));
     }
+    if volcengine::VolcengineProvider.can_handle(&url) {
+        return Some(Provider::Volcengine(volcengine::VolcengineProvider));
+    }
     if sub2api::Sub2ApiProvider.can_handle(&url) {
         return Some(Provider::Sub2Api(sub2api::Sub2ApiProvider));
     }
@@ -126,15 +132,11 @@ pub fn detect_provider(base_url: &str) -> Option<Provider> {
 }
 
 /// Main entry point - query usage for a model
-pub async fn query_model_usage(base_url: &str, api_key: &str) -> Result<UsageResult, String> {
-    if api_key.trim().is_empty() {
-        return Ok(UsageResult {
-            success: false,
-            data: None,
-            error: Some("API key is empty".to_string()),
-        });
-    }
-
+pub async fn query_model_usage(
+    base_url: &str,
+    api_key: &str,
+    internal_id: &str,
+) -> Result<UsageResult, String> {
     let provider = match detect_provider(base_url) {
         Some(p) => p,
         None => {
@@ -145,6 +147,21 @@ pub async fn query_model_usage(base_url: &str, api_key: &str) -> Result<UsageRes
             });
         }
     };
+
+    // Volcengine usage uses per-model AK/SK (keyed by internal_id), not the
+    // inference api_key - route it through the per-model entrypoint so the
+    // empty-api-key check below doesn't block it.
+    if let Provider::Volcengine(p) = &provider {
+        return p.query_usage_for_model(internal_id, base_url).await;
+    }
+
+    if api_key.trim().is_empty() {
+        return Ok(UsageResult {
+            success: false,
+            data: None,
+            error: Some("API key is empty".to_string()),
+        });
+    }
 
     provider.query_usage(api_key, base_url).await
 }
