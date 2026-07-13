@@ -13,6 +13,7 @@ pub mod utils;
 
 use commands::mod_stub;
 use commands::model_commands;
+use commands::skill_commands;
 use commands::process_commands;
 use commands::settings_commands;
 use commands::tool_commands;
@@ -855,6 +856,10 @@ pub fn run() {
             model_commands::test_model,
             model_commands::ping_model,
             model_commands::is_key_destroyed,
+            skill_commands::get_skills,
+            skill_commands::add_skill,
+            skill_commands::delete_skill,
+            skill_commands::update_skill,
             process_commands::start_tool,
             process_commands::start_llm_server,
             process_commands::stop_llm_server,

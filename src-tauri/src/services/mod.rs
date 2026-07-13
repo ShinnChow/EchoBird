@@ -12,6 +12,7 @@ pub mod llm_client;
 pub mod local_llm;
 pub mod model_directory;
 pub mod model_manager;
+pub mod skill_manager;
 pub mod parasite;
 pub mod process_manager;
 pub mod pulse_archive;

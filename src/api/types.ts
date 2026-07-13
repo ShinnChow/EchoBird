@@ -46,6 +46,17 @@ export interface ModelConfig {
   anthropicLatency?: number;
 }
 
+// ─── Skill (favorite) Types ───
+
+export interface SkillConfig {
+  id: string;
+  name: string;
+  url: string;
+  category: string;
+  description: string;
+  createdAt: number;
+}
+
 export interface ModelTestResult {
   success: boolean;
   latency: number;

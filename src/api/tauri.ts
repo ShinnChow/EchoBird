@@ -12,6 +12,7 @@ import type { DetectedTool, ApplyModelInput, AppSettings } from './types';
 // ─── Re-export domain modules ───
 
 export * from './models';
+export * from './skills';
 export * from './localServer';
 export * from './agent';
 export * from './parasite';
