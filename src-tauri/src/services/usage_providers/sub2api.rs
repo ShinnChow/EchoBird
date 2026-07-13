@@ -103,20 +103,32 @@ impl UsageProvider for Sub2ApiProvider {
         } else {
             0.0
         };
+        // Label as "$used / $limit" so the card shows e.g. "$200.40 / $200.00".
+        let label = if plan_limit > 0.0 {
+            Some(format!("${:.2} / ${:.2}", actual_cost, plan_limit))
+        } else {
+            Some(plan_name.clone())
+        };
+        // Approximate reset from plan name (日/周/月). sub2api returns no reset time.
+        let reset_at = if plan_name.contains('月') {
+            now_millis() + 30 * 24 * 60 * 60 * 1000
+        } else if plan_name.contains('周') {
+            now_millis() + 7 * 24 * 60 * 60 * 1000
+        } else {
+            now_millis() + 24 * 60 * 60 * 1000 // 日卡 or unknown -> 24h
+        };
+        // unit is unused now (label carries the $ figure).
+        let _ = unit;
 
         Ok(UsageResult {
             success: true,
             data: Some(ModelUsageData {
                 quotas: vec![UsageQuota {
                     percentage,
-                    // Daily-card plans reset next day; sub2api returns no reset time,
-                    // so approximate 24h. (If the site exposes resetAt later, use it.)
-                    reset_at: now_millis() + 24 * 60 * 60 * 1000,
-                    label: Some(plan_name),
-                    // actual_cost is "used"; shown as the balance figure with the plan
-                    // name as label so the user sees "200.39 USD / 日卡 每日200刀".
-                    balance: Some(actual_cost),
-                    balance_unit: Some(unit),
+                    reset_at,
+                    label,
+                    balance: None,
+                    balance_unit: None,
                 }],
                 last_updated: Some(now_millis()),
             }),

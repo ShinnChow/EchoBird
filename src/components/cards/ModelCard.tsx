@@ -351,7 +351,7 @@ export const ModelCard = React.memo(
                     <>
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-cyber-text font-bold">
-                          {quota.percentage.toFixed(1)}%
+                          {quota.label || `${quota.percentage.toFixed(1)}%`}
                         </span>
                         <span className="text-cyber-text-muted text-[10px]">
                           {formatCountdown(
