@@ -62,7 +62,7 @@ impl UsageProvider for OpenRouterProvider {
                 quotas: vec![UsageQuota {
                     percentage,
                     reset_at: now_millis() + 30 * 24 * 60 * 60 * 1000, // 30 days
-                    label: Some("Credits".to_string()),
+                    label: None,
                     balance: None,
                     balance_unit: None,
                 }],
