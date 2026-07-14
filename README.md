@@ -23,7 +23,7 @@
   <a href="README.zh-CN.md">中文 README</a>
 </p>
 
-<p align="center"><sub><em>EchoBird supports usage queries for sub2api-based relay sites. To partner, open an <a href="https://github.com/edison7009/EchoBird/issues">Issue</a> or email <a href="mailto:hi@echobird.ai">hi@echobird.ai</a>.</em></sub></p>
+<p align="center"><sub>EchoBird supports usage queries for sub2api-based relay sites. To partner, open an <a href="https://github.com/edison7009/EchoBird/issues">Issue</a> or email <a href="mailto:hi@echobird.ai">hi@echobird.ai</a>.</sub></p>
 
 > **Note** — This repository is just one of several download channels
 > and an issue tracker. For product information, announcements, and
