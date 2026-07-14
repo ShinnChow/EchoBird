@@ -90,7 +90,7 @@ fn ensure_parent(path: &Path) {
 /// across model switches. The launcher proxy translates the display
 /// model to the real provider's model ID when forwarding requests.
 const CODEX_PROVIDER: &str = "OpenAI";
-const CODEX_DISPLAY_MODEL: &str = "gpt-5.5";
+const CODEX_DISPLAY_MODEL: &str = "gpt-5.6-sol";
 
 // Stable proxy port. Sourced from codex_proxy (the listener owner) so
 // the constant has exactly one definition. Bound permanently so
@@ -1846,7 +1846,7 @@ pub(crate) fn write_codex_canonical_fields(content: &str, codex_base_url: &str) 
     c = toml_write_top(&c, "model_provider", CODEX_PROVIDER);
     c = toml_write_top(&c, "model", CODEX_DISPLAY_MODEL);
     c = toml_write_top(&c, "review_model", CODEX_DISPLAY_MODEL);
-    c = toml_write_top(&c, "model_reasoning_effort", "high");
+    c = toml_write_top(&c, "model_reasoning_effort", "medium");
     // Top-level raw (bool, int).
     c = toml_write_top_raw(&c, "disable_response_storage", "true");
     c = toml_write_top_raw(&c, "model_context_window", "1000000");
