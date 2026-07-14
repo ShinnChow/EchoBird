@@ -7,7 +7,8 @@
 //! This is a fallback provider (can_handle always true) - it sits last in
 //! detect_provider so official providers (DeepSeek/Kimi/...) match first.
 //! Any unmatched base_url (relay/proxy) is tried against /v1/usage; if the
-//! site runs sub2api it returns 200, otherwise 404 and we report not-supported.
+//! site runs sub2api it returns 200 and we render bars, otherwise (404, bad
+//! key, non-JSON, wrong shape) we silently show "暂无用量数据".
 
 use super::{now_millis, parse_f64, ModelUsageData, UsageProvider, UsageQuota, UsageResult};
 use chrono::TimeZone;
@@ -152,41 +153,48 @@ fn parse_subscription_quotas(body: &serde_json::Value) -> Option<Vec<UsageQuota>
     }
 }
 
+/// Empty result: no usage data. Sub2Api is the catch-all fallback provider, so
+/// every failure mode (unreachable host, non-2xx, non-JSON, or a 200 that isn't
+/// sub2api-shaped) collapses to this - the UI shows "暂无用量数据" instead of a
+/// provider-specific error toast.
+fn no_data() -> UsageResult {
+    UsageResult {
+        success: false,
+        data: None,
+        error: None,
+    }
+}
+
 #[async_trait::async_trait]
 impl UsageProvider for Sub2ApiProvider {
     async fn query_usage(&self, api_key: &str, base_url: &str) -> Result<UsageResult, String> {
         let usage_url = build_usage_url(base_url);
         let client = reqwest::Client::new();
-        let resp = client
+        let resp = match client
             .get(&usage_url)
             .header("Authorization", format!("Bearer {}", api_key))
             .header("Accept", "application/json")
             .timeout(Duration::from_secs(15))
             .send()
             .await
-            .map_err(|e| format!("Network error: {}", e))?;
+        {
+            Ok(r) => r,
+            // Can't reach the endpoint (DNS / network / timeout) -> no data.
+            Err(_) => return Ok(no_data()),
+        };
 
-        let status = resp.status();
-        if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
-            return Ok(UsageResult {
-                success: false,
-                data: None,
-                error: Some(format!("Authentication failed (HTTP {})", status)),
-            });
-        }
-        if !status.is_success() {
-            // Not a sub2api endpoint (404 etc) - silently report no data.
-            return Ok(UsageResult {
-                success: false,
-                data: None,
-                error: Some(format!("Not a sub2api endpoint (HTTP {})", status)),
-            });
+        // Any non-2xx (404 = not sub2api, 401/403, 5xx, ...) -> no data. As a
+        // guess fallback we can't tell a bad key from a non-sub2api endpoint, so
+        // we never surface a specific error; the UI shows "暂无用量数据".
+        if !resp.status().is_success() {
+            return Ok(no_data());
         }
 
-        let body: serde_json::Value = resp
-            .json()
-            .await
-            .map_err(|e| format!("Failed to parse response: {}", e))?;
+        let body: serde_json::Value = match resp.json().await {
+            Ok(b) => b,
+            // 200 but not JSON / wrong shape -> no data.
+            Err(_) => return Ok(no_data()),
+        };
 
         // Prefer the structured `subscription` object: it carries explicit
         // per-window limits (daily/weekly/monthly), so we render one bar per
@@ -202,24 +210,26 @@ impl UsageProvider for Sub2ApiProvider {
             });
         }
 
-        // Fallback (older/non-standard sub2api): single bar from total cost vs
-        // the limit parsed out of the plan name.
-        let total = body.get("usage").and_then(|u| u.get("total"));
-        let actual_cost = total
-            .and_then(|u| u.get("actual_cost"))
-            .and_then(parse_f64)
-            .unwrap_or(0.0);
+        // Legacy fallback (sub2api without `subscription`): single bar from
+        // total cost vs the limit parsed out of the plan name. Only emit a bar
+        // when we actually parsed a limit; otherwise the 200 isn't real sub2api
+        // data -> no data (avoids a bogus 0% bar on non-sub2api endpoints).
         let plan_name = body
             .get("planName")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
         let plan_limit = parse_plan_limit(&plan_name);
-        let percentage = if plan_limit > 0.0 {
-            (actual_cost / plan_limit * 100.0).clamp(0.0, 100.0)
-        } else {
-            0.0
-        };
+        if plan_limit <= 0.0 {
+            return Ok(no_data());
+        }
+        let actual_cost = body
+            .get("usage")
+            .and_then(|u| u.get("total"))
+            .and_then(|u| u.get("actual_cost"))
+            .and_then(parse_f64)
+            .unwrap_or(0.0);
+        let percentage = (actual_cost / plan_limit * 100.0).clamp(0.0, 100.0);
         // Reset window from plan name (日/周/月). sub2api returns no reset time.
         let reset_at = if plan_name.contains('月') {
             now_millis() + 30 * 24 * 60 * 60 * 1000
