@@ -79,7 +79,7 @@ impl UsageProvider for ZenMuxProvider {
         let mut quotas = Vec::new();
 
         if let Some(arr) = limits {
-            for (idx, limit_item) in arr.iter().enumerate() {
+            for limit_item in arr.iter() {
                 let limit = limit_item.get("limit").and_then(parse_f64).unwrap_or(1.0);
                 let used = limit_item.get("used").and_then(parse_f64).unwrap_or(0.0);
                 let reset_at = limit_item
@@ -93,17 +93,10 @@ impl UsageProvider for ZenMuxProvider {
                     0.0
                 };
 
-                // Assign labels based on position
-                let label = if idx == 0 {
-                    Some("Hourly".to_string())
-                } else {
-                    Some("Daily".to_string())
-                };
-
                 quotas.push(UsageQuota {
                     percentage,
                     reset_at,
-                    label,
+                    label: None,
                     balance: None,
                     balance_unit: None,
                 });

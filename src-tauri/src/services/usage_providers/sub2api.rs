@@ -98,7 +98,7 @@ fn parse_subscription_quotas(body: &serde_json::Value) -> Option<Vec<UsageQuota>
             quotas.push(UsageQuota {
                 percentage: pct(usage, limit),
                 reset_at: daily_reset_ms(body),
-                label: Some("Daily".to_string()),
+                label: None,
                 balance: None,
                 balance_unit: None,
             });
@@ -117,7 +117,7 @@ fn parse_subscription_quotas(body: &serde_json::Value) -> Option<Vec<UsageQuota>
             quotas.push(UsageQuota {
                 percentage: pct(usage, limit),
                 reset_at: reset,
-                label: Some("Weekly".to_string()),
+                label: None,
                 balance: None,
                 balance_unit: None,
             });
@@ -138,7 +138,7 @@ fn parse_subscription_quotas(body: &serde_json::Value) -> Option<Vec<UsageQuota>
             quotas.push(UsageQuota {
                 percentage: pct(usage, limit),
                 reset_at: reset,
-                label: Some("Monthly".to_string()),
+                label: None,
                 balance: None,
                 balance_unit: None,
             });
@@ -277,11 +277,11 @@ mod tests {
         });
         let quotas = parse_subscription_quotas(&body).expect("subscription present");
         assert_eq!(quotas.len(), 3);
-        assert_eq!(quotas[0].label.as_deref(), Some("Daily"));
+        assert!(quotas[0].label.is_none());
         assert!((quotas[0].percentage - 48.06).abs() < 0.1);
-        assert_eq!(quotas[1].label.as_deref(), Some("Weekly"));
+        assert!(quotas[1].label.is_none());
         assert!((quotas[1].percentage - 6.87).abs() < 0.1);
-        assert_eq!(quotas[2].label.as_deref(), Some("Monthly"));
+        assert!(quotas[2].label.is_none());
         assert!((quotas[2].percentage - 1.60).abs() < 0.1);
     }
 
@@ -296,7 +296,7 @@ mod tests {
         });
         let quotas = parse_subscription_quotas(&body).expect("subscription present");
         assert_eq!(quotas.len(), 1);
-        assert_eq!(quotas[0].label.as_deref(), Some("Daily"));
+        assert!(quotas[0].label.is_none());
         assert!((quotas[0].percentage - 25.0).abs() < 0.01);
     }
 

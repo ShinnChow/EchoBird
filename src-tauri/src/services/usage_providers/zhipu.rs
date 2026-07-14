@@ -81,7 +81,7 @@ impl UsageProvider for ZhipuProvider {
         let mut quotas = Vec::new();
 
         // Parse each limit (5-hour window, weekly, etc.)
-        for (idx, limit_item) in limits.iter().enumerate() {
+        for limit_item in limits.iter() {
             let limit = limit_item.get("limit").and_then(parse_f64).unwrap_or(1.0);
             let used = limit_item.get("used").and_then(parse_f64).unwrap_or(0.0);
             let reset_at = limit_item
@@ -95,17 +95,10 @@ impl UsageProvider for ZhipuProvider {
                 0.0
             };
 
-            // Determine label based on position (heuristic)
-            let label = if idx == 0 {
-                Some("5 Hours".to_string())
-            } else {
-                Some("Weekly".to_string())
-            };
-
             quotas.push(UsageQuota {
                 percentage,
                 reset_at,
-                label,
+                label: None,
                 balance: None,
                 balance_unit: None,
             });

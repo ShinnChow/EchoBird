@@ -88,19 +88,6 @@ impl UsageProvider for MiniMaxProvider {
                     .and_then(extract_reset_time)
                     .unwrap_or_else(|| now_millis() + 24 * 60 * 60 * 1000);
 
-                let name = quota_item
-                    .get("type")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
-
-                let label = match name {
-                    "hourly" => Some("Hourly".to_string()),
-                    "daily" => Some("Daily".to_string()),
-                    "weekly" => Some("Weekly".to_string()),
-                    "monthly" => Some("Monthly".to_string()),
-                    _ => Some(name.to_string()),
-                };
-
                 let percentage = if limit > 0.0 {
                     (used / limit * 100.0).clamp(0.0, 100.0)
                 } else {
@@ -110,7 +97,7 @@ impl UsageProvider for MiniMaxProvider {
                 quotas.push(UsageQuota {
                     percentage,
                     reset_at,
-                    label,
+                    label: None,
                     balance: None,
                     balance_unit: None,
                 });

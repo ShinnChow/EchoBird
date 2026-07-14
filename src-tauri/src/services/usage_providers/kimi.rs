@@ -88,7 +88,7 @@ impl UsageProvider for KimiProvider {
                     quotas.push(UsageQuota {
                         percentage,
                         reset_at,
-                        label: Some("5 Hours".to_string()),
+                        label: None,
                         balance: None,
                         balance_unit: None,
                     });
@@ -115,7 +115,7 @@ impl UsageProvider for KimiProvider {
             quotas.push(UsageQuota {
                 percentage,
                 reset_at,
-                label: Some("Weekly".to_string()),
+                label: None,
                 balance: None,
                 balance_unit: None,
             });
