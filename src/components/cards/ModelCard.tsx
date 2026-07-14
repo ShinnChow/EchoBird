@@ -370,7 +370,7 @@ export const ModelCard = React.memo(
                         <span className="text-cyber-text font-bold">
                           {`${quota.percentage.toFixed(1)}%`}
                         </span>
-                        <span className="text-cyber-text-muted text-[10px]">
+                        <span className="text-cyber-text-muted text-[10px] translate-y-[2px]">
                           {formatCountdown(
                             // eslint-disable-next-line react-hooks/purity
                             quota.resetAt - Date.now(),
