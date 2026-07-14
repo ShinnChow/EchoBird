@@ -1,7 +1,7 @@
 {
 "generated_at": "2026-07-14T03:32:43.000Z",
 "window_hours": 168,
-"total_items": 1011,
+"total_items": 1010,
 "total_items_ai_raw": 1010,
 "total_items_raw": 1010,
 "total_items_all_mode": 1010,
@@ -25,7 +25,7 @@
 "huggingface": 5,
 "googleai": 2,
 "anthropic": 1,
-"echobird": 1
+"echobird": 0
 },
 "items": [
 {
@@ -57,21 +57,6 @@
 "title_en": "moeru-ai/airi — 💖🧸 Self hosted, you-owned Grok Companion, a container of souls of waifu, cyber livings to bring them into our worlds, wishing to achieve Neuro-sama's altitude. Capable of realtime voice chat, Minecraft, Factorio playing. Web / macOS / Windows supported.",
 "title_zh": null,
 "title_bilingual": "moeru-ai/airi — 💖🧸 Self hosted, you-owned Grok Companion, a container of souls of waifu, cyber livings to bring them into our worlds, wishing to achieve Neuro-sama's altitude. Capable of realtime voice chat, Minecraft, Factorio playing. Web / macOS / Windows supported."
-},
-{
-"id": "5e7243d95fe8396ae982554d2e4abb64a791013a",
-"site_id": "echobird",
-"site_name": "EchoBird Official",
-"source": "EchoBird",
-"title": "Free LLMs on OpenRouter: 50 requests/day to top-tier models (Official Guide)",
-"url": "https://echobird.ai/openrouter/",
-"published_at": "2026-07-14T03:32:43.000Z",
-"first_seen_at": "2026-07-14T03:33:04.177Z",
-"last_seen_at": "2026-07-14T03:33:04.177Z",
-"title_original": "Free LLMs on OpenRouter: 50 requests/day to top-tier models (Official Guide)",
-"title_en": null,
-"title_zh": "Free LLMs on OpenRouter: 50 requests/day to top-tier models (Official Guide)",
-"title_bilingual": "Free LLMs on OpenRouter: 50 requests/day to top-tier models (Official Guide)"
 },
 {
 "id": "48447d485785502650e88dd476376999dcb2f768",

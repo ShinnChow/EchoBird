@@ -1,7 +1,7 @@
 {
   "generated_at": "2026-07-14T01:23:35.479Z",
   "window_hours": 168,
-  "total_items": 5560,
+  "total_items": 5559,
   "total_items_ai_raw": 6829,
   "total_items_raw": 44207,
   "total_items_all_mode": 41228,
@@ -97,8 +97,8 @@
     {
       "site_id": "echobird",
       "site_name": "EchoBird 官方",
-      "count": 2,
-      "raw_count": 2
+      "count": 1,
+      "raw_count": 1
     }
   ],
   "items": [
@@ -133,19 +133,19 @@
       "title_bilingual": "一只没有固定形状的史莱姆，如何长成机器人大脑第一股|甲子光年"
     },
     {
-      "id": "5e7243d95fe8396ae982554d2e4abb64a791013a",
+      "id": "ccbcfcf855cc8e04ee445c29b8d9b28a352f2ddf",
       "site_id": "echobird",
       "site_name": "EchoBird 官方",
       "source": "EchoBird",
-      "title": "白嫖 OpenRouter 免费模型:每天 50 次免费请求跑顶尖大模型(官方教程)",
-      "url": "https://echobird.ai/openrouter/",
+      "title": "9.8元，体验 ChatGPT / Claude 全球顶尖大模型，好不好用？不如试试再说？",
+      "url": "https://echobird.ai/ccvibe/",
       "published_at": "2026-07-14T01:25:00Z",
-      "first_seen_at": "2026-07-14T03:33:04.044Z",
-      "last_seen_at": "2026-07-14T03:33:04.044Z",
-      "title_original": "白嫖 OpenRouter 免费模型:每天 50 次免费请求跑顶尖大模型(官方教程)",
+      "first_seen_at": "2026-07-14T04:49:59.385Z",
+      "last_seen_at": "2026-07-14T04:49:59.385Z",
+      "title_original": "9.8元，体验 ChatGPT / Claude 全球顶尖大模型，好不好用？不如试试再说？",
       "title_en": null,
-      "title_zh": "白嫖 OpenRouter 免费模型:每天 50 次免费请求跑顶尖大模型(官方教程)",
-      "title_bilingual": "白嫖 OpenRouter 免费模型:每天 50 次免费请求跑顶尖大模型(官方教程)"
+      "title_zh": "9.8元，体验 ChatGPT / Claude 全球顶尖大模型，好不好用？不如试试再说？",
+      "title_bilingual": "9.8元，体验 ChatGPT / Claude 全球顶尖大模型，好不好用？不如试试再说？"
     },
     {
       "id": "ae8af9387ffca55172f1e11fea7e47ba007b212a",
@@ -161,21 +161,6 @@
       "title_en": null,
       "title_zh": "5秒挖出15年Linux漏洞，AI却让无辜记者成了偷车嫌犯",
       "title_bilingual": "5秒挖出15年Linux漏洞，AI却让无辜记者成了偷车嫌犯"
-    },
-    {
-      "id": "b7eef7a6b1cbd2fa7df0c77313aa5fa87da01ae6",
-      "site_id": "echobird",
-      "site_name": "EchoBird 官方",
-      "source": "EchoBird",
-      "title": "Codex 全英文插件看不懂?简体中文 Codex 插件市场导航,它来了!",
-      "url": "https://echobird.cn/",
-      "published_at": "2026-07-14T01:23:35.479Z",
-      "first_seen_at": "2026-07-14T03:33:04.044Z",
-      "last_seen_at": "2026-07-14T03:33:04.044Z",
-      "title_original": "Codex 全英文插件看不懂?简体中文 Codex 插件市场导航,它来了!",
-      "title_en": null,
-      "title_zh": "Codex 全英文插件看不懂?简体中文 Codex 插件市场导航,它来了!",
-      "title_bilingual": "Codex 全英文插件看不懂?简体中文 Codex 插件市场导航,它来了!"
     },
     {
       "id": "10b12f1adaac27789d965020acbc855a539d971a",
