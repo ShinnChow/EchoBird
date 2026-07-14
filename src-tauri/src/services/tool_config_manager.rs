@@ -2503,6 +2503,11 @@ fn apply_claudedesktop(model_info: &ModelInfo) -> ApplyResult {
         "inferenceGatewayBaseUrl": gateway_base_url,
         "inferenceModels": [model_entry],
         "inferenceProvider": "gateway",
+        // Claude Desktop 3P mode derives the built-in web_fetch egress policy
+        // from this field. Without it, egress falls back to the gateway host
+        // only (127.0.0.1), so web_fetch can't reach external URLs. ["*"]
+        // lets web_fetch fetch any URL the user asks Claude to fetch.
+        "coworkEgressAllowedHosts": ["*"],
     });
     if let Err(e) = write_json_file(&profile_path, &profile) {
         return ApplyResult {
