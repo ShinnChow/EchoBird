@@ -1,5 +1,5 @@
 {
-  "version": "5.5.1",
+  "version": "5.5.3",
   "releaseDate": "2026-07-13",
   "releaseNotes": "## 新增功能\n\n- **火山引擎用量查询**：模型中心火山引擎模型切到「用量」标签，点击 `[访问权限]` 填入 IAM Access Key / Secret Access Key，即可查看 CodingPlan 的 session / weekly / monthly 额度进度与重置倒计时。每个火山模型独立配置，支持多账号。\n- **BytePlus 厂商**：模型中心新增 BytePlus（火山海外版）厂商入口，含图标与模型 ID 列表。\n\n## 优化\n\n- 用量进度条统一显示百分比，间距收紧，最后一条不再贴边。\n- 「访问权限」弹窗风格与添加模型弹窗统一，Access Key / Secret Access Key 两个输入框均支持一键粘贴。",
   "releaseNotesI18n": {
