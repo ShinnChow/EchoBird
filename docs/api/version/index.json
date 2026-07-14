@@ -1,11 +1,11 @@
 {
   "version": "5.5.3",
-  "releaseDate": "2026-07-13",
-  "releaseNotes": "## 新增功能\n\n- **火山引擎用量查询**：模型中心火山引擎模型切到「用量」标签，点击 `[访问权限]` 填入 IAM Access Key / Secret Access Key，即可查看 CodingPlan 的 session / weekly / monthly 额度进度与重置倒计时。每个火山模型独立配置，支持多账号。\n- **BytePlus 厂商**：模型中心新增 BytePlus（火山海外版）厂商入口，含图标与模型 ID 列表。\n\n## 优化\n\n- 用量进度条统一显示百分比，间距收紧，最后一条不再贴边。\n- 「访问权限」弹窗风格与添加模型弹窗统一，Access Key / Secret Access Key 两个输入框均支持一键粘贴。",
+  "releaseDate": "2026-07-14",
+  "releaseNotes": "## 优化\n\n- 支持 Sub2api 类中转站用量查询，在模型中心页面“用量”查询，节约用户查询时间，把时间用在更重要的事情上。\n- ChatGPT 和 Claude 家族产品，跟进最近的版本更新，模型切换后设置与原版一模一样。",
   "releaseNotesI18n": {
-    "zh-cn": "## 新增功能\n\n- **火山引擎用量查询**：模型中心火山引擎模型切到「用量」标签，点击 `[访问权限]` 填入 IAM Access Key / Secret Access Key，即可查看 CodingPlan 的 session / weekly / monthly 额度进度与重置倒计时。每个火山模型独立配置，支持多账号。\n- **BytePlus 厂商**：模型中心新增 BytePlus（火山海外版）厂商入口，含图标与模型 ID 列表。\n\n## 优化\n\n- 用量进度条统一显示百分比，间距收紧，最后一条不再贴边。\n- 「访问权限」弹窗风格与添加模型弹窗统一，Access Key / Secret Access Key 两个输入框均支持一键粘贴。\n",
-    "en": "## New\n\n- **Volcengine usage query**: switch a Volcengine model to the \"Usage\" tab, click `[Access Key]` and enter your IAM Access Key / Secret Access Key to view CodingPlan session / weekly / monthly quota progress with reset countdowns. Each Volcengine model keeps its own credentials - multiple accounts supported.\n- **BytePlus vendor**: BytePlus (Volcengine overseas) added as a provider in Model Center, with icon and model ID list.\n\n## Improvements\n\n- Usage bars now show percentages uniformly with tighter spacing; the last bar no longer touches the card edge.\n- The \"Access Key\" modal matches the add-model modal style; both inputs support one-click paste.\n",
-    "zh-tw": "## 新增功能\n\n- **火山引擎用量查詢**：模型中心火山引擎模型切到「用量」標籤，點擊 `[存取權限]` 填入 IAM Access Key / Secret Access Key，即可檢視 CodingPlan 的 session / weekly / monthly 額度進度與重置倒數。每個火山模型獨立設定，支援多帳號。\n- **BytePlus 廠商**：模型中心新增 BytePlus（火山海外版）廠商入口，含圖示與模型 ID 列表。\n\n## 最佳化\n\n- 用量進度條統一顯示百分比，間距收緊，最後一條不再貼邊。\n- 「存取權限」彈窗風格與新增模型彈窗統一，Access Key / Secret Access Key 兩個輸入框均支援一鍵貼上。\n",
-    "ja": "## 新機能\n\n- **火山エンジン使用量照会**：モデルセンターの火山エンジンモデルで「使用量」タブを開き、`[アクセス権]` をクリックして IAM Access Key / Secret Access Key を入力すると、CodingPlan の session / weekly / monthly 使用量とリセットまでのカウントダウンを表示。火山モデルごとに個別設定、複数アカウント対応。\n- **BytePlus ベンダー**：モデルセンターに BytePlus（火山エンジン海外版）ベンダーを追加、アイコンとモデル ID リスト付き。\n\n## 改善\n\n- 使用量バーはパーセンテージを統一表示、間隔を狭め、最後のバーが端に寄らないようにしました。\n- 「アクセス権」モーダルをモデル追加モーダルと統一デザインにし、両入力欄にワンクリック貼り付け対応。\n"
+    "zh-cn": "## 优化\n\n- 支持 Sub2api 类中转站用量查询，在模型中心页面“用量”查询，节约用户查询时间，把时间用在更重要的事情上。\n- ChatGPT 和 Claude 家族产品，跟进最近的版本更新，模型切换后设置与原版一模一样。\n",
+    "en": "## Improvements\n\n- Sub2api relay usage query is now supported — check usage on the Model Center “Usage” tab, saving you query time to spend on what matters.\n- ChatGPT and Claude family products track the latest upstream updates; after switching models, settings match the official apps exactly.\n",
+    "zh-tw": "## 最佳化\n\n- 支援 Sub2api 類中轉站用量查詢，在模型中心頁面「用量」查詢，節約使用者查詢時間，把時間用在更重要的事情上。\n- ChatGPT 與 Claude 家族產品，跟進最近的版本更新，模型切換後設定與原版一模一樣。\n",
+    "ja": "## 改善\n\n- Sub2api 系中継サイトの使用量照会に対応しました。モデルセンターの「使用量」タブで確認でき、照会時間を節約してより重要なことに時間を使えます。\n- ChatGPT および Claude ファミリー製品は最新のアップストリーム版に追従し、モデル切換後も公式アプリと同じ設定を維持します。\n"
   }
 }
