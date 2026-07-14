@@ -68,7 +68,6 @@ impl UsageProvider for NovitaProvider {
                 quotas: vec![UsageQuota {
                     percentage,
                     reset_at: now_millis() + 30 * 24 * 60 * 60 * 1000,
-                    label: None,
                     balance: None,
                     balance_unit: None,
                 }],

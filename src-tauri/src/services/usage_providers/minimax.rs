@@ -97,7 +97,6 @@ impl UsageProvider for MiniMaxProvider {
                 quotas.push(UsageQuota {
                     percentage,
                     reset_at,
-                    label: None,
                     balance: None,
                     balance_unit: None,
                 });

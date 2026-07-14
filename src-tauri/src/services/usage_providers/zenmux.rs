@@ -96,7 +96,6 @@ impl UsageProvider for ZenMuxProvider {
                 quotas.push(UsageQuota {
                     percentage,
                     reset_at,
-                    label: None,
                     balance: None,
                     balance_unit: None,
                 });

@@ -56,29 +56,16 @@ fn parse_iso_ms(s: &str) -> Option<i64> {
 }
 
 /// Daily quota resets at next midnight in CC Vibe's timezone (CST, +08:00).
-/// Uses `daily_usage[0].date` when available; falls back to now+24h.
-fn daily_reset_ms(body: &serde_json::Value) -> i64 {
+/// Computed from the current time rather than the response's `daily_usage`
+/// date, which can be stale and yield a past reset (-> "0m" countdown).
+fn daily_reset_ms() -> i64 {
     let cst = chrono::FixedOffset::east_opt(8 * 3600).unwrap();
-    let today = body
-        .get("daily_usage")
-        .and_then(|v| v.as_array())
-        .and_then(|a| a.first())
-        .and_then(|d| d.get("date"))
-        .and_then(|v| v.as_str())
-        .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-    match today {
-        Some(d) => {
-            let next = d + chrono::Duration::days(1);
-            match cst
-                .from_local_datetime(&next.and_hms_opt(0, 0, 0).unwrap())
-                .single()
-            {
-                Some(dt) => dt.timestamp_millis(),
-                None => now_millis() + 24 * 60 * 60 * 1000,
-            }
-        }
-        None => now_millis() + 24 * 60 * 60 * 1000,
-    }
+    let now_cst = chrono::Utc::now().with_timezone(&cst);
+    let tomorrow = now_cst.date_naive() + chrono::Duration::days(1);
+    // FixedOffset has no DST, so from_local_datetime is always Single.
+    cst.from_local_datetime(&tomorrow.and_hms_opt(0, 0, 0).unwrap())
+        .unwrap()
+        .timestamp_millis()
 }
 
 /// Build one quota bar per enforced limit found in the `subscription` object
@@ -98,8 +85,7 @@ fn parse_subscription_quotas(body: &serde_json::Value) -> Option<Vec<UsageQuota>
             let usage = sub.get("daily_usage_usd").and_then(parse_f64).unwrap_or(0.0);
             quotas.push(UsageQuota {
                 percentage: pct(usage, limit),
-                reset_at: daily_reset_ms(body),
-                label: None,
+                reset_at: daily_reset_ms(),
                 balance: None,
                 balance_unit: None,
             });
@@ -118,7 +104,6 @@ fn parse_subscription_quotas(body: &serde_json::Value) -> Option<Vec<UsageQuota>
             quotas.push(UsageQuota {
                 percentage: pct(usage, limit),
                 reset_at: reset,
-                label: None,
                 balance: None,
                 balance_unit: None,
             });
@@ -131,6 +116,8 @@ fn parse_subscription_quotas(body: &serde_json::Value) -> Option<Vec<UsageQuota>
                 .get("monthly_usage_usd")
                 .and_then(parse_f64)
                 .unwrap_or(0.0);
+            // expires_at = subscription end = monthly quota reset (CC Vibe plans
+            // are monthly; the API exposes no separate monthly-reset field).
             let reset = sub
                 .get("expires_at")
                 .and_then(|v| v.as_str())
@@ -139,7 +126,6 @@ fn parse_subscription_quotas(body: &serde_json::Value) -> Option<Vec<UsageQuota>
             quotas.push(UsageQuota {
                 percentage: pct(usage, limit),
                 reset_at: reset,
-                label: None,
                 balance: None,
                 balance_unit: None,
             });
@@ -245,7 +231,6 @@ impl UsageProvider for Sub2ApiProvider {
                 quotas: vec![UsageQuota {
                     percentage,
                     reset_at,
-                    label: None,
                     balance: None,
                     balance_unit: None,
                 }],
@@ -287,11 +272,8 @@ mod tests {
         });
         let quotas = parse_subscription_quotas(&body).expect("subscription present");
         assert_eq!(quotas.len(), 3);
-        assert!(quotas[0].label.is_none());
         assert!((quotas[0].percentage - 48.06).abs() < 0.1);
-        assert!(quotas[1].label.is_none());
         assert!((quotas[1].percentage - 6.87).abs() < 0.1);
-        assert!(quotas[2].label.is_none());
         assert!((quotas[2].percentage - 1.60).abs() < 0.1);
     }
 
@@ -306,7 +288,6 @@ mod tests {
         });
         let quotas = parse_subscription_quotas(&body).expect("subscription present");
         assert_eq!(quotas.len(), 1);
-        assert!(quotas[0].label.is_none());
         assert!((quotas[0].percentage - 25.0).abs() < 0.01);
     }
 

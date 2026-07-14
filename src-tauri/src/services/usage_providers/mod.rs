@@ -22,7 +22,6 @@ pub mod zhipu;
 pub struct UsageQuota {
     pub percentage: f64,       // 0-100
     pub reset_at: i64,         // Unix timestamp (ms)
-    pub label: Option<String>, // Optional label (e.g., "Hourly", "Daily", "Monthly")
     // Balance display (for providers like DeepSeek that show remaining balance)
     pub balance: Option<f64>,         // Remaining balance (e.g., 10.50 USD)
     pub balance_unit: Option<String>, // Currency unit (e.g., "USD", "CNY", "Credits")

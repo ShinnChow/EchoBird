@@ -58,7 +58,6 @@ export async function isKeyDestroyed(internalId: string): Promise<boolean> {
 export interface UsageQuota {
   percentage: number;
   resetAt: number;
-  label?: string;
   balance?: number;
   balanceUnit?: string;
 }

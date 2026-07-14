@@ -322,7 +322,6 @@ fn parse_usage(raw: &serde_json::Value) -> Option<Vec<UsageQuota>> {
             quotas.push(UsageQuota {
                 percentage: *percent,
                 reset_at: *reset,
-                label: None,
                 balance: None,
                 balance_unit: None,
             });

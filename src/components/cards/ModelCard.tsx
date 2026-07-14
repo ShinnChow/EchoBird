@@ -357,7 +357,7 @@ export const ModelCard = React.memo(
                     // Balance display (for providers like DeepSeek) - centered, one line
                     <div className="flex items-center justify-center gap-2">
                       <span className="text-cyber-text font-bold text-2xl">
-                        {quota.label || t('model.balance')}
+                        {t('model.balance')}
                       </span>
                       <span className="text-cyber-text font-bold text-2xl">
                         {quota.balance.toFixed(2)} {quota.balanceUnit || 'CNY'}
@@ -368,7 +368,7 @@ export const ModelCard = React.memo(
                     <>
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-cyber-text font-bold">
-                          {quota.label || `${quota.percentage.toFixed(1)}%`}
+                          {`${quota.percentage.toFixed(1)}%`}
                         </span>
                         <span className="text-cyber-text-muted text-[10px]">
                           {formatCountdown(
