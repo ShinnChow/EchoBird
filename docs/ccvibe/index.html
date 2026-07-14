@@ -327,6 +327,7 @@
             cursor: pointer;
             transition: all 0.2s;
             text-align: center;
+            text-decoration: none;
         }
         .plan-btn img { width: 16px; height: 16px; flex-shrink: 0; }
         .plan.featured .plan-btn:first-child img { filter: invert(1); }
@@ -438,6 +439,8 @@
         .step-body p { margin-bottom: 12px; }
         .step-body p:last-child { margin-bottom: 0; }
         .step-body strong { color: var(--neon); font-weight: 600; background: var(--neon-soft); padding: 2px 8px; border-radius: 5px; white-space: nowrap; }
+        .step-body a { color: var(--neon); text-decoration: underline; text-underline-offset: 2px; transition: color 0.15s; }
+        .step-body a:hover { color: var(--white); }
 
         .shot-wrap {
             background: var(--bg);
@@ -546,6 +549,16 @@
             font-family: var(--mono);
             font-size: 12px; color: var(--dim);
         }
+        .disclaimer {
+            max-width: 760px;
+            margin: 24px auto 0;
+            text-align: center;
+            font-family: var(--sans);
+            font-size: 11px;
+            line-height: 1.75;
+            color: var(--dim);
+            opacity: 0.82;
+        }
 
         /* ── Responsive ── */
         @media (max-width: 900px) {
@@ -652,7 +665,7 @@
             <span>EchoBird</span>
         </a>
         <div style="display:flex;align-items:center;gap:12px;">
-            <a href="../" class="nav-back">← 返回首页</a>
+            <a href="https://cc-vibe.com/register?aff=FN3FUL3XEARC" class="nav-back" target="_blank" rel="noopener">CC Vibe 控制台</a>
         </div>
     </nav>
 
@@ -693,8 +706,8 @@
                     <li>适合先体验再决定</li>
                 </ul>
                 <div class="plan-btns">
-                <button class="plan-btn"><img src="chatgpt.svg" alt=""><span>ChatGPT</span></button>
-                <button class="plan-btn"><img src="claude.svg" alt=""><span>Claude</span></button>
+                <a class="plan-btn" href="https://cc-vibe.com/register?aff=FN3FUL3XEARC" target="_blank" rel="noopener"><img src="chatgpt.svg" alt=""><span>ChatGPT</span></a>
+                <a class="plan-btn" href="https://cc-vibe.com/register?aff=FN3FUL3XEARC" target="_blank" rel="noopener"><img src="claude.svg" alt=""><span>Claude</span></a>
                 </div>
             </div>
 
@@ -712,8 +725,8 @@
                     <li>日均仅 ¥8.6，更划算</li>
                 </ul>
                 <div class="plan-btns">
-                <button class="plan-btn"><img src="chatgpt.svg" alt=""><span>ChatGPT</span></button>
-                <button class="plan-btn"><img src="claude.svg" alt=""><span>Claude</span></button>
+                <a class="plan-btn" href="https://cc-vibe.com/register?aff=FN3FUL3XEARC" target="_blank" rel="noopener"><img src="chatgpt.svg" alt=""><span>ChatGPT</span></a>
+                <a class="plan-btn" href="https://cc-vibe.com/register?aff=FN3FUL3XEARC" target="_blank" rel="noopener"><img src="claude.svg" alt=""><span>Claude</span></a>
                 </div>
             </div>
 
@@ -731,8 +744,8 @@
                     <li>日均仅 ¥7.6，重度用户首选</li>
                 </ul>
                 <div class="plan-btns">
-                <button class="plan-btn"><img src="chatgpt.svg" alt=""><span>ChatGPT</span></button>
-                <button class="plan-btn"><img src="claude.svg" alt=""><span>Claude</span></button>
+                <a class="plan-btn" href="https://cc-vibe.com/register?aff=FN3FUL3XEARC" target="_blank" rel="noopener"><img src="chatgpt.svg" alt=""><span>ChatGPT</span></a>
+                <a class="plan-btn" href="https://cc-vibe.com/register?aff=FN3FUL3XEARC" target="_blank" rel="noopener"><img src="claude.svg" alt=""><span>Claude</span></a>
                 </div>
             </div>
             </div>
@@ -751,8 +764,8 @@
                     <li>日均仅 ¥16.7，大用量首选</li>
                 </ul>
                 <div class="plan-btns">
-                <button class="plan-btn"><img src="chatgpt.svg" alt=""><span>ChatGPT</span></button>
-                <button class="plan-btn"><img src="claude.svg" alt=""><span>Claude</span></button>
+                <a class="plan-btn" href="https://cc-vibe.com/register?aff=FN3FUL3XEARC" target="_blank" rel="noopener"><img src="chatgpt.svg" alt=""><span>ChatGPT</span></a>
+                <a class="plan-btn" href="https://cc-vibe.com/register?aff=FN3FUL3XEARC" target="_blank" rel="noopener"><img src="claude.svg" alt=""><span>Claude</span></a>
                 </div>
             </div>
             </div><!-- /pricing-track -->
@@ -762,15 +775,16 @@
             <button class="pricing-tab active" data-page="0">基础套餐</button>
             <button class="pricing-tab" data-page="1">大月卡</button>
         </div>
+        <p class="disclaimer">免责声明：API 模型服务 由 CC Vibe 提供，EchoBird 不提供任何相关的咨询和支付问题，有问题在 CC Vibe 提交客服工单。<br>本页面为宣传物料，具体细节以 CC Vibe 控制台为准。</p>
         </div><!-- /hero-inner -->
     </section>
 
     <!-- How to use -->
     <section class="section">
         <div class="section-head">
-            <div class="section-eyebrow">两步开始</div>
-            <h2 class="section-title">两步搞定，开始体验</h2>
-            <p class="section-sub">配置模型，启动工具，两步畅用。</p>
+            <div class="section-eyebrow">四步开始</div>
+            <h2 class="section-title">四步搞定，开始体验</h2>
+            <p class="section-sub">开通订阅，获取密钥，配置模型，启动工具，四步畅用。</p>
         </div>
 
         <div class="steps-wrap">
@@ -780,15 +794,15 @@
                     <div class="step-num">01</div>
                     <div class="meta">
                         <div class="eyebrow">第一步</div>
-                        <h3>通过 EchoBird 快速配置 CC Vibe</h3>
+                        <h3>登录 CC Vibe 控制台，开通订阅</h3>
                     </div>
                 </header>
                 <div class="step-body">
-                    <p>进入 EchoBird 模型中心页面，然后选择 模型中转站，点击 CC Vibe 卡片上的"+"后，弹出配置信息，直接选择模型id，如果你购买 ChatGPT 建议选择 gpt-5.5 / Claude 就选择 claude-opus-4-8 ，然后粘贴你的 API 密钥，点击保存。</p>
+                    <p>登录 <a href="https://cc-vibe.com/register?aff=FN3FUL3XEARC" target="_blank" rel="noopener">CC Vibe 控制台</a>，进入“充值 / 订阅”页面，选择“订阅”，然后点击“立即开通”，支持 支付宝 / 微信 / Stripe / USDT。</p>
                 </div>
                 <div class="shot-wrap">
-                    <img src="./step1.png" alt="通过 EchoBird 快速配置 CC Vibe" loading="lazy">
-                    <div class="caption">图 1 · 通过 EchoBird 快速配置 CC Vibe</div>
+                    <img src="./step1.webp" alt="登录 CC Vibe 控制台，开通订阅" loading="lazy">
+                    <div class="caption">图 1 · 登录 CC Vibe 控制台，开通订阅</div>
                 </div>
             </article>
 
@@ -798,6 +812,42 @@
                     <div class="step-num">02</div>
                     <div class="meta">
                         <div class="eyebrow">第二步</div>
+                        <h3>创建并复制 CC Vibe 的 API 密钥</h3>
+                    </div>
+                </header>
+                <div class="step-body">
+                    <p>进入“API 密钥”页面，点击右上角的“创建密钥”，然后在你创建好的这条 API 信息上点击复制图标，即可复制你的 API 密钥。</p>
+                </div>
+                <div class="shot-wrap">
+                    <img src="./step2.webp" alt="创建并复制 CC Vibe 的 API 密钥" loading="lazy">
+                    <div class="caption">图 2 · 创建并复制 CC Vibe 的 API 密钥</div>
+                </div>
+            </article>
+
+            <!-- Step 3 -->
+            <article class="step">
+                <header class="step-head">
+                    <div class="step-num">03</div>
+                    <div class="meta">
+                        <div class="eyebrow">第三步</div>
+                        <h3>通过 EchoBird 快速配置 CC Vibe</h3>
+                    </div>
+                </header>
+                <div class="step-body">
+                    <p>进入 EchoBird 模型中心页面，然后选择 模型中转站，点击 CC Vibe 卡片上的"+"后，弹出配置信息，直接选择模型id，如果你购买 ChatGPT 建议选择 gpt-5.5 / Claude 就选择 claude-opus-4-8 ，然后粘贴你的 API 密钥，点击保存。</p>
+                </div>
+                <div class="shot-wrap">
+                    <img src="./step3.png" alt="通过 EchoBird 快速配置 CC Vibe" loading="lazy">
+                    <div class="caption">图 3 · 通过 EchoBird 快速配置 CC Vibe</div>
+                </div>
+            </article>
+
+            <!-- Step 4 -->
+            <article class="step">
+                <header class="step-head">
+                    <div class="step-num">04</div>
+                    <div class="meta">
+                        <div class="eyebrow">第四步</div>
                         <h3>通过 EchoBird 把模型配置到工具中</h3>
                     </div>
                 </header>
@@ -805,8 +855,8 @@
                     <p>进入 EchoBird 应用管理页面，选择你要用的AI工具，然后右侧出现模型列表，选择我们刚才添加的 CC Vibe，不同工具要开启对应的开关。<strong>Claude Code</strong> 开启 API Router + 1M 、<strong>Claude 桌面端</strong> 开启 API Router（默认1M）、<strong>ChatGPT</strong> 开启 Responses 和 Web Search 、<strong>Codex CLI</strong> 开启 Responses 和 Web Search 。最后，点击“启动应用”。</p>
                 </div>
                 <div class="shot-wrap">
-                    <img src="./step2.png" alt="通过 EchoBird 把模型配置到工具中" loading="lazy">
-                    <div class="caption">图 2 · 通过 EchoBird 把模型配置到工具中</div>
+                    <img src="./step4.png" alt="通过 EchoBird 把模型配置到工具中" loading="lazy">
+                    <div class="caption">图 4 · 通过 EchoBird 把模型配置到工具中</div>
                 </div>
             </article>
 
