@@ -1,5 +1,5 @@
 {
-  "version": "5.5.3",
+  "version": "5.5.4",
   "releaseDate": "2026-07-14",
   "releaseNotes": "## 优化\n\n- 支持 Sub2api 类中转站用量查询，在模型中心页面“用量”查询，节约用户查询时间，把时间用在更重要的事情上。\n- ChatGPT 和 Claude 家族产品，跟进最近的版本更新，模型切换后设置与原版一模一样。",
   "releaseNotesI18n": {
