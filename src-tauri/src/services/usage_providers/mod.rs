@@ -20,8 +20,8 @@ pub mod zhipu;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UsageQuota {
-    pub percentage: f64,       // 0-100
-    pub reset_at: i64,         // Unix timestamp (ms)
+    pub percentage: f64, // 0-100
+    pub reset_at: i64,   // Unix timestamp (ms)
     // Balance display (for providers like DeepSeek that show remaining balance)
     pub balance: Option<f64>,         // Remaining balance (e.g., 10.50 USD)
     pub balance_unit: Option<String>, // Currency unit (e.g., "USD", "CNY", "Credits")

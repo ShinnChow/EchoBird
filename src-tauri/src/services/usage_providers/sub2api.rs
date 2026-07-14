@@ -82,7 +82,10 @@ fn parse_subscription_quotas(body: &serde_json::Value) -> Option<Vec<UsageQuota>
 
     if let Some(limit) = sub.get("daily_limit_usd").and_then(parse_f64) {
         if limit > 0.0 {
-            let usage = sub.get("daily_usage_usd").and_then(parse_f64).unwrap_or(0.0);
+            let usage = sub
+                .get("daily_usage_usd")
+                .and_then(parse_f64)
+                .unwrap_or(0.0);
             quotas.push(UsageQuota {
                 percentage: pct(usage, limit),
                 reset_at: daily_reset_ms(),
@@ -94,7 +97,10 @@ fn parse_subscription_quotas(body: &serde_json::Value) -> Option<Vec<UsageQuota>
 
     if let Some(limit) = sub.get("weekly_limit_usd").and_then(parse_f64) {
         if limit > 0.0 {
-            let usage = sub.get("weekly_usage_usd").and_then(parse_f64).unwrap_or(0.0);
+            let usage = sub
+                .get("weekly_usage_usd")
+                .and_then(parse_f64)
+                .unwrap_or(0.0);
             let reset = sub
                 .get("weekly_window_start")
                 .and_then(|v| v.as_str())
