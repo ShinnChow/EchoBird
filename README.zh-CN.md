@@ -22,7 +22,7 @@
   <a href="README.md">English README</a>
 </p>
 
-<p align="center"><sub><em>如果 EchoBird 帮你解决了问题,可以 <a href="https://echobird.ai/support/">请我们喝杯咖啡 ☕</a>。</em></sub></p>
+<p align="center"><sub><em>EchoBird 支持采用 sub2api 的中转站用量查询。申请合伙请提 <a href="https://github.com/edison7009/EchoBird/issues">Issues</a> 或邮件 <a href="mailto:hi@echobird.ai">hi@echobird.ai</a>。</em></sub></p>
 
 > **说明** —— 本仓库仅为下载渠道与 issue 反馈渠道之一,产品信息、
 > 公告、商业询价请访问 [echobird.ai](https://echobird.ai)。
