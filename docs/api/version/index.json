@@ -1,11 +1,11 @@
 {
   "version": "5.5.5",
   "releaseDate": "2026-07-16",
-  "releaseNotes": "## 修复\n\n- **用量显示数字修复**：部分中转站类型在新一天尚未产生用量时，每日用量进度条会错误显示为 `100%`（读取了未刷新的昨日数据），现已按当天实际用量正确显示 `0%`。\n- 用量卡片中重置倒计时与百分比的对齐细节微调。\n- ChatGPT 自身的 API 模式，可能对自家 `gpt-5.6-sol` 支持存在问题，回归到模型 `gpt-5.5`。",
+  "releaseNotes": "## 修复\n\n- **用量显示数字修复**：部分中转站类型在新一天尚未产生用量时，每日用量进度条会错误显示为 `100%`（读取了未刷新的昨日数据），现已按当天实际用量正确显示 `0%`。\n- 用量卡片中重置倒计时与百分比的对齐细节微调。\n- 全球大量开发者发现 ChatGPT 自身的 API 模式，对自家 `gpt-5.6-sol` 支持存在问题，已回归到 `gpt-5.5`。",
   "releaseNotesI18n": {
-    "zh-cn": "## 修复\n\n- **用量显示数字修复**：部分中转站类型在新一天尚未产生用量时，每日用量进度条会错误显示为 `100%`（读取了未刷新的昨日数据），现已按当天实际用量正确显示 `0%`。\n- 用量卡片中重置倒计时与百分比的对齐细节微调。\n- ChatGPT 自身的 API 模式，可能对自家 `gpt-5.6-sol` 支持存在问题，回归到模型 `gpt-5.5`。\n",
-    "en": "## Fixes\n\n- **Usage display fix**: For some relay-site providers, the daily usage bar incorrectly showed `100%` on a fresh day with no usage yet (it read a stale, un-refreshed value from the previous day). It now uses the actual current-day usage and correctly shows `0%`.\n- Minor alignment tweak between the reset countdown and the percentage on the usage card.\n- ChatGPT's own API mode may have issues supporting its `gpt-5.6-sol`; we have reverted to the `gpt-5.5` model.\n",
-    "zh-tw": "## 修復\n\n- **用量顯示數字修復**：部分中轉站類型在新一天尚未產生用量時，每日用量進度條會錯誤顯示為 `100%`（讀取了未刷新的昨日資料），現已改用當天實際用量正確顯示 `0%`。\n- 用量卡片中重置倒數計時與百分比對齊細節微調。\n- ChatGPT 自身的 API 模式，可能對自家 `gpt-5.6-sol` 支援存在問題，回歸到模型 `gpt-5.5`。\n",
-    "ja": "## 修正\n\n- **使用量表示の数字修正**：一部の中継サイトタイプでは、新しい日の使用量がまだ発生していないとき、1日の使用量バーが誤って `100%` と表示されていました（更新されていない前日の値を読み取っていたため）。当日の実際の使用量を使って正しく `0%` と表示するように修正しました。\n- 使用量カードのリセットカウントダウンとパーセンテージの配置を微調整しました。\n- ChatGPT 自身の API モードは自社の `gpt-5.6-sol` のサポートに問題がある可能性があるため、モデル `gpt-5.5` に戻しました。\n"
+    "zh-cn": "## 修复\n\n- **用量显示数字修复**：部分中转站类型在新一天尚未产生用量时，每日用量进度条会错误显示为 `100%`（读取了未刷新的昨日数据），现已按当天实际用量正确显示 `0%`。\n- 用量卡片中重置倒计时与百分比的对齐细节微调。\n- 全球大量开发者发现 ChatGPT 自身的 API 模式，对自家 `gpt-5.6-sol` 支持存在问题，已回归到 `gpt-5.5`。\n",
+    "en": "## Fixes\n\n- **Usage display fix**: For some relay-site providers, the daily usage bar incorrectly showed `100%` on a fresh day with no usage yet (it read a stale, un-refreshed value from the previous day). It now uses the actual current-day usage and correctly shows `0%`.\n- Minor alignment tweak between the reset countdown and the percentage on the usage card.\n- Many developers worldwide have found that ChatGPT's own API mode has issues supporting its `gpt-5.6-sol`; we have reverted to `gpt-5.5`.\n",
+    "zh-tw": "## 修復\n\n- **用量顯示數字修復**：部分中轉站類型在新一天尚未產生用量時，每日用量進度條會錯誤顯示為 `100%`（讀取了未刷新的昨日資料），現已改用當天實際用量正確顯示 `0%`。\n- 用量卡片中重置倒數計時與百分比對齊細節微調。\n- 全球大量開發者發現 ChatGPT 自身的 API 模式，對自家 `gpt-5.6-sol` 支援存在問題，已回歸到 `gpt-5.5`。\n",
+    "ja": "## 修正\n\n- **使用量表示の数字修正**：一部の中継サイトタイプでは、新しい日の使用量がまだ発生していないとき、1日の使用量バーが誤って `100%` と表示されていました（更新されていない前日の値を読み取っていたため）。当日の実際の使用量を使って正しく `0%` と表示するように修正しました。\n- 使用量カードのリセットカウントダウンとパーセンテージの配置を微調整しました。\n- 世界中の多くの開発者が、ChatGPT 自身の API モードは自社 `gpt-5.6-sol` のサポートに問題があることを発見し、`gpt-5.5` に回帰しました。\n"
   }
 }
