@@ -82,9 +82,19 @@ fn parse_subscription_quotas(body: &serde_json::Value) -> Option<Vec<UsageQuota>
 
     if let Some(limit) = sub.get("daily_limit_usd").and_then(parse_f64) {
         if limit > 0.0 {
-            let usage = sub
-                .get("daily_usage_usd")
+            // `subscription.daily_usage_usd` is STALE: it holds the previous
+            // day's spend and does NOT reset to 0 at the start of a new day
+            // until new usage arrives. So a fresh day with 0 usage still reads
+            // yesterday's value (e.g. 200.70 against a 200 limit) -> bogus
+            // 100%. The authoritative current-day figure is
+            // `usage.today.actual_cost`; fall back to `daily_usage_usd` only
+            // when the upstream omits `usage.today` (older sub2api builds).
+            let usage = body
+                .get("usage")
+                .and_then(|u| u.get("today"))
+                .and_then(|t| t.get("actual_cost"))
                 .and_then(parse_f64)
+                .or_else(|| sub.get("daily_usage_usd").and_then(parse_f64))
                 .unwrap_or(0.0);
             quotas.push(UsageQuota {
                 percentage: pct(usage, limit),
@@ -317,5 +327,59 @@ mod tests {
             "usage": { "total": { "actual_cost": 10.0 } }
         });
         assert!(parse_subscription_quotas(&body).is_none());
+    }
+
+    #[test]
+    fn fresh_day_with_zero_today_is_0_pct_not_100() {
+        // Real cc-vibe.com shape on a new day with no usage yet: the upstream
+        // leaves `subscription.daily_usage_usd` holding YESTERDAY's spend
+        // (200.708 against a 200 limit) while `usage.today.actual_cost` is the
+        // authoritative 0. We must read today's figure, else the bar wrongly
+        // shows 100%.
+        let body = json!({
+            "planName": "月卡 每日200刀",
+            "subscription": {
+                "daily_limit_usd": 200, "daily_usage_usd": 200.7082975,
+                "weekly_limit_usd": 1400, "weekly_usage_usd": 296.8321385,
+                "monthly_limit_usd": 6000, "monthly_usage_usd": 296.8321385,
+                "weekly_window_start": "2026-07-14T00:00:00+08:00",
+                "expires_at": "2026-07-17T17:27:45+08:00"
+            },
+            "daily_usage": [
+                { "date": "2026-07-14", "actual_cost": 96.123841 },
+                { "date": "2026-07-15", "actual_cost": 200.7082975 }
+            ],
+            "usage": {
+                "today": { "actual_cost": 0 },
+                "total": { "actual_cost": 296.8321385 }
+            }
+        });
+        let quotas = parse_subscription_quotas(&body).expect("subscription present");
+        assert_eq!(quotas.len(), 3);
+        // Daily bar must reflect today's 0 usage, not the stale 200.708.
+        assert!(
+            (quotas[0].percentage - 0.0).abs() < 0.01,
+            "daily should be 0%, got {}",
+            quotas[0].percentage
+        );
+        // Weekly/monthly are cumulative-over-window and keep including past days.
+        assert!((quotas[1].percentage - 21.20).abs() < 0.1);
+        assert!((quotas[2].percentage - 4.95).abs() < 0.1);
+    }
+
+    #[test]
+    fn daily_falls_back_to_daily_usage_usd_when_today_absent() {
+        // Older sub2api builds expose no `usage.today`; keep using
+        // `subscription.daily_usage_usd` so we don't regress those sites.
+        let body = json!({
+            "planName": "天卡 每日200刀",
+            "subscription": {
+                "daily_limit_usd": 200, "daily_usage_usd": 50.0
+            },
+            "daily_usage": [{ "date": "2026-07-14" }]
+        });
+        let quotas = parse_subscription_quotas(&body).expect("subscription present");
+        assert_eq!(quotas.len(), 1);
+        assert!((quotas[0].percentage - 25.0).abs() < 0.01);
     }
 }
