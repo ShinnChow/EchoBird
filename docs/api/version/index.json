@@ -1,11 +1,11 @@
 {
   "version": "5.5.4",
-  "releaseDate": "2026-07-14",
-  "releaseNotes": "## 优化\n\n- 支持 Sub2api 类中转站用量查询，在模型中心页面“用量”查询，节约用户查询时间，把时间用在更重要的事情上。\n- ChatGPT 和 Claude 家族产品，跟进最近的版本更新，模型切换后设置与原版一模一样。",
+  "releaseDate": "2026-07-16",
+  "releaseNotes": "## 修复\n\n- **用量显示数字修复**：部分中转站类型在新一天尚未产生用量时，每日用量进度条会错误显示为 `100%`（读取了未刷新的昨日数据），现已按当天实际用量正确显示 `0%`。\n- 用量卡片中重置倒计时与百分比的对齐细节微调。\n- ChatGPT 官方 API 对 `gpt-5.6-sol` 的支持可能存在问题，将 Codex 切换的显示模型调整回 `gpt-5.5`、推理强度调整回 `high`。",
   "releaseNotesI18n": {
-    "zh-cn": "## 优化\n\n- 支持 Sub2api 类中转站用量查询，在模型中心页面“用量”查询，节约用户查询时间，把时间用在更重要的事情上。\n- ChatGPT 和 Claude 家族产品，跟进最近的版本更新，模型切换后设置与原版一模一样。\n",
-    "en": "## Improvements\n\n- Sub2api relay usage query is now supported — check usage on the Model Center “Usage” tab, saving you query time to spend on what matters.\n- ChatGPT and Claude family products track the latest upstream updates; after switching models, settings match the official apps exactly.\n",
-    "zh-tw": "## 最佳化\n\n- 支援 Sub2api 類中轉站用量查詢，在模型中心頁面「用量」查詢，節約使用者查詢時間，把時間用在更重要的事情上。\n- ChatGPT 與 Claude 家族產品，跟進最近的版本更新，模型切換後設定與原版一模一樣。\n",
-    "ja": "## 改善\n\n- Sub2api 系中継サイトの使用量照会に対応しました。モデルセンターの「使用量」タブで確認でき、照会時間を節約してより重要なことに時間を使えます。\n- ChatGPT および Claude ファミリー製品は最新のアップストリーム版に追従し、モデル切換後も公式アプリと同じ設定を維持します。\n"
+    "zh-cn": "## 修复\n\n- **用量显示数字修复**：部分中转站类型在新一天尚未产生用量时，每日用量进度条会错误显示为 `100%`（读取了未刷新的昨日数据），现已按当天实际用量正确显示 `0%`。\n- 用量卡片中重置倒计时与百分比的对齐细节微调。\n- ChatGPT 官方 API 对 `gpt-5.6-sol` 的支持可能存在问题，将 Codex 切换的显示模型调整回 `gpt-5.5`、推理强度调整回 `high`。\n",
+    "en": "## Fixes\n\n- **Usage display fix**: For some relay-site providers, the daily usage bar incorrectly showed `100%` on a fresh day with no usage yet (it read a stale, un-refreshed value from the previous day). It now uses the actual current-day usage and correctly shows `0%`.\n- Minor alignment tweak between the reset countdown and the percentage on the usage card.\n- ChatGPT's official API may have issues supporting `gpt-5.6-sol`; the Codex display model has been switched back to `gpt-5.5` and reasoning effort back to `high`.\n",
+    "zh-tw": "## 修復\n\n- **用量顯示數字修復**：部分中轉站類型在新一天尚未產生用量時，每日用量進度條會錯誤顯示為 `100%`（讀取了未刷新的昨日資料），現已改用當天實際用量正確顯示 `0%`。\n- 用量卡片中重置倒數計時與百分比對齊細節微調。\n- ChatGPT 官方 API 對 `gpt-5.6-sol` 的支援可能存在問題，將 Codex 切換的顯示模型調整回 `gpt-5.5`、推理強度調整回 `high`。\n",
+    "ja": "## 修正\n\n- **使用量表示の数字修正**：一部の中継サイトタイプでは、新しい日の使用量がまだ発生していないとき、1日の使用量バーが誤って `100%` と表示されていました（更新されていない前日の値を読み取っていたため）。当日の実際の使用量を使って正しく `0%` と表示するように修正しました。\n- 使用量カードのリセットカウントダウンとパーセンテージの配置を微調整しました。\n- ChatGPT 公式 API は `gpt-5.6-sol` のサポートに問題がある可能性があるため、Codex 切替の表示モデルを `gpt-5.5` に、推論強度を `high` に戻しました。\n"
   }
 }
