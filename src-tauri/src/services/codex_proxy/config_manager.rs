@@ -59,9 +59,9 @@ pub fn codex_proxy_url() -> String {
 pub fn canonical_config_toml() -> String {
     format!(
         "model_provider = \"OpenAI\"\n\
-         model = \"gpt-5.6-sol\"\n\
-         review_model = \"gpt-5.6-sol\"\n\
-         model_reasoning_effort = \"medium\"\n\
+         model = \"gpt-5.5\"\n\
+         review_model = \"gpt-5.5\"\n\
+         model_reasoning_effort = \"high\"\n\
          disable_response_storage = true\n\
          model_context_window = 1000000\n\
          model_auto_compact_token_limit = 900000\n\
@@ -241,7 +241,7 @@ mod tests {
         let t = canonical_config_toml();
         assert!(t.contains("127.0.0.1:53682"), "got: {t}");
         assert!(t.contains("wire_api = \"responses\""), "got: {t}");
-        assert!(t.contains("model = \"gpt-5.6-sol\""), "got: {t}");
+        assert!(t.contains("model = \"gpt-5.5\""), "got: {t}");
         assert!(t.contains("[model_providers.OpenAI]"), "got: {t}");
     }
 
@@ -570,7 +570,7 @@ mod tests {
         let after = fs::read_to_string(&cfg).unwrap();
         // Top-level keys restored.
         assert!(after.contains("model_provider = \"OpenAI\""));
-        assert!(after.contains("model = \"gpt-5.6-sol\""));
+        assert!(after.contains("model = \"gpt-5.5\""));
         assert!(!after.contains("anthropic"));
         assert!(!after.contains("claude-sonnet-4-6"));
         // Codex runtime state preserved.
@@ -643,11 +643,11 @@ mod tests {
         let out = ensure_canonical_config(&cfg, &missing_relay_path(&dir)).expect("ok");
         assert!(out.wrote);
         let after = fs::read_to_string(&cfg).unwrap();
-        assert!(after.contains("model_reasoning_effort = \"medium\""));
+        assert!(after.contains("model_reasoning_effort = \"high\""));
         assert!(after.contains("disable_response_storage = true"));
         assert!(after.contains("model_context_window = 1000000"));
         assert!(after.contains("model_auto_compact_token_limit = 900000"));
-        assert!(after.contains("review_model = \"gpt-5.6-sol\""));
+        assert!(after.contains("review_model = \"gpt-5.5\""));
 
         fs::remove_dir_all(&dir).ok();
     }
