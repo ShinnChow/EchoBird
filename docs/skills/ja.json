@@ -1,5 +1,5 @@
 {
-  "categories": ["AI コーディング", "プロンプトとエージェント", "コンテンツ制作"],
+  "categories": ["AI コーディング", "プロンプトとエージェント", "コンテンツ制作", "金融クオンツ"],
   "skills": [
     {
       "id": "en-superpowers",
@@ -154,6 +154,13 @@
       "url": "https://github.com/Egonex-AI/Understand-Anything",
       "description": "あらゆるコードを探索・検索・質問できるインタラクティブなナレッジグラフに変換。Claude Code、Codex、Cursor、Copilot、Gemini CLI などに対応。",
       "category": "AI コーディング"
+    },
+    {
+      "id": "en-gs-quant",
+      "name": "GS Quant",
+      "url": "https://github.com/goldmansachs/gs-quant",
+      "description": "ゴールドマン・サックス提供、世界最強のクオンツ金融ツールキット。クオンツ取引戦略とリスク管理ソリューションの開発を加速し、グローバル市場を駆け抜けてきた 25 年の実戦経験を凝縮。",
+      "category": "金融クオンツ"
     }
   ]
 }

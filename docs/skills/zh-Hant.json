@@ -1,5 +1,5 @@
 {
-  "categories": ["AI 程式設計", "Prompt 與 Agent", "內容創作"],
+  "categories": ["AI 程式設計", "Prompt 與 Agent", "內容創作", "金融量化"],
   "skills": [
     {
       "id": "en-superpowers",
@@ -154,6 +154,13 @@
       "url": "https://github.com/Egonex-AI/Understand-Anything",
       "description": "把任何程式碼變成可探索、搜尋、提問的互動式知識圖譜。支援 Claude Code、Codex、Cursor、Copilot、Gemini CLI 等。",
       "category": "AI 程式設計"
+    },
+    {
+      "id": "en-gs-quant",
+      "name": "GS Quant",
+      "url": "https://github.com/goldmansachs/gs-quant",
+      "description": "高盛出品,全球最強大的量化金融 skills 工具包。旨在加速量化交易策略與風險管理方案的開發,凝聚 25 年駕馭全球市場的實戰經驗。",
+      "category": "金融量化"
     }
   ]
 }

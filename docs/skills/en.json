@@ -1,5 +1,5 @@
 {
-  "categories": ["AI Coding", "Prompts & Agents", "Content Creation"],
+  "categories": ["AI Coding", "Prompts & Agents", "Content Creation", "Quant Finance"],
   "skills": [
     {
       "id": "en-superpowers",
@@ -154,6 +154,13 @@
       "url": "https://github.com/Egonex-AI/Understand-Anything",
       "description": "Turn any code into an interactive knowledge graph you can explore, search, and ask questions about. Works with Claude Code, Codex, Cursor, Copilot, Gemini CLI and more.",
       "category": "AI Coding"
+    },
+    {
+      "id": "en-gs-quant",
+      "name": "GS Quant",
+      "url": "https://github.com/goldmansachs/gs-quant",
+      "description": "From Goldman Sachs, the world's most powerful quant finance toolkit. Built to accelerate quantitative trading strategies and risk management solutions, distilling 25 years of experience navigating global markets.",
+      "category": "Quant Finance"
     }
   ]
 }
