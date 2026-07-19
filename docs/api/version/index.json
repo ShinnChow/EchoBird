@@ -1,11 +1,11 @@
 {
   "version": "5.5.6",
   "releaseDate": "2026-07-19",
-  "releaseNotes": "## 优化\n\n- 目前大部分第三方模型已适配 Responses 协议，EchoBird 调整为：开启 Responses 开关后，直接把上游模型 id 和地址写入配置（直连上游，跳过本地代理）。",
+  "releaseNotes": "## 优化\n\n- 目前大部分第三方模型已适配 Responses 协议，EchoBird 调整为：开启 Responses 开关后，直接把上游模型 id 和地址写入配置（直连上游，跳过本地代理）。\n- 优化 Codex 的搜索设置；部分第三方模型的网络搜索需在模型侧二次开通方可使用。",
   "releaseNotesI18n": {
-    "zh-cn": "## 优化\n\n- 目前大部分第三方模型已适配 Responses 协议，EchoBird 调整为：开启 Responses 开关后，直接把上游模型 id 和地址写入配置（直连上游，跳过本地代理）。\n",
-    "en": "## Improvements\n\n- Most third-party models now support the Responses protocol natively. EchoBird now writes the upstream model id and base URL directly into the config when the Responses switch is enabled (direct connection to the upstream, bypassing the local proxy).\n",
-    "zh-tw": "## 最佳化\n\n- 目前大部分第三方模型已適配 Responses 協議，EchoBird 調整為：開啟 Responses 開關後，直接把上游模型 id 與位址寫入設定（直連上游，跳過本機代理）。\n",
-    "ja": "## 改善\n\n- 現在、ほとんどのサードパーティモデルが Responses プロトコルに対応しています。EchoBird は、Responses スイッチを有効にすると、上流のモデル id とベース URL を直接設定に書き込むように変更しました（上流へ直接接続し、ローカルプロキシをバイパス）。\n"
+    "zh-cn": "## 优化\n\n- 目前大部分第三方模型已适配 Responses 协议，EchoBird 调整为：开启 Responses 开关后，直接把上游模型 id 和地址写入配置（直连上游，跳过本地代理）。\n- 优化 Codex 的搜索设置；部分第三方模型的网络搜索需在模型侧二次开通方可使用。\n",
+    "en": "## Improvements\n\n- Most third-party models now support the Responses protocol natively. EchoBird now writes the upstream model id and base URL directly into the config when the Responses switch is enabled (direct connection to the upstream, bypassing the local proxy).\n- Improved Codex web-search settings; some third-party models require a separate activation on the model side before web search works.\n",
+    "zh-tw": "## 最佳化\n\n- 目前大部分第三方模型已適配 Responses 協議，EchoBird 調整為：開啟 Responses 開關後，直接把上游模型 id 與位址寫入設定（直連上游，跳過本機代理）。\n- 最佳化 Codex 的搜尋設定；部分第三方模型的網路搜尋需在模型側二次開通方可使用。\n",
+    "ja": "## 改善\n\n- 現在、ほとんどのサードパーティモデルが Responses プロトコルに対応しています。EchoBird は、Responses スイッチを有効にすると、上流のモデル id とベース URL を直接設定に書き込むように変更しました（上流へ直接接続し、ローカルプロキシをバイパス）。\n- Codex の Web 検索設定を改善しました。一部のサードパーティモデルでは、モデル側での別途有効化が必要です。\n"
   }
 }
