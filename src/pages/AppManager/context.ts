@@ -34,8 +34,10 @@ export interface AppManagerContextType {
   /** Codex-only "Responses passthrough" toggle. */
   codexResponsesPassthrough: boolean;
   setCodexResponsesPassthrough: (v: boolean) => void;
-  /** Codex-only web-search toggle. OFF ⇒ apply writes web_search="disabled" so
-   *  Codex won't offer its built-in search tool; default ON (Codex "cached"). */
+  /** Codex-only web-search toggle. OFF ⇒ apply writes web_search="disabled"
+   *  so Codex removes its built-in search tool; default ON ⇒ web_search="live"
+   *  (real-time retrieval). NOT Codex's "cached" — OpenAI index, no external
+   *  web access, useless for our third-party upstreams. */
   codexWebSearch: boolean;
   setCodexWebSearch: (v: boolean) => void;
   /** Claude Desktop routing toggle. Kept separate from Codex because the

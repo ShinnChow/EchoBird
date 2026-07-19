@@ -44,9 +44,10 @@ pub struct ModelInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub responses_passthrough: Option<bool>,
     /// Codex-only. `Some(false)` → write `web_search = "disabled"` into
-    /// config.toml so Codex won't offer its built-in web-search tool; otherwise
-    /// left at Codex's default (`cached`). Lets the user kill web search even on
-    /// vendors whose adapter supports it (MiMo/GLM/Qwen) to save tokens.
+    /// config.toml so Codex removes its built-in web-search tool; otherwise
+    /// `web_search = "live"` (unrestricted real-time retrieval). Note: NOT
+    /// Codex's default `"cached"` — that's an OpenAI-maintained index with
+    /// no external web access, useless for our third-party upstreams.
     /// Consumed by `apply_codex`; other tools ignore it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub web_search: Option<bool>,
@@ -2009,14 +2010,18 @@ fn apply_codex(tool_id: &str, model_info: &ModelInfo) -> ApplyResult {
     let existing = fs::read_to_string(&config_path).unwrap_or_default();
     let mut new_content = write_codex_canonical_fields(&existing, &codex_base_url, codex_model);
 
-    // web_search: user toggle. `Some(false)` → "disabled" (Codex won't offer
-    // its built-in search tool); otherwise Codex's default "cached". Written
-    // here (not in write_codex_canonical_fields) so the pre-spawn self-heal
-    // leaves the user's choice untouched.
+    // web_search: user toggle. `Some(false)` → "disabled" (Codex removes
+    // its built-in search tool); ON → "live" — unrestricted live retrieval,
+    // i.e. actual real-time web search. NOT Codex's default "cached": that
+    // uses an OpenAI-maintained index with NO external web access, which is
+    // meaningless for our third-party upstreams (OpenAI's index doesn't
+    // cover them) and isn't "web search on" as a user expects the toggle to
+    // mean. Written here (not in write_codex_canonical_fields) so the
+    // pre-spawn self-heal leaves the user's choice untouched.
     let web_search_value = if model_info.web_search == Some(false) {
         "disabled"
     } else {
-        "cached"
+        "live"
     };
     new_content = toml_write_top(&new_content, "web_search", web_search_value);
 

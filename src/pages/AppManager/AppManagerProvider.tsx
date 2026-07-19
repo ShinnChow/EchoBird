@@ -193,8 +193,11 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const [codexResponsesPassthrough, setCodexResponsesPassthroughRaw] = useState<boolean>(() =>
     readBool('echobird_codex_responses_passthrough', false)
   );
-  // Codex-only web-search toggle. Default ON (Codex's "cached"); OFF writes
-  // web_search="disabled" so Codex won't offer its built-in search tool.
+  // Codex-only web-search toggle. Default ON → write web_search="live"
+  // (real-time retrieval); OFF writes web_search="disabled" so Codex removes
+  // its built-in search tool. NOT Codex's default "cached" — that's an
+  // OpenAI-maintained index with no external web access, useless for our
+  // third-party upstreams.
   const [codexWebSearch, setCodexWebSearchRaw] = useState<boolean>(() =>
     readBool('echobird_codex_web_search', true)
   );
