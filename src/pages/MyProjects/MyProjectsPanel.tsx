@@ -39,11 +39,12 @@ const synthesiseToolFromProject = (id: string, name: string): LocalTool => ({
 });
 
 // Render a hint string with any bare http(s) URL turned into an external-open
-// link (Tauri shell:open, not in-webview navigation). Only zh-Hans's hint
-// currently carries a URL — the echobird.cn/apps publish CTA — so other
-// locales split to a single plain-text chunk and render unchanged. The split
-// stops at whitespace and CJK sentence punctuation so a trailing 。 stays out
-// of the link.
+// link (Tauri shell:open, not in-webview navigation). No locale's hint
+// currently carries a URL (the echobird.cn/apps publish CTA was removed),
+// so each renders as a single plain-text chunk today; the linkify machinery
+// is kept for future hints that reintroduce a URL. The split stops at
+// whitespace and CJK sentence punctuation so a trailing 。 stays out of the
+// link.
 const linkifyHint = (text: string): React.ReactNode =>
   text.split(/(https?:\/\/[^\s，。]+)/g).map((part, i) =>
     /^https?:\/\//.test(part) ? (

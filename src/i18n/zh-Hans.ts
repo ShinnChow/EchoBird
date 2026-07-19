@@ -239,7 +239,7 @@ const zhHans: Partial<Translations> = {
   'hint.devInvite':
     '切换 ChatGPT / Codex CLI / Claude 桌面端 / Claude Code 的模型后，请保持 EchoBird 运行。',
   'hint.myProjects':
-    '给你 Vibe Coding 的应用或游戏切换模型，参考黑白棋和 AI 翻译的 models.json 或复制它到你的项目。你可以在 https://echobird.cn/apps 发布你的 AI 应用或 AI 游戏。',
+    '给你 Vibe Coding 的应用或游戏切换模型，参考黑白棋和 AI 翻译的 models.json 或复制它到你的项目。',
   'mother.selectModel': '选择模型',
   'mother.hintInstall': '安装 {agent}',
   'mother.enterMessage': '输入消息...',
