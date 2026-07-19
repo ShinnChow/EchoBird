@@ -1,11 +1,11 @@
 {
   "version": "5.5.5",
-  "releaseDate": "2026-07-16",
-  "releaseNotes": "## 修复\n\n- **用量显示数字修复**：部分中转站类型在新一天尚未产生用量时，每日用量进度条会错误显示为 `100%`（读取了未刷新的昨日数据），现已按当天实际用量正确显示 `0%`。\n- 用量卡片中重置倒计时与百分比的对齐细节微调。\n- 全球大量开发者发现 ChatGPT 自身的 API 模式，对自家 `gpt-5.6-sol` 支持存在问题，已回归到 `gpt-5.5`。",
+  "releaseDate": "2026-07-19",
+  "releaseNotes": "## 优化\n\n- 目前大部分第三方模型已适配 Responses 协议，EchoBird 调整为：开启 Responses 开关后，直接把上游模型 id 和地址写入配置（直连上游，跳过本地代理）。",
   "releaseNotesI18n": {
-    "zh-cn": "## 修复\n\n- **用量显示数字修复**：部分中转站类型在新一天尚未产生用量时，每日用量进度条会错误显示为 `100%`（读取了未刷新的昨日数据），现已按当天实际用量正确显示 `0%`。\n- 用量卡片中重置倒计时与百分比的对齐细节微调。\n- 全球大量开发者发现 ChatGPT 自身的 API 模式，对自家 `gpt-5.6-sol` 支持存在问题，已回归到 `gpt-5.5`。\n",
-    "en": "## Fixes\n\n- **Usage display fix**: For some relay-site providers, the daily usage bar incorrectly showed `100%` on a fresh day with no usage yet (it read a stale, un-refreshed value from the previous day). It now uses the actual current-day usage and correctly shows `0%`.\n- Minor alignment tweak between the reset countdown and the percentage on the usage card.\n- Many developers worldwide have found that ChatGPT's own API mode has issues supporting its `gpt-5.6-sol`; we have reverted to `gpt-5.5`.\n",
-    "zh-tw": "## 修復\n\n- **用量顯示數字修復**：部分中轉站類型在新一天尚未產生用量時，每日用量進度條會錯誤顯示為 `100%`（讀取了未刷新的昨日資料），現已改用當天實際用量正確顯示 `0%`。\n- 用量卡片中重置倒數計時與百分比對齊細節微調。\n- 全球大量開發者發現 ChatGPT 自身的 API 模式，對自家 `gpt-5.6-sol` 支援存在問題，已回歸到 `gpt-5.5`。\n",
-    "ja": "## 修正\n\n- **使用量表示の数字修正**：一部の中継サイトタイプでは、新しい日の使用量がまだ発生していないとき、1日の使用量バーが誤って `100%` と表示されていました（更新されていない前日の値を読み取っていたため）。当日の実際の使用量を使って正しく `0%` と表示するように修正しました。\n- 使用量カードのリセットカウントダウンとパーセンテージの配置を微調整しました。\n- 世界中の多くの開発者が、ChatGPT 自身の API モードは自社 `gpt-5.6-sol` のサポートに問題があることを発見し、`gpt-5.5` に回帰しました。\n"
+    "zh-cn": "## 优化\n\n- 目前大部分第三方模型已适配 Responses 协议，EchoBird 调整为：开启 Responses 开关后，直接把上游模型 id 和地址写入配置（直连上游，跳过本地代理）。\n",
+    "en": "## Improvements\n\n- Most third-party models now support the Responses protocol natively. EchoBird now writes the upstream model id and base URL directly into the config when the Responses switch is enabled (direct connection to the upstream, bypassing the local proxy).\n",
+    "zh-tw": "## 最佳化\n\n- 目前大部分第三方模型已適配 Responses 協議，EchoBird 調整為：開啟 Responses 開關後，直接把上游模型 id 與位址寫入設定（直連上游，跳過本機代理）。\n",
+    "ja": "## 改善\n\n- 現在、ほとんどのサードパーティモデルが Responses プロトコルに対応しています。EchoBird は、Responses スイッチを有効にすると、上流のモデル id とベース URL を直接設定に書き込むように変更しました（上流へ直接接続し、ローカルプロキシをバイパス）。\n"
   }
 }
