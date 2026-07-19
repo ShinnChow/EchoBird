@@ -1861,6 +1861,16 @@ pub(crate) fn write_codex_canonical_fields(
     c = toml_write_top(&c, "model_provider", CODEX_PROVIDER);
     c = toml_write_top(&c, "model", model);
     c = toml_write_top(&c, "model_reasoning_effort", "high");
+    // Evict legacy keys we no longer own. Older EchoBird versions wrote
+    // `review_model = "gpt-5.5"`; we stopped writing it (Codex no longer
+    // consumes it). But our TOML helpers are update-or-insert — they
+    // never delete — so a stale line from an old version survives every
+    // switch and self-heal. Under a Responses direct-connect session
+    // (model = the real upstream id, e.g. "glm-5.2"; base_url = the real
+    // upstream) Codex would still send `gpt-5.5` on its review pass to a
+    // gateway that only knows the real id → 4xx. Strip it on every write
+    // so the canonical set we write below is the full top-level truth.
+    c = toml_delete_top(&c, "review_model");
     // Top-level raw (bool, int).
     c = toml_write_top_raw(&c, "disable_response_storage", "true");
     c = toml_write_top_raw(&c, "model_context_window", "1000000");
@@ -4306,6 +4316,45 @@ fn toml_read_top(content: &str, key: &str) -> String {
     String::new()
 }
 
+/// Surgically remove a top-level `key = ...` line from a TOML document,
+/// preserving every other line and section verbatim. Mirrors the
+/// top-level-only scan of `toml_write_top`: only keys before the first
+/// `[section]` are candidates (the write helpers never touch keys
+/// inside a section, so a top-level key is the only shape we'd ever
+/// need to delete). No-op if the key is absent. The trailing-newline
+/// convention is re-applied by `write_codex_canonical_fields` at the
+/// end of its pipeline, so this helper — like `toml_write_top` — does
+/// not re-add it.
+///
+/// Used to evict legacy keys we no longer write (e.g. `review_model`)
+/// so a stale value left by an older EchoBird version can't survive a
+/// model switch / pre-spawn self-heal.
+fn toml_delete_top(content: &str, key: &str) -> String {
+    let mut lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
+    let mut first_section: Option<usize> = None;
+    let mut i = 0;
+    while i < lines.len() {
+        let t = lines[i].trim();
+        if first_section.is_none() && t.starts_with('[') {
+            first_section = Some(i);
+        }
+        // Once we've entered the first [section], the remaining top-level
+        // keys are exhausted — stop scanning (a same-named key inside a
+        // section belongs to that section, not the top level).
+        if first_section.is_some() && i >= first_section.unwrap() {
+            break;
+        }
+        if let Some((k, _)) = t.split_once('=') {
+            if k.trim() == key {
+                lines.remove(i);
+                break;
+            }
+        }
+        i += 1;
+    }
+    lines.join("\n")
+}
+
 fn toml_write_top(content: &str, key: &str, value: &str) -> String {
     let mut lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
     let mut found = false;
@@ -4537,6 +4586,89 @@ fn toml_escape(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn toml_delete_top_removes_a_top_level_key() {
+        // The key we own sits before the first [section]: delete it, keep
+        // the rest verbatim (whitespace, comments, sections all untouched).
+        let content = "model_provider = \"OpenAI\"\n\
+                       model = \"gpt-5.5\"\n\
+                       review_model = \"gpt-5.5\"\n\
+                       \n\
+                       [model_providers.OpenAI]\n\
+                       name = \"OpenAI\"\n";
+        let out = toml_delete_top(content, "review_model");
+        assert!(!out.contains("review_model"));
+        assert!(out.contains("model = \"gpt-5.5\""));
+        assert!(out.contains("[model_providers.OpenAI]"));
+        assert!(out.contains("name = \"OpenAI\""));
+    }
+
+    #[test]
+    fn toml_delete_top_is_noop_when_key_absent() {
+        // No key removed → only the join-strips-trailing-newline behavior
+        // of `content.lines().collect().join("\n")` changes the string (the
+        // caller, write_codex_canonical_fields, re-adds it). Assert the scan
+        // matched nothing by checking the lines content survives.
+        let content = "model = \"gpt-5.5\"\n[model_providers.OpenAI]\n";
+        let out = toml_delete_top(content, "review_model");
+        assert!(out.contains("model = \"gpt-5.5\""));
+        assert!(out.contains("[model_providers.OpenAI]"));
+        assert!(!out.contains("review_model"));
+    }
+
+    #[test]
+    fn toml_delete_top_ignores_same_named_key_inside_a_section() {
+        // A `review_model` that lives INSIDE a [section] belongs to that
+        // section — not a top-level key we own — so it must survive. Only
+        // the pre-section scan should match.
+        let content = "model = \"gpt-5.5\"\n\
+                       [model_providers.OpenAI]\n\
+                       review_model = \"leave-me\"\n";
+        let out = toml_delete_top(content, "review_model");
+        assert!(out.contains("review_model = \"leave-me\""));
+        assert!(out.contains("model = \"gpt-5.5\""));
+    }
+
+    #[test]
+    fn write_codex_canonical_fields_evicts_stale_review_model_on_direct_connect() {
+        // Regression: an older EchoBird version wrote `review_model =
+        // "gpt-5.5"`. Our write helpers never delete, so it survived every
+        // switch. Under a Responses direct-connect session (real model id
+        // + real upstream base_url) Codex would still send `gpt-5.5` on its
+        // review pass to a gateway that only knows the real id → 4xx. The
+        // canonical write must strip the stale line so `model` is the only
+        // model key the upstream ever sees.
+        let stale = "model_provider = \"OpenAI\"\n\
+                     model = \"gpt-5.5\"\n\
+                     review_model = \"gpt-5.5\"\n\
+                     [model_providers.OpenAI]\n\
+                     name = \"OpenAI\"\n";
+        let out = write_codex_canonical_fields(
+            stale,
+            "https://ark.cn-beijing.volces.com/api/coding/v1",
+            "glm-5.2",
+        );
+        assert!(
+            !out.contains("review_model"),
+            "stale review_model survived: {out}"
+        );
+        assert!(out.contains("model = \"glm-5.2\""));
+        assert!(out.contains("base_url = \"https://ark.cn-beijing.volces.com/api/coding/v1\""));
+    }
+
+    #[test]
+    fn write_codex_canonical_fields_evicts_review_model_in_bridge_mode_too() {
+        // Bridge mode (proxy base_url + gpt-5.5 alias) must ALSO strip a
+        // stale review_model — the pre-spawn self-heal runs write_codex
+        // _canonical_fields too, and a cold start shouldn't leave a stale
+        // value lying around even when not on direct connect.
+        let stale = "model = \"gpt-5.5\"\n\
+                     review_model = \"gpt-5.5\"\n\
+                     [model_providers.OpenAI]\n";
+        let out = write_codex_canonical_fields(stale, "http://127.0.0.1:53682/v1", "gpt-5.5");
+        assert!(!out.contains("review_model"));
+    }
 
     fn claudecode_model_info(relay_mode: Option<bool>) -> ModelInfo {
         ModelInfo {
