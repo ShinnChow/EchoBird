@@ -1,5 +1,5 @@
 {
-  "version": "5.5.5",
+  "version": "5.5.6",
   "releaseDate": "2026-07-19",
   "releaseNotes": "## 优化\n\n- 目前大部分第三方模型已适配 Responses 协议，EchoBird 调整为：开启 Responses 开关后，直接把上游模型 id 和地址写入配置（直连上游，跳过本地代理）。",
   "releaseNotesI18n": {
