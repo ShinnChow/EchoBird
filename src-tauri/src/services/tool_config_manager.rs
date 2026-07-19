@@ -33,12 +33,14 @@ pub struct ModelInfo {
     /// Only consumed by `apply_codex`; other tools ignore it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub relay_mode: Option<bool>,
-    /// Codex-only. When true, keep config.toml pointed at the 127.0.0.1
-    /// proxy (so model-id rewrite still happens) but have the proxy forward
-    /// to the upstream's native `/responses` endpoint verbatim instead of
-    /// translating down to Chat Completions. For third-party models that
-    /// natively speak the Responses protocol. Mutually exclusive with
-    /// `relay_mode`. Only consumed by `apply_codex`; other tools ignore it.
+    /// Codex-only. When true, write the provider's REAL base_url + the
+    /// REAL model id (not our "gpt-5.5" display alias) into
+    /// ~/.codex/config.toml so Codex talks to the upstream directly,
+    /// bypassing our local proxy. For third-party models that natively
+    /// speak the Responses protocol (e.g. Volcengine ARK `glm-5.2`) —
+    /// no proxy hop, no Responses→Chat translation, no model-id spoof.
+    /// Mutually exclusive with `relay_mode` (UI auto-flips so both are
+    /// never on). Only consumed by `apply_codex`; other tools ignore it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub responses_passthrough: Option<bool>,
     /// Codex-only. `Some(false)` → write `web_search = "disabled"` into
@@ -90,7 +92,12 @@ fn ensure_parent(path: &Path) {
 /// across model switches. The launcher proxy translates the display
 /// model to the real provider's model ID when forwarding requests.
 const CODEX_PROVIDER: &str = "OpenAI";
-const CODEX_DISPLAY_MODEL: &str = "gpt-5.5";
+/// Codex's display model alias. Pinned in Bridge and Relay sessions so
+/// Codex thinks it's talking to a gpt-5 family model (model-id deception
+/// moat); the proxy / relay station rewrites to the real id. Exposed
+/// `pub(crate)` so `codex_proxy::config_manager` can pass it to
+/// `write_codex_canonical_fields` on the pre-spawn self-heal path.
+pub(crate) const CODEX_DISPLAY_MODEL: &str = "gpt-5.5";
 
 // Stable proxy port. Sourced from codex_proxy (the listener owner) so
 // the constant has exactly one definition. Bound permanently so
@@ -1810,7 +1817,7 @@ fn restore_openscience_to_official() -> ApplyResult {
 
 // Codex CLI and ChatGPT desktop share ~/.codex/config.toml.
 
-/// Apply our 11 canonical Codex fields surgically — overwrite if
+/// Apply our 10 canonical Codex fields surgically — overwrite if
 /// present, insert if missing — and return the rewritten content.
 /// Preserves everything else in the file (`[projects.*]` trust grants,
 /// `[tui.*]` NUX progress, `[plugins.*]` state, comments, hand-edited
@@ -1830,9 +1837,17 @@ fn restore_openscience_to_official() -> ApplyResult {
 ///     Codex spawn (pre-launch self-heal)
 ///
 /// `codex_base_url` is the URL Codex will see in config.toml. In Bridge
-/// mode this is `http://127.0.0.1:53682/v1`; in Relay mode it's the
-/// real upstream URL.
-pub(crate) fn write_codex_canonical_fields(content: &str, codex_base_url: &str) -> String {
+/// mode this is `http://127.0.0.1:53682/v1`; in Relay and Responses-
+/// direct modes it's the real upstream URL (Codex skips our proxy).
+/// Write the model id the caller chose — Bridge and Relay sessions pin
+/// Codex's `gpt-5.5` display alias (CODEX_DISPLAY_MODEL); a Responses
+/// direct-connect session passes the real upstream model id (e.g.
+/// `glm-5.2`) so Codex talks to the third party in its own id.
+pub(crate) fn write_codex_canonical_fields(
+    content: &str,
+    codex_base_url: &str,
+    model: &str,
+) -> String {
     // Preserve the input's trailing-newline convention. `toml_write_*`
     // helpers go through `content.lines().collect().join("\n")` which
     // strips trailing newlines; without re-adding it, a canonical-input
@@ -1844,8 +1859,7 @@ pub(crate) fn write_codex_canonical_fields(content: &str, codex_base_url: &str) 
 
     // Top-level string keys.
     c = toml_write_top(&c, "model_provider", CODEX_PROVIDER);
-    c = toml_write_top(&c, "model", CODEX_DISPLAY_MODEL);
-    c = toml_write_top(&c, "review_model", CODEX_DISPLAY_MODEL);
+    c = toml_write_top(&c, "model", model);
     c = toml_write_top(&c, "model_reasoning_effort", "high");
     // Top-level raw (bool, int).
     c = toml_write_top_raw(&c, "disable_response_storage", "true");
@@ -1941,25 +1955,41 @@ fn apply_codex(tool_id: &str, model_info: &ModelInfo) -> ApplyResult {
         raw_api_key
     };
 
-    // Resolve the URL Codex itself will see in its config.toml.
-    // Bridge mode points at our proxy port; Relay mode points at the
-    // real upstream so Codex skips the proxy.
+    // Resolve the URL + model id Codex itself will see in its config.toml.
+    // Three routing modes:
+    //   • Bridge (default): base_url = our proxy port; model = "gpt-5.5"
+    //     display alias. The proxy reads ~/.echobird/codex.json per request
+    //     and forwards with Responses ↔ Chat translation as needed.
+    //   • Relay (relay_mode): base_url = real upstream; model = "gpt-5.5"
+    //     display alias (relay stations accept the alias and map it
+    //     themselves — keep the model-id deception moat). Codex skips the
+    //     proxy entirely.
+    //   • Responses direct (responses_passthrough): base_url = real
+    //     upstream; model = the REAL upstream model id (e.g. "glm-5.2").
+    //     For third parties that natively speak the Responses protocol —
+    //     Codex connects straight to them, no proxy hop, no translation,
+    //     no id spoof. The two direct modes are mutually exclusive (UI
+    //     auto-flips), so we force passthrough off when relay is on.
     let relay_mode = model_info.relay_mode.unwrap_or(false);
-    // Responses passthrough is a sub-mode of Bridge (the proxy stays in the
-    // path). It's meaningless under relay mode (which bypasses the proxy
-    // entirely), so force it off there — defensive, even though the UI
-    // auto-flips so the two are never both on.
     let responses_passthrough = !relay_mode && model_info.responses_passthrough.unwrap_or(false);
+    let direct_mode = relay_mode || responses_passthrough;
     let proxy_base_url = format!("http://127.0.0.1:{}/v1", CODEX_PROXY_PORT);
-    let codex_base_url = if relay_mode {
+    let codex_base_url = if direct_mode {
         base_url.clone()
     } else {
         proxy_base_url.clone()
     };
+    // Direct Responses connect needs the real model id; every other mode
+    // pins Codex's "gpt-5.5" display alias.
+    let codex_model = if responses_passthrough {
+        model_id
+    } else {
+        CODEX_DISPLAY_MODEL
+    };
 
     ensure_parent(&config_path);
 
-    // Canonicalize ALL 11 fields we own, every time. Overwrite-in-place
+    // Canonicalize ALL 10 fields we own, every time. Overwrite-in-place
     // if present, insert if missing. This is the bottom-out for sibling
     // model-switchers (cc-switch, manual edits, etc.) that may have
     // rewritten our keys to point at a different provider — we restore
@@ -1967,7 +1997,7 @@ fn apply_codex(tool_id: &str, model_info: &ModelInfo) -> ApplyResult {
     // runtime state (`[projects.*]` trust, `[tui.*]` NUX, `[plugins.*]`)
     // and any unrelated user-edited top-level keys stay untouched.
     let existing = fs::read_to_string(&config_path).unwrap_or_default();
-    let mut new_content = write_codex_canonical_fields(&existing, &codex_base_url);
+    let mut new_content = write_codex_canonical_fields(&existing, &codex_base_url, codex_model);
 
     // web_search: user toggle. `Some(false)` → "disabled" (Codex won't offer
     // its built-in search tool); otherwise Codex's default "cached". Written

@@ -3,7 +3,7 @@
 // Two filesystem locations:
 //
 //   ~/.codex/config.toml        ← Codex's own config. We own its shape
-//                                 end-to-end (canonical 13-line template
+//                                 end-to-end (canonical 12-line template
 //                                 with base_url = http://127.0.0.1:53682/v1
 //                                 and wire_api = "responses"). `apply_codex`
 //                                 in tool_config_manager.rs writes this
@@ -50,17 +50,15 @@ pub fn codex_proxy_url() -> String {
     format!("http://127.0.0.1:{CODEX_PROXY_PORT}/v1")
 }
 
-/// The exact 13-line config.toml shape we own. Codex must see this
-/// verbatim — any drift (different model id, missing review_model,
-/// changed wire_api) breaks the protocol bridge. `apply_codex` writes
-/// the same template, and `ensure_canonical_config` rewrites if drift
-/// is detected.
+/// The exact 12-line config.toml shape we own. Codex must see this
+/// verbatim — any drift (different model id, changed wire_api) breaks
+/// the protocol bridge. `apply_codex` writes the same template, and
+/// `ensure_canonical_config` rewrites if drift is detected.
 #[allow(dead_code)]
 pub fn canonical_config_toml() -> String {
     format!(
         "model_provider = \"OpenAI\"\n\
          model = \"gpt-5.5\"\n\
-         review_model = \"gpt-5.5\"\n\
          model_reasoning_effort = \"high\"\n\
          disable_response_storage = true\n\
          model_context_window = 1000000\n\
@@ -111,22 +109,23 @@ pub struct EnsureOutcome {
 /// Called by `process_manager.rs::start_codex_native` as a pre-spawn
 /// self-heal in case the file got edited outside EchoBird.
 ///
-/// Relay-mode exception: when the relay file at `relay_config_path`
-/// carries `relayMode: true`, the user has chosen to bypass our proxy
-/// and point Codex straight at the upstream. The canonical "must
-/// contain 127.0.0.1:53682" rule no longer applies — the real upstream
-/// URL is what we wrote on purpose. Skip the drift check entirely in
-/// that case so we don't undo the user's choice. Passing the relay
-/// path explicitly (rather than re-deriving via env vars) keeps tests
-/// hermetic.
+/// Proxy-bypassed exception: when the relay file at `relay_config_path`
+/// carries `relayMode: true` OR `responsesPassthrough: true`, the user
+/// has chosen to point Codex straight at the upstream (a relay station,
+/// or a third party that natively speaks the Responses protocol). The
+/// canonical "must contain 127.0.0.1:53682" rule no longer applies — the
+/// real upstream URL is what we wrote on purpose. Skip the drift check
+/// entirely in that case so we don't undo the user's choice. Passing
+/// the relay path explicitly (rather than re-deriving via env vars)
+/// keeps tests hermetic.
 pub fn ensure_canonical_config(
     codex_config_path: &Path,
     relay_config_path: &Path,
 ) -> io::Result<EnsureOutcome> {
-    if relay_mode_active(relay_config_path) {
+    if proxy_bypassed(relay_config_path) {
         return Ok(EnsureOutcome {
             wrote: false,
-            reason: "relay-mode-skip",
+            reason: "proxy-bypassed-skip",
         });
     }
 
@@ -151,15 +150,19 @@ pub fn ensure_canonical_config(
 
     let had_section = existing.contains(provider_section);
 
-    // Canonicalize ALL 11 fields we own — overwrite-in-place if present,
+    // Canonicalize ALL 10 fields we own — overwrite-in-place if present,
     // insert if missing. Codex's own runtime state ([projects.*] /
     // [tui.*] / [plugins.*]) and unrelated user-edited top-level keys
     // (e.g. `hide_agent_reasoning`) are preserved. Same helper
     // `apply_codex` uses on every model switch, so both code paths agree
     // on canonical shape — no drift between "user applied a model" and
-    // "Codex was spawned cold".
-    let new_content =
-        crate::services::tool_config_manager::write_codex_canonical_fields(&existing, &proxy_url);
+    // "Codex was spawned cold". The pre-spawn path is always the Bridge
+    // proxy shape (direct modes skip above), so pin the display alias.
+    let new_content = crate::services::tool_config_manager::write_codex_canonical_fields(
+        &existing,
+        &proxy_url,
+        crate::services::tool_config_manager::CODEX_DISPLAY_MODEL,
+    );
 
     if new_content == existing {
         return Ok(EnsureOutcome {
@@ -176,7 +179,7 @@ pub fn ensure_canonical_config(
         wrote: true,
         // "missing-section" = file existed but our provider section did
         //   not (a sibling tool overwrote it, or the user hand-edited).
-        // "drifted" = section was there but at least one of our 11
+        // "drifted" = section was there but at least one of our 10
         //   canonical fields was wrong (stale base_url from a previous
         //   relay-mode session, sibling tool flipped wire_api, etc.).
         reason: if had_section {
@@ -187,16 +190,28 @@ pub fn ensure_canonical_config(
     })
 }
 
-/// Read the relay file and return whether `relayMode` is truthy.
+/// Read the relay file and return whether Codex is configured to bypass
+/// our proxy and talk straight to the upstream — true when EITHER
+/// `relayMode` (relay station) OR `responsesPassthrough` (third party
+/// that natively speaks the Responses protocol) is truthy. In both cases
+/// config.toml's `base_url` is the real upstream URL we wrote on
+/// purpose, so the canonical self-heal must not rewrite it back to
+/// 127.0.0.1:53682.
 /// Returns false on any error (missing file, malformed JSON, missing
-/// key) — the canonical-self-heal path is the safe default.
-fn relay_mode_active(relay_config_path: &Path) -> bool {
+/// keys) — the canonical-self-heal path is the safe default.
+fn proxy_bypassed(relay_config_path: &Path) -> bool {
     let Some(v) = read_echobird_relay(relay_config_path) else {
         return false;
     };
-    v.get("relayMode")
+    let relay = v
+        .get("relayMode")
         .and_then(|x| x.as_bool())
-        .unwrap_or(false)
+        .unwrap_or(false);
+    let passthrough = v
+        .get("responsesPassthrough")
+        .and_then(|x| x.as_bool())
+        .unwrap_or(false);
+    relay || passthrough
 }
 
 /// Read the relay file fresh. Called by the proxy on EVERY incoming
@@ -246,23 +261,24 @@ mod tests {
     }
 
     #[test]
-    fn canonical_template_is_13_content_lines() {
+    fn canonical_template_is_12_content_lines() {
         // The template was historically described as "13 lines". Verify
         // the line count stays stable so accidental edits get caught.
         let t = canonical_config_toml();
         let lines: Vec<&str> = t.lines().collect();
-        // 7 top-level + 1 blank + 5 provider block = 13 lines, plus
+        // 6 top-level + 1 blank + 5 provider block = 12 lines, plus
         // the trailing newline. (Dropped `network_access` — was a dead
         // line: wrong location, wrong type, also overridden by
-        // sandbox_mode = "danger-full-access".)
-        assert_eq!(lines.len(), 13, "got {} lines: {t}", lines.len());
+        // sandbox_mode = "danger-full-access". Dropped `review_model`
+        // — no longer used by Codex regardless of Responses mode.)
+        assert_eq!(lines.len(), 12, "got {} lines: {t}", lines.len());
     }
 
     // ---- ensure_canonical_config ----
 
-    /// Build a relay path that does NOT exist so `relay_mode_active`
+    /// Build a relay path that does NOT exist so `proxy_bypassed`
     /// returns false. Use this whenever the test exercises the
-    /// canonical-self-heal path, not the relay-mode bypass.
+    /// canonical-self-heal path, not the proxy-bypassed skip.
     fn missing_relay_path(dir: &Path) -> PathBuf {
         dir.join("nonexistent-relay.json")
     }
@@ -372,7 +388,7 @@ mod tests {
         fs::remove_dir_all(&dir).ok();
     }
 
-    // ---- relay-mode bypass ----
+    // ---- proxy-bypassed skip (relay mode / responses direct) ----
 
     #[test]
     fn ensure_skips_drift_when_relay_mode_active() {
@@ -403,7 +419,7 @@ mod tests {
         .unwrap();
 
         let out = ensure_canonical_config(&cfg, &relay).expect("ok");
-        assert_eq!(out.reason, "relay-mode-skip");
+        assert_eq!(out.reason, "proxy-bypassed-skip");
         assert!(!out.wrote);
         // config.toml left alone.
         let after = fs::read_to_string(&cfg).unwrap();
@@ -414,10 +430,53 @@ mod tests {
     }
 
     #[test]
+    fn ensure_skips_drift_when_responses_passthrough_active() {
+        // Responses direct = user has chosen to point Codex straight at
+        // a third party that natively speaks the Responses protocol
+        // (e.g. Volcengine ARK). config.toml carries the REAL model id
+        // and base_url, NOT our 127.0.0.1 proxy / "gpt-5.5" alias. The
+        // self-heal must not rewrite either back.
+        let dir = unique_tmpdir("responsespt");
+        let cfg = dir.join(CODEX_CONFIG_FILENAME);
+        let relay = dir.join(RELAY_FILENAME);
+
+        fs::write(
+            &cfg,
+            "model_provider = \"OpenAI\"\n\
+             model = \"glm-5.2\"\n\
+             base_url = \"https://ark.cn-beijing.volces.com/api/coding/v1\"\n",
+        )
+        .unwrap();
+        fs::write(
+            &relay,
+            serde_json::json!({
+                "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v1",
+                "actualModel": "glm-5.2",
+                "relayMode": false,
+                "responsesPassthrough": true,
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        let out = ensure_canonical_config(&cfg, &relay).expect("ok");
+        assert_eq!(out.reason, "proxy-bypassed-skip");
+        assert!(!out.wrote);
+        let after = fs::read_to_string(&cfg).unwrap();
+        assert!(after.contains("glm-5.2"));
+        assert!(after.contains("ark.cn-beijing.volces.com"));
+        assert!(!after.contains("127.0.0.1:53682"));
+        assert!(!after.contains("gpt-5.5"));
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
     fn ensure_self_heals_when_relay_mode_false() {
         // relayMode: false explicitly — same behavior as no relay
-        // file at all: canonical-self-heal applies (surgical drift fix,
-        // since the provider section is present).
+        // file at all (neither bypass flag set): canonical-self-heal
+        // applies (surgical drift fix, since the provider section is
+        // present).
         let dir = unique_tmpdir("relayfalse");
         let cfg = dir.join(CODEX_CONFIG_FILENAME);
         let relay = dir.join(RELAY_FILENAME);
@@ -449,7 +508,7 @@ mod tests {
 
     #[test]
     fn ensure_self_heals_when_relay_file_malformed() {
-        // Garbage in relay file → relayMode treated as false → drift
+        // Garbage in relay file → neither bypass flag detectable → drift
         // check runs as normal. Don't accidentally fail open.
         let dir = unique_tmpdir("relaybad2");
         let cfg = dir.join(CODEX_CONFIG_FILENAME);
@@ -619,7 +678,7 @@ mod tests {
         // Scenario: file has the OpenAI section + correct base_url but
         // the top-level keys we own (model_reasoning_effort,
         // disable_response_storage, model_context_window,
-        // model_auto_compact_token_limit, review_model) are missing —
+        // model_auto_compact_token_limit) are missing —
         // a sibling tool wrote a minimal "just enough for them" config.
         // Pre-fix, "section present + base_url right" returned
         // already-canonical without checking these — Codex would use
@@ -647,7 +706,6 @@ mod tests {
         assert!(after.contains("disable_response_storage = true"));
         assert!(after.contains("model_context_window = 1000000"));
         assert!(after.contains("model_auto_compact_token_limit = 900000"));
-        assert!(after.contains("review_model = \"gpt-5.5\""));
 
         fs::remove_dir_all(&dir).ok();
     }
