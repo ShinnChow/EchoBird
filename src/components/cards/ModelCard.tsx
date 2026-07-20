@@ -12,7 +12,7 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
 
   // Matching rules: keywords -> icon file
   const iconMap: [string[], string][] = [
-    [['qwen', '通义', 'tongyi'], 'qwen'],
+    [['qwen', '通义', 'tongyi'], 'qianwen'],
     [['claude', 'anthropic', 'sonnet', 'opus', 'haiku'], 'claude'],
     [['gpt', 'openai', 'chatgpt', 'o1', 'o3'], 'chatgpt'],
     [['gemma'], 'google'],
@@ -59,6 +59,7 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
       if (icon === 'compshare') return './icons/models/compshare.png';
       if (icon === 'ccvibe') return './icons/models/ccvibe.png';
       if (icon === 'byteplus') return './icons/models/byteplus.png';
+      if (icon === 'qianwen') return './icons/models/qianwen.png';
       return `./icons/models/${icon}.svg`;
     }
   }
