@@ -77,6 +77,36 @@ EchoBird 提供 **4 大场景**,共享一个 **模型数据中枢** —— **一
 
 **跨平台** —— Windows、macOS、Linux(x64 + arm64)
 
+## 支持的工具 —— 一键安装、一键切换模型
+
+EchoBird 内置了各工具的安装脚本,**并直接写入每个工具的原生配置文件**,
+所以你既能在一个地方装好,更关键的是能**一键切换模型**。在模型中心配好一处
+provider,任意支持的工具都能指向它;不用手改 TOML / JSON,不用每个 CLI 重新
+登录。这正是大部分「切换模型」开源仓要你自己折腾的部分。
+
+### 一键安装 + 一键切换模型
+
+以下工具**同时**支持安装与切换模型 —— 这是 EchoBird 的核心:
+
+**编程 CLI** —— Claude Code · Codex CLI(OpenAI) · Grok Build(xAI) ·
+Kimi Code(月之暗面) · Qwen Code · Aider · OpenCode · MiMo Code(小米) ·
+ZCode(Z.AI) · OpenClaw · Pi · OpenScience · Vibe-Trading
+
+**桌面应用** —— Claude Desktop(第三方 profile) · ChatGPT 桌面版 ·
+OpenCode Desktop · WorkBuddy(腾讯 CodeBuddy 办公版)
+
+> 在 GitHub 上搜「给 Grok Build 切换模型」「给 Kimi Code 切换模型」?
+> 这两个在这里都是一等公民 —— 在模型中心选好模型,按下切换,EchoBird
+> 就帮你重写 `~/.grok/config.toml` 或 `~/.kimi-code/config.toml`。
+
+### 一键安装与启动
+
+这些工具由 EchoBird 检测、安装、管理,但模型切换由应用自身负责
+(厂商锁定或无模型配置):
+
+Hermes Desktop · Claude Science · Trae / Trae CN · Cursor · VS Code ·
+Gemini Desktop · Coffee CLI
+
 ## 界面截图
 
 ### AI 资讯 & 明星项目 —— 每天的 AI 简报

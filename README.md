@@ -79,6 +79,39 @@ EchoBird offers **4 scenarios** sharing a **unified model data hub** — **confi
 
 **Cross-platform** — Windows, macOS, Linux (x64 + arm64)
 
+## Supported tools — install & switch models in one click
+
+EchoBird bundles the install references and **writes each tool's native config
+file**, so you install from one place and — crucially — **switch the model
+with a single click**. Configure a provider once in Model Nexus, then point
+any supported tool at it; no manual TOML / JSON editing, no per-CLI re-login.
+This is the part most "model switcher" repos leave you to figure out alone.
+
+### One-click install + one-click model switch
+
+The tools below support **both** — install _and_ model switching — which is
+the core of what EchoBird is for:
+
+**Coding CLIs** — Claude Code · Codex CLI (OpenAI) · Grok Build (xAI) ·
+Kimi Code (Moonshot) · Qwen Code · Aider · OpenCode · MiMo Code (Xiaomi) ·
+ZCode (Z.AI) · OpenClaw · Pi · OpenScience · Vibe-Trading
+
+**Desktop apps** — Claude Desktop (3P profile) · ChatGPT desktop ·
+OpenCode Desktop · WorkBuddy (Tencent CodeBuddy)
+
+> Searching GitHub for "switch model for Grok Build" or "switch model for
+> Kimi Code"? Those are first-class here — pick the model in Model Nexus,
+> hit switch, and EchoBird rewrites `~/.grok/config.toml` or
+> `~/.kimi-code/config.toml` for you.
+
+### One-click install & launch
+
+These are detected, installed, and managed by EchoBird, but model switching
+is handled by the app itself (vendor-locked or no model config):
+
+Hermes Desktop · Claude Science · Trae / Trae CN · Cursor · VS Code ·
+Gemini Desktop · Coffee CLI
+
 ## Screenshots
 
 ### AI News & Star Projects — your daily AI brief
