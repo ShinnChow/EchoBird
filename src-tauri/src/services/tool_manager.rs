@@ -1856,6 +1856,7 @@ async fn scan_single_tool(def: ToolDefinition) -> DetectedTool {
             Some(pc.command.clone())
         },
         no_model_config: pc.no_model_config,
+        no_cwd_prompt: pc.no_cwd_prompt,
         launch_uri: pc.launch_uri.clone(),
     }
 }

@@ -568,8 +568,11 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         // re-prompt every launch). If the user cancels the picker, abort the
         // launch entirely — don't fall back to home, which is the bug this
         // fixes (CLI tools used to spawn in ~/ and were useless for development).
+        // A CLI tool may opt out per-tool via paths.json `noCwdPrompt: true`
+        // (e.g. openclaw) — it launches directly with no prompt, spawning in
+        // the home dir, which is fine for self-contained CLI agents.
         let cwd: string | undefined;
-        if (toolData?.category === 'CLI Code') {
+        if (toolData?.category === 'CLI Code' && !toolData?.noCwdPrompt) {
           try {
             const picked = await openDialog({ directory: true, multiple: false });
             if (typeof picked !== 'string' || !picked) {

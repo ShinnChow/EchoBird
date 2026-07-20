@@ -14,6 +14,7 @@
     "configFileAlt": "~/.openclaw/settings.json",
     "requireConfigFile": false,
     "detectByConfigDir": true,
+    "noCwdPrompt": true,
     "paths": {
         "win32": [
             "%APPDATA%\\npm\\openclaw.cmd",

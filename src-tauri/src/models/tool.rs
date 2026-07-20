@@ -84,6 +84,14 @@ pub struct PathsConfig {
     pub launch_file: Option<String>,
     #[serde(default)]
     pub no_model_config: bool,
+    /// Skip the working-directory folder picker on launch and run the CLI
+    /// directly (spawns in the user home, like the pre-picker behavior).
+    /// Set for CLI tools that don't need a project cwd to be useful (e.g.
+    /// openclaw, a self-contained agent). Most "CLI Code" tools still prompt,
+    /// because spawning in ~/ made them useless for development — keep this
+    /// false unless the tool genuinely doesn't care about its working dir.
+    #[serde(default)]
+    pub no_cwd_prompt: bool,
     /// Optional shell URI (e.g. "shell:AppsFolder\\Claude_pzs8sxrjxfjjc!Claude")
     /// used to launch MSIX/Store apps that have no plain .exe path.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -253,6 +261,8 @@ pub struct DetectedTool {
     pub command: Option<String>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub no_model_config: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub no_cwd_prompt: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub launch_uri: Option<String>,
 }

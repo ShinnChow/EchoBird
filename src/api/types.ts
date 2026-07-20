@@ -20,6 +20,7 @@ export interface DetectedTool {
   command?: string; // CLI install command (non-empty = installable via Mother Agent)
   version?: string; // Tool version from paths.json
   noModelConfig?: boolean; // Hide model picker; show "no model config supported" instead
+  noCwdPrompt?: boolean; // Skip the folder picker on launch — run directly (CLI tools that don't need a working directory)
   launchUri?: string; // shell:AppsFolder\<AUMID> for MSIX / Store apps
 }
 
