@@ -57,7 +57,8 @@
       "url": "https://platform.kimi.com/",
       "baseUrl": "https://api.moonshot.cn/v1",
       "anthropicUrl": "https://api.moonshot.cn/anthropic",
-      "modelId": "kimi-k2.7-code",
+      "modelId": "kimi-k3",
+      "modelIds": ["kimi-k3", "kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6"],
       "region": "cn"
     },
     {
@@ -65,7 +66,8 @@
       "url": "https://platform.kimi.ai/",
       "baseUrl": "https://api.moonshot.ai/v1",
       "anthropicUrl": "https://api.moonshot.ai/anthropic",
-      "modelId": "kimi-k2.7-code",
+      "modelId": "kimi-k3",
+      "modelIds": ["kimi-k3", "kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6"],
       "region": "global"
     },
     {
