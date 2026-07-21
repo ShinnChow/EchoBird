@@ -147,6 +147,13 @@ pub struct HeatmapEntry {
 /// XML-style tags / synthetic prompts injected by the tools when run inside
 /// an IDE or shell. Filtered out of title extraction so the list shows what
 /// the user actually typed.
+///
+/// The last entry is Claude Code's compaction / prior-session summary prompt.
+/// It lands in the jsonl as a bare `user` message (no `<session-start-hook-
+/// additional-context>` wrapper — that tag is stripped before disk), so we
+/// must anchor on the literal prefix, not a structural tag. Without this,
+/// every post-compaction session shows up titled
+/// "Below is a conversation log from a Claud...". Mirrors Coffee CLI 9748a48.
 const SYSTEM_INJECTION_TAGS: &[&str] = &[
     "<environment_context>",
     "<ide_opened_file>",
@@ -156,6 +163,7 @@ const SYSTEM_INJECTION_TAGS: &[&str] = &[
     "<command-message>",
     "<command-name>",
     "# AGENTS.md",
+    "Below is a conversation log from a Claude Code coding session",
 ];
 
 fn is_system_injected(text: &str) -> bool {
@@ -1117,6 +1125,11 @@ mod tests {
     fn system_injected_prompts_detected() {
         assert!(is_system_injected("<ide_opened_file>foo"));
         assert!(is_system_injected("  # AGENTS.md instructions"));
+        // Claude Code compaction / prior-session summary prompt lands in the
+        // jsonl as a bare user message — must be filtered by literal prefix.
+        assert!(is_system_injected(
+            "Below is a conversation log from a Claude Code coding session.\nCreate a summary..."
+        ));
         assert!(!is_system_injected("real user question"));
     }
 
