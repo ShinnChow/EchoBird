@@ -9,6 +9,7 @@ pub mod kimi;
 pub mod minimax;
 pub mod novita;
 pub mod openrouter;
+pub mod qwen;
 pub mod siliconflow;
 pub mod stepfun;
 pub mod sub2api;
@@ -63,6 +64,7 @@ pub enum Provider {
     MiniMax(minimax::MiniMaxProvider),
     Novita(novita::NovitaProvider),
     OpenRouter(openrouter::OpenRouterProvider),
+    Qwen(qwen::QwenProvider),
     SiliconFlow(siliconflow::SiliconFlowProvider),
     StepFun(stepfun::StepFunProvider),
     ZenMux(zenmux::ZenMuxProvider),
@@ -79,6 +81,7 @@ impl Provider {
             Provider::MiniMax(p) => p.query_usage(api_key, base_url).await,
             Provider::Novita(p) => p.query_usage(api_key, base_url).await,
             Provider::OpenRouter(p) => p.query_usage(api_key, base_url).await,
+            Provider::Qwen(p) => p.query_usage(api_key, base_url).await,
             Provider::SiliconFlow(p) => p.query_usage(api_key, base_url).await,
             Provider::StepFun(p) => p.query_usage(api_key, base_url).await,
             Provider::ZenMux(p) => p.query_usage(api_key, base_url).await,
@@ -107,6 +110,9 @@ pub fn detect_provider(base_url: &str) -> Option<Provider> {
     }
     if openrouter::OpenRouterProvider.can_handle(&url) {
         return Some(Provider::OpenRouter(openrouter::OpenRouterProvider));
+    }
+    if qwen::QwenProvider.can_handle(&url) {
+        return Some(Provider::Qwen(qwen::QwenProvider));
     }
     if siliconflow::SiliconFlowProvider.can_handle(&url) {
         return Some(Provider::SiliconFlow(siliconflow::SiliconFlowProvider));
