@@ -12,7 +12,15 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
 
   // Matching rules: keywords -> icon file
   const iconMap: [string[], string][] = [
-    [['qwen', '通义', 'tongyi'], 'qianwen'],
+    // Qwen model (紫色): model id (qwen3.8-max-preview etc.) or「通义」.
+    // MUST precede the platform rule — the platform row's text is CJK「千问」
+    // (no `qwen` token), and the token-plan URL carries no `qwen` substring, so
+    // this rule only fires when a real qwen modelId is present (config tab).
+    [['qwen', '通义', 'tongyi'], 'qwen'],
+    // Qwen platform (白底): platform name「千问AI平台」or token-plan/bailian
+    // host. Catches the usage-tab URL and the right-panel provider row, which
+    // have no modelId and thus miss the model rule above.
+    [['千问', 'qianwenai', 'maas.aliyuncs', 'bailian'], 'qianwen'],
     [['claude', 'anthropic', 'sonnet', 'opus', 'haiku'], 'claude'],
     [['gpt', 'openai', 'chatgpt', 'o1', 'o3'], 'chatgpt'],
     [['gemma'], 'google'],
