@@ -240,7 +240,12 @@ export const ModelCard = React.memo(
     akSkMissing,
     onProtocolClick: _onProtocolClick,
   }: ModelCardProps & { isActive?: boolean }) => {
-    const iconPath = getModelIcon(name, modelId);
+    // Config tab: resolve icon from the MODEL ID only (platform name must not
+    // leak in — otherwise a Qwen platform card configured with model id
+    // `glm-5.2` matches the「千问」platform rule and shows qianwen.png instead
+    // of glm.svg). The 用量 tab below resolves from baseUrl instead, so the
+    // two tabs use two separate icon lookups (model-id vs vendor) by design.
+    const iconPath = getModelIcon('', modelId);
     const confirm = useConfirm();
     const { t } = useI18n();
 
