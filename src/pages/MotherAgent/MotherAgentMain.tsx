@@ -49,7 +49,7 @@ export function MotherAgentMain() {
       models.map((m) => ({
         id: m.internalId,
         name: m.name,
-        icon: getModelIcon(m.name, m.modelId),
+        icon: getModelIcon('', m.modelId),
       })),
     [models]
   );

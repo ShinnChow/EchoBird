@@ -304,7 +304,12 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
       }
     })();
 
-    const iconSrc = getModelIcon(model.name, model.modelId || '');
+    // Resolve icon from the MODEL ID only — mirror the model-nexus 配置 tab
+    // (ModelCard.tsx). Passing the platform name (e.g.「千问AI平台」) here
+    // matched the platform rule and showed qianwen.png even when the model
+    // id was glm-5.2. The 官方端点 card below keeps name-based resolution
+    // because ep.name is the vendor's own endpoint name, not a platform card.
+    const iconSrc = getModelIcon('', model.modelId || '');
 
     return (
       <div

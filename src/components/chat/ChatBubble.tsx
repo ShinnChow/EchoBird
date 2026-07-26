@@ -43,7 +43,7 @@ function ReadonlyChips({ chips }: { chips: BubbleChip[] }) {
     <div className="flex flex-wrap gap-1 mt-1.5">
       {chips.map((c, i) => {
         if (c.type === 'model') {
-          const icon = getModelIcon(c.name, c.modelId || '');
+          const icon = getModelIcon('', c.modelId || '');
           return (
             <span key={i} className={CHIP_MODEL}>
               {icon ? (
