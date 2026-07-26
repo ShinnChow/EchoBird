@@ -416,7 +416,7 @@ export function MotherAgentMain() {
                   name: 'Claude Code',
                   // CLI-style blocky icon — deliberately different from
                   // claudecode.svg (the Anthropic star logo used by the
-                  // claude-opus-4-* models) so the parasite engine row is
+                  // claude-opus-* models) so the parasite engine row is
                   // visually distinct from regular Claude models.
                   icon: '/icons/tools/claude.svg',
                   disabled: !parasiteAvailable.includes(PARASITE_CLAUDE_ID),

@@ -85,7 +85,7 @@ async fn handle_messages_with(
     };
 
     // Model id rewrite — Claude Desktop hard-codes claude-sonnet-4-* /
-    // claude-opus-4-* / claude-haiku-4-*. Strict upstreams need the
+    // claude-opus-* / claude-haiku-4-*. Strict upstreams need the
     // real id. Smart upstreams ignore this and use their own.
     if let Some(real) = relay.real_model_id.as_deref() {
         let current = req_body.get("model").and_then(|v| v.as_str()).unwrap_or("");

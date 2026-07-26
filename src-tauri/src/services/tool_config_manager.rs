@@ -2499,7 +2499,7 @@ fn apply_claudedesktop(model_info: &ModelInfo) -> ApplyResult {
     // display name, which can be anything ("deepseek你好" etc.) and
     // would surface garbage in Desktop's picker. cc-switch surfaces the
     // upstream id here too.
-    // Bridge mode rewrites the id downstream, so the canonical claude-opus-4-8
+    // Bridge mode rewrites the id downstream, so the canonical claude-opus-5
     // is correct (and clears Desktop's Claude-name filter). Relay mode bypasses
     // the proxy — Desktop talks to the upstream directly — so the real upstream
     // id (e.g. "fable-5") must be sent as-is, or the station receives a model
@@ -2508,7 +2508,7 @@ fn apply_claudedesktop(model_info: &ModelInfo) -> ApplyResult {
     let base_model_id = if relay_mode && !real_model_id.is_empty() {
         real_model_id
     } else {
-        "claude-opus-4-8"
+        "claude-opus-5"
     };
     // 1M context: Claude Desktop expresses the long-context variant via a
     // `supports1m: true` flag on the model entry — NOT a `[1m]` name suffix

@@ -169,7 +169,7 @@
       "url": "https://www.anthropic.com",
       "baseUrl": "",
       "anthropicUrl": "https://api.anthropic.com",
-      "modelId": "claude-opus-4-8",
+      "modelId": "claude-opus-5",
       "region": "global"
     },
     {
@@ -319,9 +319,9 @@
       "url": "https://echobird.ai/ccvibe/",
       "baseUrl": "https://cc-vibe.com/v1",
       "anthropicUrl": "https://cc-vibe.com",
-      "modelId": "claude-opus-4-8",
+      "modelId": "claude-opus-5",
       "modelIds": [
-        "claude-opus-4-8",
+        "claude-opus-5",
         "claude-sonnet-5",
         "claude-fable-5",
         "claude-haiku-4-5",

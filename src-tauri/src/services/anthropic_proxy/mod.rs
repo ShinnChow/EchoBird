@@ -13,7 +13,7 @@
 // Unlike codex_proxy, this is NOT a protocol translator — both sides
 // speak the same Anthropic Messages API. The only transformation is
 // model-id substitution: Claude Desktop hard-codes "claude-sonnet-4-*"
-// / "claude-opus-4-*" / "claude-haiku-4-*" as the request model field,
+// / "claude-opus-*" / "claude-haiku-4-*" as the request model field,
 // but strict upstreams (Xiaomi MiMo, etc.) reject those names and
 // require their own real id (e.g. "mimo-v2.5-pro"). Smart upstreams
 // (DeepSeek /anthropic, GLM /anthropic) auto-route claude-* to their
