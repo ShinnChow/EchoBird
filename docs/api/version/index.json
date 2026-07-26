@@ -1,6 +1,6 @@
 {
-  "version": "5.5.7",
-  "releaseDate": "2026-07-19",
+  "version": "5.5.8",
+  "releaseDate": "2026-07-26",
   "releaseNotes": "## 修复\n\n- 修复模型图标逻辑：在「配置」标签页、应用管理右侧模型列表、聊天气泡模型标签与 Mother Agent 模型选择器中，图标改为按**模型 id** 解析，不再受平台名干扰。例如千问 AI 平台配置 `glm-5.2` 时，现在正确显示 GLM 图标而非千问平台图标；「用量」标签页与厂商入口仍按平台显示。\n\n## 新增\n\n- Claude 桌面端代理模式默认模型升级为 `claude-opus-5`（原 `claude-opus-4-8`）。\n- Kimi 平台模型列表刷新至 `kimi-k3` 系列。\n\n## 优化\n\n- 移除 AI 资讯（Pulse）的腾讯云香港 COS 镜像，统一由 echobird.ai 主源 + GitHub Pages / jsDelivr / GitHub Raw 兜底，减少冗余链路。",
   "releaseNotesI18n": {
     "zh-cn": "## 修复\n\n- 修复模型图标逻辑：在「配置」标签页、应用管理右侧模型列表、聊天气泡模型标签与 Mother Agent 模型选择器中，图标改为按**模型 id** 解析，不再受平台名干扰。例如千问 AI 平台配置 `glm-5.2` 时，现在正确显示 GLM 图标而非千问平台图标；「用量」标签页与厂商入口仍按平台显示。\n\n## 新增\n\n- Claude 桌面端代理模式默认模型升级为 `claude-opus-5`（原 `claude-opus-4-8`）。\n- Kimi 平台模型列表刷新至 `kimi-k3` 系列。\n\n## 优化\n\n- 移除 AI 资讯（Pulse）的腾讯云香港 COS 镜像，统一由 echobird.ai 主源 + GitHub Pages / jsDelivr / GitHub Raw 兜底，减少冗余链路。\n",
