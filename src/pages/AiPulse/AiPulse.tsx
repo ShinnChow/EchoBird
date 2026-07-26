@@ -4,7 +4,7 @@
 //   • zh users → SuYxh/ai-news-aggregator latest-7d.json (~6000 items, mostly CN)
 //   • en users → our own latest-7d-en.json built from HN Algolia + AI lab RSS
 //                + GitHub Trending. US/global sources only, no CN dependency.
-// Mirror chain: echobird.ai/pulse → CF Worker → GitHub raw / Tencent COS / jsdelivr.
+// Mirror chain: echobird.ai/pulse → CF Worker → GitHub raw / jsdelivr / GitHub Pages.
 //
 // AI 资讯  : items that are NOT projects (news articles, blog posts, HN discussion).
 // 明星项目: items where url is on github.com or source mentions Trending/开源.
@@ -34,14 +34,9 @@ import type { TKey } from '../../i18n';
 
 // ===== Mirror config =====
 
-// ZH feed: SuYxh's bilingual (mostly CN) aggregator — five mirrors.
+// ZH feed: SuYxh's bilingual (mostly CN) aggregator — four mirrors.
 const PULSE_MIRRORS_ZH: { name: string; base: string }[] = [
   { name: 'echobird', base: 'https://echobird.ai/pulse' },
-  // Tencent COS Hong Kong — refreshed by .github/workflows/refresh-pulse-data.yml
-  // every 6h. HK region needs no ICP filing, default domain is bucket-level
-  // public-read, and is reliably reachable from mainland China when
-  // echobird.ai (Cloudflare) is throttled.
-  { name: 'tencent-hk', base: 'https://ainew-1251534910.cos.ap-hongkong.myqcloud.com' },
   // Upstream's own GitHub Pages — official publish point, freshest data
   // (updates within minutes of the upstream Action), CORS enabled,
   // and *.github.io is generally GFW-routable from mainland China.
@@ -57,13 +52,11 @@ const PULSE_MIRRORS_ZH: { name: string; base: string }[] = [
   },
 ];
 
-// EN feed: built by scripts/build_en_pulse.py and committed to docs/pulse/
-// + mirrored to Tencent COS. Only available from our infrastructure — none
-// of SuYxh's mirrors carry it. Order trades latency vs. CN-reachability the
-// same way as the ZH chain.
+// EN feed: built by scripts/build_en_pulse.py and committed to docs/pulse/.
+// Only available from our infrastructure — none of SuYxh's mirrors carry it.
+// Order trades latency vs. CN-reachability the same way as the ZH chain.
 const PULSE_MIRRORS_EN: { name: string; base: string }[] = [
   { name: 'echobird', base: 'https://echobird.ai/pulse' },
-  { name: 'tencent-hk', base: 'https://ainew-1251534910.cos.ap-hongkong.myqcloud.com' },
   // jsDelivr proxy of OUR repo's docs/pulse — useful when echobird.ai is throttled.
   { name: 'jsdelivr', base: 'https://cdn.jsdelivr.net/gh/edison7009/EchoBird@main/docs/pulse' },
   {

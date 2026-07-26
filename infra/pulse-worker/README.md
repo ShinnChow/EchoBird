@@ -22,8 +22,8 @@ The pulse workflow:
    blocklisted hosts (`x.com` / `twitter.com` / `v2ex.com`) and promo-marker titles
    (`【广告】` / `【推广】` / `【赞助】` / `[AD]` / `[PR]` etc.) before commit.
 
-Sourcing through our own repo means all five frontend mirrors (worker,
-Tencent COS, jsDelivr-on-our-repo, raw-on-our-repo, plus the upstream
+Sourcing through our own repo means all four frontend mirrors (worker,
+jsDelivr-on-our-repo, raw-on-our-repo, plus the upstream
 GitHub Pages fallback) see the same filtered payload.
 
 Add a new source by appending an entry to `ROUTES` in [src/index.js](src/index.js)
