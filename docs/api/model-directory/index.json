@@ -87,7 +87,7 @@
       "region": "global"
     },
     {
-      "name": "UCloud 优云智算(支持GLM-5.2)",
+      "name": "UCloud 优云智算(glm5.2)",
       "url": "https://passport.compshare.cn/register?referral_code=LlOJAWughXiDXtP9v1Srra",
       "baseUrl": "https://cp.compshare.cn/v1",
       "anthropicUrl": "https://cp.compshare.cn",
