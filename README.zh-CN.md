@@ -32,15 +32,6 @@
 <table>
   <tr>
     <td width="150" align="center">
-      <a href="https://www.volcengine.com/activity/ai618?utm_campaign=hw&utm_content=hw&utm_medium=devrel_tool_web&utm_source=OWO&utm_term=EchoBird1"><img src="public/icons/sponsors/volcengine.svg" width="92" alt="火山引擎 Volcengine" /></a>
-    </td>
-    <td>
-      <a href="https://www.volcengine.com/activity/ai618?utm_campaign=hw&utm_content=hw&utm_medium=devrel_tool_web&utm_source=OWO&utm_term=EchoBird1"><strong>火山引擎 Volcengine</strong></a><br/>
-      感谢 <strong>火山引擎</strong> 赞助本项目!火山引擎是字节跳动旗下的云服务平台,方舟 Agent Plan 主打 <strong>AI Coding</strong>,极大提升开发效率 —— 每月 20,000 Agent 燃料值,集合主流热门编程模型。通过<a href="https://www.volcengine.com/activity/ai618?utm_campaign=hw&utm_content=hw&utm_medium=devrel_tool_web&utm_source=OWO&utm_term=EchoBird1">专属链接</a>注册,<strong>新客首单首月仅 ¥9.9</strong>。
-    </td>
-  </tr>
-  <tr>
-    <td width="150" align="center">
       <a href="https://passport.compshare.cn/register?referral_code=LlOJAWughXiDXtP9v1Srra"><img src="public/icons/sponsors/compshare.png" width="92" alt="优云智算 CompShare" /></a>
     </td>
     <td>
