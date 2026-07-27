@@ -87,24 +87,18 @@
       "region": "global"
     },
     {
-      "name": "Volcengine 火山引擎",
-      "url": "https://www.volcengine.com/",
-      "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v3",
-      "anthropicUrl": "https://ark.cn-beijing.volces.com/api/coding",
-      "modelId": "",
+      "name": "UCloud 优云智算(支持GLM-5.2)",
+      "url": "https://console.compshare.cn/light-gpu/model-subscription",
+      "baseUrl": "https://cp.compshare.cn/v1",
+      "anthropicUrl": "https://cp.compshare.cn",
+      "modelId": "glm-5.2",
       "modelIds": [
-        "ark-code-latest",
-        "doubao-seed-2.0-code",
-        "doubao-seed-2.0-pro",
-        "doubao-seed-2.0-lite",
-        "doubao-seed-2.0-mini",
         "glm-5.2",
-        "kimi-k2.7-code",
-        "deepseek-v4-pro",
-        "deepseek-v4-flash",
-        "minimax-m3",
-        "minimax-m2.7",
-        "kimi-k2.6"
+        "glm-5.1",
+        "MiniMax-M2.7",
+        "kimi-k2.6",
+        "deepseek-ai/DeepSeek-V3.2",
+        "deepseek-v4-flash"
       ],
       "region": "cn"
     },
@@ -273,18 +267,24 @@
       "region": "global"
     },
     {
-      "name": "UCloud 优云智算",
-      "url": "https://console.compshare.cn/light-gpu/model-subscription",
-      "baseUrl": "https://cp.compshare.cn/v1",
-      "anthropicUrl": "https://cp.compshare.cn",
-      "modelId": "glm-5.2",
+      "name": "火山引擎",
+      "url": "https://www.volcengine.com/",
+      "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v3",
+      "anthropicUrl": "https://ark.cn-beijing.volces.com/api/coding",
+      "modelId": "",
       "modelIds": [
+        "ark-code-latest",
+        "doubao-seed-2.0-code",
+        "doubao-seed-2.0-pro",
+        "doubao-seed-2.0-lite",
+        "doubao-seed-2.0-mini",
         "glm-5.2",
-        "glm-5.1",
-        "MiniMax-M2.7",
-        "kimi-k2.6",
-        "deepseek-ai/DeepSeek-V3.2",
-        "deepseek-v4-flash"
+        "kimi-k2.7-code",
+        "deepseek-v4-pro",
+        "deepseek-v4-flash",
+        "minimax-m3",
+        "minimax-m2.7",
+        "kimi-k2.6"
       ],
       "region": "cn"
     }
