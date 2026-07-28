@@ -63,20 +63,6 @@ pub struct ModelInfo {
     /// Only consumed by `apply_claudecode`; other tools ignore it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub one_m_context: Option<bool>,
-    /// Real context window (in tokens) of the selected model. Consumed by
-    /// `apply_codex` to write `model_context_window` /
-    /// `model_auto_compact_token_limit` matching the model's actual token
-    /// budget. `None` → the apply path falls back to a per-model registry
-    /// lookup (and ultimately the 1M historic default) so callers that don't
-    /// supply it keep working.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub context_window: Option<u64>,
-    /// Real input modalities of the selected model (e.g. `["text","image",
-    /// "video"]`). Consumed by `apply_zcode` to write the provider model
-    /// block's `modalities.input`. `None` → the apply path falls back to a
-    /// per-model registry lookup (and ultimately the text-only default).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub input_modalities: Option<Vec<String>>,
 }
 
 /// Result of applying a model config
@@ -599,8 +585,6 @@ fn read_generic_json(tool_id: &str) -> Option<ModelInfo> {
         responses_passthrough: None,
         web_search: None,
         one_m_context: None,
-        context_window: None,
-        input_modalities: None,
     })
 }
 
@@ -710,8 +694,6 @@ fn read_echobird_relay(tool_id: &str) -> Option<ModelInfo> {
         responses_passthrough: None,
         web_search: None,
         one_m_context: None,
-        context_window: None,
-        input_modalities: None,
     })
 }
 
@@ -913,8 +895,6 @@ fn read_openclaw() -> Option<ModelInfo> {
         responses_passthrough: None,
         web_search: None,
         one_m_context: None,
-        context_window: None,
-        input_modalities: None,
     })
 }
 
@@ -1071,8 +1051,6 @@ fn read_opencode() -> Option<ModelInfo> {
         responses_passthrough: None,
         web_search: None,
         one_m_context: None,
-        context_window: None,
-        input_modalities: None,
     })
 }
 
@@ -1107,8 +1085,6 @@ fn read_opencode_native_config(path: &Path) -> Option<ModelInfo> {
         responses_passthrough: None,
         web_search: None,
         one_m_context: None,
-        context_window: None,
-        input_modalities: None,
     })
 }
 
@@ -1433,28 +1409,6 @@ fn read_zcode() -> Option<ModelInfo> {
         "openai"
     };
 
-    // Round-trip the real input modalities from the provider's model block so
-    // the model-picker UI reflects image/video support when present. Falls back
-    // to the registry's value for the model id when the config block omits
-    // modalities (e.g. written by an older EchoBird that hard-coded text-only).
-    let config_input_modalities = provider
-        .pointer(&format!("/models/{}/modalities/input", model_id))
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|m| m.as_str().map(String::from))
-                .collect::<Vec<String>>()
-        })
-        .filter(|v| !v.is_empty());
-    let input_modalities = config_input_modalities.or_else(|| {
-        let reg = model_input_modalities_for(model_id);
-        if reg.len() == 1 && reg[0] == "text" {
-            None
-        } else {
-            Some(reg.iter().map(|s| s.to_string()).collect())
-        }
-    });
-
     Some(ModelInfo {
         name: provider
             .pointer(&format!("/models/{}/name", model_id))
@@ -1477,8 +1431,6 @@ fn read_zcode() -> Option<ModelInfo> {
         responses_passthrough: None,
         web_search: None,
         one_m_context: None,
-        context_window: None,
-        input_modalities,
     })
 }
 
@@ -1835,8 +1787,6 @@ fn read_openscience() -> Option<ModelInfo> {
         responses_passthrough: None,
         web_search: None,
         one_m_context: None,
-        context_window: None,
-        input_modalities: None,
     })
 }
 
@@ -2260,19 +2210,6 @@ fn read_codex() -> Option<ModelInfo> {
         model_from_toml
     };
 
-    // Round-trip the real context window from the relay file so the
-    // model-picker reflects what apply_codex wrote. Falls back to the
-    // per-model registry lookup (and ultimately None) when the relay file
-    // is missing or pre-dates the contextWindow field.
-    let context_window = read_codex_relay_context_window().or_else(|| {
-        if provider_id == CODEX_PROVIDER {
-            let cw = model_context_window_for(&model);
-            (cw != DEFAULT_CODEX_CONTEXT_WINDOW).then_some(cw)
-        } else {
-            None
-        }
-    });
-
     // API key now lives in ~/.codex/auth.json (preferred_auth_method=apikey).
     // Fall back to the legacy env_key path for configs written before this change.
     let api_key = read_codex_auth_key(&codex_dir).or_else(|| {
@@ -2304,8 +2241,6 @@ fn read_codex() -> Option<ModelInfo> {
         responses_passthrough: None,
         web_search: None,
         one_m_context: None,
-        context_window,
-        input_modalities: None,
     })
 }
 
@@ -2314,13 +2249,6 @@ fn read_codex_relay_base_url() -> Option<String> {
     let content = fs::read_to_string(relay_path).ok()?;
     let v: serde_json::Value = serde_json::from_str(&content).ok()?;
     v.get("baseUrl").and_then(|x| x.as_str()).map(String::from)
-}
-
-fn read_codex_relay_context_window() -> Option<u64> {
-    let relay_path = echobird_dir().join("codex.json");
-    let content = fs::read_to_string(relay_path).ok()?;
-    let v: serde_json::Value = serde_json::from_str(&content).ok()?;
-    v.get("contextWindow").and_then(|x| x.as_u64())
 }
 
 fn read_codex_relay_model() -> Option<String> {
@@ -2816,8 +2744,6 @@ fn read_claudedesktop() -> Option<ModelInfo> {
         responses_passthrough: None,
         web_search: None,
         one_m_context: None,
-        context_window: None,
-        input_modalities: None,
     })
 }
 
@@ -3112,8 +3038,6 @@ fn read_claudecode() -> Option<ModelInfo> {
         responses_passthrough: None,
         web_search: None,
         one_m_context: None,
-        context_window: None,
-        input_modalities: None,
     })
 }
 
@@ -3332,8 +3256,6 @@ fn read_aider() -> Option<ModelInfo> {
         responses_passthrough: None,
         web_search: None,
         one_m_context: None,
-        context_window: None,
-        input_modalities: None,
     })
 }
 
@@ -3369,8 +3291,6 @@ fn read_vibe_trading() -> Option<ModelInfo> {
         responses_passthrough: None,
         web_search: None,
         one_m_context: None,
-        context_window: None,
-        input_modalities: None,
     })
 }
 
@@ -3514,8 +3434,6 @@ fn read_workbuddy() -> Option<ModelInfo> {
         responses_passthrough: None,
         web_search: None,
         one_m_context: None,
-        context_window: None,
-        input_modalities: None,
     })
 }
 
@@ -3736,8 +3654,6 @@ fn read_grok() -> Option<ModelInfo> {
         responses_passthrough: None,
         web_search: None,
         one_m_context: None,
-        context_window: None,
-        input_modalities: None,
     })
 }
 
@@ -3887,8 +3803,6 @@ fn read_qwen_code() -> Option<ModelInfo> {
         responses_passthrough: None,
         web_search: None,
         one_m_context: None,
-        context_window: None,
-        input_modalities: None,
     })
 }
 
@@ -4046,8 +3960,6 @@ fn read_pi() -> Option<ModelInfo> {
         responses_passthrough: None,
         web_search: None,
         one_m_context: None,
-        context_window: None,
-        input_modalities: None,
     })
 }
 
@@ -4298,8 +4210,6 @@ fn read_kimicode() -> Option<ModelInfo> {
         responses_passthrough: None,
         web_search: None,
         one_m_context: None,
-        context_window: None,
-        input_modalities: None,
     })
 }
 
@@ -4846,8 +4756,6 @@ mod tests {
             responses_passthrough: None,
             web_search: None,
             one_m_context: None,
-            context_window: None,
-            input_modalities: None,
         }
     }
 
