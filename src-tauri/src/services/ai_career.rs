@@ -204,7 +204,8 @@ fn turns_from_messages(total_messages: u32) -> u32 {
 
 /// Generic agent JSONL parser (Claude Code). One JSON object per line; pulls
 /// `sessionId` / `cwd` off any row, counts user+assistant messages, and uses
-/// the first real user message as the title.
+/// the first real user message as the title. Files with no real user message
+/// are internal compaction/summary sub-tasks and are not user-visible sessions.
 fn parse_agent_jsonl(file_path: &Path, family: Family) -> Option<SavedSession> {
     use std::io::BufRead;
     let file = std::fs::File::open(file_path).ok()?;
@@ -214,6 +215,7 @@ fn parse_agent_jsonl(file_path: &Path, family: Family) -> Option<SavedSession> {
     let mut cwd = String::new();
     let mut title = String::new();
     let mut total_messages = 0u32;
+    let mut real_user_messages = 0u32;
 
     for line in reader.lines().map_while(Result::ok) {
         let Ok(value) = serde_json::from_str::<serde_json::Value>(&line) else {
@@ -242,6 +244,29 @@ fn parse_agent_jsonl(file_path: &Path, family: Family) -> Option<SavedSession> {
         let role = msg_obj.get("role").and_then(|v| v.as_str()).unwrap_or("");
         if role == "user" || role == "assistant" {
             total_messages += 1;
+        }
+        if role == "user" {
+            let is_real_user = match msg_obj.get("content") {
+                Some(content) if content.is_string() => content
+                    .as_str()
+                    .is_some_and(|text| !is_system_injected(text)),
+                Some(content) if content.is_array() => content.as_array().is_some_and(|arr| {
+                    arr.iter().any(|block| {
+                        let bt = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                        if bt != "text" && bt != "input_text" {
+                            return false;
+                        }
+                        block
+                            .get("text")
+                            .and_then(|v| v.as_str())
+                            .is_some_and(|text| !is_system_injected(text))
+                    })
+                }),
+                _ => false,
+            };
+            if is_real_user {
+                real_user_messages += 1;
+            }
         }
         if role != "user" || !title.is_empty() {
             continue;
@@ -286,6 +311,10 @@ fn parse_agent_jsonl(file_path: &Path, family: Family) -> Option<SavedSession> {
                 }
             }
         }
+    }
+
+    if real_user_messages == 0 {
+        return None;
     }
 
     if title.is_empty() {
@@ -1165,6 +1194,47 @@ mod tests {
         assert_eq!(s.cwd, "/tmp/proj");
         assert_eq!(s.session_token.as_deref(), Some("abc"));
         assert_eq!(s.turn_count, Some(1)); // 2 messages → 1 turn
+        let _ = std::fs::remove_file(&f);
+    }
+
+    #[test]
+    fn parse_agent_jsonl_drops_pure_compaction_subtask() {
+        let dir = std::env::temp_dir().join("echobird_ai_career_test_compaction");
+        let _ = std::fs::create_dir_all(&dir);
+        let f = dir.join("compact.jsonl");
+        let body = "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"Below is a conversation log from a Claude Code coding session.\\nCreate a summary to help the next session quickly understand the context.\"}}\n\
+                    {\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"# Session Summary\\n...\"}]}}\n\
+                    {\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"### Tasks\\n- did stuff\"}]}}\n";
+        std::fs::write(&f, body).unwrap();
+        assert!(parse_agent_jsonl(&f, Family::Claude).is_none());
+        let _ = std::fs::remove_file(&f);
+    }
+
+    #[test]
+    fn parse_agent_jsonl_titles_continued_session_after_compaction() {
+        let dir = std::env::temp_dir().join("echobird_ai_career_test_compaction_continued");
+        let _ = std::fs::create_dir_all(&dir);
+        let f = dir.join("continued.jsonl");
+        let body = "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"Below is a conversation log from a Claude Code coding session.\\nCreate a summary...\"}}\n\
+                    {\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"summary\"}]}}\n\
+                    {\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"继续帮我测一下 OSC 52\"}}\n\
+                    {\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"好\"}]}}\n";
+        std::fs::write(&f, body).unwrap();
+        let s = parse_agent_jsonl(&f, Family::Claude).unwrap();
+        assert_eq!(s.name, "继续帮我测一下 OSC 52");
+        let _ = std::fs::remove_file(&f);
+    }
+
+    #[test]
+    fn parse_agent_jsonl_counts_mixed_array_real_user_message() {
+        let dir = std::env::temp_dir().join("echobird_ai_career_test_agent_array");
+        let _ = std::fs::create_dir_all(&dir);
+        let f = dir.join("array.jsonl");
+        let body = "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"x\",\"content\":\"<ide_opened_file>\"},{\"type\":\"text\",\"text\":\"帮我把这个文件重构一下\"}]}}\n\
+                    {\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"好的\"}]}}\n";
+        std::fs::write(&f, body).unwrap();
+        let s = parse_agent_jsonl(&f, Family::Claude).unwrap();
+        assert_eq!(s.name, "帮我把这个文件重构一下");
         let _ = std::fs::remove_file(&f);
     }
 
