@@ -33,6 +33,7 @@ export interface ModelNexusCtx {
   modelUsageData: Record<string, ModelUsageData>;
   setModelUsageData: React.Dispatch<React.SetStateAction<Record<string, ModelUsageData>>>;
   isRefreshingUsage: boolean;
+  refreshingUsageIds: Set<string>;
   // Volcengine AK/SK (per-model: one account per model)
   volcAkSkMissingIds: Set<string>;
   setVolcAkSkMissingIds: React.Dispatch<React.SetStateAction<Set<string>>>;

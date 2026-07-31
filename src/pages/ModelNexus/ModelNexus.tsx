@@ -36,6 +36,7 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
   const [viewMode, setViewMode] = useState<'config' | 'usage'>('config');
   const [modelUsageData, setModelUsageData] = useState<Record<string, ModelUsageData>>({});
   const [isRefreshingUsage, setIsRefreshingUsage] = useState(false);
+  const [refreshingUsageIds, setRefreshingUsageIds] = useState<Set<string>>(new Set());
   // Volcengine AK/SK (per-model: one account per model)
   const { showToast } = useToast();
   const [volcAkSkMissingIds, setVolcAkSkMissingIds] = useState<Set<string>>(new Set());
@@ -201,9 +202,12 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
 
   // Refresh usage for a single model
   const refreshSingleUsage = async (modelId: string) => {
+    if (refreshingUsageIds.has(modelId)) return;
+
     const model = userModels.find((m) => m.internalId === modelId);
     if (!model) return;
 
+    setRefreshingUsageIds((prev) => new Set(prev).add(model.internalId));
     try {
       const result = await api.queryModelUsage(model.internalId);
       if (result.error === 'VOLC_AKSK_REQUIRED') {
@@ -227,6 +231,12 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
       }
     } catch {
       /* silent */
+    } finally {
+      setRefreshingUsageIds((prev) => {
+        const next = new Set(prev);
+        next.delete(model.internalId);
+        return next;
+      });
     }
   };
 
@@ -340,8 +350,9 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
         viewMode,
         setViewMode,
         modelUsageData,
-        setModelUsageData,
         isRefreshingUsage,
+        refreshingUsageIds,
+        setModelUsageData,
         volcAkSkMissingIds,
         setVolcAkSkMissingIds,
         volcAkSkModelId,
@@ -615,6 +626,7 @@ export function ModelNexusMain() {
     keyDestroyed: _keyDestroyed,
     setKeyDestroyed,
     refreshSingleUsage,
+    refreshingUsageIds,
     volcAkSkMissingIds,
     volcAkSkModelId,
     setVolcAkSkModelId,
@@ -761,6 +773,7 @@ export function ModelNexusMain() {
                     onEdit={isDemo ? undefined : () => handleCardEdit(model)}
                     onDelete={isDemo ? undefined : () => handleCardDelete(model.internalId)}
                     onRefresh={() => refreshSingleUsage(model.internalId)}
+                    isRefreshingUsage={refreshingUsageIds.has(model.internalId)}
                     onAccessKey={
                       isVolcengineUrl(model.baseUrl, model.anthropicUrl)
                         ? () => openAkskModal(model.internalId)

@@ -1,6 +1,7 @@
 // ModelCard component
 
 import React, { useState, useEffect } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { useConfirm } from '../ConfirmDialog';
 import { useI18n } from '../../hooks/useI18n';
 import type { ModelUsageData } from '../../api/tauri';
@@ -111,6 +112,7 @@ export interface ModelCardProps {
   onEdit?: () => void; // edit callback
   onDelete?: () => void; // delete callback
   onRefresh?: () => void; // refresh usage callback (usage mode only)
+  isRefreshingUsage?: boolean; // usage refresh in progress (usage mode only)
   onAccessKey?: () => void; // open AK/SK config modal (Volcengine usage mode)
   akSkMissing?: boolean; // AK/SK not yet configured -> show hint
   onProtocolClick?: (protocol: 'openai' | 'anthropic') => void; // protocol tag click
@@ -236,6 +238,7 @@ export const ModelCard = React.memo(
     onEdit,
     onDelete,
     onRefresh,
+    isRefreshingUsage = false,
     onAccessKey,
     akSkMissing,
     onProtocolClick: _onProtocolClick,
@@ -270,7 +273,7 @@ export const ModelCard = React.memo(
         {viewMode === 'config' ? (
           // Config mode: [删除] [编辑]
           (onEdit || onDelete) && (
-            <div className="absolute top-2 right-2 flex gap-1.5">
+            <div className="absolute top-2 right-2 flex gap-0.5">
               {onDelete && (
                 <button
                   className="text-xs font-mono text-cyber-text-muted/70 hover:text-red-500 transition-colors"
@@ -309,7 +312,7 @@ export const ModelCard = React.memo(
           <div className="absolute top-2 right-2 flex gap-1.5">
             {onAccessKey && (
               <button
-                className="text-xs font-mono text-cyber-text-muted/70 hover:text-cyber-accent transition-colors"
+                className="usage-card-action-button text-xs font-mono"
                 onClick={(e) => {
                   e.stopPropagation();
                   onAccessKey();
@@ -320,13 +323,28 @@ export const ModelCard = React.memo(
             )}
             {onRefresh && (
               <button
-                className="text-xs font-mono text-cyber-text-muted/70 hover:text-cyber-text transition-colors"
+                className="usage-card-action-button text-xs font-mono"
+                disabled={isRefreshingUsage}
+                aria-busy={isRefreshingUsage}
+                aria-label={t('btn.refresh')}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onRefresh();
+                  if (!isRefreshingUsage) {
+                    onRefresh();
+                  }
                 }}
               >
-                [{t('btn.refresh')}]
+                <span className={isRefreshingUsage ? 'invisible' : 'visible'}>
+                  {t('btn.refresh')}
+                </span>
+                {isRefreshingUsage && (
+                  <span
+                    className="absolute inset-0 flex items-center justify-center"
+                    aria-hidden="true"
+                  >
+                    <RefreshCw size={11} className="animate-spin" />
+                  </span>
+                )}
               </button>
             )}
           </div>
@@ -502,6 +520,7 @@ export const ModelCard = React.memo(
       'isPinging',
       'selected',
       'viewMode',
+      'isRefreshingUsage',
       'akSkMissing',
     ];
     const p = prev as unknown as Record<string, unknown>;

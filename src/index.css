@@ -43,6 +43,24 @@
   --text-muted-rgb: 130 124 114; /* #827C72 — readable warm muted */
 }
 
+.usage-card-action-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: 1.4em;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgb(var(--text-muted-rgb) / 0.7);
+  white-space: nowrap;
+}
+
+.usage-card-action-button:hover {
+  color: rgb(var(--text-primary-rgb));
+}
+
 /* ── Local Font Faces ──
    Latin via woff2 (Inter, CascadiaMono). CJK relies on system fonts:
    PingFang SC on macOS, Microsoft YaHei on Windows, Noto Sans CJK on Linux.
