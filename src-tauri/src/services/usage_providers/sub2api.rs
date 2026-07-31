@@ -1,8 +1,10 @@
 //! Sub2Api usage provider
 //!
 //! Sub2Api is the backend used by many AI relay/proxy sites (e.g. cc-vibe.com).
-//! GET {base}/v1/usage with Bearer api-key returns:
-//! { planName, unit, usage: { total: { actual_cost, requests, ... }, today: {...} } }
+//! GET {base}/v1/usage with Bearer api-key returns quota mode:
+//! { planName, unit, subscription: { daily_limit_usd, ... }, usage: { total: {...} } }
+//! or wallet mode:
+//! { planName, unit, mode: "unrestricted", balance, remaining, usage: {...} }
 //!
 //! This is a fallback provider (can_handle always true) - it sits last in
 //! detect_provider so official providers (DeepSeek/Kimi/...) match first.
@@ -155,6 +157,26 @@ fn parse_subscription_quotas(body: &serde_json::Value) -> Option<Vec<UsageQuota>
     }
 }
 
+fn parse_balance_quota(body: &serde_json::Value) -> Option<UsageQuota> {
+    let balance = body
+        .get("remaining")
+        .and_then(parse_f64)
+        .or_else(|| body.get("balance").and_then(parse_f64))?;
+    let unit = body
+        .get("unit")
+        .or_else(|| body.get("currency"))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or("USD");
+
+    Some(UsageQuota {
+        percentage: 0.0,
+        reset_at: now_millis() + 30 * 24 * 60 * 60 * 1000,
+        balance: Some(balance),
+        balance_unit: Some(unit.to_string()),
+    })
+}
+
 /// Empty result: no usage data. Sub2Api is the catch-all fallback provider, so
 /// every failure mode (unreachable host, non-2xx, non-JSON, or a 200 that isn't
 /// sub2api-shaped) collapses to this - the UI shows "暂无用量数据" instead of a
@@ -206,6 +228,20 @@ impl UsageProvider for Sub2ApiProvider {
                 success: true,
                 data: Some(ModelUsageData {
                     quotas,
+                    last_updated: Some(now_millis()),
+                }),
+                error: None,
+            });
+        }
+
+        // Wallet / API-call mode exposes a remaining balance instead of enforced
+        // daily/weekly/monthly limits. Return a balance quota so the existing UI
+        // takes the same display path as DeepSeek, without changing quota bars.
+        if let Some(quota) = parse_balance_quota(&body) {
+            return Ok(UsageResult {
+                success: true,
+                data: Some(ModelUsageData {
+                    quotas: vec![quota],
                     last_updated: Some(now_millis()),
                 }),
                 error: None,
@@ -318,6 +354,37 @@ mod tests {
         });
         let quotas = parse_subscription_quotas(&body).expect("subscription present");
         assert_eq!(quotas.len(), 1);
+    }
+
+    #[test]
+    fn wallet_mode_yields_balance_display() {
+        let body = json!({
+            "balance": 5384.70840195,
+            "remaining": 5384.70840195,
+            "isValid": true,
+            "mode": "unrestricted",
+            "planName": "Wallet balance",
+            "unit": "USD",
+            "usage": {
+                "today": { "actual_cost": 203.944362 },
+                "total": { "actual_cost": 286.406855 }
+            }
+        });
+        let quota = parse_balance_quota(&body).expect("balance present");
+        assert_eq!(quota.balance_unit.as_deref(), Some("USD"));
+        assert!((quota.balance.unwrap_or_default() - 5384.70840195).abs() < 0.000001);
+    }
+
+    #[test]
+    fn wallet_mode_can_use_balance_when_remaining_absent() {
+        let body = json!({
+            "balance": "12.50",
+            "planName": "Wallet balance",
+            "unit": "CNY"
+        });
+        let quota = parse_balance_quota(&body).expect("balance present");
+        assert_eq!(quota.balance_unit.as_deref(), Some("CNY"));
+        assert!((quota.balance.unwrap_or_default() - 12.5).abs() < 0.000001);
     }
 
     #[test]
