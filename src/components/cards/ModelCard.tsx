@@ -9,7 +9,22 @@ import type { TKey } from '../../i18n/types';
 
 // Smart icon detection — match model name/ID to icon file
 export const getModelIcon = (name: string, modelId?: string): string | null => {
-  const text = `${name} ${modelId || ''}`.toLowerCase();
+  const nameText = name.toLowerCase();
+  const modelIdText = (modelId || '').toLowerCase();
+
+  // Provider/directory rows do not pass a real modelId. In that case the
+  // vendor name must win over model-family words embedded in the title, e.g.
+  // 「优云智算(支持GLM-5.2)」should show the 优云智算 logo, not GLM.
+  if (!modelIdText) {
+    if (['compshare', '优云智算', '优云'].some((kw) => nameText.includes(kw))) {
+      return './icons/models/compshare.png';
+    }
+    if (['ccvibe', 'cc vibe', 'cc-vibe'].some((kw) => nameText.includes(kw))) {
+      return './icons/models/ccvibe.png';
+    }
+  }
+
+  const text = `${nameText} ${modelIdText}`;
 
   // Matching rules: keywords -> icon file
   const iconMap: [string[], string][] = [
