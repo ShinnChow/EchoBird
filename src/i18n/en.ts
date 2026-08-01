@@ -225,7 +225,7 @@ const en: Translations = {
     'When on, appends [1m] to the model id to enable the 1M context window. Carefully read the official docs of the model you purchased to confirm whether it supports the "model id + [1m]" convention.',
   'agent.codexResponsesLabel': 'Responses',
   'agent.codexResponsesHint':
-    'Enable this if your third-party model supports the Responses protocol for native integration. (Carefully read the official documentation of the model you purchased to confirm whether it supports the Responses protocol.)',
+    'Enable this for native integration if your model — official GPT relay station or third-party model — supports the Responses protocol. (Carefully read the official documentation of the model you purchased to confirm whether it supports the Responses protocol.)',
   'agent.codexWebSearchLabel': 'Web Search',
   'agent.codexWebSearchHint':
     'Some third-party models require web_search to be separately enabled or billed. (Carefully read the official documentation of the model you purchased to confirm whether web_search is supported and how to enable it.)',

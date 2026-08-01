@@ -4,6 +4,7 @@ pub mod ai_career;
 pub mod anthropic_proxy;
 pub mod auto_fix;
 pub mod bundled_assets;
+pub mod codex_catalog;
 pub mod codex_proxy;
 pub mod codex_session_merge;
 pub mod datalog;

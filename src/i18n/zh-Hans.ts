@@ -203,7 +203,7 @@ const zhHans: Partial<Translations> = {
     '开启后向模型 id 追加 [1m] 以使用 1M 上下文。请仔细阅读你购买模型的官方文档，确认是否支持「模型id+[1m]」约定。',
   'agent.codexResponsesLabel': 'Responses',
   'agent.codexResponsesHint':
-    '第三方模型支持 Responses 可开启此项，原生接入（仔细阅读你购买模型的官方文档，是否支持 Responses 协议）',
+    '官方 GPT 模型的中转站和第三方模型支持 Responses 可开启此项，原生接入（仔细阅读你购买模型的官方文档，是否支持 Responses 协议）',
   'agent.codexWebSearchLabel': 'Web Search',
   'agent.codexWebSearchHint':
     '部分第三方模型 web_search 需要二次开通或另外计费（仔细阅读你购买模型的官方文档，确认是否支持及如何开通 web_search 能力）',

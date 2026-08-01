@@ -5,6 +5,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::services::codex_catalog;
 use crate::services::tool_manager;
 
 /// Model info to apply to a tool
@@ -1923,6 +1924,14 @@ pub(crate) fn write_codex_canonical_fields(
     // gateway that only knows the real id → 4xx. Strip it on every write
     // so the canonical set we write below is the full top-level truth.
     c = toml_delete_top(&c, "review_model");
+    // Evict any stale `model_catalog_json` from a previous Responses-direct
+    // session. The line is conditional (only written by apply_codex for
+    // passthrough + bundled-vendor catalogs), so a plain overwrite-or-insert
+    // helper would never remove it after switching back to bridge/relay mode
+    // or to a non-catalog vendor — leaving config.toml pointing at a catalog
+    // that no longer matches the selected model. apply_codex re-adds it when
+    // the catalog applies.
+    c = toml_delete_top(&c, "model_catalog_json");
     // Top-level raw (bool, int).
     c = toml_write_top_raw(&c, "disable_response_storage", "true");
     c = toml_write_top_raw(&c, "model_context_window", &context_window.to_string());
@@ -1944,6 +1953,19 @@ pub(crate) fn write_codex_canonical_fields(
         c.push('\n');
     }
     c
+}
+
+/// Whether `content` (a config.toml) references OUR canonical catalog path in
+/// `model_catalog_json`. Used by `apply_codex` to decide when to delete the
+/// stale `~/.codex/models.json` file after leaving catalog mode. The check is
+/// exact-path, not substring: a user's own catalog pointed at via a different
+/// path (e.g. MiniMax docs' `~/.codex/model-catalogs/custom-catalog.json`)
+/// must NOT trigger deletion of our file. Accepts both the absolute
+/// forward-slash form we write and the `~/.codex/models.json` shorthand the
+/// vendor docs use.
+fn codex_catalog_referenced(content: &str, our_path: &str) -> bool {
+    let referenced = toml_read_top(content, "model_catalog_json");
+    !referenced.is_empty() && (referenced == our_path || referenced == "~/.codex/models.json")
 }
 
 fn apply_codex(tool_id: &str, model_info: &ModelInfo) -> ApplyResult {
@@ -2085,6 +2107,60 @@ fn apply_codex(tool_id: &str, model_info: &ModelInfo) -> ApplyResult {
         "live"
     };
     new_content = toml_write_top(&new_content, "web_search", web_search_value);
+
+    // Model catalog — Responses-direct third parties (DeepSeek / MiniMax /
+    // MiMo) need `model_catalog_json` so Codex knows the real model's
+    // context window, reasoning levels, and tool capabilities. Only written
+    // in passthrough mode (Codex talks to the upstream directly with the
+    // real model id); bridge + relay keep the display-alias shape and get no
+    // catalog line. Vendors without a bundled catalog keep today's behavior.
+    // The stale line is evicted by `write_codex_canonical_fields` on every
+    // canonicalize, so switching away from passthrough (or to a non-catalog
+    // vendor) can't leave a dangling pointer.
+    let catalog_template = if responses_passthrough {
+        codex_catalog::template_for_url(&base_url)
+    } else {
+        None
+    };
+    if let Some(template_str) = catalog_template {
+        let catalog_path = codex_catalog::models_json_path();
+        let template = serde_json::from_str(template_str).unwrap_or_default();
+        // Stamp the SELECTED model onto the vendor capability template and
+        // write a single-entry catalog — we never enumerate a vendor's model
+        // versions, so `deepseek-v5-flash` / `mimo-v2.6` need no bundled
+        // asset change.
+        let catalog = codex_catalog::build_catalog(
+            &template,
+            model_id,
+            model_info.name.as_deref().unwrap_or(model_id),
+            context_window,
+        );
+        // Only add the config line if the file write succeeded — a dangling
+        // model_catalog_json pointing at a missing file makes Codex error on
+        // startup.
+        if write_json_file(&catalog_path, &catalog).is_ok() {
+            new_content = toml_write_top(
+                &new_content,
+                "model_catalog_json",
+                &catalog_path.to_string_lossy(),
+            );
+        }
+    } else {
+        // Leaving catalog mode (passthrough off, or a non-bundled vendor):
+        // the canonical write evicted the `model_catalog_json` line, so Codex
+        // no longer reads the file. Delete the stale file at OUR canonical
+        // path so the switch is disk-clean too — but ONLY when the previous
+        // config actually referenced OUR canonical path. A user's own catalog
+        // pointed at a different path (e.g. MiniMax docs' custom-catalog.json)
+        // must not trigger deletion of our file, and a config that never
+        // mentioned a catalog must leave whatever's on disk alone.
+        let catalog_path = codex_catalog::models_json_path();
+        if codex_catalog_referenced(&existing, &catalog_path.to_string_lossy())
+            && catalog_path.exists()
+        {
+            let _ = fs::remove_file(&catalog_path);
+        }
+    }
 
     // Only write if content actually changed — avoids touching mtime
     // for no-op applies and avoids unnecessary fs traffic.
@@ -4741,6 +4817,50 @@ mod tests {
             DEFAULT_CODEX_CONTEXT_WINDOW,
         );
         assert!(!out.contains("review_model"));
+    }
+
+    #[test]
+    fn write_codex_canonical_fields_evicts_stale_model_catalog_json() {
+        // Regression: `model_catalog_json` is conditional (apply_codex writes
+        // it only for Responses passthrough + bundled-vendor catalogs). After
+        // switching back to bridge mode — or to a non-catalog vendor — the
+        // stale line must not survive, or config.toml points at a catalog that
+        // no longer matches the selected model. Same never-delete-helper
+        // problem as review_model: the canonical write owns the eviction.
+        let stale = "model_provider = \"OpenAI\"\n\
+                     model = \"gpt-5.5\"\n\
+                     model_catalog_json = \"C:/Users/x/.codex/models.json\"\n\
+                     [model_providers.OpenAI]\n\
+                     name = \"OpenAI\"\n";
+        let out = write_codex_canonical_fields(
+            stale,
+            "http://127.0.0.1:53682/v1",
+            "gpt-5.5",
+            DEFAULT_CODEX_CONTEXT_WINDOW,
+        );
+        assert!(
+            !out.contains("model_catalog_json"),
+            "stale model_catalog_json survived: {out}"
+        );
+    }
+
+    #[test]
+    fn codex_catalog_referenced_matches_only_our_canonical_path() {
+        // Our absolute forward-slash form.
+        let ours = "C:/Users/x/.codex/models.json";
+        let abs = "model_provider = \"OpenAI\"\n\
+                   model_catalog_json = \"C:/Users/x/.codex/models.json\"\n\
+                   [model_providers.OpenAI]\n";
+        assert!(codex_catalog_referenced(abs, ours));
+        // Vendor-doc tilde shorthand resolves to the same file.
+        let tilde = "model_catalog_json = \"~/.codex/models.json\"\n";
+        assert!(codex_catalog_referenced(tilde, ours));
+        // A user's own catalog pointed at a DIFFERENT path must NOT match.
+        let other_path = "model_catalog_json = \"~/.codex/model-catalogs/custom-catalog.json\"\n";
+        assert!(!codex_catalog_referenced(other_path, ours));
+        // Config with no catalog line must not match.
+        let no_line = "model = \"gpt-5.5\"\n[model_providers.OpenAI]\n";
+        assert!(!codex_catalog_referenced(no_line, ours));
     }
 
     fn claudecode_model_info(relay_mode: Option<bool>) -> ModelInfo {
