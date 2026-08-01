@@ -1,6 +1,6 @@
 {
-  "version": "5.5.9",
-  "releaseDate": "2026-07-31",
+  "version": "5.6.0",
+  "releaseDate": "2026-08-01",
   "releaseNotes": "本次更新主题:deepseek-v4-flash 支持接入 Codex ,并完美支持各项功能。\n\n## 新增\n\n- Codex 原生 Responses 直连时,自动为 DeepSeek / MiniMax / MiMo 写入模型目录(models.json),Codex 能正确识别所选模型的上下文窗口、推理等级与工具能力;切换新版本模型无需任何手动配置。\n\n## 修复\n\n- 修复「我的 AI 生涯」Claude 家族中,内部自动压缩/摘要会话被当成普通对话记录展示的问题;无真实用户消息的内部子任务不再计入会话列表。\n\n## 说明\n\n- Codex 模型目录仅对 DeepSeek / MiniMax / MiMo 三个厂商(按网址域名识别)生效,且需开启 Responses 开关;其余厂商仍走代理桥接,行为不变。",
   "releaseNotesI18n": {
     "zh-cn": "本次更新主题:deepseek-v4-flash 支持接入 Codex ,并完美支持各项功能。\n\n## 新增\n\n- Codex 原生 Responses 直连时,自动为 DeepSeek / MiniMax / MiMo 写入模型目录(models.json),Codex 能正确识别所选模型的上下文窗口、推理等级与工具能力;切换新版本模型无需任何手动配置。\n\n## 修复\n\n- 修复「我的 AI 生涯」Claude 家族中,内部自动压缩/摘要会话被当成普通对话记录展示的问题;无真实用户消息的内部子任务不再计入会话列表。\n\n## 说明\n\n- Codex 模型目录仅对 DeepSeek / MiniMax / MiMo 三个厂商(按网址域名识别)生效,且需开启 Responses 开关;其余厂商仍走代理桥接,行为不变。",
