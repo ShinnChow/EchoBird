@@ -95,11 +95,12 @@ jobs:
 
       # The GitHub release body is hand-written per release and has drifted to
       # Chinese-only since v5.5.8, while the manifest's `releaseNotesI18n` always
-      # carries an English translation. Sync the release body to a bilingual
-      # 中文 + English version built from the manifest so the releases page stops
-      # falling out of step with the in-app changelog. This overwrites the body
-      # with the canonical bilingual notes — the manifest is the single source of
-      # truth for release notes on both surfaces.
+      # carries an English translation. Sync the release body to a collapsible
+      # GFM `<details>` layout (one block per language, click to expand) built
+      # from the manifest so the releases page stops falling out of step with the
+      # in-app changelog and doesn't dump a wall of text on first load. This
+      # overwrites the body with the canonical bilingual notes — the manifest is
+      # the single source of truth for release notes on both surfaces.
       - name: Sync GitHub release body from manifest i18n
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -119,13 +120,14 @@ jobs:
             exit 0
           fi
           {
-            printf '## 中文\n\n'
+            printf '<details><summary>中文</summary>\n\n'
             printf '%s\n' "$ZH"
-            printf '\n---\n\n## English\n\n'
+            printf '\n</details>\n\n<details><summary>English</summary>\n\n'
             printf '%s\n' "$EN"
+            printf '\n</details>'
           } > body.md
           gh release edit "$TAG" --repo "$REPO" --notes-file body.md
-          echo "Synced bilingual release body for $TAG"
+          echo "Synced collapsible release body for $TAG"
 
       - name: Commit and push
         env:
