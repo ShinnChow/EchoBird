@@ -93,6 +93,40 @@ jobs:
           fi
           mv "$TMP" "$MANIFEST"
 
+      # The GitHub release body is hand-written per release and has drifted to
+      # Chinese-only since v5.5.8, while the manifest's `releaseNotesI18n` always
+      # carries an English translation. Sync the release body to a bilingual
+      # 中文 + English version built from the manifest so the releases page stops
+      # falling out of step with the in-app changelog. This overwrites the body
+      # with the canonical bilingual notes — the manifest is the single source of
+      # truth for release notes on both surfaces.
+      - name: Sync GitHub release body from manifest i18n
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          MANIFEST="docs/api/version/index.json"
+          if ! gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "Release $TAG not found; skipping body sync."
+            exit 0
+          fi
+          ZH="$(jq -r '.releaseNotesI18n["zh-cn"] // empty' "$MANIFEST")"
+          EN="$(jq -r '.releaseNotesI18n.en // empty' "$MANIFEST")"
+          if [ -z "$EN" ]; then
+            echo "No English notes in manifest; skipping body sync."
+            exit 0
+          fi
+          {
+            printf '## 中文\n\n'
+            printf '%s\n' "$ZH"
+            printf '\n---\n\n## English\n\n'
+            printf '%s\n' "$EN"
+          } > body.md
+          gh release edit "$TAG" --repo "$REPO" --notes-file body.md
+          echo "Synced bilingual release body for $TAG"
+
       - name: Commit and push
         env:
           TAG_NAME: ${{ steps.tag.outputs.tag }}
