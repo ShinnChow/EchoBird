@@ -13,6 +13,4 @@ export const FRONTEND_HINTS: MotherHint[] = [
   { action: 'setClaudeLocale' },
   // Set ChatGPT UI language — text: `mother.hintSetCodexLocale`.
   { action: 'setCodexLocale' },
-  // Find & add ChatGPT plugin marketplaces — text: `mother.hintUnlockCodexPlugins`.
-  { action: 'unlockCodexPlugins' },
 ];

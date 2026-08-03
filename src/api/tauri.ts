@@ -61,8 +61,8 @@ export interface SelfUpdateProgress {
   percent: number;
 }
 
-/// Windows-only. Downloads the installer (fastest of GitHub / echobird.cn),
-/// launches its wizard, then exits so the installer can replace our files.
+/// Windows-only. Downloads the installer from GitHub releases, launches its
+/// wizard, then exits so the installer can replace our files.
 /// Rejects on non-Windows or download failure — the caller falls back to
 /// opening the download page in the browser.
 export async function downloadAndInstallUpdate(version: string): Promise<void> {

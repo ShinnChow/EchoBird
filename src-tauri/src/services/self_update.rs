@@ -1,7 +1,7 @@
 //! In-app self-update (Windows) — DIY flow.
 //!
-//! Download the installer (whichever of GitHub releases vs the echobird.cn
-//! mirror responds fastest), launch its wizard, then exit so the installer can
+//! Download the installer from GitHub releases, launch its wizard, then exit
+//! so the installer can
 //! replace our files. The user clicks through the official installer; there is
 //! NO silent run and NO signature verification here — the signed + silent +
 //! auto-relaunch alternative is `tauri-plugin-updater`, deliberately not adopted
@@ -36,20 +36,19 @@ fn emit(app: &AppHandle, status: &'static str, percent: u8) {
 }
 
 /// Windows x64 installer asset name — the only in-app update target. Matches
-/// the released asset on BOTH hosts (GitHub + echobird.cn use the same name).
+/// the released asset on GitHub.
 #[cfg(target_os = "windows")]
 fn installer_asset(version: &str) -> String {
     format!("EchoBird_{version}_Windows_x64-setup.exe")
 }
 
-/// Download candidates: GitHub releases first, echobird.cn mirror second.
-/// Order is only a tiebreak — `pick_fastest` actually times both.
+/// Download candidate: GitHub releases is the only source now.
+/// `pick_fastest` probes it and falls back to it if unreachable.
 #[cfg(target_os = "windows")]
 fn candidate_urls(version: &str, asset: &str) -> Vec<String> {
-    vec![
-        format!("https://github.com/edison7009/EchoBird/releases/download/v{version}/{asset}"),
-        format!("https://echobird.cn/download/downloads/{asset}"),
-    ]
+    vec![format!(
+        "https://github.com/edison7009/EchoBird/releases/download/v{version}/{asset}"
+    )]
 }
 
 /// Time a tiny ranged GET from each URL; return the fastest that responds.

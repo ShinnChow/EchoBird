@@ -70,19 +70,11 @@ const QUICK_ACTION_DETECT_CUDA: &str = include_str!("../../assets/quick-actions/
 /// rationale as [`QUICK_ACTION_NETWORK_INFO`].
 const QUICK_ACTION_INSTALL_CUDA: &str = include_str!("../../assets/quick-actions/install-cuda.md");
 
-/// Quick-Action: "Find & Add Codex Plugin Marketplaces" task script.
-/// Drives the Mother Agent flow that discovers GitHub plugin
-/// marketplaces (repos with `.agents/plugins/marketplace.json`) and
-/// surgically adds them to `~/.codex/config.toml`. Same rationale as
-/// [`QUICK_ACTION_NETWORK_INFO`].
-const QUICK_ACTION_CODEX_PLUGINS: &str =
-    include_str!("../../assets/quick-actions/codex-plugins.md");
-
 /// Quick-Action: "Help me install Git" task script. winget first on
 /// Windows with the npmmirror git-for-windows binary mirror as the
 /// mainland-network fallback; brew / xcode-select on macOS; distro
 /// package managers on Linux. Git is a prerequisite the website
-/// promises we can install (and the codex-plugins flow needs it).
+/// promises we can install.
 /// Internal-only by the same rationale as [`QUICK_ACTION_NETWORK_INFO`].
 const QUICK_ACTION_INSTALL_GIT: &str = include_str!("../../assets/quick-actions/install-git.md");
 
@@ -130,7 +122,6 @@ pub fn get_tool_script(name: &str) -> Option<&'static str> {
         "detect-cuda" => Some(QUICK_ACTION_DETECT_CUDA),
         "install-cuda" => Some(QUICK_ACTION_INSTALL_CUDA),
         "install-git" => Some(QUICK_ACTION_INSTALL_GIT),
-        "codex-plugins" => Some(QUICK_ACTION_CODEX_PLUGINS),
         _ => None,
     }
 }
@@ -195,7 +186,6 @@ pub fn build_embedded_refs_section() -> String {
         "detect-cuda",
         "install-cuda",
         "install-git",
-        "codex-plugins",
     ] {
         if let Some(md) = get_tool_script(name) {
             out.push_str(&format!(

@@ -271,7 +271,6 @@ export type TKey =
   | 'mother.hintInstallCuda'
   | 'mother.hintInstallGit'
   | 'mother.hintSetCodexLocale'
-  | 'mother.hintUnlockCodexPlugins'
   | 'mother.hintSetClaudeLocale'
   | 'mother.enterMessage'
   | 'mother.servers'

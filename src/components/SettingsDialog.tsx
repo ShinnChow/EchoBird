@@ -159,10 +159,9 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   }, [isOpen, handleClose]);
 
   // Auto-check for updates when the dialog opens — no manual button. Version
-  // truth is the canonical manifest (echobird.ai/api/version/index.json); the
-  // China route is a download MIRROR only, so we never parse a second version
-  // source. Any failure (offline / unreachable) silently stays on "latest" —
-  // no error UI, just no update offered.
+  // truth is the canonical manifest (echobird.ai/api/version/index.json). Any
+  // failure (offline / unreachable) silently stays on "latest" — no error UI,
+  // just no update offered.
   useEffect(() => {
     if (!isOpen || !appVersion) return;
     let cancelled = false;
@@ -189,12 +188,10 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
   // Click "Update to vX": on Windows, download + launch the installer in-app
   // (the app exits as the wizard opens); elsewhere — or if the download fails —
-  // open the locale-routed download page in the browser instead.
+  // open the download page in the browser instead.
   const handleUpdate = useCallback(async () => {
     if (!latestVersion) return;
-    const downloadPage = locale.startsWith('zh')
-      ? 'https://echobird.cn/download/'
-      : 'https://echobird.ai/';
+    const downloadPage = 'https://echobird.ai/';
     if (!navigator.userAgent.includes('Windows')) {
       await api.openExternal(downloadPage);
       return;
@@ -218,7 +215,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     } finally {
       unlisten?.();
     }
-  }, [latestVersion, locale]);
+  }, [latestVersion]);
 
   if (!isOpen) return null;
 

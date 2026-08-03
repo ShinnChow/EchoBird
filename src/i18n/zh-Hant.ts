@@ -334,7 +334,6 @@ const zhHant: Partial<Translations> = {
   'mother.hintInstallCuda': '幫我安裝 CUDA 模組',
   'mother.hintInstallGit': '幫我安裝 Git',
   'mother.hintSetCodexLocale': '設定 ChatGPT 為繁體中文',
-  'mother.hintUnlockCodexPlugins': '幫我解鎖 ChatGPT 的插件',
   'mother.hintSetClaudeLocale': '設定 Claude 桌面端為繁體中文',
   'mother.parasiteTipInstalled':
     '我是 AI 助手，只有短暫的記憶和嫻熟的安裝能力，助你在 AI 領域啟航。如果你的 Claude Code 配好了模型，在右側選擇它繼續和你對話。',

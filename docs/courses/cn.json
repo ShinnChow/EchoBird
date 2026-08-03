@@ -2,13 +2,6 @@
   "categories": ["AI 创业", "AI 编程", "Prompt 与 Agent", "学习平台"],
   "courses": [
     {
-      "id": "cn-echobird-codex-marketplace",
-      "name": "Codex 中文插件市场",
-      "url": "https://echobird.cn/",
-      "description": "主打纯简体中文技能,告别英文的困扰;复制 git 地址一键添加,还能帮你发布你开发的技能",
-      "category": "AI 编程"
-    },
-    {
       "id": "cn-echobird-openrouter-guide",
       "name": "白嫖 OpenRouter 免费模型",
       "url": "https://echobird.ai/openrouter/",
