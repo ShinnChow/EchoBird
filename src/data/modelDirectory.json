@@ -129,16 +129,14 @@
       "url": "https://console.bce.baidu.com/qianfan/",
       "baseUrl": "https://qianfan.baidubce.com/v2/coding",
       "anthropicUrl": "https://qianfan.baidubce.com/anthropic/coding",
-      "modelId": "kimi-k2.5",
+      "modelId": "deepseek-v4-pro",
       "modelIds": [
-        "kimi-k2.5",
-        "deepseek-v3.2",
-        "glm-5",
-        "minimax-m2.5",
-        "ernie-4.5-turbo-20260402",
         "deepseek-v4-pro",
         "deepseek-v4-flash",
-        "glm-5.1"
+        "glm-5.2",
+        "glm-5.1",
+        "kimi-k2.6",
+        "ernie-5.1"
       ],
       "region": "cn"
     },
