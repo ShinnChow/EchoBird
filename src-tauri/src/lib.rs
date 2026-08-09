@@ -116,6 +116,10 @@ static BUNDLED: BundledAssets = BundledAssets {
             include_str!("../../docs/api/tools/install/cursor.json"),
         ),
         (
+            "clashverge",
+            include_str!("../../docs/api/tools/install/clashverge.json"),
+        ),
+        (
             "trae",
             include_str!("../../docs/api/tools/install/trae.json"),
         ),
