@@ -1,0 +1,28 @@
+{
+    "id": "kilo",
+    "displayName": "Kilo Code (CLI)",
+    "homepage": "https://kilo.ai",
+    "docs": "https://kilo.ai/docs/cli",
+    "github": "https://github.com/Kilo-Org/kilocode",
+    "install": {
+        "curl (macOS / Linux — recommended)": "curl -fsSL https://kilo.ai/cli/install | bash",
+        "npm (all platforms)": "npm install -g @kilocode/cli",
+        "note": "CLI coding agent by Kilo, forked from OpenCode. The binary is `kilo` (curl installs to ~/.kilo/bin and updates PATH; restart the shell or source the rc file before verifying). Windows: use npm or the GitHub Releases binary. Do NOT install `opencode-ai` — Kilo Code is a separate product with its own npm package `@kilocode/cli`."
+    },
+    "network_requirements": {
+        "test_urls": [
+            "https://kilo.ai",
+            "https://github.com/Kilo-Org/kilocode"
+        ],
+        "blocked_regions": {
+            "zh-CN": "kilo.ai is reachable in mainland China, but the curl installer downloads the binary from GitHub Releases, which is unreliable there. If the curl install stalls or fails, use npm instead: `npm install -g @kilocode/cli --registry=https://registry.npmmirror.com`."
+        },
+        "mirrors": {}
+    },
+    "first_run": {
+        "description": "On first launch `kilo` opens a TUI. To use your own provider, add an OpenAI-compatible provider block in the config file, or run /connect and pick a provider. OpenRouter, Anthropic, and any OpenAI-compatible endpoint are supported.",
+        "config_global": "~/.config/kilo/kilo.json",
+        "config_project": "kilo.json",
+        "verify": "kilo --version"
+    }
+}

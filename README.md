@@ -84,7 +84,7 @@ The tools below support **both** — install _and_ model switching — which is
 the core of what EchoBird is for:
 
 **Coding CLIs** — Claude Code · Codex CLI (OpenAI) · Grok Build (xAI) ·
-Kimi Code (Moonshot) · Qwen Code · Aider · OpenCode · MiMo Code (Xiaomi) ·
+Kimi Code (Moonshot) · Qwen Code · Aider · OpenCode · MiMo Code (Xiaomi) · Kilo Code ·
 ZCode (Z.AI) · OpenClaw · Pi · OpenScience · Vibe-Trading
 
 **Desktop apps** — Claude Desktop (3P profile) · ChatGPT desktop ·

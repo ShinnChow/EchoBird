@@ -80,7 +80,7 @@ provider,任意支持的工具都能指向它;不用手改 TOML / JSON,不用每
 以下工具**同时**支持安装与切换模型 —— 这是 EchoBird 的核心:
 
 **编程 CLI** —— Claude Code · Codex CLI(OpenAI) · Grok Build(xAI) ·
-Kimi Code(月之暗面) · Qwen Code · Aider · OpenCode · MiMo Code(小米) ·
+Kimi Code(月之暗面) · Qwen Code · Aider · OpenCode · MiMo Code(小米) · Kilo Code ·
 ZCode(Z.AI) · OpenClaw · Pi · OpenScience · Vibe-Trading
 
 **桌面应用** —— Claude Desktop(第三方 profile) · ChatGPT 桌面版 ·

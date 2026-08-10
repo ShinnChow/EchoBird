@@ -526,16 +526,20 @@ impl ProcessManager {
         // Build the final command with tool-specific args
         let mut full_command = command.to_string();
 
-        // MiMo Code keeps no ~/.echobird relay file — pull the selection from
-        // its native config so it gets the same --model injection as OpenCode.
+        // MiMo Code / Kilo Code keep no ~/.echobird relay file — pull the
+        // selection from their native config so they get the same --model
+        // injection as OpenCode.
         if tool_id == "mimocode" {
             model_id = crate::services::tool_config_manager::mimocode_echobird_model();
+        }
+        if tool_id == "kilo" {
+            model_id = crate::services::tool_config_manager::kilo_echobird_model();
         }
 
         // OpenCode family: append --model echobird/{modelId} to force model
         // selection (beats project-level config and the TUI's recent-model
         // history, both of which can override the global config's `model`).
-        if matches!(tool_id, "opencode" | "mimocode") {
+        if matches!(tool_id, "opencode" | "mimocode" | "kilo") {
             if let Some(ref mid) = model_id {
                 full_command = format!("{} --model echobird/{}", command, mid);
             }

@@ -138,6 +138,7 @@ pub const INSTALLABLE_TOOL_IDS: &[&str] = &[
     "openclaw",
     "opencode",
     "mimocode",
+    "kilo",
     "kimicode",
     "claudedesktop",
     "chatgptdesktop",

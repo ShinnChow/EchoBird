@@ -1192,11 +1192,13 @@ async fn build_system_prompt(request: &AgentRequest, ssh_pool: &SSHPool) -> Stri
         | OpenCode | Charm/Anomaly | `opencode-ai` | opencode |\n\
         | OpenClaw | Community | `openclaw` | openclaw |\n\
         | MiMo Code | Xiaomi | `@mimo-ai/cli` | mimo |\n\
+        | Kilo Code | Kilo | `@kilocode/cli` | kilo |\n\
         | Kimi Code | Moonshot AI | `@moonshot-ai/kimi-code` | kimi |\n\
         When the user says 'install Codex', install `@openai/codex`. Do NOT install Claude Code.\n\
         When the user says 'install Claude Code', install via `irm https://claude.ai/install.ps1 | iex` (Windows) or `curl -fsSL https://claude.ai/install.sh | bash`. Do NOT install Codex.\n\
         When the user says 'install OpenCode', install `opencode-ai`. Do NOT install Codex or Claude Code.\n\
         When the user says 'install MiMo Code', install `@mimo-ai/cli` (or `curl -fsSL https://mimo.xiaomi.com/install | bash` on macOS/Linux). It is a fork of OpenCode but a SEPARATE product — do NOT install `opencode-ai`.\n\
+        When the user says 'install Kilo Code', install `@kilocode/cli` (or `curl -fsSL https://kilo.ai/cli/install | bash` on macOS/Linux). It is a fork of OpenCode but a SEPARATE product — do NOT install `opencode-ai`.\n\
         When the user says 'install Kimi Code', install `@moonshot-ai/kimi-code` (or `curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash` on macOS/Linux, `brew install kimi-code`). It is built on Pi's pi-tui but a SEPARATE product — do NOT install `pi` or `@earendil-works/pi-coding-agent`.\n\
         ALWAYS read the tool's install JSON first from the **Embedded Install References** section appended below — do NOT `web_fetch` echobird.ai for these (they are already in this prompt).\n\n\
         ## Rules\n\
@@ -1304,7 +1306,7 @@ Do NOT offer WSL2 as a workaround.\n\
         - OpenClaw remote: npm uninstall -g openclaw && pkill -f 'openclaw gateway' || true\n\
         - NEVER delete ~/.openclaw/openclaw.json unless user explicitly requests -- it contains the channel pairing token.\n\n\
         ## Tool Install Reference\n\
-        When the user asks to install any tool, ALWAYS read the install reference from the **Embedded Install References** section appended at the end of this system prompt — it contains the install JSON for every supported tool (openclaw, opencode, mimocode, kimicode, claudecode, claudescience, openscience, codex, hermes, grok, workbuddy, zcode).\n\
+        When the user asks to install any tool, ALWAYS read the install reference from the **Embedded Install References** section appended at the end of this system prompt — it contains the install JSON for every supported tool (openclaw, opencode, mimocode, kilo, kimicode, claudecode, claudescience, openscience, codex, hermes, grok, workbuddy, zcode).\n\
         Do NOT `web_fetch` `https://echobird.ai/api/tools/install/...` — that content is already embedded in this prompt and works offline.\n\
         Only fall back to `web_fetch` on the tool's official site when the requested tool is NOT in the embedded list.\n\n\
         ## Network Pre-Check (MANDATORY Before Installation)\n\
@@ -1436,6 +1438,7 @@ enum AgentTarget {
     OpenClaw,
     OpenCode,
     MiMoCode,
+    KiloCode,
     KimiCode,
     ClaudeCode,
     Codex,
@@ -1447,6 +1450,7 @@ impl AgentTarget {
             Self::OpenClaw => "OpenClaw",
             Self::OpenCode => "OpenCode",
             Self::MiMoCode => "MiMo Code",
+            Self::KiloCode => "Kilo Code",
             Self::KimiCode => "Kimi Code",
             Self::ClaudeCode => "Claude Code",
             Self::Codex => "Codex CLI",
@@ -1457,6 +1461,7 @@ impl AgentTarget {
             Self::OpenClaw => "npm install -g openclaw",
             Self::OpenCode => "npm install -g opencode-ai",
             Self::MiMoCode => "npm install -g @mimo-ai/cli  (or  curl -fsSL https://mimo.xiaomi.com/install | bash)",
+            Self::KiloCode => "npm install -g @kilocode/cli  (or  curl -fsSL https://kilo.ai/cli/install | bash)",
             Self::KimiCode => "npm install -g @moonshot-ai/kimi-code  (or  curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash)",
             Self::ClaudeCode => "curl -fsSL https://claude.ai/install.sh | bash  (or  npm install -g @anthropic-ai/claude-code)",
             Self::Codex => "npm install -g @openai/codex",
@@ -1496,6 +1501,12 @@ fn detect_user_intent(messages: &[Message]) -> Option<AgentTarget> {
         // usually refers to the MiMo model/API, not the CLI (skip-on-uncertainty).
         if text.contains("mimocode") || text.contains("mimo code") || text.contains("mimo-code") {
             return Some(AgentTarget::MiMoCode);
+        }
+        // Kilo Code: bare "kilo" deliberately NOT matched — it usually refers
+        // to the Kilo platform/model, not the CLI (skip-on-uncertainty, same
+        // as mimo).
+        if text.contains("kilocode") || text.contains("kilo code") || text.contains("kilo-code") {
+            return Some(AgentTarget::KiloCode);
         }
         // Kimi Code: bare "kimi" deliberately NOT matched — it usually refers
         // to the Kimi model/API, not the CLI (skip-on-uncertainty, same as mimo).
@@ -1547,6 +1558,9 @@ fn detect_command_target(command: &str) -> Option<AgentTarget> {
     }
     if cmd.contains("@mimo-ai/cli") || cmd.contains("mimo.xiaomi.com/install") {
         return Some(AgentTarget::MiMoCode);
+    }
+    if cmd.contains("@kilocode/cli") || cmd.contains("kilo.ai/cli/install") {
+        return Some(AgentTarget::KiloCode);
     }
     if cmd.contains("@moonshot-ai/kimi-code")
         || cmd.contains("code.kimi.com/kimi-code/install")
