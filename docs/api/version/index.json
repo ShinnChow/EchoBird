@@ -1,11 +1,11 @@
 {
   "version": "5.6.1",
   "releaseDate": "2026-08-09",
-  "releaseNotes": "本次更新主题:新增「Clash Verge」工具安装支持。\n\n## 新增\n\n- 应用管理新增「Clash Verge」工具:一键安装/卸载,自动适配各系统版本(GitHub Release / WinGet / DEB / RPM / macOS),无需手动处理不同平台的安装方式。",
+  "releaseNotes": "本次更新主题:新增「Kilo Code」工具支持。\n\n## 新增\n\n- 应用管理新增「Kilo Code」工具:CLI 编程助手(Kilo 出品,基于 OpenCode),支持一键安装、自动检测、模型配置。可通过 OpenRouter / Anthropic / 任意 OpenAI 兼容端点使用模型。\n- 优化了通过聚合服务(如 OpenRouter)使用模型时的应用识别兼容性。",
   "releaseNotesI18n": {
-    "zh-cn": "本次更新主题:新增「Clash Verge」工具安装支持。\n\n## 新增\n\n- 应用管理新增「Clash Verge」工具:一键安装/卸载,自动适配各系统版本(GitHub Release / WinGet / DEB / RPM / macOS),无需手动处理不同平台的安装方式。",
-    "en": "Theme of this update: add Clash Verge install support.\n\n## New\n\n- New \"Clash Verge\" tool in App Management: one-click install/uninstall with automatic detection of each OS package (GitHub Release / WinGet / DEB / RPM / macOS) — no manual handling of platform-specific installers.",
-    "zh-tw": "本次更新主題:新增「Clash Verge」工具安裝支援。\n\n## 新增\n\n- 應用管理新增「Clash Verge」工具:一鍵安裝／解除安裝,自動適配各系統版本(GitHub Release / WinGet / DEB / RPM / macOS),無需手動處理不同平台的安裝方式。",
-    "ja": "今回のアップデートのテーマ:「Clash Verge」ツールのインストール対応を追加しました。\n\n## 追加\n\n- アプリ管理に「Clash Verge」ツールを新規追加:ワンクリックでインストール／アンインストールでき、各 OS のパッケージ(GitHub Release / WinGet / DEB / RPM / macOS)を自動判別します。プラットフォームごとのインストーラーを手動で用意する必要はありません。"
+    "zh-cn": "本次更新主题:新增「Kilo Code」工具支持。\n\n## 新增\n\n- 应用管理新增「Kilo Code」工具:CLI 编程助手(Kilo 出品,基于 OpenCode),支持一键安装、自动检测、模型配置。可通过 OpenRouter / Anthropic / 任意 OpenAI 兼容端点使用模型。\n- 优化了通过聚合服务(如 OpenRouter)使用模型时的应用识别兼容性。",
+    "en": "Theme of this update: add Kilo Code tool support.\n\n## New\n\n- New \"Kilo Code\" tool in App Management: a CLI coding agent by Kilo (built on OpenCode) with one-click install, auto-detection, and model configuration. Works with OpenRouter / Anthropic / any OpenAI-compatible endpoint.\n- Improved app-attribution compatibility when using models through aggregators such as OpenRouter.",
+    "zh-tw": "本次更新主題:新增「Kilo Code」工具支援。\n\n## 新增\n\n- 應用管理新增「Kilo Code」工具:CLI 程式設計助手(Kilo 出品,基於 OpenCode),支援一鍵安裝、自動偵測、模型設定。可透過 OpenRouter / Anthropic / 任意 OpenAI 相容端點使用模型。\n- 改善了透過聚合服務(如 OpenRouter)使用模型時的應用識別相容性。",
+    "ja": "今回のアップデートのテーマ:「Kilo Code」ツールの対応を追加しました。\n\n## 追加\n\n- アプリ管理に「Kilo Code」ツールを新規追加:CLI コーディングエージェント(Kilo 製、OpenCode ベース)で、ワンクリックインストール、自動検出、モデル設定に対応。OpenRouter / Anthropic / 任意の OpenAI 互換エンドポイントでモデルを利用できます。\n- OpenRouter などのアグリゲーター経由でモデルを利用する際のアプリ識別の互換性を改善しました。"
   }
 }
