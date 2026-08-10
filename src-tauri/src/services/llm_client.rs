@@ -227,16 +227,19 @@ impl LlmClient {
             headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
             headers.insert(AUTHORIZATION, auth_value.clone());
             // App-identification for usage-analytics aggregators. OpenRouter
-            // introduced HTTP-Referer + X-Title and Helicone / LangSmith /
-            // similar proxies copied the convention — these headers let
-            // those dashboards attribute traffic to EchoBird instead of
-            // bucketing it as "unknown". Endpoints that don't recognize
-            // them silently ignore both fields, so safe to send always.
+            // introduced HTTP-Referer + X-Title (now X-OpenRouter-Title) and
+            // Helicone / LangSmith / similar proxies copied the convention —
+            // these headers let those dashboards attribute traffic to
+            // EchoBird instead of bucketing it as "unknown". OpenRouter still
+            // accepts X-Title as a backwards-compatible alias, so we send both
+            // the old and new names; endpoints that don't recognize them
+            // silently ignore them, so safe to send always.
             headers.insert(
                 "HTTP-Referer",
                 HeaderValue::from_static("https://echobird.ai"),
             );
             headers.insert("X-Title", HeaderValue::from_static("EchoBird"));
+            headers.insert("X-OpenRouter-Title", HeaderValue::from_static("EchoBird"));
             Ok(http.post(&url_owned).headers(headers).json(&body_owned))
         };
 
