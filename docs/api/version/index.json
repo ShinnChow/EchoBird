@@ -1,11 +1,11 @@
 {
   "version": "5.6.2",
   "releaseDate": "2026-08-10",
-  "releaseNotes": "本次更新主题:新增「Kilo Code」工具支持。\n\n## 新增\n\n- 应用管理新增「Kilo Code」工具:CLI 编程助手(Kilo 出品,基于 OpenCode),支持一键安装、自动检测、模型配置。可通过 OpenRouter / Anthropic / 任意 OpenAI 兼容端点使用模型。\n- 优化了通过聚合服务(如 OpenRouter)使用模型时的应用识别兼容性。",
+  "releaseNotes": "本次更新主题:模型中心支持拖拽排序,可自定义模型展示顺序。\n\n## 新增\n\n- 「模型中心」支持拖拽排序:长按模型卡片左上角的拖拽手柄即可调整顺序,顺序会自动保存,下次启动依然生效。\n- 优化了拖拽时的卡片跟随与边缘自动滚动体验。\n- 更新了 Compshare 模型列表,并精简其显示名称。\n\n## 修复\n\n- 修复了模型卡片在拖拽过程中被裁剪、无法移动到窗口边缘的问题。\n\n## 其它\n\n- 更新了 Kilo 与 Coffee CLI 的工具图标。",
   "releaseNotesI18n": {
-    "zh-cn": "本次更新主题:新增「Kilo Code」工具支持。\n\n## 新增\n\n- 应用管理新增「Kilo Code」工具:CLI 编程助手(Kilo 出品,基于 OpenCode),支持一键安装、自动检测、模型配置。可通过 OpenRouter / Anthropic / 任意 OpenAI 兼容端点使用模型。\n- 优化了通过聚合服务(如 OpenRouter)使用模型时的应用识别兼容性。",
-    "en": "Theme of this update: add Kilo Code tool support.\n\n## New\n\n- New \"Kilo Code\" tool in App Management: a CLI coding agent by Kilo (built on OpenCode) with one-click install, auto-detection, and model configuration. Works with OpenRouter / Anthropic / any OpenAI-compatible endpoint.\n- Improved app-attribution compatibility when using models through aggregators such as OpenRouter.",
-    "zh-tw": "本次更新主題:新增「Kilo Code」工具支援。\n\n## 新增\n\n- 應用管理新增「Kilo Code」工具:CLI 程式設計助手(Kilo 出品,基於 OpenCode),支援一鍵安裝、自動偵測、模型設定。可透過 OpenRouter / Anthropic / 任意 OpenAI 相容端點使用模型。\n- 改善了透過聚合服務(如 OpenRouter)使用模型時的應用識別相容性。",
-    "ja": "今回のアップデートのテーマ:「Kilo Code」ツールの対応を追加しました。\n\n## 追加\n\n- アプリ管理に「Kilo Code」ツールを新規追加:CLI コーディングエージェント(Kilo 製、OpenCode ベース)で、ワンクリックインストール、自動検出、モデル設定に対応。OpenRouter / Anthropic / 任意の OpenAI 互換エンドポイントでモデルを利用できます。\n- OpenRouter などのアグリゲーター経由でモデルを利用する際のアプリ識別の互換性を改善しました。"
+    "zh-cn": "本次更新主题:模型中心支持拖拽排序,可自定义模型展示顺序。\n\n## 新增\n\n- 「模型中心」支持拖拽排序:长按模型卡片左上角的拖拽手柄即可调整顺序,顺序会自动保存,下次启动依然生效。\n- 优化了拖拽时的卡片跟随与边缘自动滚动体验。\n- 更新了 Compshare 模型列表,并精简其显示名称。\n\n## 修复\n\n- 修复了模型卡片在拖拽过程中被裁剪、无法移动到窗口边缘的问题。\n\n## 其它\n\n- 更新了 Kilo 与 Coffee CLI 的工具图标。",
+    "en": "Theme of this update: Model Center now supports drag-to-reorder, so you can customize the order of your models.\n\n## New\n\n- Drag-to-reorder in Model Center: press and hold the drag handle at the top-left corner of a model card to rearrange it. The order is saved automatically and persists across launches.\n- Improved card-following and edge auto-scroll while dragging.\n- Updated the Compshare model list and shortened its display name.\n\n## Fixes\n\n- Fixed model cards being clipped during drag and being unable to reach the window edges.\n\n## Other\n\n- Updated the Kilo and Coffee CLI tool icons.",
+    "zh-tw": "本次更新主題:模型中心支援拖拽排序,可自訂模型展示順序。\n\n## 新增\n\n- 「模型中心」支援拖拽排序:長按模型卡片左上角的拖拽把手即可調整順序,順序會自動儲存,下次啟動依然生效。\n- 優化了拖拽時的卡片跟隨與邊緣自動捲動體驗。\n- 更新了 Compshare 模型清單,並精簡其顯示名稱。\n\n## 修復\n\n- 修復了模型卡片在拖拽過程中被裁切、無法移動到視窗邊緣的問題。\n\n## 其它\n\n- 更新了 Kilo 與 Coffee CLI 的工具圖示。",
+    "ja": "今回のアップデートのテーマ:モデルセンターでドラッグ並べ替えに対応し、モデルの表示順をカスタマイズできます。\n\n## 追加\n\n- モデルセンターのドラッグ並べ替え:モデルカード左上のドラッグハンドルを長押しして順序を変更できます。順序は自動保存され、次回起動時にも反映されます。\n- ドラッグ中のカード追従と端の自動スクロールの操作性を改善しました。\n- Compshare のモデルリストを更新し、表示名を短縮しました。\n\n## 修正\n\n- ドラッグ中にモデルカードが切り取られ、ウィンドウの端まで移動できない問題を修正しました。\n\n## その他\n\n- Kilo と Coffee CLI のツールアイコンを更新しました。"
   }
 }
