@@ -167,6 +167,7 @@ export type TKey =
   | 'model.countdown.minutes'
   | 'model.cloud'
   | 'model.local'
+  | 'model.dragSort'
 
   // App Manager
   | 'agent.myLocalModel'

@@ -47,6 +47,12 @@ export async function testModel(
   return invoke('test_model', { internalId, prompt, protocol });
 }
 
+/** Persist a user-defined model display order (full visible list of
+ *  internal_ids in the new order). */
+export async function reorderModels(orderedIds: string[]): Promise<boolean> {
+  return invoke('reorder_models', { orderedIds });
+}
+
 export async function pingModel(internalId: string): Promise<PingResult> {
   return invoke('ping_model', { internalId });
 }

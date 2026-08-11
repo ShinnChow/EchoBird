@@ -4,7 +4,24 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { readText as readClipboardText } from '@tauri-apps/plugin-clipboard-manager';
-import { X, Box, ExternalLink, Plus, Lock, Unlock, RefreshCw } from 'lucide-react';
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { X, Box, ExternalLink, Plus, Lock, Unlock, RefreshCw, GripVertical } from 'lucide-react';
 import { ModelCard, ModelCardSkeleton, getModelIcon, ModelIdCombobox } from '../../components';
 import { useToast } from '../../components/Toast';
 import { useI18n } from '../../hooks/useI18n';
@@ -600,6 +617,41 @@ function VolcAkskModal({
   );
 }
 
+// dnd-kit sortable wrapper for the model card grid. The grip handle at the
+// bottom-left corner is the ONLY drag surface, so the card's own clicks and
+// buttons (select / edit / delete / refresh) keep working untouched.
+function SortableModelCard({
+  id,
+  dragLabel,
+  children,
+}: {
+  id: string;
+  dragLabel: string;
+  children: React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      className={isDragging ? 'relative z-50' : 'relative'}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+    >
+      {children}
+      <button
+        {...attributes}
+        {...listeners}
+        title={dragLabel}
+        aria-label={dragLabel}
+        className="absolute bottom-2 left-2 z-10 p-0.5 text-cyber-text-muted/40 hover:text-cyber-text cursor-grab active:cursor-grabbing transition-colors outline-none"
+      >
+        <GripVertical size={14} />
+      </button>
+    </div>
+  );
+}
+
 export function ModelNexusMain() {
   const { t } = useI18n();
   const {
@@ -730,81 +782,115 @@ export function ModelNexusMain() {
     [setUserModels]
   );
 
+  // Drag-reorder: pointer (5px activation so plain clicks pass through) +
+  // keyboard (a11y). On drop, reorder in place and persist the full visible
+  // order — a failed write just reverts on next reload (best-effort).
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const activeId = String(event.active.id);
+    const overId = String(event.over?.id ?? '');
+    if (!overId || activeId === overId) return;
+    const oldIndex = userModels.findIndex((m) => m.internalId === activeId);
+    const newIndex = userModels.findIndex((m) => m.internalId === overId);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const next = arrayMove(userModels, oldIndex, newIndex);
+    setUserModels(next);
+    api.reorderModels(next.map((m) => m.internalId)).catch((err) => {
+      console.error('reorderModels failed:', err);
+    });
+  };
+
   return (
     <>
       <div className="flex-1 overflow-y-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {/* Show skeleton when loading */}
-          {isLoadingModels ? (
-            <>
-              <ModelCardSkeleton />
-              <ModelCardSkeleton />
-              <ModelCardSkeleton />
-              <ModelCardSkeleton />
-            </>
-          ) : (
-            <>
-              {/* User custom models */}
-              {userModels.map((model) => {
-                const protocols: ('openai' | 'anthropic')[] = [];
-                if (model.baseUrl) protocols.push('openai');
-                if (model.anthropicUrl) protocols.push('anthropic');
-                const isDemo = model.modelType === 'DEMO';
-                return (
-                  <ModelCard
-                    key={model.internalId}
-                    id={model.internalId}
-                    name={model.name}
-                    type={model.modelType || ''}
-                    baseUrl={model.baseUrl}
-                    anthropicUrl={model.anthropicUrl}
-                    modelId={model.modelId || ''}
-                    protocols={protocols}
-                    latency={modelLatencies[model.internalId] ?? model.openaiLatency}
-                    openaiTested={model.openaiTested}
-                    anthropicTested={model.anthropicTested}
-                    isPinging={pingingModelIds.has(model.internalId)}
-                    selected={selectedModel === model.internalId}
-                    isActive={selectedModel === model.internalId}
-                    viewMode={viewMode}
-                    usageData={modelUsageData[model.internalId]}
-                    onClick={() => handleCardClick(model)}
-                    onProtocolClick={(protocol) => handleCardProtocolClick(model, protocol)}
-                    onEdit={isDemo ? undefined : () => handleCardEdit(model)}
-                    onDelete={isDemo ? undefined : () => handleCardDelete(model.internalId)}
-                    onRefresh={() => refreshSingleUsage(model.internalId)}
-                    isRefreshingUsage={refreshingUsageIds.has(model.internalId)}
-                    onAccessKey={
-                      isVolcengineUrl(model.baseUrl, model.anthropicUrl)
-                        ? () => openAkskModal(model.internalId)
-                        : undefined
-                    }
-                    akSkMissing={volcAkSkMissingIds.has(model.internalId)}
-                  />
-                );
-              })}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {/* Show skeleton when loading */}
+            {isLoadingModels ? (
+              <>
+                <ModelCardSkeleton />
+                <ModelCardSkeleton />
+                <ModelCardSkeleton />
+                <ModelCardSkeleton />
+              </>
+            ) : (
+              <>
+                {/* User custom models (drag to reorder) */}
+                <SortableContext
+                  items={userModels.map((m) => m.internalId)}
+                  strategy={rectSortingStrategy}
+                >
+                  {userModels.map((model) => {
+                    const protocols: ('openai' | 'anthropic')[] = [];
+                    if (model.baseUrl) protocols.push('openai');
+                    if (model.anthropicUrl) protocols.push('anthropic');
+                    const isDemo = model.modelType === 'DEMO';
+                    return (
+                      <SortableModelCard
+                        key={model.internalId}
+                        id={model.internalId}
+                        dragLabel={t('model.dragSort')}
+                      >
+                        <ModelCard
+                          id={model.internalId}
+                          name={model.name}
+                          type={model.modelType || ''}
+                          baseUrl={model.baseUrl}
+                          anthropicUrl={model.anthropicUrl}
+                          modelId={model.modelId || ''}
+                          protocols={protocols}
+                          latency={modelLatencies[model.internalId] ?? model.openaiLatency}
+                          openaiTested={model.openaiTested}
+                          anthropicTested={model.anthropicTested}
+                          isPinging={pingingModelIds.has(model.internalId)}
+                          selected={selectedModel === model.internalId}
+                          isActive={selectedModel === model.internalId}
+                          viewMode={viewMode}
+                          usageData={modelUsageData[model.internalId]}
+                          onClick={() => handleCardClick(model)}
+                          onProtocolClick={(protocol) => handleCardProtocolClick(model, protocol)}
+                          onEdit={isDemo ? undefined : () => handleCardEdit(model)}
+                          onDelete={isDemo ? undefined : () => handleCardDelete(model.internalId)}
+                          onRefresh={() => refreshSingleUsage(model.internalId)}
+                          isRefreshingUsage={refreshingUsageIds.has(model.internalId)}
+                          onAccessKey={
+                            isVolcengineUrl(model.baseUrl, model.anthropicUrl)
+                              ? () => openAkskModal(model.internalId)
+                              : undefined
+                          }
+                          akSkMissing={volcAkSkMissingIds.has(model.internalId)}
+                        />
+                      </SortableModelCard>
+                    );
+                  })}
+                </SortableContext>
 
-              {/* Add new model button */}
-              <div
-                className="h-48 border border-dashed border-cyber-border flex flex-col items-center justify-center hover:border-cyber-border cursor-pointer transition-all rounded-card text-cyber-text-secondary hover:text-cyber-text"
-                onClick={() => {
-                  setNewModelForm({
-                    name: '',
-                    baseUrl: '',
-                    anthropicUrl: '',
-                    apiKey: '',
-                    modelId: '',
-                  });
-                  setEditingModelId(null);
-                  setShowAddModelModal(true);
-                }}
-              >
-                <span className="font-bold tracking-wider">{t('btn.addModel')}</span>
-                <span className="text-[10px] opacity-60 mt-1">OpenAI / Anthropic API</span>
-              </div>
-            </>
-          )}
-        </div>
+                {/* Add new model button */}
+                <div
+                  className="h-48 border border-dashed border-cyber-border flex flex-col items-center justify-center hover:border-cyber-border cursor-pointer transition-all rounded-card text-cyber-text-secondary hover:text-cyber-text"
+                  onClick={() => {
+                    setNewModelForm({
+                      name: '',
+                      baseUrl: '',
+                      anthropicUrl: '',
+                      apiKey: '',
+                      modelId: '',
+                    });
+                    setEditingModelId(null);
+                    setShowAddModelModal(true);
+                  }}
+                >
+                  <span className="font-bold tracking-wider">{t('btn.addModel')}</span>
+                  <span className="text-[10px] opacity-60 mt-1">OpenAI / Anthropic API</span>
+                </div>
+              </>
+            )}
+          </div>
+        </DndContext>
       </div>
       {volcAkSkModelId && (
         <VolcAkskModal

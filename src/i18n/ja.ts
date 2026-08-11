@@ -208,6 +208,7 @@ const ja: Partial<Translations> = {
   'model.notTested': '未測定',
   'model.cloud': 'クラウド',
   'model.local': 'ローカル',
+  'model.dragSort': 'ドラッグで並べ替え',
   'btn.copy': '[コピー]',
   'btn.copied': '[✓]',
   'common.confirm': '確認',

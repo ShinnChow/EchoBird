@@ -28,6 +28,13 @@ pub fn update_model(internal_id: String, updates: UpdateModelInput) -> Option<Mo
     model_manager::update_model(&internal_id, updates)
 }
 
+/// Persist a user-defined model display order (full visible list of
+/// internal_ids in the new order).
+#[tauri::command]
+pub fn reorder_models(ordered_ids: Vec<String>) -> bool {
+    model_manager::reorder_models(ordered_ids)
+}
+
 /// Test model with API request
 #[tauri::command]
 pub async fn test_model(

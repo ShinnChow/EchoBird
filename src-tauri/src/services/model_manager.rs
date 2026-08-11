@@ -20,6 +20,88 @@ fn ensure_config_dir() {
     let _ = fs::create_dir_all(&config_dir);
 }
 
+// ─── User-defined display order ───
+//
+// The visible model list is a merge (local server → user → built-in). Drag
+// reorder in the Model Center persists the FULL visible order here as a JSON
+// array of internal_ids. get_models() sorts by it; ids absent from the stored
+// order (newly added models, built-ins shipped in a later update) keep their
+// default merge position and sit below the ordered ones.
+
+/// Model order file: ~/.echobird/config/model-order.json
+fn model_order_path() -> std::path::PathBuf {
+    echobird_dir().join("config").join("model-order.json")
+}
+
+fn load_model_order() -> Vec<String> {
+    let path = model_order_path();
+    if !path.exists() {
+        return Vec::new();
+    }
+    match fs::read_to_string(&path) {
+        Ok(content) => serde_json::from_str(&content).unwrap_or_else(|e| {
+            log::error!("[ModelManager] Failed to parse model order: {}", e);
+            Vec::new()
+        }),
+        Err(e) => {
+            log::error!("[ModelManager] Failed to read model order: {}", e);
+            Vec::new()
+        }
+    }
+}
+
+fn save_model_order(ordered_ids: &[String]) {
+    ensure_config_dir();
+    let path = model_order_path();
+    let content = serde_json::to_string_pretty(ordered_ids).unwrap_or_default();
+    if let Err(e) = fs::write(&path, content) {
+        log::error!("[ModelManager] Failed to save model order: {}", e);
+    }
+}
+
+/// Sort models by the persisted user order. Known ids follow the stored rank;
+/// unknown ids keep their default merge order and sink below ordered ones.
+fn apply_user_order(mut models: Vec<ModelConfig>, order: &[String]) -> Vec<ModelConfig> {
+    if order.is_empty() || models.len() < 2 {
+        return models;
+    }
+    let rank: std::collections::HashMap<&str, usize> = order
+        .iter()
+        .enumerate()
+        .map(|(i, id)| (id.as_str(), i))
+        .collect();
+    let default_rank: std::collections::HashMap<String, usize> = models
+        .iter()
+        .enumerate()
+        .map(|(i, m)| (m.internal_id.clone(), i))
+        .collect();
+    models.sort_by_key(|m| match rank.get(m.internal_id.as_str()) {
+        Some(&r) => (0usize, r),
+        None => (
+            1usize,
+            default_rank
+                .get(&m.internal_id)
+                .copied()
+                .unwrap_or(usize::MAX),
+        ),
+    });
+    models
+}
+
+/// Persist a user-defined model display order (the frontend sends every
+/// visible internal_id in the new order). Returns false for an empty payload.
+pub fn reorder_models(ordered_ids: Vec<String>) -> bool {
+    if ordered_ids.is_empty() {
+        return false;
+    }
+    save_model_order(&ordered_ids);
+    log::info!(
+        "[ModelManager] Saved model order ({} ids)",
+        ordered_ids.len()
+    );
+    true
+}
+
 // ─── API Key encryption (AES-256-GCM) ───
 
 const ENCRYPTED_PREFIX: &str = "enc:v1:";
@@ -329,12 +411,12 @@ pub fn get_models() -> Vec<ModelConfig> {
         Vec::new()
     };
 
-    // Order: local �?user �?built-in
+    // Order: local �?user �?built-in, then apply the user's drag-reorder
     let mut all = Vec::new();
     all.extend(local_models);
     all.extend(user_models);
     all.extend(built_in_models);
-    all
+    apply_user_order(all, &load_model_order())
 }
 
 /// Generate unique internal ID (m-abc123 format)
@@ -805,4 +887,71 @@ pub fn is_key_destroyed(internal_id: &str) -> bool {
 
     let decrypted = decrypt_api_key(&model.api_key);
     decrypted.is_empty()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::model::ModelConfig;
+
+    fn mk_model(id: &str) -> ModelConfig {
+        ModelConfig {
+            internal_id: id.to_string(),
+            name: id.to_string(),
+            model_id: None,
+            base_url: String::new(),
+            api_key: String::new(),
+            anthropic_url: None,
+            model_type: None,
+            openai_tested: None,
+            anthropic_tested: None,
+            openai_latency: None,
+            anthropic_latency: None,
+        }
+    }
+
+    fn ids(models: &[ModelConfig]) -> Vec<String> {
+        models.iter().map(|m| m.internal_id.clone()).collect()
+    }
+
+    #[test]
+    fn apply_user_order_puts_known_ids_first_in_stored_order() {
+        let models = vec![mk_model("a"), mk_model("b"), mk_model("c")];
+        let order = vec!["c".to_string(), "a".to_string()];
+        assert_eq!(ids(&apply_user_order(models, &order)), vec!["c", "a", "b"]);
+    }
+
+    #[test]
+    fn apply_user_order_empty_order_keeps_default_merge() {
+        let models = vec![mk_model("a"), mk_model("b")];
+        assert_eq!(ids(&apply_user_order(models, &[])), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn apply_user_order_new_ids_sink_below_in_default_order() {
+        // "b" is absent from the stored order (newly added) → below known "a"
+        let models = vec![mk_model("b"), mk_model("a")];
+        let order = vec!["a".to_string()];
+        assert_eq!(ids(&apply_user_order(models, &order)), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn apply_user_order_ignores_stale_ids_from_deleted_models() {
+        let models = vec![mk_model("a"), mk_model("b")];
+        let order = vec!["b".to_string(), "gone".to_string(), "a".to_string()];
+        assert_eq!(ids(&apply_user_order(models, &order)), vec!["b", "a"]);
+    }
+
+    #[test]
+    fn apply_user_order_handles_single_model_and_duplicate_ids() {
+        let single = vec![mk_model("a")];
+        assert_eq!(
+            ids(&apply_user_order(single, &["a".to_string()])),
+            vec!["a"]
+        );
+
+        let models = vec![mk_model("a"), mk_model("b")];
+        let order = vec!["b".to_string(), "b".to_string(), "a".to_string()];
+        assert_eq!(ids(&apply_user_order(models, &order)), vec!["b", "a"]);
+    }
 }

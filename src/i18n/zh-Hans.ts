@@ -183,6 +183,7 @@ const zhHans: Partial<Translations> = {
   'model.notTested': '未测试',
   'model.cloud': '云端',
   'model.local': '本地',
+  'model.dragSort': '拖动卡片排序',
   'btn.copy': '[复制]',
   'btn.copied': '[✓]',
   'common.confirm': '确认',

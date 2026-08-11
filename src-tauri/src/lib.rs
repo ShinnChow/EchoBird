@@ -861,6 +861,7 @@ pub fn run() {
             model_commands::add_model,
             model_commands::delete_model,
             model_commands::update_model,
+            model_commands::reorder_models,
             model_commands::test_model,
             model_commands::ping_model,
             model_commands::is_key_destroyed,

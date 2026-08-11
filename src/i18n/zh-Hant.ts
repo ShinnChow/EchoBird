@@ -203,6 +203,7 @@ const zhHant: Partial<Translations> = {
   'model.notTested': '未測試',
   'model.cloud': '雲端',
   'model.local': '本地',
+  'model.dragSort': '拖曳卡片排序',
   'btn.copy': '[複製]',
   'btn.copied': '[✓]',
   'common.confirm': '確認',

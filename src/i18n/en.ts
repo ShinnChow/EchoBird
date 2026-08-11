@@ -201,6 +201,7 @@ const en: Translations = {
   'model.notTested': 'Not tested',
   'model.cloud': 'CLOUD',
   'model.local': 'LOCAL',
+  'model.dragSort': 'Drag to reorder',
   // Copy button
   'btn.copy': '[COPY]',
   'btn.copied': '[✓]',
