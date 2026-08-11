@@ -87,18 +87,16 @@
       "region": "global"
     },
     {
-      "name": "优云智算(支持GLM-5.2)",
+      "name": "优云智算glm5.2\\deepseek",
       "url": "https://console.compshare.cn/light-gpu/model-subscription",
       "baseUrl": "https://cp.compshare.cn/v1",
       "anthropicUrl": "https://cp.compshare.cn",
       "modelId": "glm-5.2",
       "modelIds": [
         "glm-5.2",
-        "glm-5.1",
         "MiniMax-M2.7",
-        "kimi-k2.6",
-        "deepseek-ai/DeepSeek-V3.2",
-        "deepseek-v4-flash"
+        "deepseek-v4-flash-0731",
+        "kimi-k2.6"
       ],
       "region": "cn"
     },
