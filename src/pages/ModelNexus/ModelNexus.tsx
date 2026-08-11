@@ -9,9 +9,11 @@ import {
   PointerSensor,
   KeyboardSensor,
   closestCenter,
+  DragOverlay,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -635,17 +637,9 @@ function SortableModelCard({
   return (
     <div
       ref={setNodeRef}
-      className={isDragging ? 'relative z-50 shadow-2xl' : 'relative'}
-      style={{
-        // While dragging, lift with a slight scale on top of the dnd transform
-        // (Tailwind scale utilities would be overwritten by the inline transform).
-        transform: CSS.Transform.toString(
-          isDragging
-            ? { x: transform?.x ?? 0, y: transform?.y ?? 0, scaleX: 1.03, scaleY: 1.03 }
-            : transform
-        ),
-        transition,
-      }}
+      data-drag-model={id}
+      className={isDragging ? 'relative opacity-0' : 'relative'}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
     >
       {children}
       {/* No title attr: this is desktop software, not a web page — hover
@@ -795,12 +789,29 @@ export function ModelNexusMain() {
   // Drag-reorder: pointer (5px activation so plain clicks pass through) +
   // keyboard (a11y). On drop, reorder in place and persist the full visible
   // order — a failed write just reverts on next reload (best-effort).
+  // autoScroll is disabled on purpose: the grid lives in an overflow-y-auto
+  // container and edge-drag auto-scroll felt janky. A DragOverlay (portal)
+  // floats the dragged card above everything, so the scroll container never
+  // clips the lifted card or its shadow.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [activeDragWidth, setActiveDragWidth] = useState(0);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const id = String(event.active.id);
+    setActiveDragId(id);
+    // dnd-kit's active.rect is not measured yet at onDragStart (null), so
+    // measure the grid node directly for the DragOverlay ghost's width.
+    const el = document.querySelector<HTMLElement>(`[data-drag-model="${id}"]`);
+    setActiveDragWidth(el?.offsetWidth ?? 0);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragId(null);
     const activeId = String(event.active.id);
     const overId = String(event.over?.id ?? '');
     if (!overId || activeId === overId) return;
@@ -814,10 +825,64 @@ export function ModelNexusMain() {
     });
   };
 
+  const handleDragCancel = () => setActiveDragId(null);
+
+  const activeDragModel = activeDragId
+    ? userModels.find((m) => m.internalId === activeDragId)
+    : undefined;
+
+  // Model card body, shared by the grid item and the DragOverlay ghost (the
+  // ghost is wrapped in pointer-events-none so its interactions are inert).
+  const renderModelCard = (model: (typeof userModels)[0]) => {
+    const protocols: ('openai' | 'anthropic')[] = [];
+    if (model.baseUrl) protocols.push('openai');
+    if (model.anthropicUrl) protocols.push('anthropic');
+    const isDemo = model.modelType === 'DEMO';
+    return (
+      <ModelCard
+        id={model.internalId}
+        name={model.name}
+        type={model.modelType || ''}
+        baseUrl={model.baseUrl}
+        anthropicUrl={model.anthropicUrl}
+        modelId={model.modelId || ''}
+        protocols={protocols}
+        latency={modelLatencies[model.internalId] ?? model.openaiLatency}
+        openaiTested={model.openaiTested}
+        anthropicTested={model.anthropicTested}
+        isPinging={pingingModelIds.has(model.internalId)}
+        selected={selectedModel === model.internalId}
+        isActive={selectedModel === model.internalId}
+        viewMode={viewMode}
+        usageData={modelUsageData[model.internalId]}
+        dragHandlePad
+        onClick={() => handleCardClick(model)}
+        onProtocolClick={(protocol) => handleCardProtocolClick(model, protocol)}
+        onEdit={isDemo ? undefined : () => handleCardEdit(model)}
+        onDelete={isDemo ? undefined : () => handleCardDelete(model.internalId)}
+        onRefresh={() => refreshSingleUsage(model.internalId)}
+        isRefreshingUsage={refreshingUsageIds.has(model.internalId)}
+        onAccessKey={
+          isVolcengineUrl(model.baseUrl, model.anthropicUrl)
+            ? () => openAkskModal(model.internalId)
+            : undefined
+        }
+        akSkMissing={volcAkSkMissingIds.has(model.internalId)}
+      />
+    );
+  };
+
   return (
     <>
       <div className="flex-1 overflow-y-auto">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+          autoScroll={false}
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {/* Show skeleton when loading */}
             {isLoadingModels ? (
@@ -834,50 +899,15 @@ export function ModelNexusMain() {
                   items={userModels.map((m) => m.internalId)}
                   strategy={rectSortingStrategy}
                 >
-                  {userModels.map((model) => {
-                    const protocols: ('openai' | 'anthropic')[] = [];
-                    if (model.baseUrl) protocols.push('openai');
-                    if (model.anthropicUrl) protocols.push('anthropic');
-                    const isDemo = model.modelType === 'DEMO';
-                    return (
-                      <SortableModelCard
-                        key={model.internalId}
-                        id={model.internalId}
-                        dragLabel={t('model.dragSort')}
-                      >
-                        <ModelCard
-                          id={model.internalId}
-                          name={model.name}
-                          type={model.modelType || ''}
-                          baseUrl={model.baseUrl}
-                          anthropicUrl={model.anthropicUrl}
-                          modelId={model.modelId || ''}
-                          protocols={protocols}
-                          latency={modelLatencies[model.internalId] ?? model.openaiLatency}
-                          openaiTested={model.openaiTested}
-                          anthropicTested={model.anthropicTested}
-                          isPinging={pingingModelIds.has(model.internalId)}
-                          selected={selectedModel === model.internalId}
-                          isActive={selectedModel === model.internalId}
-                          viewMode={viewMode}
-                          usageData={modelUsageData[model.internalId]}
-                          dragHandlePad
-                          onClick={() => handleCardClick(model)}
-                          onProtocolClick={(protocol) => handleCardProtocolClick(model, protocol)}
-                          onEdit={isDemo ? undefined : () => handleCardEdit(model)}
-                          onDelete={isDemo ? undefined : () => handleCardDelete(model.internalId)}
-                          onRefresh={() => refreshSingleUsage(model.internalId)}
-                          isRefreshingUsage={refreshingUsageIds.has(model.internalId)}
-                          onAccessKey={
-                            isVolcengineUrl(model.baseUrl, model.anthropicUrl)
-                              ? () => openAkskModal(model.internalId)
-                              : undefined
-                          }
-                          akSkMissing={volcAkSkMissingIds.has(model.internalId)}
-                        />
-                      </SortableModelCard>
-                    );
-                  })}
+                  {userModels.map((model) => (
+                    <SortableModelCard
+                      key={model.internalId}
+                      id={model.internalId}
+                      dragLabel={t('model.dragSort')}
+                    >
+                      {renderModelCard(model)}
+                    </SortableModelCard>
+                  ))}
                 </SortableContext>
 
                 {/* Add new model button */}
@@ -901,6 +931,15 @@ export function ModelNexusMain() {
               </>
             )}
           </div>
+          {/* Floating drag ghost — rendered in a portal so the scroll
+              container never clips the lifted card or its shadow. */}
+          <DragOverlay>
+            {activeDragModel && (
+              <div style={{ width: activeDragWidth }} className="pointer-events-none shadow-2xl">
+                {renderModelCard(activeDragModel)}
+              </div>
+            )}
+          </DragOverlay>
         </DndContext>
       </div>
       {volcAkSkModelId && (
