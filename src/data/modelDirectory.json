@@ -87,7 +87,7 @@
       "region": "global"
     },
     {
-      "name": "优云智算glm5.2\\deepseek",
+      "name": "优云智算(glm5.2,dpv4)",
       "url": "https://console.compshare.cn/light-gpu/model-subscription",
       "baseUrl": "https://cp.compshare.cn/v1",
       "anthropicUrl": "https://cp.compshare.cn",
