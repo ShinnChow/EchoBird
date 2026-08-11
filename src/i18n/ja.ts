@@ -206,8 +206,6 @@ const ja: Partial<Translations> = {
   'model.source': 'ソース',
   'model.latency': 'レイテンシ',
   'model.notTested': '未測定',
-  'model.cloud': 'クラウド',
-  'model.local': 'ローカル',
   'model.dragSort': 'ドラッグで並べ替え',
   'btn.copy': '[コピー]',
   'btn.copied': '[✓]',

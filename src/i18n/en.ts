@@ -199,8 +199,6 @@ const en: Translations = {
   'model.source': 'SOURCE',
   'model.latency': 'LATENCY',
   'model.notTested': 'Not tested',
-  'model.cloud': 'CLOUD',
-  'model.local': 'LOCAL',
   'model.dragSort': 'Drag to reorder',
   // Copy button
   'btn.copy': '[COPY]',

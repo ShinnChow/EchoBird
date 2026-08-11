@@ -131,6 +131,10 @@ export interface ModelCardProps {
   onAccessKey?: () => void; // open AK/SK config modal (Volcengine usage mode)
   akSkMissing?: boolean; // AK/SK not yet configured -> show hint
   onProtocolClick?: (protocol: 'openai' | 'anthropic') => void; // protocol tag click
+  /** Add top/bottom spacing around the name row so the overlaid top-left drag
+   *  handle doesn't cover it, keeping the name left-aligned. Only used by the
+   *  Model Center's sortable grid. */
+  dragHandlePad?: boolean;
 }
 
 // Matrix decode animation — characters scramble then lock in sequence
@@ -257,6 +261,7 @@ export const ModelCard = React.memo(
     onAccessKey,
     akSkMissing,
     onProtocolClick: _onProtocolClick,
+    dragHandlePad = false,
   }: ModelCardProps & { isActive?: boolean }) => {
     // Config tab: resolve icon from the MODEL ID only (platform name must not
     // leak in — otherwise a Qwen platform card configured with model id
@@ -364,14 +369,7 @@ export const ModelCard = React.memo(
             )}
           </div>
         )}
-        <div className="text-xs text-cyber-text-secondary mb-1 tracking-widest uppercase font-mono min-h-[15px]">
-          {(() => {
-            const url = baseUrl || anthropicUrl;
-            if (!url) return <span>&nbsp;</span>;
-            return /localhost|127\.0\.0\.1/.test(url) ? t('model.local') : t('model.cloud');
-          })()}
-        </div>
-        <div className="flex items-center gap-2 mb-3">
+        <div className={`flex items-center gap-2 ${dragHandlePad ? 'mt-5 mb-4' : 'mb-3'}`}>
           {/* Show provider logo in usage mode (based on baseUrl) */}
           {viewMode === 'usage' &&
             (() => {

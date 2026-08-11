@@ -165,8 +165,6 @@ export type TKey =
   | 'model.countdown.days'
   | 'model.countdown.hours'
   | 'model.countdown.minutes'
-  | 'model.cloud'
-  | 'model.local'
   | 'model.dragSort'
 
   // App Manager

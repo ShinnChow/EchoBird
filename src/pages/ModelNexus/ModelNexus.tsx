@@ -635,16 +635,26 @@ function SortableModelCard({
   return (
     <div
       ref={setNodeRef}
-      className={isDragging ? 'relative z-50' : 'relative'}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={isDragging ? 'relative z-50 shadow-2xl' : 'relative'}
+      style={{
+        // While dragging, lift with a slight scale on top of the dnd transform
+        // (Tailwind scale utilities would be overwritten by the inline transform).
+        transform: CSS.Transform.toString(
+          isDragging
+            ? { x: transform?.x ?? 0, y: transform?.y ?? 0, scaleX: 1.03, scaleY: 1.03 }
+            : transform
+        ),
+        transition,
+      }}
     >
       {children}
+      {/* No title attr: this is desktop software, not a web page — hover
+          tooltips feel out of place. aria-label stays for screen readers. */}
       <button
         {...attributes}
         {...listeners}
-        title={dragLabel}
         aria-label={dragLabel}
-        className="absolute bottom-2 left-2 z-10 p-0.5 text-cyber-text-muted/40 hover:text-cyber-text cursor-grab active:cursor-grabbing transition-colors outline-none"
+        className="absolute top-2 left-2 z-10 p-0.5 text-cyber-text-muted/60 hover:text-cyber-text cursor-grab active:cursor-grabbing transition-colors outline-none"
       >
         <GripVertical size={14} />
       </button>
@@ -851,6 +861,7 @@ export function ModelNexusMain() {
                           isActive={selectedModel === model.internalId}
                           viewMode={viewMode}
                           usageData={modelUsageData[model.internalId]}
+                          dragHandlePad
                           onClick={() => handleCardClick(model)}
                           onProtocolClick={(protocol) => handleCardProtocolClick(model, protocol)}
                           onEdit={isDemo ? undefined : () => handleCardEdit(model)}
