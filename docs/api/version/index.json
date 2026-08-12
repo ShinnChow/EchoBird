@@ -1,11 +1,11 @@
 {
   "version": "5.6.3",
   "releaseDate": "2026-08-12",
-  "releaseNotes": "本次更新主题:「模型中心」支持拖拽排序。\n\n## 新增\n\n- 「模型中心」支持拖拽排序:拖动卡片左上角手柄调整顺序,自动保存。",
+  "releaseNotes": "本次更新主题:「模型中心」支持拖拽排序。\n\n## 新增\n\n- 「模型中心」支持拖拽排序:拖动卡片左上角手柄调整顺序,自动保存。\n\n新版 DeepSeek-V4-Pro-0813 上线了！使用 EchoBird 可完美接入 Codex,官网完整 DeepSeek 配置 ~/.codex/models.json 无需 EchoBird 更新。",
   "releaseNotesI18n": {
-    "zh-cn": "本次更新主题:「模型中心」支持拖拽排序。\n\n## 新增\n\n- 「模型中心」支持拖拽排序:拖动卡片左上角手柄调整顺序,自动保存。",
-    "en": "Theme of this update: drag-to-reorder in Model Center.\n\n## New\n\n- Drag-to-reorder in Model Center: drag the handle at the top-left corner of a card to rearrange the order — saved automatically.",
-    "zh-tw": "本次更新主題:「模型中心」支援拖拽排序。\n\n## 新增\n\n- 「模型中心」支援拖拽排序:拖動卡片左上角把手調整順序,自動儲存。",
-    "ja": "今回のアップデートのテーマ:モデルセンターのドラッグ並べ替えに対応しました。\n\n## 追加\n\n- モデルセンターでドラッグ並べ替えに対応:カード左上のハンドルをドラッグして順序を変更でき、自動で保存されます。"
+    "zh-cn": "本次更新主题:「模型中心」支持拖拽排序。\n\n## 新增\n\n- 「模型中心」支持拖拽排序:拖动卡片左上角手柄调整顺序,自动保存。\n\n新版 DeepSeek-V4-Pro-0813 上线了！使用 EchoBird 可完美接入 Codex,官网完整 DeepSeek 配置 ~/.codex/models.json 无需 EchoBird 更新。",
+    "en": "Theme of this update: drag-to-reorder in Model Center.\n\n## New\n\n- Drag-to-reorder in Model Center: drag the handle at the top-left corner of a card to rearrange the order — saved automatically.\n\nDeepSeek-V4-Pro-0813 is now live! EchoBird plugs it into Codex seamlessly — DeepSeek's full official ~/.codex/models.json config works with no EchoBird update needed.",
+    "zh-tw": "本次更新主題:「模型中心」支援拖拽排序。\n\n## 新增\n\n- 「模型中心」支援拖拽排序:拖動卡片左上角把手調整順序,自動儲存。\n\n新版 DeepSeek-V4-Pro-0813 上線了！使用 EchoBird 可完美接入 Codex,官網完整 DeepSeek 設定 ~/.codex/models.json 無需 EchoBird 更新。",
+    "ja": "今回のアップデートのテーマ:モデルセンターのドラッグ並べ替えに対応しました。\n\n## 追加\n\n- モデルセンターでドラッグ並べ替えに対応:カード左上のハンドルをドラッグして順序を変更でき、自動で保存されます。\n\n新バージョン DeepSeek-V4-Pro-0813 が登場！EchoBird なら Codex に完璧に接続できます。DeepSeek 公式の完全な ~/.codex/models.json 設定は、EchoBird のアップデートなしでそのまま使えます。"
   }
 }
