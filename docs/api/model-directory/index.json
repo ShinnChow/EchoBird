@@ -71,6 +71,14 @@
       "region": "global"
     },
     {
+      "name": "LongCat 美团",
+      "url": "https://longcat.chat/platform/",
+      "baseUrl": "https://api.longcat.chat/openai",
+      "anthropicUrl": "https://api.longcat.chat/anthropic",
+      "modelId": "LongCat-2.0",
+      "region": "cn"
+    },
+    {
       "name": "OpenAI",
       "url": "https://openai.com",
       "baseUrl": "https://api.openai.com/v1",

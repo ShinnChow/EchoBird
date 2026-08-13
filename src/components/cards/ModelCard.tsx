@@ -47,6 +47,7 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
     [['grok', 'x.ai'], 'grok'],
     [['groq'], 'groq'],
     [['kimi', 'moonshot'], 'kimi'],
+    [['longcat', '美团', 'meituan', '龙猫'], 'longcat'],
     [['glm', 'zhipu', '智谱', 'z.ai', 'bigmodel'], 'glm'],
     [['ernie', 'wenxin', '文心'], 'ernie'],
     [['hunyuan', '混元'], 'hunyuan'],
