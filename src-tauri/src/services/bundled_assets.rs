@@ -156,6 +156,7 @@ pub const INSTALLABLE_TOOL_IDS: &[&str] = &[
     "vibe-trading",
     "workbuddy",
     "zcode",
+    "dsh",
 ];
 
 /// Build the full embedded-references block to append to the system prompt.

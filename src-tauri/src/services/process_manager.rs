@@ -104,7 +104,7 @@ impl ProcessManager {
         // writes). Kill OUR tracked instance by PID — NOT by image name — so a
         // user's own `openscience serve` in another terminal is left untouched.
         // Freeing port 4096 also makes the post-spawn browser-open reliable.
-        if tool_id == "openscience" && self.kill_tracked_instance(tool_id) {
+        if matches!(tool_id, "openscience" | "dsh") && self.kill_tracked_instance(tool_id) {
             tokio::time::sleep(std::time::Duration::from_millis(800)).await;
         }
 
@@ -620,7 +620,9 @@ impl ProcessManager {
                     // to bind port 4096; poll + auto-open the workspace in the
                     // user's browser so they don't copy the URL from the terminal.
                     if tool_id == "openscience" {
-                        tokio::spawn(Self::openscience_wait_and_open_workspace());
+                        tokio::spawn(Self::wait_and_open_workspace("http://localhost:4096"));
+                    } else if tool_id == "dsh" {
+                        tokio::spawn(Self::wait_and_open_workspace("http://localhost:3080"));
                     }
                     Ok(())
                 }
@@ -655,7 +657,9 @@ impl ProcessManager {
             self.processes
                 .insert(tool_id.to_string(), ProcessInfo::new(pid));
             if tool_id == "openscience" {
-                tokio::spawn(Self::openscience_wait_and_open_workspace());
+                tokio::spawn(Self::wait_and_open_workspace("http://localhost:4096"));
+            } else if tool_id == "dsh" {
+                tokio::spawn(Self::wait_and_open_workspace("http://localhost:3080"));
             }
             Ok(())
         }
@@ -1225,43 +1229,40 @@ impl ProcessManager {
         unsafe { libc::kill(pid as i32, 0) == 0 }
     }
 
-    /// After spawning `openscience serve`, poll its default port (4096) and open
-    /// the workspace in the user's default browser once it responds. We killed
-    /// any tracked old instance first (see `start_tool`), so 4096 is free and the
-    /// new serve lands here. Best-effort: on timeout the spawned terminal has
-    /// already printed the real URL (which may differ if 4096 was taken by an
+    /// After spawning a serve-style tool, poll its loopback URL and open the
+    /// workspace in the user's default browser once it responds. We killed any
+    /// tracked old instance first (see `start_tool`), so the port is free and the
+    /// new serve lands there. Best-effort: on timeout the spawned terminal has
+    /// already printed the real URL (which may differ if the port was taken by an
     /// unrelated app), so the user can still open it manually — we just log.
-    async fn openscience_wait_and_open_workspace() {
-        const URL: &str = "http://localhost:4096";
+    async fn wait_and_open_workspace(url: &'static str) {
         let client = match reqwest::Client::builder()
             .timeout(std::time::Duration::from_millis(800))
             .build()
         {
             Ok(c) => c,
             Err(e) => {
-                log::warn!("[ProcessManager] OpenScience probe client build failed: {e}");
+                log::warn!("[ProcessManager] workspace probe client build failed: {e}");
                 return;
             }
         };
         // Bound the whole probe to ~10s wall-clock, not a fixed iteration count:
-        // a non-HTTP app squatting on 4096 could otherwise hold each request for
-        // the full per-request timeout and inflate the loop manyfold. The
-        // kill-old step frees 4096 for our serve, so the common path resolves in
-        // a few hundred ms (Bun-compiled binary binds in ~1-3s).
+        // a non-HTTP app squatting on the port could otherwise hold each request
+        // for the full per-request timeout and inflate the loop manyfold. The
+        // kill-old step frees the port for our serve, so the common path resolves
+        // in a few hundred ms (Bun-compiled binary binds in ~1-3s).
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
         while std::time::Instant::now() < deadline {
-            if client.get(URL).send().await.is_ok() {
-                Self::open_in_browser(URL);
-                log::info!(
-                    "[ProcessManager] OpenScience workspace ready at {URL}, opened in browser"
-                );
+            if client.get(url).send().await.is_ok() {
+                Self::open_in_browser(url);
+                log::info!("[ProcessManager] workspace ready at {url}, opened in browser");
                 return;
             }
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
         log::warn!(
-            "[ProcessManager] OpenScience serve did not respond at {URL} within ~10s — \
-             open the URL printed in the serve terminal manually (the port may differ if 4096 was taken)"
+            "[ProcessManager] workspace did not respond at {url} within ~10s — \
+             open the URL printed in the serve terminal manually (the port may differ if taken)"
         );
     }
 

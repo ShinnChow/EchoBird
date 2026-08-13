@@ -147,6 +147,7 @@ static BUNDLED: BundledAssets = BundledAssets {
             "zcode",
             include_str!("../../docs/api/tools/install/zcode.json"),
         ),
+        ("dsh", include_str!("../../docs/api/tools/install/dsh.json")),
     ],
 };
 

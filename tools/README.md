@@ -39,6 +39,7 @@ Tools that are installed as separate executables:
 - **vibe-trading**: AI quant-research / market-analysis agent (Quant Analysis category)
 - **claudescience**: Claude Science (Science category, noModelConfig showcase, macOS/Linux only — no Windows build)
 - **openscience**: OpenScience (Science category, open-source Claude Science alternative, web workspace served locally via `openscience serve`; macOS/Linux/Windows)
+- **dsh**: DeepSeek Harness (CLI Code category, DeepSeek's open-source agent harness, developer preview, web UI served locally via `dsh web` at http://127.0.0.1:3080)
 
 ### 2. Desktop Apps
 

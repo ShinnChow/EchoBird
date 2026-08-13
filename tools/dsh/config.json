@@ -1,0 +1,6 @@
+{
+    "docs": "https://deepseek-harness.github.io/deepseek-harness/",
+    "configFile": "~/.dsh/settings.yaml",
+    "format": "yaml",
+    "custom": true
+}

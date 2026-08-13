@@ -26,6 +26,7 @@
         "grok",
         "vibe-trading",
         "workbuddy",
-        "zcode"
+        "zcode",
+        "dsh"
     ]
 }
