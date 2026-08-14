@@ -1,6 +1,6 @@
 {
-  "version": "5.6.3",
-  "releaseDate": "2026-08-12",
+  "version": "5.6.4",
+  "releaseDate": "2026-08-14",
   "releaseNotes": "本次更新主题:新增 DeepSeek Harness 工具与 LongCat 模型。\n\n## 新增\n\n- 新增 DeepSeek Harness (dsh) 工具:一键安装、一键切换模型、一键启动,后台服务 + 浏览器界面。\n- 新增美团 LongCat-2.0 模型与供应商。",
   "releaseNotesI18n": {
     "zh-cn": "本次更新主题:新增 DeepSeek Harness 工具与 LongCat 模型。\n\n## 新增\n\n- 新增 DeepSeek Harness (dsh) 工具:一键安装、一键切换模型、一键启动,后台服务 + 浏览器界面。\n- 新增美团 LongCat-2.0 模型与供应商。",
