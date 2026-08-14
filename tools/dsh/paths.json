@@ -1,6 +1,6 @@
 {
     "name": "DeepSeek Harness",
-    "category": "CLI Code",
+    "category": "Desktop",
     "noCwdPrompt": true,
     "apiProtocol": [
         "anthropic",

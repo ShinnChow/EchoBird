@@ -3,7 +3,7 @@
     "displayName": "DeepSeek Harness",
     "homepage": "https://www.deepseek.com/harness/",
     "docs": "https://deepseek-harness.github.io/deepseek-harness/",
-    "kind": "cli",
+    "kind": "desktop_app",
     "platforms": ["macos", "linux", "windows"],
     "install": {
         "npm_global": "npm install -g @deepseek-ai/dsh",
