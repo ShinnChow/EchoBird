@@ -166,7 +166,7 @@
         "minimax-m3",
         "grok-4.5"
       ],
-      "region": "global"
+      "region": "cn"
     },
     {
       "name": "OpenCode Go",
@@ -186,7 +186,7 @@
         "minimax-m3",
         "qwen3.8-max"
       ],
-      "region": "global"
+      "region": "cn"
     },
     {
       "name": "千问AI平台",
