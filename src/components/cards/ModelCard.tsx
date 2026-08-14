@@ -66,6 +66,10 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
     [['worldrouter'], 'worldrouter'],
     [['b.ai', 'bai'], 'b-ai'],
     [['agnes'], 'agnes'],
+    // OpenCode (Zen / Go) — a gateway hosting many vendors' models, matched
+    // by the provider-row name. The model brand in the id must win, so this
+    // stays below the model-brand rules.
+    [['opencode', 'open code'], 'opencode'],
     // Resellers (pure compute providers that host third-party models, e.g.
     // Compshare/UCloud 优云智算, CC Vibe) go LAST. A model card carries a modelId that
     // identifies the actual model brand (glm/kimi/deepseek/minimax), and the
