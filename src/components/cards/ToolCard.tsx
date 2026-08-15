@@ -106,7 +106,7 @@ export const ToolCard = React.memo(
           selected
             ? 'border-cyber-accent'
             : `border-transparent ${installed ? 'hover:bg-cyber-elevated' : ''}`
-        } relative overflow-hidden rounded-card ${installed ? 'cursor-pointer' : 'cursor-default opacity-80'} transition-colors flex flex-col`}
+        } relative overflow-hidden rounded-card ${installed ? 'cursor-pointer' : 'cursor-default'} transition-colors flex flex-col`}
         onClick={handleCardClick}
       >
         {isEditable ? (
@@ -135,7 +135,7 @@ export const ToolCard = React.memo(
             <img
               src={iconUrl}
               alt={name}
-              className={`absolute top-4 right-4 w-10 h-10 rounded-lg ${selected ? 'opacity-100' : installed ? 'opacity-60' : showMotherInstall ? 'opacity-30' : 'opacity-20'}`}
+              className="absolute top-4 right-4 w-10 h-10 rounded-lg"
               onError={handleImgError}
             />
             <div

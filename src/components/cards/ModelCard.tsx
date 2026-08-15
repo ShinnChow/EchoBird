@@ -514,7 +514,7 @@ export const ModelCard = React.memo(
           <img
             src={iconPath}
             alt={name}
-            className={`absolute bottom-3 right-3 w-8 h-8 ${selected || isActive ? 'opacity-100' : 'opacity-60'}`}
+            className="absolute bottom-3 right-3 w-8 h-8"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
             }}
