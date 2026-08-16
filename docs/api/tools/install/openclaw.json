@@ -19,6 +19,7 @@
             "This reminder applies to BOTH fresh installs and upgrades (re-running `openclaw onboard` after an upgrade is safe and sometimes necessary)."
         ]
     },
+    "verify": "openclaw --version   # confirms the binary is on PATH; `openclaw onboard` must still be run once (see install_flow)",
     "network_requirements": {
         "test_urls": ["https://registry.npmjs.org", "https://github.com/openclaw/openclaw"],
         "mirrors": {

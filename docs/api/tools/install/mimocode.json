@@ -17,7 +17,9 @@
         "blocked_regions": {
             "zh-CN": "mimo.xiaomi.com itself is reachable in mainland China, but the curl installer downloads the binary from GitHub Releases, which is unreliable there. If the curl install stalls or fails, use npm instead: `npm install -g @mimo-ai/cli --registry=https://registry.npmmirror.com`."
         },
-        "mirrors": {}
+        "mirrors": {
+            "npm (China)": "npm install -g @mimo-ai/cli --registry=https://registry.npmmirror.com"
+        }
     },
     "first_run": {
         "description": "On first launch `mimo` opens a TUI. To use Xiaomi's MiMo Platform models, run /connect inside the TUI, pick mimocode, and paste an API key from code.xiaomimimo.com/auth. Any OpenAI-compatible provider can also be added via the provider block in the config file.",

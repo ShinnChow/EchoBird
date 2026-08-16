@@ -3,8 +3,9 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::time::Duration;
+use tokio::process::Command;
 use tokio::time::timeout;
 
 use crate::commands::ssh_commands::SSHPool;
@@ -556,46 +557,72 @@ async fn exec_local_shell(command: &str) -> ToolResult {
             };
         }
     }
-    let cmd = command.to_string();
     let timeout_secs = get_exec_timeout(command);
-    let result = timeout(
-        Duration::from_secs(timeout_secs),
-        tokio::task::spawn_blocking(move || {
-            #[cfg(target_os = "windows")]
-            let output = {
-                use std::os::windows::process::CommandExt;
-                const CREATE_NO_WINDOW: u32 = 0x08000000;
-                Command::new("powershell")
-                    .args([
-                        "-NoProfile",
-                        "-NonInteractive",
-                        "-Command",
-                        &format!(
-                            "[Console]::InputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; {}",
-                            cmd
-                        ),
-                    ])
-                    .env("PYTHONIOENCODING", "utf-8")
-                    .creation_flags(CREATE_NO_WINDOW)
-                    .stdin(Stdio::null())
-                    .output()
-            };
 
-            // Use bash (not sh) so `source`, `[[ ]]`, arrays etc. work on Debian/Ubuntu
-            // where /bin/sh is dash. Stdio::null() makes interactive prompts (sudo, ssh-keygen)
-            // fail fast instead of blocking until the 60s/600s timeout.
-            #[cfg(not(target_os = "windows"))]
-            let output = Command::new("bash")
-                .args(["-c", &cmd])
+    // Spawn the shell as a tracked tokio Child so a timeout can KILL the
+    // whole process tree. The previous design wrapped a blocking
+    // `.output()` in spawn_blocking; dropping that future on timeout did
+    // NOT stop the blocking task (tokio can't cancel spawn_blocking), so
+    // a timed-out `npm install` left powershell → npm → node → postinstall
+    // running and writing to node_modules. A retry then raced with the
+    // still-running install and corrupted the directory. Owning the Child
+    // lets us capture the PID and reap the tree on timeout.
+    let spawn_result = {
+        #[cfg(target_os = "windows")]
+        {
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            Command::new("powershell")
+                .args([
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    &format!(
+                        "[Console]::InputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; {}",
+                        command
+                    ),
+                ])
+                .env("PYTHONIOENCODING", "utf-8")
+                .creation_flags(CREATE_NO_WINDOW)
                 .stdin(Stdio::null())
-                .output();
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            // Use bash (not sh) so `source`, `[[ ]]`, arrays etc. work on
+            // Debian/Ubuntu where /bin/sh is dash. Stdio::null() makes
+            // interactive prompts (sudo, ssh-keygen) fail fast instead of
+            // blocking until the 60s/600s timeout.
+            //
+            // process_group(0) makes the bash child a new process-group
+            // leader so a timeout can `kill -pgid` the whole tree
+            // (bash → npm → node → postinstall) in one signal.
+            Command::new("bash")
+                .args(["-c", command])
+                .process_group(0)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+        }
+    };
 
-            output
-        }),
-    ).await;
+    let child = match spawn_result {
+        Ok(c) => c,
+        Err(e) => {
+            return ToolResult {
+                success: false,
+                output: format!("Failed to execute command: {}", e),
+            };
+        }
+    };
+    // Capture the PID before wait_with_output consumes the Child handle —
+    // on timeout the handle is gone, so the tree-kill must go by PID.
+    let pid = child.id();
 
-    match result {
-        Ok(Ok(Ok(output))) => {
+    match timeout(Duration::from_secs(timeout_secs), child.wait_with_output()).await {
+        Ok(Ok(output)) => {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
             let mut combined = String::new();
@@ -631,18 +658,58 @@ async fn exec_local_shell(command: &str) -> ToolResult {
                 },
             }
         }
-        Ok(Ok(Err(e))) => ToolResult {
-            success: false,
-            output: format!("Failed to execute command: {}", e),
-        },
         Ok(Err(e)) => ToolResult {
             success: false,
-            output: format!("Task join error: {}", e),
+            output: format!("Failed to wait for command: {}", e),
         },
-        Err(_) => ToolResult {
-            success: false,
-            output: format!("Command timed out after {}s", EXEC_TIMEOUT_SECS),
-        },
+        Err(_) => {
+            // Timeout elapsed — the future was dropped, but the child and
+            // its whole descendant tree are still alive. Kill the tree so a
+            // retry doesn't race a still-running install (which corrupts
+            // node_modules via concurrent writes).
+            if let Some(pid) = pid {
+                kill_process_tree(pid);
+            }
+            ToolResult {
+                success: false,
+                output: format!("Command timed out after {}s", timeout_secs),
+            }
+        }
+    }
+}
+
+/// Kill a process and its entire descendant tree after a command timeout.
+/// Internal call — NOT routed through exec_local_shell, so the agent's
+/// blocked-patterns safety filter (which blocks `taskkill` / `stop-process`
+/// to protect EchoBird) does not apply. Mirrors the tree-kill pattern in
+/// process_manager.rs (stop_tool / kill_tracked_instance / stop_all).
+fn kill_process_tree(pid: u32) {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        // /T = kill the whole descendant tree; /F = force. Without this a
+        // timed-out npm install keeps writing via its node/postinstall
+        // children even after the parent shell is gone.
+        let killed = std::process::Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        log::warn!(
+            "[AgentTools] Timed-out command: killed process tree at PID {pid} (taskkill ok={killed})"
+        );
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        // The shell was spawned as its own process-group leader
+        // (process_group(0) above), so -pgid reaches it and every
+        // descendant (npm/node/postinstall). SIGKILL is immediate.
+        unsafe {
+            libc::kill(-(pid as i32), libc::SIGKILL);
+        }
+        log::warn!("[AgentTools] Timed-out command: killed process group at PID {pid}");
     }
 }
 
