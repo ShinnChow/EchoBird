@@ -36,9 +36,9 @@ const FAMILIES: ReadonlyArray<{ id: AiCareerFamily; name: string; icon: string }
   { id: 'claude', name: 'Claude', icon: 'claude' },
   { id: 'codex', name: 'Codex', icon: 'codex' },
   { id: 'opencode', name: 'OpenCode', icon: 'opencode' },
+  { id: 'deepseek', name: 'DeepSeek', icon: 'dsh' },
   { id: 'hermes', name: 'Hermes', icon: 'hermes' },
   { id: 'mimo', name: 'MiMo', icon: 'mimocode' },
-  { id: 'deepseek', name: 'DeepSeek', icon: 'dsh' },
 ];
 
 function FamilyIcon({ icon, name }: { icon: string; name: string }) {
