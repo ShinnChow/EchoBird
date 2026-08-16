@@ -19,7 +19,7 @@ pub async fn ai_career_family_history(
         .map_err(|e| format!("history task join failed: {e}"))
 }
 
-/// Contribution-heatmap entries across all four families (drives the heatmap
+/// Contribution-heatmap entries across all six families (drives the heatmap
 /// grid and the five summary stats, which the frontend derives from these).
 #[tauri::command]
 pub async fn ai_career_heatmap() -> Result<Vec<HeatmapEntry>, String> {

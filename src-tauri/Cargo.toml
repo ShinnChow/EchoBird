@@ -100,6 +100,11 @@ base64 = "0.22"
 # Desktop UX
 rfd = "0.17"
 which = "8"
+# Zstandard decode — DeepSeek Harness persists sessions as `session.jsonl.zstd`
+# (concatenated checksummed frames) by default; the "我的AI生涯" scanner
+# decompresses them to read the event log. Decode-only use, but the crate's
+# libzstd (zstd-sys, bundled C) is the standard multi-frame streaming decoder.
+zstd = "0.13.3"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

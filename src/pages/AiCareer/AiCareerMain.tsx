@@ -1,5 +1,5 @@
 // "我的AI生涯" center page — editable avatar, five activity stats, the
-// contribution heatmap, and the four family cards. The three blocks (stats,
+// contribution heatmap, and the six family cards. The three blocks (stats,
 // heatmap, cards) all span the same row width so they line up. Selecting a
 // family card drives the right panel (AiCareerPanel) via the shared store.
 
@@ -38,6 +38,7 @@ const FAMILIES: ReadonlyArray<{ id: AiCareerFamily; name: string; icon: string }
   { id: 'opencode', name: 'OpenCode', icon: 'opencode' },
   { id: 'hermes', name: 'Hermes', icon: 'hermes' },
   { id: 'mimo', name: 'MiMo', icon: 'mimocode' },
+  { id: 'deepseek', name: 'DeepSeek', icon: 'dsh' },
 ];
 
 function FamilyIcon({ icon, name }: { icon: string; name: string }) {

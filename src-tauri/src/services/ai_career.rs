@@ -1,25 +1,26 @@
 //! "我的AI生涯" (My AI Career) data layer — cross-tool session history +
 //! contribution heatmap. Ported from Coffee CLI's `server.rs` history
-//! scanner, trimmed to four first-class tool families.
+//! scanner, trimmed to six first-class tool families.
 //!
 //! Each family reads its on-disk session store DIRECTLY (independent of
-//! EchoBird's tool detection — we just scan the four well-known roots).
+//! EchoBird's tool detection — we just scan the well-known roots).
 //! Desktop and CLI variants of a family share one session store, so they
 //! fold into a single family here (e.g. EchoBird's `claudecode` +
 //! `claudedesktop` tool ids both map to the `Claude` family →
 //! `~/.claude/projects`).
 //!
-//! | Family   | Root                              | Shape                  |
-//! |----------|-----------------------------------|------------------------|
-//! | Claude   | `~/.claude/projects`              | JSONL, depth 2         |
-//! | Codex    | `~/.codex/sessions`               | JSONL rollout, depth 4 |
-//! | OpenCode | `~/.local/share/opencode`         | SQLite (`opencode.db`) |
-//! | Hermes   | `<HERMES_HOME>/state.db`          | SQLite (`state.db`)    |
-//! | MiMo     | `~/.local/share/mimocode`         | SQLite (`mimocode.db`) |
+//! | Family   | Root                              | Shape                          |
+//! |----------|-----------------------------------|--------------------------------|
+//! | Claude   | `~/.claude/projects`              | JSONL, depth 2                 |
+//! | Codex    | `~/.codex/sessions`               | JSONL rollout, depth 4         |
+//! | OpenCode | `~/.local/share/opencode`         | SQLite (`opencode.db`)         |
+//! | Hermes   | `<HERMES_HOME>/state.db`          | SQLite (`state.db`)            |
+//! | MiMo     | `~/.local/share/mimocode`         | SQLite (`mimocode.db`)         |
+//! | DeepSeek | `<DSH_HOME|~/.dsh>/sessions`     | zstd/JSONL event log, depth 3  |
 //!
 //! Two surfaces consume this: the per-family history list (paginated, one
 //! family at a time — keeps the payload small) and the contribution heatmap
-//! (all four families aggregated, 210-day lookback, on-disk count cache).
+//! (all six families aggregated, 210-day lookback, on-disk count cache).
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -31,7 +32,9 @@ use serde::{Deserialize, Serialize};
 
 /// The first-class families. CLI + desktop variants fold into one. MiMo Code is
 /// Xiaomi's OpenCode fork (same Drizzle/SQLite store, different data dir + db
-/// name) — it rides the same reader as OpenCode.
+/// name) — it rides the same reader as OpenCode. DeepSeek is DeepSeek Harness
+/// (`dsh`): each session is one event log under `~/.dsh/sessions` (zstd by
+/// default), read directly here — independent of EchoBird's dsh model config.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Family {
     Claude,
@@ -39,15 +42,17 @@ pub enum Family {
     OpenCode,
     Hermes,
     MiMo,
+    DeepSeek,
 }
 
 impl Family {
-    pub const ALL: [Family; 5] = [
+    pub const ALL: [Family; 6] = [
         Family::Claude,
         Family::Codex,
         Family::OpenCode,
         Family::Hermes,
         Family::MiMo,
+        Family::DeepSeek,
     ];
 
     /// Stable id used in the IPC payload + frontend family cards.
@@ -58,6 +63,7 @@ impl Family {
             Family::OpenCode => "opencode",
             Family::Hermes => "hermes",
             Family::MiMo => "mimo",
+            Family::DeepSeek => "deepseek",
         }
     }
 
@@ -68,18 +74,19 @@ impl Family {
             "opencode" => Some(Family::OpenCode),
             "hermes" => Some(Family::Hermes),
             "mimo" => Some(Family::MiMo),
+            "deepseek" => Some(Family::DeepSeek),
             _ => None,
         }
     }
 
     /// JSONL scan depth for the file-walking families; `None` for the SQLite
-    /// families (OpenCode, MiMo, Hermes) that bypass the mtime-then-parse
-    /// pipeline.
+    /// families (OpenCode, MiMo, Hermes) and DeepSeek (its own collector) that
+    /// bypass the mtime-then-parse pipeline.
     fn jsonl_depth(self) -> Option<u8> {
         match self {
             Family::Claude => Some(2), // ~/.claude/projects/<hash>/<hash>.jsonl
             Family::Codex => Some(4),  // ~/.codex/sessions/<Y>/<M>/<D>/rollout-*.jsonl
-            Family::OpenCode | Family::Hermes | Family::MiMo => None,
+            Family::OpenCode | Family::Hermes | Family::MiMo | Family::DeepSeek => None,
         }
     }
 
@@ -93,6 +100,9 @@ impl Family {
             // MiMo Code (Xiaomi's OpenCode fork) — `~/.local/share/mimocode`,
             // same `.local/share/<app>` pattern as OpenCode (db = mimocode.db).
             Family::MiMo => home.join(".local").join("share").join("mimocode"),
+            // DeepSeek Harness — `<dsh home>/sessions` (the dsh-base bundle's
+            // `session-persistence-jsonl` root; see dsh_home()).
+            Family::DeepSeek => dsh_home().join("sessions"),
         }
     }
 }
@@ -118,6 +128,23 @@ fn hermes_home() -> PathBuf {
         }
     }
     dirs::home_dir().unwrap_or_default().join(".hermes")
+}
+
+/// Resolve DeepSeek Harness's data root: an absolute `$DSH_HOME` overrides,
+/// else `~/.dsh`. Mirrors `resolveDshHome` in `@deepseek-ai/dsh-home-paths`.
+/// Sessions live under `<home>/sessions` (the dsh-base bundle's
+/// `session-persistence-jsonl` root), so `Family::root` joins that.
+fn dsh_home() -> PathBuf {
+    if let Ok(v) = std::env::var("DSH_HOME") {
+        let trimmed = v.trim();
+        if !trimmed.is_empty() {
+            let candidate = PathBuf::from(trimmed);
+            if candidate.is_absolute() {
+                return candidate;
+            }
+        }
+    }
+    dirs::home_dir().unwrap_or_default().join(".dsh")
 }
 
 // ─── Wire types (snake_case to match the ported frontend) ────────────────
@@ -883,6 +910,214 @@ fn collect_hermes_heatmap_entries(db_path: &Path, cutoff_secs: i64, out: &mut Ve
     }
 }
 
+// ─── DeepSeek Harness (dsh) ──────────────────────────────────────────────
+//
+// DeepSeek Harness persists each session as an append-only event log under
+// `<dshHome>/sessions/<project-key>/<session-id>/session.jsonl[.zstd]` (the
+// JSONL backend; default compression is checksummed concatenated Zstandard
+// frames — `.zstd`, plain `.jsonl` when `persistenceCompression: 'none'`).
+// The first line is the session header (`{"type":"session","version":0,
+// "id":...,"cwd":...,"createdAt":...}`); each following line is a
+// `SessionEvent` (`type`, monotonic `seq`, epoch-ms `time`, `data`). We read
+// the store directly like the other families — independent of EchoBird's dsh
+// model config.
+
+/// Collect every DeepSeek Harness session log under `root`, i.e. all
+/// `<project>/<session>/session.jsonl` / `session.jsonl.zstd` files (depth 3).
+/// Both physical encodings are matched; the mtime tags the last append.
+fn collect_dsh_paths(root: &Path, family: Family, out: &mut Vec<(SystemTime, PathBuf, Family)>) {
+    let Ok(projects) = std::fs::read_dir(root) else {
+        return;
+    };
+    for project in projects.flatten() {
+        let p = project.path();
+        if !p.is_dir() {
+            continue;
+        }
+        let Ok(sessions) = std::fs::read_dir(&p) else {
+            continue;
+        };
+        for session in sessions.flatten() {
+            let sp = session.path();
+            if !sp.is_dir() {
+                continue;
+            }
+            let Ok(files) = std::fs::read_dir(&sp) else {
+                continue;
+            };
+            for f in files.flatten() {
+                let path = f.path();
+                if !path.is_file() {
+                    continue;
+                }
+                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if name == "session.jsonl" || name == "session.jsonl.zstd" {
+                    let mtime = f
+                        .metadata()
+                        .ok()
+                        .and_then(|m| m.modified().ok())
+                        .unwrap_or(UNIX_EPOCH);
+                    out.push((mtime, path, family));
+                }
+            }
+        }
+    }
+}
+
+/// Decompress a DeepSeek Harness session-log artifact: `.zstd` files are
+/// concatenated checksummed Zstandard frames; `.jsonl` is raw UTF-8 text.
+/// libzstd's streaming decoder continues across frame boundaries, so one
+/// `read_to_end` yields the whole log (header + every append batch).
+fn dsh_decode(path: &Path) -> Option<Vec<u8>> {
+    let raw = std::fs::read(path).ok()?;
+    if path.extension().and_then(|e| e.to_str()) == Some("zstd") {
+        use std::io::Read;
+        let mut decoder = zstd::stream::read::Decoder::new(raw.as_slice()).ok()?;
+        let mut out = Vec::new();
+        decoder.read_to_end(&mut out).ok()?;
+        Some(out)
+    } else {
+        Some(raw)
+    }
+}
+
+/// First non-empty text out of a dsh `UserMessage.content` — a plain string
+/// or a `ContentBlock[]` (reuses the Hermes `first_json_text` walker).
+fn dsh_first_text(v: Option<&serde_json::Value>) -> Option<String> {
+    v.and_then(first_json_text)
+}
+
+/// Display title for a dsh session: the harness's own latest `session/title`
+/// event wins (it is authoritative, latest-wins snapshot); fall back to the
+/// first real `user/message` text. Empty (no real user input) → generic label.
+fn dsh_title_from_events(events: &[serde_json::Value]) -> String {
+    let mut title: Option<String> = None;
+    let mut first_user: Option<String> = None;
+    for ev in events {
+        let t = ev.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        if t == "session/title" {
+            if let Some(s) = ev.pointer("/data/title").and_then(|v| v.as_str()) {
+                if !s.trim().is_empty() {
+                    title = Some(s.to_string());
+                }
+            }
+        } else if t == "user/message" && first_user.is_none() {
+            if let Some(text) = dsh_first_text(ev.pointer("/data/content")) {
+                if !is_system_injected(&text) {
+                    first_user = Some(text);
+                }
+            }
+        }
+    }
+    title
+        .or(first_user)
+        .unwrap_or_else(|| "DeepSeek Session".to_string())
+}
+
+/// Approximate turn count: one per `turn/start` event (each opens a model-loop
+/// turn; a crash may leave one unclosed, which is still one real turn).
+fn dsh_turn_count(events: &[serde_json::Value]) -> u32 {
+    events
+        .iter()
+        .filter(|ev| ev.get("type").and_then(|v| v.as_str()) == Some("turn/start"))
+        .count() as u32
+}
+
+/// Parse one DeepSeek Harness session log into a `SavedSession`. The header
+/// line carries id + cwd; events are scanned for the title + turn count.
+/// `saved_at` is the artifact mtime (last append), matching the other JSONL
+/// families and the mtime-keyed heatmap cache.
+fn parse_dsh_session(path: &Path) -> Option<SavedSession> {
+    let bytes = dsh_decode(path)?;
+    let text = std::str::from_utf8(&bytes).ok()?;
+    let mut lines = text.lines();
+    let header: serde_json::Value = serde_json::from_str(lines.next()?).ok()?;
+    let cwd = header
+        .get("cwd")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let session_id = header
+        .get("id")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| {
+            path.parent()
+                .and_then(|d| d.file_name())
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default()
+        });
+
+    let events: Vec<serde_json::Value> = lines
+        .filter(|l| !l.trim().is_empty())
+        .filter_map(|l| serde_json::from_str(l).ok())
+        .collect();
+
+    // Created-but-never-appended sessions materialize as a bare header frame
+    // and leave no events behind; drop them like Claude/Codex drop sessions
+    // with no real user message (nothing to show in the history list).
+    if events.is_empty() {
+        return None;
+    }
+
+    let title = dsh_title_from_events(&events);
+    let turn_count = dsh_turn_count(&events);
+
+    Some(SavedSession {
+        id: format!("deepseek_native_{}", session_id),
+        name: make_title(&title),
+        tool: "deepseek".to_string(),
+        cwd,
+        session_token: Some(session_id),
+        saved_at: mtime_millis(path),
+        file_path: Some(path.to_string_lossy().into_owned()),
+        turn_count: (turn_count > 0).then_some(turn_count),
+    })
+}
+
+/// Heatmap count for a dsh session log: number of event lines (decompressing
+/// zstd first, capped like `count_jsonl_message_lines`). The header line is
+/// excluded — it is storage metadata, not a message.
+fn count_dsh_event_lines(path: &Path) -> u32 {
+    const MAX_BYTES: u64 = 32 * 1024 * 1024;
+    if std::fs::metadata(path)
+        .map(|m| m.len() > MAX_BYTES)
+        .unwrap_or(true)
+    {
+        return 0;
+    }
+    let bytes = if path.extension().and_then(|e| e.to_str()) == Some("zstd") {
+        match dsh_decode(path) {
+            Some(b) if (b.len() as u64) <= MAX_BYTES => b,
+            _ => return 0,
+        }
+    } else {
+        match std::fs::read(path) {
+            Ok(b) => b,
+            Err(_) => return 0,
+        }
+    };
+    bytes
+        .split(|&b| b == b'\n')
+        .skip(1) // header
+        .filter(|line| !line.iter().all(|&b| b.is_ascii_whitespace()))
+        .count() as u32
+}
+
+/// Total on-disk size of every DeepSeek session artifact under `root`
+/// (stat-only; zstd files stay compressed — the byte size is just a proxy for
+/// content volume like the other families).
+fn sum_dsh_sizes(root: &Path, cap: u64, total: &mut u64) {
+    let mut candidates = Vec::new();
+    collect_dsh_paths(root, Family::DeepSeek, &mut candidates);
+    for (_, p, _) in candidates {
+        if let Ok(m) = std::fs::metadata(&p) {
+            *total = total.saturating_add(m.len().min(cap));
+        }
+    }
+}
+
 // ─── Heatmap count cache ─────────────────────────────────────────────────
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -940,6 +1175,19 @@ pub fn family_history(family: Family, offset: usize, limit: usize) -> Vec<SavedS
     if family == Family::Hermes {
         return hermes_history_page(&Family::Hermes.root(&home).join("state.db"), offset, limit);
     }
+    // DeepSeek Harness keeps one event log per session (`session.jsonl.zstd`
+    // by default) — collect + parse those directly.
+    if family == Family::DeepSeek {
+        let mut candidates: Vec<(SystemTime, PathBuf, Family)> = Vec::new();
+        collect_dsh_paths(&family.root(&home), family, &mut candidates);
+        candidates.sort_by(|a, b| b.0.cmp(&a.0));
+        return candidates
+            .into_iter()
+            .skip(offset)
+            .take(limit)
+            .filter_map(|(_, path, _)| parse_dsh_session(&path))
+            .collect();
+    }
 
     let mut candidates: Vec<(SystemTime, PathBuf, Family)> = Vec::new();
     match family {
@@ -948,7 +1196,7 @@ pub fn family_history(family: Family, offset: usize, limit: usize) -> Vec<SavedS
                 collect_jsonl_paths(family.root(&home), depth, family, &mut candidates);
             }
         }
-        Family::OpenCode | Family::Hermes | Family::MiMo => unreachable!(),
+        Family::OpenCode | Family::Hermes | Family::MiMo | Family::DeepSeek => unreachable!(),
     }
 
     candidates.sort_by(|a, b| b.0.cmp(&a.0));
@@ -959,12 +1207,12 @@ pub fn family_history(family: Family, offset: usize, limit: usize) -> Vec<SavedS
         .filter_map(|(_, path, _)| match family {
             Family::Claude => parse_agent_jsonl(&path, Family::Claude),
             Family::Codex => parse_codex_session_jsonl(&path),
-            Family::OpenCode | Family::Hermes | Family::MiMo => None,
+            Family::OpenCode | Family::Hermes | Family::MiMo | Family::DeepSeek => None,
         })
         .collect()
 }
 
-/// Contribution-heatmap entries across all five families, 210-day lookback.
+/// Contribution-heatmap entries across all six families, 210-day lookback.
 /// Past session files are immutable once their mtime settles, so per-file
 /// counts are cached on disk and skipped on subsequent scans.
 pub fn message_heatmap() -> Vec<HeatmapEntry> {
@@ -988,6 +1236,9 @@ pub fn message_heatmap() -> Vec<HeatmapEntry> {
                     collect_jsonl_paths(family.root(&home), depth, family, &mut candidates);
                 }
             }
+            Family::DeepSeek => {
+                collect_dsh_paths(&family.root(&home), family, &mut candidates);
+            }
             Family::OpenCode | Family::Hermes | Family::MiMo => {}
         }
     }
@@ -997,7 +1248,7 @@ pub fn message_heatmap() -> Vec<HeatmapEntry> {
     let mut keep: HashSet<String> = HashSet::new();
     let mut out: Vec<HeatmapEntry> = Vec::with_capacity(candidates.len());
 
-    for (mtime, path, _) in &candidates {
+    for (mtime, path, family) in &candidates {
         if *mtime < cutoff {
             continue;
         }
@@ -1011,7 +1262,12 @@ pub fn message_heatmap() -> Vec<HeatmapEntry> {
         let count = match cache.get(&key) {
             Some(entry) if entry.mtime == ts => entry.count,
             _ => {
-                let c = count_jsonl_message_lines(path);
+                // DeepSeek logs are zstd by default — count via its own
+                // decompress-then-count path; everyone else counts lines.
+                let c = match family {
+                    Family::DeepSeek => count_dsh_event_lines(path),
+                    _ => count_jsonl_message_lines(path),
+                };
                 cache.insert(
                     key.clone(),
                     CachedCount {
@@ -1061,7 +1317,7 @@ pub fn message_heatmap() -> Vec<HeatmapEntry> {
 }
 
 /// Rough "≈ N tokens" estimate: sum the on-disk byte size of every session
-/// file across the five families (capped per file), which the frontend
+/// file across the six families (capped per file), which the frontend
 /// divides by a bytes-per-token ratio. Deliberately approximate — it measures
 /// content volume, so it works even when a provider doesn't report real usage
 /// (third-party models often log 0 tokens). Stat-only (no file reads), cheap.
@@ -1098,6 +1354,11 @@ pub fn estimate_token_bytes() -> u64 {
                     total = total.saturating_add(m.len());
                 }
             }
+            Family::DeepSeek => {
+                // One event-log file per DeepSeek session (`session.jsonl.zstd`
+                // by default); their sizes stand in for the family's volume.
+                sum_dsh_sizes(&family.root(&home), MAX_PER_FILE, &mut total);
+            }
         }
     }
     total
@@ -1127,6 +1388,7 @@ fn sum_jsonl_sizes(dir: PathBuf, depth: u8, cap: u64, total: &mut u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::Engine;
 
     #[test]
     fn family_id_round_trips() {
@@ -1387,5 +1649,131 @@ mod tests {
         let s = parse_codex_session_jsonl(&f).unwrap();
         assert_eq!(s.name, "你能看到图片吗?");
         let _ = std::fs::remove_file(&f);
+    }
+
+    // ── DeepSeek Harness (dsh) ───────────────────────────────────────────
+
+    // Multi-frame zstd fixture: DeepSeek Harness writes `session.jsonl.zstd`
+    // as concatenated checksummed Zstandard frames — one frame holding the
+    // session header, then one per durable append batch. ruzstd must decode
+    // ALL frames, not just the first. Fixture generated by
+    // `scripts/gen_dsh_fixture.mjs` (node's built-in zstd), reproducing the
+    // harness's exact physical layout; round-tripped through
+    // `zstdDecompressSync` to confirm validity.
+    const DSH_MULTIFRAME_FIXTURE_B64: &str = concat!(
+        "KLUv/SCSpQMAEscXG3Brc5BAmkSNF2s5m/J9hZIgkPpfDM2z9HMPB4BHmVusrd/PDvFmZiX+2NCc5oux",
+        "wqxYpCjqwFiKgSTlAKUgJYmQqi8wf9ktxWZmIn8+wpoiUs6LYpvTvOdXVT+N1xEGAGaE34ULU3XOVav",
+        "4hFCFIgYotS/9YIUADQcAsgsqLJAp6UT/z0gqeCOLpK9lc3epqlvK3fbekAn7JdFoktp0kor/SSO7cXY",
+        "99yoBy5wP5tCzZAmunCbSUDPuQczLh7iFsF0PB/ZpBVHy1XzMQ1BMEZSLhgrpgWGaqFhIKEgOCxOlIl0",
+        "Rth36dtvuPVd3LZIHT5Qv8uIVg61BY96IictymXPpJ/rWDXK11moAFnMaAQ0Bpt8I6qullyxfvWNrZlyU",
+        "ff3ChP4kFQAqS8DWzHnYDPkQAioBgHwwWc80HZ6xVd2KmXXkUHZm5NeIIwIwTKCAZjCFEi8hQYvWVkEB",
+        "KLUv/WARAGUFABLKISWQtenv7v5OP7MD3TY6ikjZf690a7Rfts0yEOtSbdQGu3F2PWu5SIzxuq493xZK",
+        "rGOmsFmShRIS31bfewR92AFKfBWjId7xGAgAEHgytAv5Xu11z9UVDn7Kp81XK79Q6k951qxdrbUYZimL0",
+        "zgDJa8R1FeC/EL56opgzBolvawZYmbP62v0pw0AJRMUUA4mv4zbm4twBY7JsFER2xOGH4sP4ikCEzy8ihk="
+    );
+
+    #[test]
+    fn dsh_parse_decompresses_multiframe_zstd() {
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(DSH_MULTIFRAME_FIXTURE_B64)
+            .unwrap();
+        let dir = std::env::temp_dir().join("echobird_ai_career_test_dsh");
+        let _ = std::fs::create_dir_all(&dir);
+        let session_dir = dir.join("--E-test-0--").join("session-test-1111");
+        let _ = std::fs::create_dir_all(&session_dir);
+        let f = session_dir.join("session.jsonl.zstd");
+        std::fs::write(&f, &bytes).unwrap();
+
+        // All three frames decode → header + 5 events parse into one session.
+        let s = parse_dsh_session(&f).unwrap();
+        assert_eq!(s.name, "帮我写个排序算法"); // from the session/title event
+        assert_eq!(s.cwd, "E:\\test-0"); // from the header line
+        assert_eq!(s.tool, "deepseek");
+        assert_eq!(s.session_token.as_deref(), Some("session-test-1111"));
+        assert_eq!(s.id, "deepseek_native_session-test-1111");
+        assert_eq!(s.turn_count, Some(1)); // exactly one turn/start event
+
+        // Heatmap count = 5 event lines (header line excluded).
+        assert_eq!(count_dsh_event_lines(&f), 5);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn dsh_parse_plain_jsonl_falls_back_to_first_user_message() {
+        let dir = std::env::temp_dir().join("echobird_ai_career_test_dsh_plain");
+        let _ = std::fs::create_dir_all(&dir);
+        let session_dir = dir.join("--proj--").join("session-abcd");
+        let _ = std::fs::create_dir_all(&session_dir);
+        let f = session_dir.join("session.jsonl");
+        // `compression: 'none'` writes raw newline-delimited JSON — same
+        // logical lines, no zstd frames. No session/title event here, so the
+        // title falls back to the first real user/message text.
+        let body = "{\"type\":\"session\",\"version\":0,\"id\":\"session-abcd\",\"createdAt\":1786841051863,\"cwd\":\"E:\\\\proj\",\"delegationDepth\":0}\n\
+                    {\"type\":\"turn/start\",\"seq\":0,\"time\":1786841052000,\"data\":{\"turn\":0}}\n\
+                    {\"type\":\"user/message\",\"seq\":1,\"time\":1786841053000,\"data\":{\"turn\":0,\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"real prompt here\"}]},\"surfaceOp\":\"append\"}\n\
+                    {\"type\":\"assistant/message\",\"seq\":2,\"time\":1786841054000,\"data\":{\"turn\":0,\"step\":0,\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"ok\"}]}},\"surfaceOp\":\"append\"}\n\
+                    {\"type\":\"turn/end\",\"seq\":3,\"time\":1786841055000,\"data\":{\"turn\":0,\"reason\":{\"kind\":\"done\"}}}\n";
+        std::fs::write(&f, body).unwrap();
+        let s = parse_dsh_session(&f).unwrap();
+        assert_eq!(s.name, "real prompt here");
+        assert_eq!(s.cwd, "E:\\proj");
+        assert_eq!(s.turn_count, Some(1));
+        assert_eq!(count_dsh_event_lines(&f), 4); // header excluded
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn dsh_parse_drops_header_only_session() {
+        // A created-but-never-used session materializes as a bare header frame
+        // with no event lines — nothing to show, like Claude/Codex empty files.
+        let dir = std::env::temp_dir().join("echobird_ai_career_test_dsh_empty");
+        let _ = std::fs::create_dir_all(&dir);
+        let session_dir = dir.join("--proj--").join("session-empty");
+        let _ = std::fs::create_dir_all(&session_dir);
+        let f = session_dir.join("session.jsonl.zstd");
+        // Zstd frame of just the header line (compressed via the zstd crate).
+        let header = "{\"type\":\"session\",\"version\":0,\"id\":\"session-empty\",\"createdAt\":1786841051863,\"cwd\":\"E:\\\\proj\",\"delegationDepth\":0}\n";
+        let compressed = zstd::stream::encode_all(header.as_bytes(), 1).unwrap();
+        std::fs::write(&f, compressed).unwrap();
+        assert!(parse_dsh_session(&f).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn dsh_family_history_reads_session_store() {
+        // Point DSH_HOME at a scratch root so the full collect+parse path runs
+        // against a synthetic store, independent of the machine's real ~/.dsh.
+        let dsh = std::env::temp_dir().join("echobird_ai_career_test_dsh_home");
+        let sroot = dsh.join("sessions").join("--proj--");
+        let _ = std::fs::create_dir_all(sroot.join("session-test-1111"));
+        let zfile = sroot.join("session-test-1111").join("session.jsonl.zstd");
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(DSH_MULTIFRAME_FIXTURE_B64)
+            .unwrap();
+        std::fs::write(&zfile, &bytes).unwrap();
+        let _ = std::fs::create_dir_all(sroot.join("session-abcd"));
+        let pfile = sroot.join("session-abcd").join("session.jsonl");
+        let plain_body = "{\"type\":\"session\",\"version\":0,\"id\":\"session-abcd\",\"createdAt\":1786841051863,\"cwd\":\"E:\\\\proj\",\"delegationDepth\":0}\n\
+                          {\"type\":\"turn/start\",\"seq\":0,\"time\":1786841052000,\"data\":{\"turn\":0}}\n\
+                          {\"type\":\"user/message\",\"seq\":1,\"time\":1786841053000,\"data\":{\"turn\":0,\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"plain prompt\"}]},\"surfaceOp\":\"append\"}\n";
+        std::fs::write(&pfile, plain_body).unwrap();
+
+        let prev = std::env::var("DSH_HOME").ok();
+        std::env::set_var("DSH_HOME", &dsh);
+        let rows = family_history(Family::DeepSeek, 0, 30);
+        match prev {
+            Some(v) => std::env::set_var("DSH_HOME", v),
+            None => std::env::remove_var("DSH_HOME"),
+        }
+
+        // Both encodings surface through the shared collect+parse path.
+        assert_eq!(rows.len(), 2);
+        assert!(rows
+            .iter()
+            .any(|s| s.id == "deepseek_native_session-test-1111" && s.name == "帮我写个排序算法"));
+        assert!(rows
+            .iter()
+            .any(|s| s.id == "deepseek_native_session-abcd" && s.name == "plain prompt"));
+        let _ = std::fs::remove_dir_all(&dsh);
     }
 }
