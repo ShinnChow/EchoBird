@@ -1,5 +1,5 @@
 {
-  "version": "5.6.4",
+  "version": "5.6.5",
   "releaseDate": "2026-08-16",
   "releaseNotes": "本次更新主题:新增 DeepSeek Harness 工具与 DeepSeek 家族支持。\n\n## 新增\n\n- 新增 DeepSeek Harness (dsh) 工具:一键安装、一键切换模型、一键启动,后台服务 + 浏览器界面。\n- 新增在\"我的AI生涯\"页面,对DeepSeek 家族的支持。",
   "releaseNotesI18n": {
