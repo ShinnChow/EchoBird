@@ -50,7 +50,9 @@
 Friends kept asking me to install **Claude Code**, **OpenClaw**, **Hermes Agent**… every machine was different, and some refused to pay for an LLM. Setup and explanations took forever. So I built **EchoBird** — an Agent inspired by **Songbird**, the genius netrunner from _Cyberpunk 2077_ who solves any tech problem for V…
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/162f0428-a44d-4e83-9e10-c6b580ef0120" alt="EchoBird — My AI Career dashboard" width="820" />
+  <img src="docs/screenshots/deepseek-harness-demo.gif" alt="DeepSeek Harness One-click install + model switch （DEMO）" width="820" />
+  <br/>
+  <sub><strong>DeepSeek Harness One-click install + model switch （DEMO）</strong></sub>
 </p>
 
 ## Highlights
@@ -147,6 +149,12 @@ Gemini Desktop · Coffee CLI
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/agent-en-dark.png">
   <img alt="Install & Repair Agent" src="docs/screenshots/agent-en-light.png" width="100%">
 </picture>
+
+### My AI Career — dashboard
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/162f0428-a44d-4e83-9e10-c6b580ef0120" alt="EchoBird — My AI Career dashboard" width="820" />
+</p>
 
 ## Install
 

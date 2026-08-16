@@ -48,7 +48,9 @@
 很多朋友让我帮他们安装 **Claude Code**、**OpenClaw**、**Hermes Agent**……不但每个人的系统都不一样,甚至有些人还抠门到不愿花钱买大模型,安装和解释起来都特别费劲。于是我开发了这个叫「EchoBird」的 Agent —— 灵感来自《赛博朋克 2077》里那位聪慧过人、总能帮主角搞定一切技术难题的天才女助理 **Songbird**…
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/162f0428-a44d-4e83-9e10-c6b580ef0120" alt="EchoBird —— 我的 AI 生涯仪表盘" width="820" />
+  <img src="docs/screenshots/deepseek-harness-demo.gif" alt="DeepSeek Harness 一键安装+切换模型 （演示）" width="820" />
+  <br/>
+  <sub><strong>DeepSeek Harness 一键安装+切换模型 （演示）</strong></sub>
 </p>
 
 ## 亮点
@@ -142,6 +144,12 @@ Gemini Desktop · Coffee CLI
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/agent-cn-dark.png">
   <img alt="安装与修复" src="docs/screenshots/agent-cn-light.png" width="100%">
 </picture>
+
+### 我的 AI 生涯 —— 仪表盘
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/162f0428-a44d-4e83-9e10-c6b580ef0120" alt="EchoBird —— 我的 AI 生涯仪表盘" width="820" />
+</p>
 
 ## 安装
 
