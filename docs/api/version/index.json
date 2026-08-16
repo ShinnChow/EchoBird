@@ -1,11 +1,11 @@
 {
   "version": "5.6.4",
-  "releaseDate": "2026-08-14",
-  "releaseNotes": "本次更新主题:新增 DeepSeek Harness 工具与 LongCat 模型。\n\n## 新增\n\n- 新增 DeepSeek Harness (dsh) 工具:一键安装、一键切换模型、一键启动,后台服务 + 浏览器界面。\n- 新增美团 LongCat-2.0 模型与供应商。",
+  "releaseDate": "2026-08-16",
+  "releaseNotes": "本次更新主题:新增 DeepSeek Harness 工具与 DeepSeek 家族支持。\n\n## 新增\n\n- 新增 DeepSeek Harness (dsh) 工具:一键安装、一键切换模型、一键启动,后台服务 + 浏览器界面。\n- 新增在\"我的AI生涯\"页面,对DeepSeek 家族的支持。",
   "releaseNotesI18n": {
-    "zh-cn": "本次更新主题:新增 DeepSeek Harness 工具与 LongCat 模型。\n\n## 新增\n\n- 新增 DeepSeek Harness (dsh) 工具:一键安装、一键切换模型、一键启动,后台服务 + 浏览器界面。\n- 新增美团 LongCat-2.0 模型与供应商。",
-    "en": "Theme of this update: new DeepSeek Harness tool and LongCat model.\n\n## New\n\n- Added DeepSeek Harness (dsh) tool: one-click install, model switching, and launch — a background service with a browser UI.\n- Added Meituan LongCat-2.0 model and provider.",
-    "zh-tw": "本次更新主題:新增 DeepSeek Harness 工具與 LongCat 模型。\n\n## 新增\n\n- 新增 DeepSeek Harness (dsh) 工具:一鍵安裝、一鍵切換模型、一鍵啟動,背景服務 + 瀏覽器介面。\n- 新增美團 LongCat-2.0 模型與供應商。",
-    "ja": "今回のアップデートのテーマ:DeepSeek Harness ツールと LongCat モデルを追加しました。\n\n## 追加\n\n- DeepSeek Harness (dsh) ツールを追加:ワンクリックでインストール・モデル切り替え・起動ができ、バックグラウンドサービス + ブラウザー UI で動作します。\n- Meituan の LongCat-2.0 モデルとプロバイダーを追加しました。"
+    "zh-cn": "本次更新主题:新增 DeepSeek Harness 工具与 DeepSeek 家族支持。\n\n## 新增\n\n- 新增 DeepSeek Harness (dsh) 工具:一键安装、一键切换模型、一键启动,后台服务 + 浏览器界面。\n- 新增在\"我的AI生涯\"页面,对DeepSeek 家族的支持。",
+    "en": "Theme of this update: new DeepSeek Harness tool and DeepSeek family support.\n\n## New\n\n- Added DeepSeek Harness (dsh) tool: one-click install, model switching, and launch — a background service with a browser UI.\n- Added support for the DeepSeek family on the \"My AI Career\" page.",
+    "zh-tw": "本次更新主題:新增 DeepSeek Harness 工具與 DeepSeek 家族支持。\n\n## 新增\n\n- 新增 DeepSeek Harness (dsh) 工具:一鍵安裝、一鍵切換模型、一鍵啟動,背景服務 + 瀏覽器介面。\n- 新增在「我的AI生涯」頁面,對 DeepSeek 家族的支持。",
+    "ja": "今回のアップデートのテーマ:DeepSeek Harness ツールと DeepSeek ファミリーのサポートを追加しました。\n\n## 追加\n\n- DeepSeek Harness (dsh) ツールを追加:ワンクリックでインストール・モデル切り替え・起動ができ、バックグラウンドサービス + ブラウザー UI で動作します。\n- 「マイ AI キャリア」ページで DeepSeek ファミリーのサポートを追加しました。"
   }
 }
