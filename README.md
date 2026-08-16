@@ -1,8 +1,4 @@
 <p align="center">
-  <img src="docs/logo.png" alt="EchoBird" width="100%" />
-</p>
-
-<p align="center">
   <img src="docs/icon.png" alt="EchoBird" width="140" />
 </p>
 
