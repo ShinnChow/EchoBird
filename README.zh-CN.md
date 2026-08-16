@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/icon.png" alt="EchoBird" width="140" />
+  <img src="docs/logo.png" alt="EchoBird" width="720" />
 </p>
 
 <h1 align="center">EchoBird</h1>
