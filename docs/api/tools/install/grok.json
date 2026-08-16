@@ -8,10 +8,9 @@
         "curl (macOS / Linux — recommended)": "curl -fsSL https://x.ai/cli/install.sh | bash",
         "powershell (Windows — recommended)": "irm https://x.ai/cli/install.ps1 | iex",
         "curl (Windows — Git Bash / MSYS2 alternative)": "curl -fsSL https://x.ai/cli/install.sh | bash",
-        "npm (any OS)": "npm install -g @xai-official/grok",
         "specific version": "curl -fsSL https://x.ai/cli/install.sh | bash -s 0.1.42",
         "deployment key (non-interactive)": "GROK_DEPLOYMENT_KEY=<key> bash <(curl -fsSL https://x.ai/cli/install.sh)",
-        "note": "Grok Build is in beta but openly installable — NO subscription required. Authenticate via `grok login` (browser OAuth, token in ~/.grok/auth.json) or the XAI_API_KEY env var. The curl/PowerShell installer drops `grok` (plus an `agent` ACP entry point) under ~/.grok/bin/ on every OS (npm installs into npm's global bin instead); on Windows add %USERPROFILE%\\.grok\\bin to PATH. WSL uses the Linux binary. Environment variables: GROK_CHANNEL (stable|alpha|enterprise, default stable), GROK_BIN_DIR (override install path), GROK_PROXY_URL (HTTP proxy), GROK_HOME (override config dir, default ~/.grok)."
+        "note": "Grok Build is in beta but openly installable — NO subscription required. Authenticate via `grok login` (browser OAuth, token in ~/.grok/auth.json) or the XAI_API_KEY env var. The curl/PowerShell installer drops `grok` (plus an `agent` ACP entry point) under ~/.grok/bin/ on every OS; on Windows add %USERPROFILE%\\.grok\\bin to PATH. WSL uses the Linux binary. Environment variables: GROK_CHANNEL (stable|alpha|enterprise, default stable), GROK_BIN_DIR (override install path), GROK_PROXY_URL (HTTP proxy), GROK_HOME (override config dir, default ~/.grok)."
     },
     "first_run": {
         "description": "Grok Build authenticates via xAI account OR via an inline API key. EchoBird's model switcher writes the key into ~/.grok/config.toml; the user only needs to run `grok login` when they restore to xAI Official.",
@@ -53,7 +52,7 @@
         "description": "Grok Build is xAI's official coding CLI, binary name `grok`. It is DIFFERENT from: the standalone Grok chat app at grok.com (web / iOS / Android), Grokipedia, and any third-party 'grok-cli' npm packages.",
         "common_confusions": {
             "grok.com web app": "grok.com is the consumer chat interface for the Grok model — NOT a CLI. Grok Build is a separate terminal coding agent.",
-            "third_party_grok_cli": "Several community npm packages use the name 'grok-cli' but are unrelated to xAI. The official npm package is `@xai-official/grok`; the curl/PowerShell installer from https://x.ai/cli is the recommended primary path."
+            "third_party_grok_cli": "Several community npm packages use the name 'grok-cli' but are unrelated to xAI. The ONLY documented install path is the curl/PowerShell installer from https://x.ai/cli (the npm package `@xai-official/grok` exists but is NOT documented by xAI)."
         }
     }
 }

@@ -6,7 +6,6 @@
     "github": "https://github.com/MoonshotAI/kimi-code",
     "install": {
         "curl (macOS / Linux — recommended)": "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash",
-        "Homebrew (macOS/Linux)": "brew install kimi-code",
         "npm (all platforms)": "npm install -g @moonshot-ai/kimi-code",
         "PowerShell (Windows)": "irm https://code.kimi.com/kimi-code/install.ps1 | iex",
         "note": "CLI coding agent by Moonshot AI (Kimi). The binary is `kimi` (curl installs to ~/.kimi-code/bin and prepends it to PATH; restart the shell or source the rc file before verifying). Built on Pi's pi-tui TUI library but a SEPARATE product — do NOT install `pi` or `@earendil-works/pi-coding-agent`. On Windows, Git for Windows is required (Kimi Code uses bundled Git Bash); set KIMI_SHELL_PATH if bash.exe is in a custom location."

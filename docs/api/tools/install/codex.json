@@ -5,15 +5,17 @@
     "docs": "https://github.com/openai/codex#readme",
     "github": "https://github.com/openai/codex",
     "install": {
-        "npm (all platforms — recommended)": "npm install -g @openai/codex@latest",
-        "bun (all platforms)": "bun add -g @openai/codex",
+        "npm (all platforms — recommended)": "npm install -g @openai/codex",
+        "curl (macOS / Linux)": "curl -fsSL https://chatgpt.com/codex/install.sh | sh",
+        "powershell (Windows)": "powershell -ExecutionPolicy ByPass -c \"irm https://chatgpt.com/codex/install.ps1 | iex\"",
+        "brew (macOS / Linux)": "brew install --cask codex",
         "WARNING": "The npm package name is EXACTLY '@openai/codex'. Do NOT confuse with '@anthropic-ai/claude-code' (that is Claude Code, a completely different tool). Do NOT install 'codex' alone (wrong package).",
         "note": "Codex CLI is OpenAI's open-source coding agent (built in Rust, distributed via npm). Requires Node.js >= 22. After install, verify with 'codex --version'. On Windows, run directly in PowerShell — do NOT use WSL. Codex is a LOCAL-ONLY CLI tool — it cannot be deployed on remote servers."
     },
     "network_requirements": {
         "test_urls": ["https://registry.npmjs.org/@openai/codex", "https://github.com/openai/codex"],
         "mirrors": {
-            "npm": "npm install -g @openai/codex@latest --registry=https://registry.npmmirror.com"
+            "npm": "npm install -g @openai/codex --registry=https://registry.npmmirror.com"
         }
     },
     "identity_guard": {

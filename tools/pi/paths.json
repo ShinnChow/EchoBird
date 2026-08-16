@@ -17,14 +17,11 @@
             "%APPDATA%\\npm\\pi.cmd",
             "%USERPROFILE%\\.local\\bin\\pi.exe",
             "%USERPROFILE%\\.bun\\bin\\pi.exe",
-            "%USERPROFILE%\\.hermes\\node\\bin\\pi.exe",
-            "%USERPROFILE%\\.hermes\\node\\bin\\pi.cmd",
             "%LOCALAPPDATA%\\pnpm\\pi.exe"
         ],
         "darwin": [
             "/usr/local/bin/pi",
             "/opt/homebrew/bin/pi",
-            "~/.hermes/node/bin/pi",
             "~/.bun/bin/pi",
             "~/.local/bin/pi",
             "~/.npm-global/bin/pi",
@@ -34,7 +31,6 @@
             "/usr/local/bin/pi",
             "/usr/bin/pi",
             "~/.local/bin/pi",
-            "~/.hermes/node/bin/pi",
             "~/.bun/bin/pi",
             "~/.npm-global/bin/pi",
             "~/.local/share/pnpm/pi"

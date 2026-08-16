@@ -10,7 +10,7 @@
         "scoop (Windows)": "scoop install opencode",
         "choco (Windows)": "choco install opencode",
         "npm (all platforms)": "npm i -g opencode-ai",
-        "bun (all platforms)": "bun add -g opencode-ai",
+        "bun (all platforms)": "bun install -g opencode-ai",
         "note": "CLI-based coding agent. Windows users: use scoop or choco. All platforms: npm/bun also work."
     }
 }

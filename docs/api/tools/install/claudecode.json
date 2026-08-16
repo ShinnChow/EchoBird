@@ -9,8 +9,8 @@
         "brew (macOS / Linux)": "brew install --cask claude-code",
         "powershell (Windows — recommended)": "irm https://claude.ai/install.ps1 | iex",
         "winget (Windows)": "winget install Anthropic.ClaudeCode",
-        "WARNING": "npm install is DEPRECATED. Do NOT use 'npm install -g @anthropic-ai/claude-code'. Use one of the methods above.",
-        "note": "After install, first-time setup MUST add allowedTools to settings for non-interactive use. See first_run below."
+        "npm (all platforms — still officially listed)": "npm install -g @anthropic-ai/claude-code",
+        "note": "Official docs still list `npm install -g @anthropic-ai/claude-code` as a valid method, but the native installers above (curl / brew / powershell / winget) are RECOMMENDED: they auto-update and install the build EchoBird's launcher expects. After install, first-time setup MUST add allowedTools to settings for non-interactive use. See first_run below."
     },
     "network_requirements": {
         "test_urls": ["https://claude.ai", "https://github.com/anthropics/claude-code"],
