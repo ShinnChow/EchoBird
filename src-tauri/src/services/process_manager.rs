@@ -166,7 +166,15 @@ impl ProcessManager {
         if let Some(command) = crate::services::tool_manager::get_tool_start_command(tool_id) {
             // Extract base command (first word) for existence check
             let base_cmd = command.split_whitespace().next().unwrap_or(&command);
-            if crate::utils::platform::command_exists(base_cmd).await {
+            // A curl/scoop/choco install can drop the binary in a dir that is not
+            // on EchoBird's process PATH (the installing shell's setx only affects
+            // future processes). The command_exists gate alone would reject it here
+            // before start_cli_tool's PATH augmentation can help. Allow the launch
+            // whenever paths.json still detects the binary on disk — start_cli_tool
+            // prepends its dir to PATH, so `cmd /C <command>` resolves.
+            if crate::utils::platform::command_exists(base_cmd).await
+                || crate::services::tool_manager::get_tool_declared_exe_path(tool_id).is_some()
+            {
                 log::info!(
                     "[ProcessManager] Starting CLI tool: {} with startCommand: {}",
                     tool_id,
@@ -227,7 +235,12 @@ impl ProcessManager {
 
         // Priority 5: Fall back to CLI command from paths.json "command" field
         if let Some(command) = crate::services::tool_manager::get_tool_command(tool_id) {
-            if crate::utils::platform::command_exists(&command).await {
+            // Same non-PATH install allowance as Priority 2: if paths.json still
+            // detects the binary on disk, proceed — start_cli_tool prepends its
+            // dir to PATH so the bare command resolves.
+            if crate::utils::platform::command_exists(&command).await
+                || crate::services::tool_manager::get_tool_declared_exe_path(tool_id).is_some()
+            {
                 log::info!(
                     "[ProcessManager] Falling back to CLI command for {}: {}",
                     tool_id,

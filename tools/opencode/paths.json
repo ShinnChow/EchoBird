@@ -16,6 +16,8 @@
             "%APPDATA%\\npm\\opencode.cmd",
             "%LOCALAPPDATA%\\Programs\\opencode\\opencode.exe",
             "%USERPROFILE%\\scoop\\shims\\opencode.exe",
+            "%PROGRAMDATA%\\chocolatey\\bin\\opencode.exe",
+            "%ChocolateyInstall%\\bin\\opencode.exe",
             "%PROGRAMFILES%\\opencode\\opencode.exe",
             "%USERPROFILE%\\.bun\\bin\\opencode.exe",
             "%USERPROFILE%\\.opencode\\bin\\opencode.exe",
