@@ -305,111 +305,158 @@
     "runtimes": ["llama-server", "vllm", "sglang"]
   },
   {
-    "id": "qwen3.6-27b",
-    "name": "Qwen3.6 27B",
+    "id": "qwen3.8-27b",
+    "name": "Qwen3.8 27B",
     "icon": "qwen",
-    "description": "Alibaba's latest flagship dense model — top reasoning, coding & multilingual",
-    "huggingfaceRepo": "unsloth/Qwen3.6-27B-GGUF",
+    "description": "Alibaba's newest flagship dense model — top reasoning, coding & multilingual",
+    "huggingfaceRepo": "unsloth/Qwen3.8-27B-GGUF",
     "variants": [
       {
         "quantization": "Q4_K_M",
-        "fileName": "Qwen3.6-27B-Q4_K_M.gguf",
-        "files": ["Qwen3.6-27B-Q4_K_M.gguf"],
-        "fileSize": 16817244384,
+        "files": ["Qwen3.8-27B-Q4_K_M.gguf"],
+        "fileSize": 17106775008,
         "recommendedVRAM": "24 GB"
       },
       {
         "quantization": "Q6_K",
-        "fileName": "Qwen3.6-27B-Q6_K.gguf",
-        "files": ["Qwen3.6-27B-Q6_K.gguf"],
-        "fileSize": 22523238624,
+        "files": ["Qwen3.8-27B-Q6_K.gguf"],
+        "fileSize": 22884408288,
         "recommendedVRAM": "32 GB"
       },
       {
         "quantization": "Q8_0",
-        "fileName": "Qwen3.6-27B-Q8_0.gguf",
-        "files": ["Qwen3.6-27B-Q8_0.gguf"],
-        "fileSize": 28595763424,
+        "files": ["Qwen3.8-27B-Q8_0.gguf"],
+        "fileSize": 29047086048,
         "recommendedVRAM": "32 GB"
       }
     ],
     "runtimes": ["llama-server", "vllm", "sglang"]
   },
   {
-    "id": "qwen3.6-35b-a3b",
-    "name": "Qwen3.6 35B-A3B (MoE)",
-    "icon": "qwen",
-    "description": "Latest Qwen MoE — 35B total, 3B active, runs as fast as 4B with frontier quality",
-    "huggingfaceRepo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+    "id": "deepseek-v4-flash-0731",
+    "name": "DeepSeek V4 Flash (MoE)",
+    "icon": "deepseek",
+    "description": "DeepSeek's fastest MoE — 304B total params, FP8, 6 active experts, top reasoning & coding at workstation RAM",
+    "huggingfaceRepo": "unsloth/DeepSeek-V4-Flash-0731-GGUF",
     "variants": [
       {
-        "quantization": "UD-IQ2_M",
-        "fileName": "Qwen3.6-35B-A3B-UD-IQ2_M.gguf",
-        "files": ["Qwen3.6-35B-A3B-UD-IQ2_M.gguf"],
-        "fileSize": 11522702304,
-        "recommendedVRAM": "12 GB"
+        "quantization": "UD-IQ1_S",
+        "files": [
+          "UD-IQ1_S/DeepSeek-V4-Flash-0731-UD-IQ1_S-00001-of-00003.gguf",
+          "UD-IQ1_S/DeepSeek-V4-Flash-0731-UD-IQ1_S-00002-of-00003.gguf",
+          "UD-IQ1_S/DeepSeek-V4-Flash-0731-UD-IQ1_S-00003-of-00003.gguf"
+        ],
+        "fileSize": 82539237792,
+        "recommendedVRAM": "96 GB"
       },
       {
-        "quantization": "Q4_K_M",
-        "fileName": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
-        "files": ["Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"],
-        "fileSize": 22134528992,
-        "recommendedVRAM": "24 GB"
+        "quantization": "UD-IQ2_XXS",
+        "files": [
+          "UD-IQ2_XXS/DeepSeek-V4-Flash-0731-UD-IQ2_XXS-00001-of-00003.gguf",
+          "UD-IQ2_XXS/DeepSeek-V4-Flash-0731-UD-IQ2_XXS-00002-of-00003.gguf",
+          "UD-IQ2_XXS/DeepSeek-V4-Flash-0731-UD-IQ2_XXS-00003-of-00003.gguf"
+        ],
+        "fileSize": 90860736928,
+        "recommendedVRAM": "96 GB"
       },
       {
-        "quantization": "Q6_K",
-        "fileName": "Qwen3.6-35B-A3B-UD-Q6_K.gguf",
-        "files": ["Qwen3.6-35B-A3B-UD-Q6_K.gguf"],
-        "fileSize": 29308320736,
-        "recommendedVRAM": "32 GB"
+        "quantization": "UD-Q4_K_XL",
+        "files": [
+          "UD-Q4_K_XL/DeepSeek-V4-Flash-0731-UD-Q4_K_XL-00001-of-00005.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Flash-0731-UD-Q4_K_XL-00002-of-00005.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Flash-0731-UD-Q4_K_XL-00003-of-00005.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Flash-0731-UD-Q4_K_XL-00004-of-00005.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Flash-0731-UD-Q4_K_XL-00005-of-00005.gguf"
+        ],
+        "fileSize": 155095241120,
+        "recommendedVRAM": "160 GB"
       },
       {
-        "quantization": "Q8_0",
-        "fileName": "Qwen3.6-35B-A3B-Q8_0.gguf",
-        "files": ["Qwen3.6-35B-A3B-Q8_0.gguf"],
-        "fileSize": 36903140320,
-        "recommendedVRAM": "48 GB"
+        "quantization": "UD-Q8_K_XL",
+        "files": [
+          "UD-Q8_K_XL/DeepSeek-V4-Flash-0731-UD-Q8_K_XL-00001-of-00005.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Flash-0731-UD-Q8_K_XL-00002-of-00005.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Flash-0731-UD-Q8_K_XL-00003-of-00005.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Flash-0731-UD-Q8_K_XL-00004-of-00005.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Flash-0731-UD-Q8_K_XL-00005-of-00005.gguf"
+        ],
+        "fileSize": 161869615520,
+        "recommendedVRAM": "176 GB"
       }
     ],
-    "runtimes": ["llama-server", "vllm", "sglang"]
+    "runtimes": [
+      "llama-server",
+      "vllm",
+      "sglang"
+    ]
   },
   {
-    "id": "qwen3.6-35b-a3b-opus-4.7-distill",
-    "name": "Qwen3.6 35B-A3B Opus 4.7 Distill MTP (MoE)",
-    "icon": "qwen",
-    "description": "Qwen3.6 MoE distilled from Claude Opus 4.7 — APEX-MTP quants by the LocalAI team. Bundled MTP draft head enables self-speculative decoding (~1.5-2× tps) via llama-server --draft-mtp",
-    "huggingfaceRepo": "mudler/Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-MTP-GGUF",
+    "id": "deepseek-v4-pro-0813",
+    "name": "DeepSeek V4 Pro (MoE)",
+    "icon": "deepseek",
+    "description": "DeepSeek's flagship MoE — 1.65T total params, FP8 + FP4 experts, frontier reasoning & coding",
+    "huggingfaceRepo": "unsloth/DeepSeek-V4-Pro-0813-GGUF",
     "variants": [
       {
-        "quantization": "I-Nano",
-        "fileName": "Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-MTP-I-Nano.gguf",
-        "files": ["Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-MTP-I-Nano.gguf"],
-        "fileSize": 11686646144,
-        "recommendedVRAM": "14 GB"
+        "quantization": "UD-Q4_K_XL",
+        "files": [
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00001-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00002-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00003-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00004-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00005-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00006-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00007-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00008-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00009-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00010-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00011-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00012-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00013-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00014-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00015-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00016-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00017-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00018-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00019-of-00020.gguf",
+          "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00020-of-00020.gguf"
+        ],
+        "fileSize": 849683927055,
+        "recommendedVRAM": "960 GB"
       },
       {
-        "quantization": "I-Compact",
-        "fileName": "Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-MTP-I-Compact.gguf",
-        "files": ["Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-MTP-I-Compact.gguf"],
-        "fileSize": 17329854848,
-        "recommendedVRAM": "20 GB"
-      },
-      {
-        "quantization": "I-Quality",
-        "fileName": "Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-MTP-I-Quality.gguf",
-        "files": ["Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-MTP-I-Quality.gguf"],
-        "fileSize": 23484576128,
-        "recommendedVRAM": "24 GB"
-      },
-      {
-        "quantization": "I-Balanced",
-        "fileName": "Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-MTP-I-Balanced.gguf",
-        "files": ["Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-MTP-I-Balanced.gguf"],
-        "fileSize": 26059444608,
-        "recommendedVRAM": "32 GB"
+        "quantization": "UD-Q8_K_XL",
+        "files": [
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00001-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00002-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00003-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00004-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00005-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00006-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00007-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00008-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00009-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00010-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00011-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00012-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00013-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00014-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00015-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00016-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00017-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00018-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00019-of-00020.gguf",
+          "UD-Q8_K_XL/DeepSeek-V4-Pro-0813-UD-Q8_K_XL-00020-of-00020.gguf"
+        ],
+        "fileSize": 873445601295,
+        "recommendedVRAM": "1024 GB"
       }
     ],
-    "runtimes": ["llama-server", "vllm", "sglang"]
+    "runtimes": [
+      "llama-server",
+      "vllm",
+      "sglang"
+    ]
   },
   {
     "id": "gemma-4-31b",
@@ -559,37 +606,6 @@
         "files": ["granite-4.1-30b-Q8_0.gguf"],
         "fileSize": 30674970560,
         "recommendedVRAM": "40 GB"
-      }
-    ],
-    "runtimes": ["llama-server", "vllm", "sglang"]
-  },
-  {
-    "id": "qwen3.6-27b-opus-distill-v2",
-    "name": "Qwen3.6 27B Opus Distill v2",
-    "icon": "qwen",
-    "description": "Qwen3.6 27B with Claude Opus 4.x reasoning distilled in — upgraded base + larger sample set over the original 4.6 distill",
-    "huggingfaceRepo": "TeichAI/Qwen3.6-27B-Claude-Opus-Reasoning-Distill-v2-GGUF",
-    "variants": [
-      {
-        "quantization": "Q4_K_M",
-        "fileName": "Qwen3.6-27B-Claude-Opus-Reasoning-Distill.q4_k_m.gguf",
-        "files": ["Qwen3.6-27B-Claude-Opus-Reasoning-Distill.q4_k_m.gguf"],
-        "fileSize": 16547399168,
-        "recommendedVRAM": "24 GB"
-      },
-      {
-        "quantization": "Q6_K",
-        "fileName": "Qwen3.6-27B-Claude-Opus-Reasoning-Distill.q6_k.gguf",
-        "files": ["Qwen3.6-27B-Claude-Opus-Reasoning-Distill.q6_k.gguf"],
-        "fileSize": 22082528768,
-        "recommendedVRAM": "32 GB"
-      },
-      {
-        "quantization": "Q8_0",
-        "fileName": "Qwen3.6-27B-Claude-Opus-Reasoning-Distill.q8_0.gguf",
-        "files": ["Qwen3.6-27B-Claude-Opus-Reasoning-Distill.q8_0.gguf"],
-        "fileSize": 28595762688,
-        "recommendedVRAM": "32 GB"
       }
     ],
     "runtimes": ["llama-server", "vllm", "sglang"]
@@ -956,6 +972,50 @@
         "files": ["Negentropy-claude-opus-4.7-4B-Q8_0.gguf"],
         "fileSize": 4482403328,
         "recommendedVRAM": "6 GB"
+      }
+    ],
+    "runtimes": ["llama-server", "vllm", "sglang"]
+  },
+  {
+    "id": "minicpm5-1b-claude-fable5",
+    "name": "MiniCPM5 1B Claude Fable 5 (Thinking)",
+    "icon": "",
+    "description": "OpenBMB MiniCPM5 1B distilled from Claude Fable 5 reasoning — tiny always-on thinking model, runs on CPU",
+    "huggingfaceRepo": "GnLOLot/MiniCPM5-1B-Claude-Opus-Fable5-Thinking-GGUF",
+    "variants": [
+      {
+        "quantization": "Q4_K_M",
+        "files": ["MiniCPM5-1B-Claude-Opus-Fable5-Thinking-Q4_K_M.gguf"],
+        "fileSize": 688066496,
+        "recommendedVRAM": "2 GB"
+      },
+      {
+        "quantization": "Q5_K_M",
+        "files": ["MiniCPM5-1B-Claude-Opus-Fable5-Thinking-Q5_K_M.gguf"],
+        "fileSize": 786862016,
+        "recommendedVRAM": "2 GB"
+      },
+      {
+        "quantization": "Q8_0",
+        "files": ["MiniCPM5-1B-Claude-Opus-Fable5-Thinking-Q8_0.gguf"],
+        "fileSize": 1153529792,
+        "recommendedVRAM": "2 GB"
+      }
+    ],
+    "runtimes": ["llama-server", "vllm", "sglang"]
+  },
+  {
+    "id": "minicpm5-1b-claude-fable5-v2",
+    "name": "MiniCPM5 1B Claude Fable 5 V2 (Thinking)",
+    "icon": "",
+    "description": "MiniCPM5 1B Claude Fable 5 V2 — upgraded tiny thinking model, runs on CPU",
+    "huggingfaceRepo": "GnLOLot/MiniCPM5-1B-Claude-Opus-Fable5-V2-Thinking-GGUF",
+    "variants": [
+      {
+        "quantization": "Q8_0",
+        "files": ["MiniCPM5-1B-Claude-Opus-Fable5-V2-Thinking-Q8_0.gguf"],
+        "fileSize": 1153529184,
+        "recommendedVRAM": "2 GB"
       }
     ],
     "runtimes": ["llama-server", "vllm", "sglang"]
