@@ -39,6 +39,15 @@
       感谢 <strong>优云智算</strong> 赞助了本项目!优云智算是 UCloud 旗下 AI 云平台,提供稳定、全面的国内外模型 API,仅一个 key 即可调用。主打包月、按次的高性价比国模 Coding Plan 套餐,支持 GLM5.2;同时提供官转稳定海外模型。支持接入 Claude Code、Codex 及 API 调用,支持企业高并发、7×24 技术支持、自助开票。通过<a href="https://passport.compshare.cn/register?referral_code=LlOJAWughXiDXtP9v1Srra">此链接</a>注册的用户,可得<strong>免费 5 元平台体验金</strong>!
     </td>
   </tr>
+  <tr>
+    <td width="150" align="center">
+      <a href="https://go.apimart.ai/gh-echobird"><img src="public/icons/sponsors/apimart.png" width="140" alt="APIMart" /></a>
+    </td>
+    <td>
+      <a href="https://go.apimart.ai/gh-echobird"><strong>APIMart</strong></a><br/>
+      感谢 <strong>APIMart</strong> 赞助了本项目!APIMart 是专注 AI 图片/视频生成的低价 API 平台,GPT-Image-2 低至 $0.006/张,1 美元可出图 160+ 张。图片、视频一套异步 API 通吃,提交任务拿 ID、回调取结果,跑批万张不超时、换模型不改代码。按量付费、无月费,通过<a href="https://go.apimart.ai/gh-echobird">此链接</a>注册即可开用。
+    </td>
+  </tr>
 </table>
 
 ---

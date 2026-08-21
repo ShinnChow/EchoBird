@@ -41,6 +41,15 @@
       Thanks to <strong>CompShare (优云智算)</strong> for sponsoring EchoBird! CompShare is UCloud's AI cloud platform, offering stable, comprehensive access to domestic and overseas model APIs through a single API key. Its flagship Coding Plan (monthly or pay-per-call) delivers great value and supports GLM5.2, alongside officially-proxied stable overseas models. Plug it into Claude Code, Codex, or call the API directly — with enterprise-grade concurrency, 24/7 support, and self-service invoicing. Sign up via <a href="https://passport.compshare.cn/register?referral_code=LlOJAWughXiDXtP9v1Srra">this link</a> to get a <strong>¥5 free platform credit</strong>!
     </td>
   </tr>
+  <tr>
+    <td width="150" align="center">
+      <a href="https://go.apimart.ai/gh-echobird"><img src="public/icons/sponsors/apimart.png" width="140" alt="APIMart" /></a>
+    </td>
+    <td>
+      <a href="https://go.apimart.ai/gh-echobird"><strong>APIMart</strong></a><br/>
+      Thanks to <strong>APIMart</strong> for sponsoring this project! APIMart is a low-cost API platform for AI image &amp; video generation — GPT-Image-2 from $0.006/image, 160+ images per dollar. One async API covers both image and video: submit a task, get an ID, fetch results via polling or callback. Batch tens of thousands of images without timeouts, switch models without changing code. Pay-as-you-go with no monthly fee — <a href="https://go.apimart.ai/gh-echobird">sign up here</a> to get started.
+    </td>
+  </tr>
 </table>
 
 ---
