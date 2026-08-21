@@ -340,6 +340,27 @@
   ],
   "relays": [
     {
+      "name": "APIMart",
+      "url": "https://go.apimart.ai/gh-echobird",
+      "baseUrl": "https://api.apimart.ai/v1",
+      "anthropicUrl": "https://api.apimart.ai",
+      "modelId": "claude-opus-5",
+      "modelIds": [
+        "claude-opus-5",
+        "grok-4.6",
+        "qwen3.8-max",
+        "gemini-3.7-flash",
+        "kimi-k3",
+        "minimax-m3",
+        "glm-5.2",
+        "mimo-v2.5-pro",
+        "gpt-5.6-sol",
+        "deepseek-v4-pro",
+        "deepseek-v4-flash"
+      ],
+      "region": "cn"
+    },
+    {
       "name": "OpenRouter",
       "url": "https://openrouter.ai",
       "baseUrl": "https://openrouter.ai/api/v1",
