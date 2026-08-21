@@ -43,7 +43,7 @@
   </tr>
   <tr>
     <td width="150" align="center">
-      <a href="https://go.apimart.ai/gh-echobird"><img src="public/icons/sponsors/apimart.png" width="140" alt="APIMart" /></a>
+      <a href="https://go.apimart.ai/gh-echobird"><img src="docs/sponsors/apimart.png" width="140" alt="APIMart" /></a>
     </td>
     <td>
       <a href="https://go.apimart.ai/gh-echobird"><strong>APIMart</strong></a><br/>
