@@ -177,7 +177,7 @@ fn apply_no_window(_cmd: &mut Command) {}
 ///
 /// The wrapped agent is invoked WITHOUT a `--model` flag — by design,
 /// Mother Agent's Connect mode lets the wrapped agent use whatever model
-/// is in its own config (set via App Manager or the agent's own setup).
+/// is in its own config (set via App Desktop or the agent's own setup).
 fn build_args(
     agent: &ParasiteAgent,
     message: &str,

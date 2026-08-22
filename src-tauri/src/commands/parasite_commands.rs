@@ -1,6 +1,6 @@
 // Parasite Commands — Tauri IPC for the Mother Agent's "Connect" mode.
 // Currently delegates the turn to Claude Code only; the wrapped agent
-// uses its own configured model (set via App Manager or `claude /model`).
+// uses its own configured model (set via App Desktop or `claude /model`).
 
 use crate::services::parasite::{self, SharedParasiteSessions};
 use serde::Deserialize;

@@ -75,7 +75,7 @@ fn my_projects_path() -> std::path::PathBuf {
 /// (`myProjectsStore`) owns the `MyProject` shape — we persist the array
 /// verbatim as JSON so the registry survives a webview-storage clear, can be
 /// backed up / hand-edited like the rest of ~/.echobird, and can be written by
-/// the "安装与修复" agent. Replaces the old localStorage-only persistence.
+/// the "一键安装" agent. Replaces the old localStorage-only persistence.
 #[tauri::command]
 pub fn get_my_projects() -> serde_json::Value {
     let path = my_projects_path();

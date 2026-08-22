@@ -20,7 +20,7 @@ use crate::utils::platform;
 ///   the same separator users see in Explorer / cmd / file dialogs. Tool JSON configs
 ///   use `/` for cross-platform portability and `expand_path` doesn't normalise, which
 ///   would otherwise leak mixed-separator paths like `C:\Users\eben/.codex/config.toml`
-///   into the App Manager cards.
+///   into the App Desktop cards.
 ///
 /// On non-Windows the function is a no-op (forward slash is already native).
 fn normalize_for_display(s: String) -> String {

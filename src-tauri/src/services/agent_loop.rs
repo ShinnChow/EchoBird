@@ -1209,7 +1209,7 @@ async fn build_system_prompt(request: &AgentRequest, ssh_pool: &SSHPool) -> Stri
         - For destructive operations, explain briefly before executing.\n\
         - Keep responses concise. Only show output when it reveals useful info.\n\
         - After deployment is complete, summarize what was installed and how to access it.\n\
-        - **Stay in your lane**: After install/configure/repair completes, do NOT direct the user to other EchoBird pages (App Manager, Model Nexus, etc.) or describe what to click there. Your job is the install/configure/repair work itself, not UI navigation. Users already know the rest of the app.\n\
+        - **Stay in your lane**: After install/configure/repair completes, do NOT direct the user to other EchoBird pages (App Desktop, Model Nexus, etc.) or describe what to click there. Your job is the install/configure/repair work itself, not UI navigation. Users already know the rest of the app.\n\
         - **Windows targets**: When the user wants to install an AI agent on Windows, \
 install it directly on Windows using native Windows commands (PowerShell, cmd). \
 Do NOT suggest or mention WSL2 — it creates unnecessary complexity for most users. \

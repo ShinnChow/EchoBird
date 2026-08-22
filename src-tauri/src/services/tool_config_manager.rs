@@ -405,7 +405,7 @@ fn normalize_model_info_for_tool(tool_id: &str, mut model_info: ModelInfo) -> Mo
 
 /// Delete the tool's config file (and any Echobird relay side-channel) so
 /// the tool itself regenerates a fresh, vendor-default config on next launch.
-/// Used by the App Manager "restore to official" flow.
+/// Used by the App Desktop "restore to official" flow.
 pub async fn restore_tool_to_official(tool_id: &str) -> ApplyResult {
     let config_path = match tool_manager::get_tool_config_mapping(tool_id) {
         Some((_, path)) => path,
@@ -3631,7 +3631,7 @@ fn apply_claudecode(model_info: &ModelInfo) -> ApplyResult {
 fn read_claudecode() -> Option<ModelInfo> {
     // Source of truth is the relay file (written in both modes), NOT
     // settings.json — mirrors read_claudedesktop. Surfaces the real upstream
-    // model so the App Manager card shows it after a rescan.
+    // model so the App Desktop card shows it after a rescan.
     let relay_path = echobird_dir().join("claudecode.json");
     let relay = read_json_file(&relay_path)?;
 
@@ -3651,7 +3651,7 @@ fn read_claudecode() -> Option<ModelInfo> {
         // Legacy tolerance: relay files written by ≤v5.3.8 (which had a 1M
         // toggle) may carry a `[1m]` suffix on actualModel. Strip it so the
         // surfaced active-model id matches the user's stored modelId —
-        // otherwise the App Manager card's "currently applied" highlight
+        // otherwise the App Desktop card's "currently applied" highlight
         // fails to match after a rescan. Nothing writes the suffix any more.
         .map(|s| s.strip_suffix("[1m]").unwrap_or(s))
         .filter(|s| !s.is_empty())
