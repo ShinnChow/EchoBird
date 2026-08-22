@@ -146,9 +146,7 @@ const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick }) =>
     <button
       onClick={onClick}
       aria-label={displayName}
-      className={`flex flex-col items-center gap-1.5 px-1.5 py-3 rounded-xl outline-none transition-colors select-none focus-visible:ring-2 focus-visible:ring-cyber-accent ${
-        selected ? 'bg-cyber-accent/10 ring-1 ring-cyber-accent' : 'hover:bg-cyber-surface/60'
-      }`}
+      className="flex flex-col items-center gap-1.5 px-1.5 py-3 rounded-xl outline-none transition-colors select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-cyber-accent"
     >
       {/* The icon alone is the graphic — no tile background behind it; the
           icon itself renders at the tile size. */}
@@ -159,7 +157,7 @@ const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick }) =>
             alt=""
             draggable={false}
             onError={handleIconError}
-            className={`w-14 h-14 object-contain ${tool.installed ? '' : 'opacity-80'}`}
+            className={`w-14 h-14 object-contain ${tool.installed || selected ? '' : 'opacity-80'}`}
           />
         ) : (
           <BoxIcon size={44} className="text-cyber-text-secondary" />
@@ -170,10 +168,15 @@ const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick }) =>
           </span>
         )}
       </span>
-      {/* Name wraps gracefully across up to two lines */}
+      {/* Name wraps gracefully across up to two lines; the selected tile
+          tints its label rather than drawing a highlight box. */}
       <span
         className={`text-xs leading-snug text-center w-full line-clamp-2 break-words ${
-          tool.installed ? 'text-cyber-text' : 'text-cyber-text-secondary'
+          selected
+            ? 'text-cyber-accent'
+            : tool.installed
+              ? 'text-cyber-text'
+              : 'text-cyber-text-secondary'
         }`}
       >
         {displayName}
