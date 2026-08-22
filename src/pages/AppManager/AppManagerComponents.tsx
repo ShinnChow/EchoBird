@@ -806,16 +806,13 @@ export const AppManagerPanel: React.FC = () => {
 
       <div className="flex-1 p-2 overflow-y-auto">
         {selectedToolData ? (
-          // Not installed yet — no model to configure; point at the bottom bar's
-          // "一键安装" instead of showing the model list for a tool that isn't here.
+          // Not installed yet — no model to configure; the bottom bar's
+          // "一键安装" already covers the action, so just state the state.
           !selectedToolData.installed ? (
             <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
               <BoxIcon size={28} className="text-cyber-text opacity-25" />
               <p className="text-base text-cyber-text-secondary font-mono leading-relaxed">
                 {t('aiDesktop.notInstalled')}
-              </p>
-              <p className="text-xs text-cyber-text-muted font-mono leading-relaxed">
-                {t('btn.installOneClick')}
               </p>
             </div>
           ) : selectedToolData.noModelConfig ? (
