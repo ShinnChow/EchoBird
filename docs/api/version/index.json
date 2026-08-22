@@ -1,11 +1,11 @@
 {
   "version": "5.6.5",
   "releaseDate": "2026-08-16",
-  "releaseNotes": "本次更新主题:新增 DeepSeek Harness 工具与 DeepSeek 家族支持。\n\n## 新增\n\n- 新增 DeepSeek Harness (dsh) 工具:一键安装、一键切换模型、一键启动,后台服务 + 浏览器界面。\n- 新增在\"我的AI生涯\"页面,对DeepSeek 家族的支持。",
+  "releaseNotes": "本次更新主题:Codex 模型图片识别支持与多项修复。\n\n## 新增\n\n- DeepSeek 与 MiMo 模型切换后支持图片识别,可在 Codex / ChatGPT 对话中直接上传图片。\n- 刷新本地 LLM 模型目录,接入最新模型数据。\n\n## 修复\n\n- 修复 Codex Desktop 会话标题被系统注入内容干扰的问题,现在正确显示真实对话主题。\n- 修复部分已安装但未加入 PATH 的工具无法启动的问题。\n- 修复工具安装超时时残留进程未清理的问题。\n- 工具安装引用对齐官方文档。",
   "releaseNotesI18n": {
-    "zh-cn": "本次更新主题:新增 DeepSeek Harness 工具与 DeepSeek 家族支持。\n\n## 新增\n\n- 新增 DeepSeek Harness (dsh) 工具:一键安装、一键切换模型、一键启动,后台服务 + 浏览器界面。\n- 新增在\"我的AI生涯\"页面,对DeepSeek 家族的支持。",
-    "en": "Theme of this update: new DeepSeek Harness tool and DeepSeek family support.\n\n## New\n\n- Added DeepSeek Harness (dsh) tool: one-click install, model switching, and launch — a background service with a browser UI.\n- Added support for the DeepSeek family on the \"My AI Career\" page.",
-    "zh-tw": "本次更新主題:新增 DeepSeek Harness 工具與 DeepSeek 家族支持。\n\n## 新增\n\n- 新增 DeepSeek Harness (dsh) 工具:一鍵安裝、一鍵切換模型、一鍵啟動,背景服務 + 瀏覽器介面。\n- 新增在「我的AI生涯」頁面,對 DeepSeek 家族的支持。",
-    "ja": "今回のアップデートのテーマ:DeepSeek Harness ツールと DeepSeek ファミリーのサポートを追加しました。\n\n## 追加\n\n- DeepSeek Harness (dsh) ツールを追加:ワンクリックでインストール・モデル切り替え・起動ができ、バックグラウンドサービス + ブラウザー UI で動作します。\n- 「マイ AI キャリア」ページで DeepSeek ファミリーのサポートを追加しました。"
+    "zh-cn": "本次更新主题:Codex 模型图片识别支持与多项修复。\n\n## 新增\n\n- DeepSeek 与 MiMo 模型切换后支持图片识别,可在 Codex / ChatGPT 对话中直接上传图片。\n- 刷新本地 LLM 模型目录,接入最新模型数据。\n\n## 修复\n\n- 修复 Codex Desktop 会话标题被系统注入内容干扰的问题,现在正确显示真实对话主题。\n- 修复部分已安装但未加入 PATH 的工具无法启动的问题。\n- 修复工具安装超时时残留进程未清理的问题。\n- 工具安装引用对齐官方文档。",
+    "en": "Theme of this update: image input support for Codex models and several fixes.\n\n## New\n\n- DeepSeek and MiMo models now support image input — attach images directly in Codex / ChatGPT conversations after switching.\n- Refreshed the local LLM model catalog with the latest model data.\n\n## Fixes\n\n- Fixed Codex Desktop session titles being polluted by system-injected content — titles now show the real conversation topic.\n- Fixed tools that are installed but not on PATH failing to launch.\n- Fixed leftover processes not being cleaned up when a tool install times out.\n- Aligned tool install references with official docs.",
+    "zh-tw": "本次更新主題:Codex 模型圖片識別支援與多項修復。\n\n## 新增\n\n- DeepSeek 與 MiMo 模型切換後支援圖片識別,可在 Codex / ChatGPT 對話中直接上傳圖片。\n- 重新整理本地 LLM 模型目錄,接入最新模型資料。\n\n## 修復\n\n- 修復 Codex Desktop 會話標題被系統注入內容干擾的問題,現在正確顯示真實對話主題。\n- 修復部分已安裝但未加入 PATH 的工具無法啟動的問題。\n- 修復工具安裝逾時時殘留程序未清理的問題。\n- 工具安裝參考對齊官方文件。",
+    "ja": "今回のアップデートのテーマ:Codex モデルの画像入力サポートと各種修正。\n\n## 追加\n\n- DeepSeek と MiMo モデルが画像入力に対応。切り替え後は Codex / ChatGPT の会話で直接画像を添付できます。\n- ローカル LLM のモデルカタログを最新データに更新しました。\n\n## 修正\n\n- Codex Desktop のセッションタイトルがシステム注入コンテンツに乱される問題を修正し、実際の会話トピックが正しく表示されるようになりました。\n- PATH に追加されていないがインストール済みのツールが起動できない問題を修正しました。\n- ツールのインストールがタイムアウトした際、残留プロセスがクリーンアップされない問題を修正しました。\n- ツールのインストール参照を公式ドキュメントに合わせました。"
   }
 }
