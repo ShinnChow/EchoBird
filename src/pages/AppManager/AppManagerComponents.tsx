@@ -127,8 +127,8 @@ interface DesktopIconProps {
 }
 
 // A desktop-style launcher tile: icon on top, name beneath. Clicking selects;
-// the bottom bar holds the launch / install action. Uninstalled apps render
-// dimmed to tell them apart from installed ones.
+// the bottom bar holds the launch / install action. All icons render
+// uniformly — which section an app sits in (已安装 / 未安装) tells the state.
 const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick }) => {
   const { locale } = useI18n();
   const [iconSrc, setIconSrc] = useState<string>(`./icons/tools/${tool.id}.svg`);
@@ -157,7 +157,7 @@ const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick }) =>
             alt=""
             draggable={false}
             onError={handleIconError}
-            className={`w-14 h-14 object-contain ${tool.installed || selected ? '' : 'opacity-80'}`}
+            className="w-14 h-14 object-contain"
           />
         ) : (
           <BoxIcon size={44} className="text-cyber-text-secondary" />
@@ -167,11 +167,7 @@ const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick }) =>
           tints its label rather than drawing a highlight box. */}
       <span
         className={`text-xs leading-snug text-center w-full line-clamp-2 break-words ${
-          selected
-            ? 'text-cyber-accent'
-            : tool.installed
-              ? 'text-cyber-text'
-              : 'text-cyber-text-secondary'
+          selected ? 'text-cyber-accent' : 'text-cyber-text'
         }`}
       >
         {displayName}
