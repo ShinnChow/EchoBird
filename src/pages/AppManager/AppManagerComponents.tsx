@@ -52,7 +52,7 @@ export const AppManagerTitleActions: React.FC = () => {
   );
 };
 
-// ===== Main Content (AI Desktop grid) =====
+// ===== Main Content (App Desktop grid) =====
 
 // Category order for the "未安装" (not installed) grouping. The installed
 // section renders flat (no category headers per spec); only the uninstalled
@@ -869,7 +869,7 @@ export const AppManagerBottom: React.FC = () => {
 
   const noModelConfig = !!selectedToolData?.noModelConfig;
   // An uninstalled tool flips the primary action to "一键安装" — one click
-  // walks the user to the Install & Repair (Mother) page prefilled with the
+  // walks the user to the One-Click Install (Mother) page prefilled with the
   // install prompt. Model config / launch are meaningless until the tool is
   // actually on the machine.
   const isUninstalled = !!selectedToolData && !selectedToolData.installed;

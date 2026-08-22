@@ -91,6 +91,26 @@ export const Sidebar = ({
       </div>
       <div className="flex-1 space-y-5 text-[15px]">
         <NavItem
+          icon={<Cpu size={20} />}
+          label={t('nav.appManager')}
+          active={activePage === 'apps'}
+          onClick={() => onPageChange('apps')}
+        />
+        <NavItem
+          icon={<Box size={20} />}
+          label={t('nav.modelNexus')}
+          active={activePage === 'models'}
+          onClick={() => onPageChange('models')}
+        />
+        <NavItem
+          icon={<Activity size={20} />}
+          label={t('nav.motherAgent')}
+          active={activePage === 'mother'}
+          onClick={() => onPageChange('mother')}
+        />
+        {/* Divider — the three primary actions sit above it; content pages below */}
+        <div className="border-t border-cyber-border/50" />
+        <NavItem
           icon={<Newspaper size={20} />}
           label={t('nav.news')}
           active={activePage === 'news'}
@@ -107,19 +127,6 @@ export const Sidebar = ({
           label={t('nav.skills')}
           active={activePage === 'skills'}
           onClick={() => onPageChange('skills')}
-        />
-        <NavItem
-          icon={<Box size={20} />}
-          label={t('nav.modelNexus')}
-          active={activePage === 'models'}
-          onClick={() => onPageChange('models')}
-        />
-
-        <NavItem
-          icon={<Cpu size={20} />}
-          label={t('nav.appManager')}
-          active={activePage === 'apps'}
-          onClick={() => onPageChange('apps')}
         />
         <NavItem
           icon={<Trophy size={20} />}
@@ -141,12 +148,6 @@ export const Sidebar = ({
             onClick={() => onPageChange('localLlm')}
           />
         )}
-        <NavItem
-          icon={<Activity size={20} />}
-          label={t('nav.motherAgent')}
-          active={activePage === 'mother'}
-          onClick={() => onPageChange('mother')}
-        />
       </div>
 
       {isFullEdition && (
