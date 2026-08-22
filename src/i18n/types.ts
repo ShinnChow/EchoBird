@@ -120,6 +120,7 @@ export type TKey =
   | 'btn.edit'
   | 'btn.launchApp'
   | 'btn.modifyOnly'
+  | 'btn.installOneClick'
   | 'btn.start'
   | 'btn.stop'
   | 'btn.remove'
@@ -168,6 +169,8 @@ export type TKey =
   | 'model.dragSort'
 
   // App Manager
+  | 'aiDesktop.installed'
+  | 'aiDesktop.notInstalled'
   | 'agent.myLocalModel'
   | 'agent.selectTool'
   | 'agent.noModelsTitle'

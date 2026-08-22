@@ -289,7 +289,7 @@ function App() {
                                         {is('projects') && 'RISING'}
                                         {is('skills') && 'MAGIC'}
                                         {is('models') && 'ROSTER'}
-                                        {is('apps') && 'STUDIO'}
+                                        {is('apps') && 'DESKTOP'}
                                         {is('myProjects') && 'VIBE CODING'}
                                         {is('aiCareer') && 'CAREER'}
                                         {is('localLlm') && 'RUNTIME'}

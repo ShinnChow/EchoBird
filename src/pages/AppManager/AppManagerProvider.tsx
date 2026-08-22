@@ -97,7 +97,6 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
 
   // Internalized state
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
-  const [activeToolCategory, setActiveToolCategory] = useState<string>('ALL');
   const [isLaunching, setIsLaunching] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
 
@@ -602,8 +601,6 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
       value={{
         selectedTool,
         setSelectedTool,
-        activeToolCategory,
-        setActiveToolCategory,
         launchAfterApply,
         setLaunchAfterApply,
         isLaunching,

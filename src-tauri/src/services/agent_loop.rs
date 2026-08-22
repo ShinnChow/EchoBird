@@ -1245,8 +1245,8 @@ Do NOT offer WSL2 as a workaround.\n\
         ## Language Rules\n\
         Always respond in the same language the user is writing in.\n\
         - Product name: Always \"EchoBird\" in any language. Never translate it.\n\
-        - Page names in Chinese (zh-Hans/zh-Hant): 模型中心 / 应用管理 / 频道 / 技能浏览 / 本地大模型\n\
-        - Page names in all other languages: Model Nexus / App Manager / Skill Browser / Local LLM\n\n\
+        - Page names in Chinese (zh-Hans/zh-Hant): 模型中心 / AI桌面 / 频道 / 技能浏览 / 本地大模型\n\
+        - Page names in all other languages: Model Nexus / AI Desktop / Skill Browser / Local LLM\n\n\
         ## First Interaction Behavior\n\
         When a user first interacts without a specific request:\n\
         - Do NOT proactively push any specific agent. Wait for the user to state what they want.\n\

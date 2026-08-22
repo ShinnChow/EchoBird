@@ -7,8 +7,6 @@ export interface AppManagerContextType {
   // Internalized state
   selectedTool: string | null;
   setSelectedTool: (id: string | null) => void;
-  activeToolCategory: string;
-  setActiveToolCategory: (cat: string) => void;
   launchAfterApply: boolean;
   setLaunchAfterApply: (v: boolean) => void;
   isLaunching: boolean;
@@ -76,15 +74,3 @@ export const useAppManager = () => {
   if (!ctx) throw new Error('useAppManager must be used within AppManagerProvider');
   return ctx;
 };
-
-// Tool categories
-export const toolCategories = [
-  'ALL',
-  'Desktop',
-  'IDE',
-  'CLI Code',
-  'Science',
-  'AutoTrading',
-  'Game',
-  'Utility',
-] as const;

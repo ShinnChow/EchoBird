@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Server as ServerIcon, Box as BoxIcon, RefreshCw, Settings } from 'lucide-react';
-import { ToolCard, getModelIcon, EffortPulse } from '../../components';
+import { Server as ServerIcon, Box as BoxIcon, Download, RefreshCw, Settings } from 'lucide-react';
+import { getModelIcon, EffortPulse } from '../../components';
 import { useI18n } from '../../hooks/useI18n';
 import * as api from '../../api/tauri';
 import type { ModelConfig, LocalTool } from '../../api/types';
 import type { TKey } from '../../i18n';
-import { useAppManager, toolCategories } from './context';
+import { useAppManager } from './context';
 import { useNavigationStore } from '../../stores/navigationStore';
 import {
   getOfficialEndpoint,
@@ -52,137 +52,243 @@ export const AppManagerTitleActions: React.FC = () => {
   );
 };
 
-// ===== Main Content (tool cards grid) =====
+// ===== Main Content (AI Desktop grid) =====
+
+// Category order for the "未安装" (not installed) grouping. The installed
+// section renders flat (no category headers per spec); only the uninstalled
+// section groups by category with i18n titles.
+const CATEGORY_ORDER = ['Desktop', 'IDE', 'CLI Code', 'Science', 'AutoTrading', 'Game', 'Utility'];
+
+// Within Desktop, keep the fixed display order (Coffee CLI last).
+const DESKTOP_ORDER: Record<string, number> = {
+  claudedesktop: 0,
+  chatgptdesktop: 1,
+  geminidesktop: 2,
+  coffeecli: 99,
+};
+
+const categoryRank = (cat?: string): number => {
+  const idx = CATEGORY_ORDER.indexOf(cat || '');
+  return idx === -1 ? 99 : idx;
+};
+
+// Within-category tiebreaker: Desktop keeps its fixed display order (Coffee
+// CLI last); Science keeps OpenScience first (its model-config support is
+// solid while Claude Science is macOS/Linux-only with thinner support).
+const withinCategoryRank = (tool: LocalTool): number => {
+  if (tool.category === 'Desktop') return DESKTOP_ORDER[tool.id] ?? 50;
+  if (tool.category === 'Science') return tool.id === 'openscience' ? 0 : 1;
+  return 0;
+};
+
+// Stable order across the desktop: category rank, then the within-category
+// tiebreaker, then name.
+const compareTools = (a: LocalTool, b: LocalTool): number => {
+  const catDiff = categoryRank(a.category) - categoryRank(b.category);
+  if (catDiff !== 0) return catDiff;
+  const rankDiff = withinCategoryRank(a) - withinCategoryRank(b);
+  if (rankDiff !== 0) return rankDiff;
+  return a.name.localeCompare(b.name);
+};
+
+const catLabelKey = (cat: string): TKey => {
+  const map: Record<string, TKey> = {
+    IDE: 'toolCat.ide',
+    'CLI Code': 'toolCat.cli',
+    AutoTrading: 'toolCat.autoTrading',
+    Game: 'toolCat.game',
+    Desktop: 'toolCat.desktop',
+    Utility: 'toolCat.utility',
+    Science: 'toolCat.science',
+  };
+  return map[cat] || (cat as TKey);
+};
+
+// Localized display name — resolves per-locale `names` like ToolCard, but
+// prefers `displayName` when present (the pre-localized label some tools
+// carry), then falls back to the plain name.
+const toolDisplayName = (tool: LocalTool, locale: string): string => {
+  if (tool.displayName) return tool.displayName;
+  if (tool.names && locale !== 'en') {
+    return (
+      tool.names[locale] ||
+      tool.names[locale.split('-')[0]] ||
+      Object.entries(tool.names).find(([k]) => k.startsWith(locale.split('-')[0]))?.[1] ||
+      tool.name
+    );
+  }
+  return tool.name;
+};
+
+interface DesktopIconProps {
+  tool: LocalTool;
+  selected: boolean;
+  onClick: () => void;
+}
+
+// A desktop-style launcher tile: icon on top, name beneath. Clicking selects;
+// the bottom bar holds the launch / install action. Uninstalled apps render
+// dimmed with a small download badge, hinting the "一键安装" flow.
+const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick }) => {
+  const { locale } = useI18n();
+  const [iconSrc, setIconSrc] = useState<string>(`./icons/tools/${tool.id}.svg`);
+  const displayName = toolDisplayName(tool, locale);
+
+  const handleIconError = () => {
+    setIconSrc((prev) => {
+      if (prev.endsWith('.svg')) return `./icons/tools/${tool.id}.png`;
+      if (tool.iconBase64 && prev !== tool.iconBase64) return tool.iconBase64;
+      return '';
+    });
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      aria-label={displayName}
+      className={`flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl outline-none transition-colors select-none focus-visible:ring-2 focus-visible:ring-cyber-accent ${
+        selected
+          ? 'bg-cyber-accent/10 ring-1 ring-cyber-accent'
+          : tool.installed
+            ? 'hover:bg-cyber-elevated'
+            : 'hover:bg-cyber-surface'
+      }`}
+    >
+      <span
+        className={`relative w-14 h-14 flex items-center justify-center rounded-lg overflow-hidden ${
+          tool.installed ? 'bg-cyber-surface' : 'bg-cyber-elevated'
+        }`}
+      >
+        {iconSrc ? (
+          <img
+            src={iconSrc}
+            alt=""
+            draggable={false}
+            onError={handleIconError}
+            className={`w-10 h-10 object-contain ${tool.installed ? '' : 'opacity-70'}`}
+          />
+        ) : (
+          <BoxIcon size={24} className="text-cyber-text-secondary" />
+        )}
+        {!tool.installed && (
+          <span className="absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full bg-cyber-accent flex items-center justify-center">
+            <Download size={10} className="text-white" />
+          </span>
+        )}
+      </span>
+      <span
+        className={`text-xs leading-tight text-center w-full truncate ${
+          tool.installed ? 'text-cyber-text' : 'text-cyber-text-secondary'
+        }`}
+      >
+        {displayName}
+      </span>
+    </button>
+  );
+};
 
 export const AppManagerMain: React.FC = () => {
   const { t } = useI18n();
-  const {
-    detectedTools,
-    isScanning,
-    activeToolCategory,
-    setActiveToolCategory,
-    selectedTool,
-    setSelectedTool,
-    onGoToMother,
-    aiInstallableIds,
-  } = useAppManager();
+  const { detectedTools, isScanning, selectedTool, setSelectedTool, aiInstallableIds } =
+    useAppManager();
+
+  const installed = useMemo(
+    () => detectedTools.filter((tool) => tool.installed).sort(compareTools),
+    [detectedTools]
+  );
+  const uninstalled = useMemo(
+    () => detectedTools.filter((tool) => !tool.installed),
+    [detectedTools]
+  );
+
+  // Group uninstalled apps by category: the canonical category order first,
+  // then any unknown categories alphabetically. AI-installable apps sort to
+  // the front of their group.
+  const uninstalledGroups = useMemo(() => {
+    const byCategory = new Map<string, LocalTool[]>();
+    for (const tool of uninstalled) {
+      const cat = tool.category || '';
+      byCategory.set(cat, [...(byCategory.get(cat) || []), tool]);
+    }
+    const sortGroup = (list: LocalTool[]) =>
+      list.sort((a, b) => {
+        const aAi = aiInstallableIds.includes(a.id) ? 0 : 1;
+        const bAi = aiInstallableIds.includes(b.id) ? 0 : 1;
+        if (aAi !== bAi) return aAi - bAi;
+        const rankDiff = withinCategoryRank(a) - withinCategoryRank(b);
+        if (rankDiff !== 0) return rankDiff;
+        return a.name.localeCompare(b.name);
+      });
+    const known = CATEGORY_ORDER.filter((cat) => byCategory.has(cat));
+    const unknown = Array.from(byCategory.keys())
+      .filter((cat) => !CATEGORY_ORDER.includes(cat))
+      .sort();
+    return [...known, ...unknown].map((cat) => ({ cat, tools: sortGroup(byCategory.get(cat)!) }));
+  }, [uninstalled, aiInstallableIds]);
+
+  const renderIcon = (tool: LocalTool) => (
+    <DesktopIcon
+      key={tool.id}
+      tool={tool}
+      selected={selectedTool === tool.id}
+      onClick={() => setSelectedTool(tool.id)}
+    />
+  );
+
+  const gridClass = 'grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-2';
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Toolbar - Fixed */}
-      {/* Category tabs — the refresh action lives in the shared page
-          title bar (AppManagerTitleActions), consistent with other pages */}
-      <div className="flex items-center flex-shrink-0 pb-4 mb-4">
-        <div className="flex gap-1">
-          {toolCategories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveToolCategory(cat)}
-              className={`px-4 py-2.5 text-[14px] transition-colors outline-none ${
-                activeToolCategory === cat
-                  ? 'text-cyber-text font-bold border-b-2 border-cyber-border'
-                  : 'text-cyber-text-secondary hover:text-cyber-text'
-              }`}
+      {isScanning && detectedTools.length === 0 ? (
+        <div className={gridClass}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl animate-pulse"
             >
-              {(() => {
-                const catMap: Record<string, string> = {
-                  ALL: 'toolCat.all',
-                  IDE: 'toolCat.ide',
-                  'CLI Code': 'toolCat.cli',
-                  AutoTrading: 'toolCat.autoTrading',
-                  Game: 'toolCat.game',
-                  Desktop: 'toolCat.desktop',
-                  Utility: 'toolCat.utility',
-                  Science: 'toolCat.science',
-                };
-                return t((catMap[cat] || cat) as TKey);
-              })()}
-            </button>
+              <span className="w-14 h-14 rounded-lg bg-cyber-border/30" />
+              <span className="w-12 h-3 bg-cyber-border/30 rounded" />
+            </div>
           ))}
         </div>
-      </div>
-      {/* Tool cards - Scrolling */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {isScanning && detectedTools.length === 0 ? (
-            // Skeleton cards while scanning
-            <>
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="relative p-5 border border-cyber-border rounded-card bg-cyber-surface flex flex-col animate-pulse"
-                >
-                  <div className="absolute top-4 right-4 w-10 h-10 rounded-lg bg-cyber-border/30" />
-                  <div className="h-5 w-2/3 bg-cyber-border/40 rounded mb-4" />
-                  <div className="space-y-2">
-                    <div className="h-3 w-4/5 bg-cyber-border/30 rounded" />
-                    <div className="h-3 w-3/5 bg-cyber-border/30 rounded" />
-                    <div className="h-3 w-4/5 bg-cyber-border/30 rounded" />
-                    <div className="h-3 w-2/5 bg-cyber-border/30 rounded" />
+      ) : (
+        <div className="flex-1 overflow-y-auto pulse-scroll pr-1">
+          {/* Installed — flat grid, no category headers (per spec) */}
+          {installed.length > 0 && (
+            <section className="mb-8">
+              <div className="flex items-baseline gap-2 mb-3">
+                <h3 className="text-sm font-bold tracking-wider text-cyber-text">
+                  {t('aiDesktop.installed')}
+                </h3>
+                <span className="text-xs text-cyber-text-muted">{installed.length}</span>
+              </div>
+              <div className={gridClass}>{installed.map(renderIcon)}</div>
+            </section>
+          )}
+
+          {/* Not installed — grouped by category with i18n titles */}
+          {uninstalledGroups.length > 0 && (
+            <section>
+              <div className="flex items-baseline gap-2 mb-3">
+                <h3 className="text-sm font-bold tracking-wider text-cyber-text">
+                  {t('aiDesktop.notInstalled')}
+                </h3>
+                <span className="text-xs text-cyber-text-muted">{uninstalled.length}</span>
+              </div>
+              <div className="space-y-6">
+                {uninstalledGroups.map(({ cat, tools }) => (
+                  <div key={cat || 'other'}>
+                    <h4 className="text-xs font-bold tracking-wider text-cyber-text-secondary mb-2.5">
+                      {cat ? t(catLabelKey(cat)) : t('toolCat.utility')}
+                    </h4>
+                    <div className={gridClass}>{tools.map(renderIcon)}</div>
                   </div>
-                </div>
-              ))}
-            </>
-          ) : (
-            detectedTools
-              .filter(
-                (tool) => activeToolCategory === 'ALL' || tool.category === activeToolCategory
-              )
-              .sort((a, b) => {
-                // 1. Installed first
-                if (a.installed !== b.installed) return a.installed ? -1 : 1;
-                // 2. Within same install status: AI auto-installable (remote index) first
-                const aHasRemote = aiInstallableIds.includes(a.id);
-                const bHasRemote = aiInstallableIds.includes(b.id);
-                if (aHasRemote !== bHasRemote) return aHasRemote ? -1 : 1;
-                // 3. Then by category
-                const categoryOrder: Record<string, number> = {
-                  Desktop: 0,
-                  IDE: 2,
-                  'CLI Code': 3,
-                  Science: 4,
-                  AutoTrading: 5,
-                  Game: 6,
-                  Utility: 7,
-                };
-                const catDiff =
-                  (categoryOrder[a.category || ''] ?? 99) - (categoryOrder[b.category || ''] ?? 99);
-                if (catDiff !== 0) return catDiff;
-                // 4. Within Desktop: fixed display order (Coffee CLI last)
-                if (a.category === 'Desktop' && b.category === 'Desktop') {
-                  const desktopOrder: Record<string, number> = {
-                    claudedesktop: 0,
-                    chatgptdesktop: 1,
-                    geminidesktop: 2,
-                    coffeecli: 99,
-                  };
-                  return (desktopOrder[a.id] ?? 50) - (desktopOrder[b.id] ?? 50);
-                }
-                // 4b. Within Science: OpenScience first (our model-config support
-                // is solid); Claude Science is macOS/Linux-only with thinner
-                // support, so it trails.
-                if (a.category === 'Science' && b.category === 'Science') {
-                  const scienceOrder: Record<string, number> = {
-                    openscience: 0,
-                    claudescience: 1,
-                  };
-                  return (scienceOrder[a.id] ?? 50) - (scienceOrder[b.id] ?? 50);
-                }
-                return 0;
-              })
-              .map((tool) => (
-                <ToolCard
-                  key={tool.id}
-                  {...tool}
-                  selected={selectedTool === tool.id}
-                  onClick={() => setSelectedTool(tool.id)}
-                  hasRemoteInstall={aiInstallableIds.includes(tool.id)}
-                  onMotherAgentInstall={() => onGoToMother(tool.id, tool.displayName || tool.name)}
-                />
-              ))
+                ))}
+              </div>
+            </section>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -734,9 +840,15 @@ export const AppManagerBottom: React.FC = () => {
     agreedConfigPolicy,
     setAgreedConfigPolicy,
     handleLaunch,
+    onGoToMother,
   } = useAppManager();
 
   const noModelConfig = !!selectedToolData?.noModelConfig;
+  // An uninstalled tool flips the primary action to "一键安装" — one click
+  // walks the user to the Install & Repair (Mother) page prefilled with the
+  // install prompt. Model config / launch are meaningless until the tool is
+  // actually on the machine.
+  const isUninstalled = !!selectedToolData && !selectedToolData.installed;
   const hasModelSelected = !!(selectedTool && toolModelConfig[selectedTool]);
   // What will a click actually do?
   //  - "Apply" runs only when the user picked a model AND agreed to the config-write policy.
@@ -745,7 +857,17 @@ export const AppManagerBottom: React.FC = () => {
   // forcing model selection just to start a CLI was the long-standing bug.
   const willApply = !noModelConfig && agreedConfigPolicy && hasModelSelected;
   const willLaunch = launchAfterApply || noModelConfig;
-  const buttonDisabled = !selectedTool || (!willApply && !willLaunch) || isLaunching;
+  const buttonDisabled =
+    !selectedToolData || isLaunching || (!isUninstalled && !willApply && !willLaunch);
+
+  // Uninstalled → install flow; otherwise the existing launch/apply flow.
+  const handlePrimaryClick = () => {
+    if (isUninstalled && selectedToolData) {
+      onGoToMother(selectedTool!, selectedToolData.displayName || selectedToolData.name);
+      return;
+    }
+    void handleLaunch();
+  };
 
   return (
     <div className="flex-shrink-0 flex flex-col mt-2">
@@ -759,7 +881,7 @@ export const AppManagerBottom: React.FC = () => {
         {/* Launch button */}
         {/* Launch button */}
         <button
-          onClick={handleLaunch}
+          onClick={handlePrimaryClick}
           disabled={buttonDisabled}
           className={`w-64 h-14 text-lg font-bold font-mono tracking-widest transition-colors flex-shrink-0 rounded-lg cjk-btn border shadow-lg ${
             buttonDisabled
@@ -767,13 +889,20 @@ export const AppManagerBottom: React.FC = () => {
               : 'bg-cyber-accent text-white border-cyber-accent hover:bg-cyber-accent-secondary hover:border-cyber-accent-secondary shadow-cyber-accent/30'
           }`}
         >
-          {willLaunch ? t('btn.launchApp') : t('btn.modifyOnly')}
+          {isUninstalled
+            ? t('btn.installOneClick')
+            : willLaunch
+              ? t('btn.launchApp')
+              : t('btn.modifyOnly')}
         </button>
         {/* Checkboxes — for tools that don't support model config (desktop apps,
-                    IDE plugins) the boxes stay visible but go gray + un-clickable, so the
-                    layout doesn't shift and the user understands why the toggles are inert. */}
+                    IDE plugins) or aren't installed yet the boxes stay visible but go
+                    gray + un-clickable, so the layout doesn't shift and the user
+                    understands why the toggles are inert. */}
         <div
-          className={`flex flex-col gap-2 ${noModelConfig ? 'opacity-40 pointer-events-none' : ''}`}
+          className={`flex flex-col gap-2 ${
+            noModelConfig || isUninstalled ? 'opacity-40 pointer-events-none' : ''
+          }`}
         >
           {/* Apply & Launch checkbox */}
           <label
