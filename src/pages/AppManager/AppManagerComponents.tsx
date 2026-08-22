@@ -146,38 +146,33 @@ const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick }) =>
     <button
       onClick={onClick}
       aria-label={displayName}
-      className={`flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl outline-none transition-colors select-none focus-visible:ring-2 focus-visible:ring-cyber-accent ${
-        selected
-          ? 'bg-cyber-accent/10 ring-1 ring-cyber-accent'
-          : tool.installed
-            ? 'hover:bg-cyber-elevated'
-            : 'hover:bg-cyber-surface'
+      className={`flex flex-col items-center gap-1.5 px-1.5 py-3 rounded-xl outline-none transition-colors select-none focus-visible:ring-2 focus-visible:ring-cyber-accent ${
+        selected ? 'bg-cyber-accent/10 ring-1 ring-cyber-accent' : 'hover:bg-cyber-surface/60'
       }`}
     >
-      <span
-        className={`relative w-14 h-14 flex items-center justify-center rounded-lg overflow-hidden ${
-          tool.installed ? 'bg-cyber-surface' : 'bg-cyber-elevated'
-        }`}
-      >
+      {/* The icon alone is the graphic — no tile background behind it; the
+          icon itself renders at the tile size. */}
+      <span className="relative flex items-center justify-center">
         {iconSrc ? (
           <img
             src={iconSrc}
             alt=""
             draggable={false}
             onError={handleIconError}
-            className={`w-10 h-10 object-contain ${tool.installed ? '' : 'opacity-70'}`}
+            className={`w-14 h-14 object-contain ${tool.installed ? '' : 'opacity-80'}`}
           />
         ) : (
-          <BoxIcon size={24} className="text-cyber-text-secondary" />
+          <BoxIcon size={44} className="text-cyber-text-secondary" />
         )}
         {!tool.installed && (
-          <span className="absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full bg-cyber-accent flex items-center justify-center">
+          <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-cyber-accent flex items-center justify-center ring-2 ring-cyber-bg">
             <Download size={10} className="text-white" />
           </span>
         )}
       </span>
+      {/* Name wraps gracefully across up to two lines */}
       <span
-        className={`text-xs leading-tight text-center w-full truncate ${
+        className={`text-xs leading-snug text-center w-full line-clamp-2 break-words ${
           tool.installed ? 'text-cyber-text' : 'text-cyber-text-secondary'
         }`}
       >
@@ -191,6 +186,9 @@ export const AppManagerMain: React.FC = () => {
   const { t } = useI18n();
   const { detectedTools, isScanning, selectedTool, setSelectedTool, aiInstallableIds } =
     useAppManager();
+  // Active category tab for the "未安装" section. 'ALL' shows every
+  // uninstalled app; the other tabs filter by category.
+  const [activeUninstalledCat, setActiveUninstalledCat] = useState('ALL');
 
   const installed = useMemo(
     () => detectedTools.filter((tool) => tool.installed).sort(compareTools),
@@ -201,30 +199,32 @@ export const AppManagerMain: React.FC = () => {
     [detectedTools]
   );
 
-  // Group uninstalled apps by category: the canonical category order first,
-  // then any unknown categories alphabetically. AI-installable apps sort to
-  // the front of their group.
-  const uninstalledGroups = useMemo(() => {
-    const byCategory = new Map<string, LocalTool[]>();
-    for (const tool of uninstalled) {
-      const cat = tool.category || '';
-      byCategory.set(cat, [...(byCategory.get(cat) || []), tool]);
-    }
-    const sortGroup = (list: LocalTool[]) =>
-      list.sort((a, b) => {
-        const aAi = aiInstallableIds.includes(a.id) ? 0 : 1;
-        const bAi = aiInstallableIds.includes(b.id) ? 0 : 1;
-        if (aAi !== bAi) return aAi - bAi;
-        const rankDiff = withinCategoryRank(a) - withinCategoryRank(b);
-        if (rankDiff !== 0) return rankDiff;
-        return a.name.localeCompare(b.name);
-      });
-    const known = CATEGORY_ORDER.filter((cat) => byCategory.has(cat));
-    const unknown = Array.from(byCategory.keys())
-      .filter((cat) => !CATEGORY_ORDER.includes(cat))
-      .sort();
-    return [...known, ...unknown].map((cat) => ({ cat, tools: sortGroup(byCategory.get(cat)!) }));
-  }, [uninstalled, aiInstallableIds]);
+  // Category tabs present among the uninstalled apps: the canonical order
+  // first, then any unknown categories alphabetically.
+  const uninstalledCats = useMemo(() => {
+    const cats = Array.from(new Set(uninstalled.map((t) => t.category).filter(Boolean)));
+    return [
+      ...CATEGORY_ORDER.filter((cat) => cats.includes(cat)),
+      ...cats.filter((cat) => !CATEGORY_ORDER.includes(cat)).sort(),
+    ];
+  }, [uninstalled]);
+
+  // Apps shown under the active tab. AI-installable first, then the
+  // within-category tiebreaker, then name.
+  const visibleUninstalled = useMemo(() => {
+    const list =
+      activeUninstalledCat === 'ALL'
+        ? uninstalled
+        : uninstalled.filter((t) => t.category === activeUninstalledCat);
+    return [...list].sort((a, b) => {
+      const aAi = aiInstallableIds.includes(a.id) ? 0 : 1;
+      const bAi = aiInstallableIds.includes(b.id) ? 0 : 1;
+      if (aAi !== bAi) return aAi - bAi;
+      const rankDiff = withinCategoryRank(a) - withinCategoryRank(b);
+      if (rankDiff !== 0) return rankDiff;
+      return a.name.localeCompare(b.name);
+    });
+  }, [uninstalled, activeUninstalledCat, aiInstallableIds]);
 
   const renderIcon = (tool: LocalTool) => (
     <DesktopIcon
@@ -235,7 +235,7 @@ export const AppManagerMain: React.FC = () => {
     />
   );
 
-  const gridClass = 'grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-2';
+  const gridClass = 'grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-2 gap-y-4';
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -246,45 +246,57 @@ export const AppManagerMain: React.FC = () => {
               key={i}
               className="flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl animate-pulse"
             >
-              <span className="w-14 h-14 rounded-lg bg-cyber-border/30" />
+              <span className="w-14 h-14 rounded-xl bg-cyber-border/30" />
               <span className="w-12 h-3 bg-cyber-border/30 rounded" />
             </div>
           ))}
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto pulse-scroll pr-1">
-          {/* Installed — flat grid, no category headers (per spec) */}
+          {/* Installed — flat grid, no section header (per spec) */}
           {installed.length > 0 && (
-            <section className="mb-8">
-              <div className="flex items-baseline gap-2 mb-3">
-                <h3 className="text-sm font-bold tracking-wider text-cyber-text">
-                  {t('aiDesktop.installed')}
-                </h3>
-                <span className="text-xs text-cyber-text-muted">{installed.length}</span>
-              </div>
+            <div className="mb-8">
               <div className={gridClass}>{installed.map(renderIcon)}</div>
-            </section>
+            </div>
           )}
 
-          {/* Not installed — grouped by category with i18n titles */}
-          {uninstalledGroups.length > 0 && (
+          {/* Not installed — category tabs switch the grid */}
+          {uninstalled.length > 0 && (
             <section>
-              <div className="flex items-baseline gap-2 mb-3">
-                <h3 className="text-sm font-bold tracking-wider text-cyber-text">
+              <div className="flex items-center gap-3 mb-3 flex-wrap">
+                <h3 className="text-sm font-bold tracking-wider text-cyber-text flex-shrink-0">
                   {t('aiDesktop.notInstalled')}
                 </h3>
-                <span className="text-xs text-cyber-text-muted">{uninstalled.length}</span>
+                <span className="text-xs text-cyber-text-muted flex-shrink-0">
+                  {uninstalled.length}
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setActiveUninstalledCat('ALL')}
+                    className={`px-3 py-1.5 text-[13px] transition-colors outline-none ${
+                      activeUninstalledCat === 'ALL'
+                        ? 'text-cyber-text font-bold border-b-2 border-cyber-border'
+                        : 'text-cyber-text-secondary hover:text-cyber-text'
+                    }`}
+                  >
+                    {t('toolCat.all')}
+                  </button>
+                  {uninstalledCats.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setActiveUninstalledCat(cat)}
+                      className={`px-3 py-1.5 text-[13px] transition-colors outline-none ${
+                        activeUninstalledCat === cat
+                          ? 'text-cyber-text font-bold border-b-2 border-cyber-border'
+                          : 'text-cyber-text-secondary hover:text-cyber-text'
+                      }`}
+                    >
+                      {t(catLabelKey(cat))}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-6">
-                {uninstalledGroups.map(({ cat, tools }) => (
-                  <div key={cat || 'other'}>
-                    <h4 className="text-xs font-bold tracking-wider text-cyber-text-secondary mb-2.5">
-                      {cat ? t(catLabelKey(cat)) : t('toolCat.utility')}
-                    </h4>
-                    <div className={gridClass}>{tools.map(renderIcon)}</div>
-                  </div>
-                ))}
-              </div>
+              <div className={gridClass}>{visibleUninstalled.map(renderIcon)}</div>
             </section>
           )}
         </div>
@@ -794,7 +806,19 @@ export const AppManagerPanel: React.FC = () => {
 
       <div className="flex-1 p-2 overflow-y-auto">
         {selectedToolData ? (
-          selectedToolData.noModelConfig ? (
+          // Not installed yet — no model to configure; point at the bottom bar's
+          // "一键安装" instead of showing the model list for a tool that isn't here.
+          !selectedToolData.installed ? (
+            <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
+              <BoxIcon size={28} className="text-cyber-text opacity-25" />
+              <p className="text-base text-cyber-text-secondary font-mono leading-relaxed">
+                {t('aiDesktop.notInstalled')}
+              </p>
+              <p className="text-xs text-cyber-text-muted font-mono leading-relaxed">
+                {t('btn.installOneClick')}
+              </p>
+            </div>
+          ) : selectedToolData.noModelConfig ? (
             <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
               <BoxIcon size={28} className="text-cyber-text opacity-25" />
               <p className="text-base text-cyber-text-secondary font-mono leading-relaxed">
