@@ -17,6 +17,14 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // index.html is the only app entry. Without this, vite's dependency
+  // pre-bundling scan crawls every .html in the repo — including the vendored
+  // `references/**` folders (gitignored but present on disk) — and fails on
+  // their broken imports whenever it re-optimizes (e.g. after a lockfile
+  // change). Limiting the scan to the real entry keeps `vite dev` green.
+  optimizeDeps: {
+    entries: ['index.html'],
+  },
   server: {
     port: 5173,
     open: false,
