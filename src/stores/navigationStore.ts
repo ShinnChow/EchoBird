@@ -24,7 +24,7 @@ interface NavigationState {
 }
 
 export const useNavigationStore = create<NavigationState>((set) => ({
-  activePage: 'news',
+  activePage: 'apps',
   motherPrefill: undefined,
   agentRunning: false,
   updateAvailable: null,

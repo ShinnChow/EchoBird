@@ -221,8 +221,9 @@ const ja: Partial<Translations> = {
   'toolCat.utility': 'ユーティリティ',
   'toolCat.science': 'サイエンス',
   'agent.modelsTab': 'モデル',
-  'aiDesktop.installed': 'インストール済み',
   'aiDesktop.notInstalled': '未インストール',
+  'aiDesktop.hideUninstalled': '未インストールを隠す',
+  'aiDesktop.showUninstalled': '未インストールを表示',
   'agent.codexRelayLabel': 'API Router',
   'agent.codexRelayHint':
     'API 中継または API Router が提供するデータ転送方式。サードパーティモデルで有効にするとフル接続になりますが、ツールに「よそ者」と判定される場合があります。',

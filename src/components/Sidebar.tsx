@@ -2,14 +2,14 @@
 import { useState, useEffect } from 'react';
 import {
   Box,
-  Cpu,
   Server,
-  Activity,
   Newspaper,
   Star,
   Sparkles,
   FolderHeart,
   Trophy,
+  Monitor,
+  Download,
 } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { useI18n } from '../hooks/useI18n';
@@ -91,7 +91,7 @@ export const Sidebar = ({
       </div>
       <div className="flex-1 space-y-5 text-[15px]">
         <NavItem
-          icon={<Cpu size={20} />}
+          icon={<Monitor size={20} />}
           label={t('nav.appManager')}
           active={activePage === 'apps'}
           onClick={() => onPageChange('apps')}
@@ -103,7 +103,7 @@ export const Sidebar = ({
           onClick={() => onPageChange('models')}
         />
         <NavItem
-          icon={<Activity size={20} />}
+          icon={<Download size={20} />}
           label={t('nav.motherAgent')}
           active={activePage === 'mother'}
           onClick={() => onPageChange('mother')}

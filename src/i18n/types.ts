@@ -169,8 +169,9 @@ export type TKey =
   | 'model.dragSort'
 
   // App Manager
-  | 'aiDesktop.installed'
   | 'aiDesktop.notInstalled'
+  | 'aiDesktop.hideUninstalled'
+  | 'aiDesktop.showUninstalled'
   | 'agent.myLocalModel'
   | 'agent.selectTool'
   | 'agent.noModelsTitle'

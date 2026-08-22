@@ -173,7 +173,7 @@ export const LocalServerMain: React.FC = () => {
   // Metal-enabled; other no-GPU hosts → AVX2 CPU build.
   const hasNvidiaGpu = systemInfo ? systemInfo.hasNvidiaGpu : false;
 
-  // Hand off to Mother Agent ("安装与修复" page) with a pre-filled trigger phrase.
+  // Hand off to Mother Agent ("一键安装" page) with a pre-filled trigger phrase.
   // Used by the CUDA detect/install helper pills below.
   const goToMother = useNavigationStore((s) => s.goToMother);
   const hasAmdGpu = systemInfo ? (systemInfo.hasAmdGpu ?? false) : false;

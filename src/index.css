@@ -267,6 +267,34 @@ html {
   font-size: 15px;
 }
 
+/* Desktop app — no hand/pointer cursor. Tailwind's preflight sets buttons to
+   cursor:pointer (web-like); this unlayered rule replaces that and the
+   cursor-pointer/grab/move utilities with the native default arrow. Text
+   fields keep the I-beam and disabled controls keep not-allowed. Unlayered
+   rules outrank Tailwind's base/utility layers, so this applies app-wide. */
+button,
+[role='button'],
+a,
+label,
+summary,
+select,
+.cursor-pointer,
+.cursor-grab,
+.cursor-move {
+  cursor: default;
+}
+:disabled,
+[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not(
+    [type='button']
+  ):not([type='submit']):not([type='reset']):not([type='file']):not(:disabled),
+textarea:not(:disabled),
+[contenteditable='true']:not(:disabled) {
+  cursor: text;
+}
+
 /* html/body/#root must stay transparent so the rounded outer shell in App.tsx
    carries the only visible background. Windows 11 DWM rounds undecorated
    windows at the OS level, masking any opaque body bg, but Linux Mutter and
@@ -398,6 +426,17 @@ pre {
 .pulse-scroll.is-scrolling::-webkit-scrollbar-thumb,
 .pulse-scroll:hover::-webkit-scrollbar-thumb {
   background: rgb(var(--accent-rgb) / 0.35);
+}
+
+/* Reserve the scrollbar gutter so content width never changes when a
+   vertical scrollbar appears/disappears — prevents horizontal reflow in
+   toggles like the App Desktop's 已安装/未安装 eye switch. macOS overlay
+   scrollbars take no layout space, so skip the reservation there. */
+.scrollbar-stable {
+  scrollbar-gutter: stable;
+}
+html.is-macos .scrollbar-stable {
+  scrollbar-gutter: auto;
 }
 
 /* macOS: neutralize .pulse-scroll. Forcing classic mode (display:block +

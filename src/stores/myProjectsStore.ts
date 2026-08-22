@@ -79,7 +79,7 @@ const isValidProject = (p: unknown): p is MyProject =>
 // Projects USED to live in localStorage; they now persist to
 // ~/.echobird/projects.json (via Rust). A file survives a webview-storage
 // clear, is backup / hand-edit friendly, and — crucially — can be appended by
-// the "安装与修复" agent when it installs a marketplace app. This legacy reader
+// the "一键安装" agent when it installs a marketplace app. This legacy reader
 // is kept ONLY to migrate old localStorage entries into the file once (init()).
 const loadLegacyProjects = (): MyProject[] => {
   try {

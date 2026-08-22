@@ -1,5 +1,31 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Server as ServerIcon, Box as BoxIcon, RefreshCw, Settings } from 'lucide-react';
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  closestCenter,
+  DragOverlay,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
+  Server as ServerIcon,
+  Box as BoxIcon,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Settings,
+} from 'lucide-react';
 import { getModelIcon, EffortPulse } from '../../components';
 import { useI18n } from '../../hooks/useI18n';
 import * as api from '../../api/tauri';
@@ -14,27 +40,40 @@ import {
 } from '../../data/officialEndpoints';
 
 // ===== Title actions (refresh) — mounted in the shared page title bar,
-// keeping App Management consistent with the other pages =====
+// keeping App Desktop consistent with the other pages =====
 
 export const AppManagerTitleActions: React.FC = () => {
   const { t } = useI18n();
-  const { scanTools, isScanning } = useAppManager();
+  const { scanTools, isScanning, showUninstalled, setShowUninstalled } = useAppManager();
 
   return (
     <div className="ml-auto flex-shrink-0 flex items-center gap-2">
       {/* Custom scan paths — opens ~/.echobird/tool-paths.json so users can
           register install locations EchoBird's bundled defaults missed.
-          Borderless icon (no button chrome), sized to the refresh button's
-          height so the two read as a pair. */}
+          Icon buttons share the refresh button's chrome and height. */}
       <button
         onClick={() => {
           void api.openToolPathsConfig().catch(() => {});
         }}
-        title={t('btn.editPaths')}
         aria-label={t('btn.editPaths')}
-        className="flex items-center text-cyber-text-secondary hover:text-cyber-text transition-colors outline-none"
+        className="flex items-center justify-center w-9 h-9 border border-cyber-border/50 rounded-md text-cyber-text-secondary hover:text-cyber-text hover:bg-cyber-text/10 transition-colors outline-none"
       >
-        <Settings size={20} />
+        <Settings size={16} />
+      </button>
+      {/* Toggle the "未安装" section on the desktop. Eye = shown, eye-off =
+          hidden (accent-tinted border + icon so the collapsed state reads). */}
+      <button
+        onClick={() => setShowUninstalled(!showUninstalled)}
+        aria-label={
+          showUninstalled ? t('aiDesktop.hideUninstalled') : t('aiDesktop.showUninstalled')
+        }
+        className={`flex items-center justify-center w-9 h-9 border rounded-md transition-colors outline-none ${
+          showUninstalled
+            ? 'border-cyber-border/50 text-cyber-text-secondary hover:text-cyber-text hover:bg-cyber-text/10'
+            : 'border-cyber-accent/50 text-cyber-accent hover:bg-cyber-accent/10'
+        }`}
+      >
+        {showUninstalled ? <Eye size={16} /> : <EyeOff size={16} />}
       </button>
       <button
         onClick={scanTools}
@@ -124,12 +163,16 @@ interface DesktopIconProps {
   tool: LocalTool;
   selected: boolean;
   onClick: () => void;
+  /** dnd-kit drag attributes/listeners (sortable tiles only). Applied to the
+      button itself so the tile stays a single focusable control instead of
+      nesting a button inside a role="button" wrapper. */
+  dragProps?: React.HTMLAttributes<HTMLElement>;
 }
 
 // A desktop-style launcher tile: icon on top, name beneath. Clicking selects;
 // the bottom bar holds the launch / install action. All icons render
 // uniformly — which section an app sits in (已安装 / 未安装) tells the state.
-const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick }) => {
+const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick, dragProps }) => {
   const { locale } = useI18n();
   const [iconSrc, setIconSrc] = useState<string>(`./icons/tools/${tool.id}.svg`);
   const displayName = toolDisplayName(tool, locale);
@@ -144,9 +187,10 @@ const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick }) =>
 
   return (
     <button
+      {...dragProps}
       onClick={onClick}
       aria-label={displayName}
-      className="flex flex-col items-center gap-1.5 px-1.5 py-3 rounded-xl outline-none transition-colors select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-cyber-accent"
+      className="flex flex-col items-center gap-1.5 px-1.5 py-3 w-full rounded-xl outline-none transition-colors select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-cyber-accent"
     >
       {/* The icon alone is the graphic — no tile background behind it; the
           icon itself renders at the tile size. */}
@@ -176,13 +220,66 @@ const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick }) =>
   );
 };
 
+// Sortable wrapper for installed icons — drag to rearrange the desktop.
+// The wrapper is the grid item; the tile inside fills it (w-full) so the
+// drag handles and the click-to-select behavior stay aligned.
+const SortableDesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: tool.id,
+  });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    // While dragging, fade the item at its sort position into a translucent
+    // placeholder — that's the insertion indicator — while the DragOverlay
+    // ghost carries the visuals following the cursor.
+    opacity: isDragging ? 0.3 : undefined,
+    zIndex: isDragging ? 10 : undefined,
+  };
+  return (
+    <div ref={setNodeRef} style={style} className="flex">
+      <DesktopIcon
+        tool={tool}
+        selected={selected}
+        onClick={onClick}
+        dragProps={{ ...attributes, ...listeners }}
+      />
+    </div>
+  );
+};
+
 export const AppManagerMain: React.FC = () => {
   const { t } = useI18n();
-  const { detectedTools, isScanning, selectedTool, setSelectedTool, aiInstallableIds } =
-    useAppManager();
+  const {
+    detectedTools,
+    isScanning,
+    selectedTool,
+    setSelectedTool,
+    aiInstallableIds,
+    showUninstalled,
+  } = useAppManager();
   // Active category tab for the "未安装" section. 'ALL' shows every
   // uninstalled app; the other tabs filter by category.
   const [activeUninstalledCat, setActiveUninstalledCat] = useState('ALL');
+
+  // User-set order for installed icons, persisted across sessions. Tools not
+  // in the saved order (newly installed) sink below the ordered ones.
+  const [toolOrder, setToolOrder] = useState<string[]>(() => {
+    try {
+      const v = localStorage.getItem('echobird_appmgr_tool_order');
+      return v ? (JSON.parse(v) as string[]) : [];
+    } catch {
+      return [];
+    }
+  });
+  const saveToolOrder = (ids: string[]) => {
+    setToolOrder(ids);
+    try {
+      localStorage.setItem('echobird_appmgr_tool_order', JSON.stringify(ids));
+    } catch {
+      /* private mode */
+    }
+  };
 
   const installed = useMemo(
     () => detectedTools.filter((tool) => tool.installed).sort(compareTools),
@@ -192,6 +289,43 @@ export const AppManagerMain: React.FC = () => {
     () => detectedTools.filter((tool) => !tool.installed),
     [detectedTools]
   );
+
+  // Apply the saved order on top of the default sort: known ids first in
+  // saved order, then any freshly-detected tools in default order.
+  const installedOrdered = useMemo(() => {
+    const orderIndex = new Map(toolOrder.map((id, i) => [id, i]));
+    const known = installed.filter((t) => orderIndex.has(t.id));
+    const unknown = installed.filter((t) => !orderIndex.has(t.id));
+    known.sort((a, b) => orderIndex.get(a.id)! - orderIndex.get(b.id)!);
+    return [...known, ...unknown];
+  }, [installed, toolOrder]);
+
+  // Drag-reorder for installed icons — pointer with a 5px activation so
+  // plain clicks still select; keyboard for a11y. On drop, reorder in place
+  // and persist the full visible order (best-effort; a failed write just
+  // reverts on next reload).
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragId(String(event.active.id));
+  };
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragId(null);
+    const activeId = String(event.active.id);
+    const overId = String(event.over?.id ?? '');
+    if (!overId || activeId === overId) return;
+    const oldIndex = installedOrdered.findIndex((t) => t.id === activeId);
+    const newIndex = installedOrdered.findIndex((t) => t.id === overId);
+    if (oldIndex < 0 || newIndex < 0) return;
+    saveToolOrder(arrayMove(installedOrdered, oldIndex, newIndex).map((t) => t.id));
+  };
+  const handleDragCancel = () => setActiveDragId(null);
+
+  const activeDragTool = activeDragId ? installed.find((t) => t.id === activeDragId) : undefined;
 
   // Category tabs present among the uninstalled apps: the canonical order
   // first, then any unknown categories alphabetically.
@@ -246,16 +380,46 @@ export const AppManagerMain: React.FC = () => {
           ))}
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto pulse-scroll pr-1">
-          {/* Installed — flat grid, no section header (per spec) */}
-          {installed.length > 0 && (
-            <div className="mb-8">
-              <div className={gridClass}>{installed.map(renderIcon)}</div>
+        <div className="flex-1 overflow-y-auto pulse-scroll pr-1 scrollbar-stable">
+          {/* Installed — flat draggable grid, no section header (per spec) */}
+          {installedOrdered.length > 0 && (
+            <div className={showUninstalled && uninstalled.length > 0 ? 'mb-8' : ''}>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDragCancel={handleDragCancel}
+              >
+                <SortableContext
+                  items={installedOrdered.map((t) => t.id)}
+                  strategy={rectSortingStrategy}
+                >
+                  <div className={gridClass}>
+                    {installedOrdered.map((tool) => (
+                      <SortableDesktopIcon
+                        key={tool.id}
+                        tool={tool}
+                        selected={selectedTool === tool.id}
+                        onClick={() => setSelectedTool(tool.id)}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+                <DragOverlay>
+                  {activeDragTool && (
+                    <div className="pointer-events-none opacity-70 scale-105 drop-shadow-lg">
+                      <DesktopIcon tool={activeDragTool} selected={false} onClick={() => {}} />
+                    </div>
+                  )}
+                </DragOverlay>
+              </DndContext>
             </div>
           )}
 
-          {/* Not installed — category tabs switch the grid */}
-          {uninstalled.length > 0 && (
+          {/* Not installed — category tabs switch the grid; hidden on demand
+              via the eye toggle in the page title bar for a cleaner view */}
+          {showUninstalled && uninstalled.length > 0 && (
             <section>
               <div className="flex items-center gap-3 mb-3 flex-wrap">
                 <h3 className="text-sm font-bold tracking-wider text-cyber-text flex-shrink-0">
@@ -426,8 +590,10 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
     return (
       <div
         key={model.internalId}
-        className={`relative overflow-hidden p-3 rounded cursor-pointer transition-colors mb-2 flex items-center gap-3 border bg-cyber-surface ${
-          isSelected ? 'border-cyber-accent' : 'border-transparent hover:bg-cyber-elevated'
+        className={`relative overflow-hidden p-3 rounded-card cursor-pointer transition-colors mb-2 flex items-center gap-3 border ${
+          isSelected
+            ? 'bg-cyber-elevated border-transparent'
+            : 'bg-cyber-surface border-transparent hover:bg-cyber-elevated'
         }`}
         onClick={() => selectedTool && handleSelectModel(selectedTool, model.internalId)}
       >
@@ -437,13 +603,11 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
         {/* Left: Radio + Icon */}
         <div className="relative z-10 flex items-center gap-3 flex-shrink-0">
           <div
-            className={`w-4 h-4 rounded-full border-2 relative ${
+            className={`w-[16px] h-[16px] rounded-full border-2 flex items-center justify-center ${
               isSelected ? 'border-cyber-accent' : 'border-cyber-border'
             }`}
           >
-            {isSelected && (
-              <div className="w-2 h-2 rounded-full bg-cyber-accent absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-            )}
+            {isSelected && <div className="w-[8px] h-[8px] rounded-full bg-cyber-accent" />}
           </div>
           {iconSrc ? (
             <img
@@ -519,8 +683,10 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
 
     return (
       <div
-        className={`relative overflow-hidden p-3 rounded cursor-pointer transition-colors mb-2 flex items-center gap-3 border bg-cyber-surface ${
-          isOfficialPending ? 'border-cyber-accent' : 'border-transparent hover:bg-cyber-elevated'
+        className={`relative overflow-hidden p-3 rounded-card cursor-pointer transition-colors mb-2 flex items-center gap-3 border ${
+          isOfficialPending
+            ? 'bg-cyber-elevated border-transparent'
+            : 'bg-cyber-surface border-transparent hover:bg-cyber-elevated'
         }`}
         onClick={() => selectedTool && handleSelectModel(selectedTool, officialSentinel)}
       >
@@ -529,13 +695,11 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
         )}
         <div className="relative z-10 flex items-center gap-3 flex-shrink-0">
           <div
-            className={`w-4 h-4 rounded-full border-2 relative ${
+            className={`w-[16px] h-[16px] rounded-full border-2 flex items-center justify-center ${
               isOfficialPending ? 'border-cyber-accent' : 'border-cyber-border'
             }`}
           >
-            {isOfficialPending && (
-              <div className="w-2 h-2 rounded-full bg-cyber-accent absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-            )}
+            {isOfficialPending && <div className="w-[8px] h-[8px] rounded-full bg-cyber-accent" />}
           </div>
           {iconSrc ? (
             <img
@@ -1003,7 +1167,7 @@ export const AppManagerBottom: React.FC = () => {
 
 // Orange instructional copy shown at the bottom-left of the launch row.
 // Branches on activePage so the same AppManagerBottom can serve both
-// "应用管理" and "我的AI项目" without duplicating the rest of the row.
+// "应用桌面" and "我的AI项目" without duplicating the rest of the row.
 const PageAwareHint: React.FC = () => {
   const { t } = useI18n();
   const activePage = useNavigationStore((s) => s.activePage);

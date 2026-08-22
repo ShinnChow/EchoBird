@@ -65,6 +65,9 @@ export interface AppManagerContextType {
   onGoToMother: (toolId: string, toolName: string) => void;
   // AI-installable tool IDs (from bundled tools/install/index.json)
   aiInstallableIds: string[];
+  /** Whether the "未安装" (not installed) section is shown on the desktop */
+  showUninstalled: boolean;
+  setShowUninstalled: (v: boolean) => void;
 }
 
 export const AppManagerContext = createContext<AppManagerContextType | null>(null);

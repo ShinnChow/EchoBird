@@ -55,13 +55,13 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   // right panel AND the 我的AI项目 right panel (same ModelListSection
   // component), so reload on either activation — otherwise a model added
   // in 模型中心 only surfaces in 我的AI项目 after the user incidentally
-  // bounces through 应用管理 (which flips isActive). The extra trigger
+  // bounces through 应用桌面 (which flips isActive). The extra trigger
   // is free in practice (IPC + a couple of file reads on local Rust).
   const [userModels, setUserModels] = useState<ModelConfig[]>([]);
   const userModelsActive = isActive || activePage === 'myProjects';
   useEffect(() => {
     if (!api.getModels) return;
-    // Guard against out-of-order resolution: rapid 应用管理/我的AI项目 toggles can
+    // Guard against out-of-order resolution: rapid 应用桌面/我的AI项目 toggles can
     // overlap getModels() calls, and a slower earlier one resolving last would
     // clobber userModels with stale data.
     let ignore = false;
@@ -213,6 +213,15 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const [claude1mMode, setClaude1mModeRaw] = useState<boolean>(() =>
     readBool('echobird_claudecode_1m_mode', false)
   );
+  // Whether the "未安装" section is visible on the desktop. Default on;
+  // hiding it gives a cleaner installed-only view. Persisted across sessions.
+  const [showUninstalled, setShowUninstalledRaw] = useState<boolean>(() =>
+    readBool('echobird_appmgr_show_uninstalled', true)
+  );
+  const setShowUninstalled = (v: boolean) => {
+    setShowUninstalledRaw(v);
+    writeBool('echobird_appmgr_show_uninstalled', v);
+  };
   // Tool model config (single selection - one model per tool)
   const [toolModelConfig, setToolModelConfig] = useState<Record<string, string | null>>({
     claudecode: null,
@@ -633,6 +642,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         handleLaunch,
         onGoToMother: handleGoToMother,
         aiInstallableIds,
+        showUninstalled,
+        setShowUninstalled,
       }}
     >
       {children}

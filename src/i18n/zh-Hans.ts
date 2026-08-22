@@ -196,8 +196,9 @@ const zhHans: Partial<Translations> = {
   'toolCat.utility': '工具',
   'toolCat.science': '科研',
   'agent.modelsTab': '模型',
-  'aiDesktop.installed': '已安装',
   'aiDesktop.notInstalled': '未安装',
+  'aiDesktop.hideUninstalled': '隐藏未安装',
+  'aiDesktop.showUninstalled': '显示未安装',
   'agent.codexRelayLabel': 'API Router',
   'agent.codexRelayHint':
     '由 API 中转站或 API Router 提供的数据转发方案，第三方模型开启则全量接入，但可能会被工具判定为“外乡人”。',

@@ -488,7 +488,7 @@ export function MotherAgentProvider({ children }: { children: React.ReactNode })
       // CC runs in its own environment with its own memory, skills, tools,
       // AND model config. EchoBird's model selector is hidden while
       // Connect is active — model management belongs to Claude Code
-      // (configure via App Manager or `claude /model`).
+      // (configure via App Desktop or `claude /model`).
       if (parasiteAgent) {
         try {
           await api.parasiteSendMessage({

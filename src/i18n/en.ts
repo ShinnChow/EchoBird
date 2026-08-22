@@ -157,8 +157,9 @@ const en: Translations = {
   'model.escCancel': 'CANCEL',
   'model.enterSave': 'SAVE',
   // App Manager
-  'aiDesktop.installed': 'Installed',
   'aiDesktop.notInstalled': 'Not Installed',
+  'aiDesktop.hideUninstalled': 'Hide Not Installed',
+  'aiDesktop.showUninstalled': 'Show Not Installed',
   'agent.myLocalModel': 'My Local Model',
   'agent.selectTool': 'Select a tool to configure',
   'agent.noModelsTitle': 'No models configured.',
