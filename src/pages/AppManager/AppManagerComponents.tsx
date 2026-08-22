@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Server as ServerIcon, Box as BoxIcon, Download, RefreshCw, Settings } from 'lucide-react';
+import { Server as ServerIcon, Box as BoxIcon, RefreshCw, Settings } from 'lucide-react';
 import { getModelIcon, EffortPulse } from '../../components';
 import { useI18n } from '../../hooks/useI18n';
 import * as api from '../../api/tauri';
@@ -128,7 +128,7 @@ interface DesktopIconProps {
 
 // A desktop-style launcher tile: icon on top, name beneath. Clicking selects;
 // the bottom bar holds the launch / install action. Uninstalled apps render
-// dimmed with a small download badge, hinting the "一键安装" flow.
+// dimmed to tell them apart from installed ones.
 const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick }) => {
   const { locale } = useI18n();
   const [iconSrc, setIconSrc] = useState<string>(`./icons/tools/${tool.id}.svg`);
@@ -161,11 +161,6 @@ const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick }) =>
           />
         ) : (
           <BoxIcon size={44} className="text-cyber-text-secondary" />
-        )}
-        {!tool.installed && (
-          <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-cyber-accent flex items-center justify-center ring-2 ring-cyber-bg">
-            <Download size={10} className="text-white" />
-          </span>
         )}
       </span>
       {/* Name wraps gracefully across up to two lines; the selected tile
