@@ -14,13 +14,13 @@
 // The bundled assets are NOT model lists. Each is a **capability template** for
 // one vendor — the fields that are model-agnostic (base_instructions prompt
 // framework, apply_patch_tool_type, web_search_tool_type, supported_reasoning
-// _levels, truncation_policy, …). `build_catalog` stamps the SELECTED model's
-// identity onto that template (slug / display_name / context_window / priority)
-// and emits a single-entry `{"models":[...]}`. So switching to
-// `deepseek-v5-flash` or `mimo-v2.6` "just works" with zero maintenance — we
-// never enumerate a vendor's model versions. Matching is domain-only, never by
-// model brand (a reseller may not implement the same capabilities — same rule
-// cc-switch v3.19.1 uses).
+// levels, truncation_policy, input_modalities, …). `build_catalog` stamps the
+// selected model's identity onto that template (slug / display_name /
+// context_window / priority) and emits a single-entry `{"models":[...]}`. So
+// switching to `deepseek-v5-flash` or `mimo-v2.6` "just works" with zero
+// maintenance — we never enumerate a vendor's model versions. Matching is
+// domain-only, never by model brand (a reseller may not implement the same
+// capabilities — same rule cc-switch v3.19.1 uses).
 //
 // Vendors we do NOT bundle keep the current behavior: no `model_catalog_json`
 // line, Codex talks to the upstream directly with the real id (its own default
@@ -42,9 +42,9 @@ pub const DEEPSEEK_TEMPLATE: &str = include_str!("../../assets/codex-catalogs/de
 /// selected display name.
 pub const MINIMAX_TEMPLATE: &str = include_str!("../../assets/codex-catalogs/minimax.json");
 
-/// Xiaomi MiMo Codex capability template (1M window, text-only, NO web_search
-/// tool — MiMo rejects it with a hard 400). Mirrors the catalog cc-switch
-/// generates for MiMo.
+/// Xiaomi MiMo Codex capability template (1M window, text + image, NO
+/// web_search tool — MiMo rejects it with a hard 400). Mirrors the catalog
+/// cc-switch generates for MiMo.
 pub const MIMO_TEMPLATE: &str = include_str!("../../assets/codex-catalogs/mimo.json");
 
 /// Match a provider base_url to the bundled capability template that applies.
@@ -188,6 +188,31 @@ mod tests {
             instr.len() > 1000,
             "base_instructions framework must ship verbatim"
         );
+    }
+
+    #[test]
+    fn deepseek_and_mimo_templates_advertise_image_input() {
+        // Both vendors ship vision-capable models now; the capability template
+        // declares image input at the VENDOR level on purpose so Codex permits
+        // attachments in the composer for every model of the family — we never
+        // differentiate per model (that list would churn with each release).
+        for template in [DEEPSEEK_TEMPLATE, MIMO_TEMPLATE] {
+            let v: Value = serde_json::from_str(template).unwrap();
+            let modalities = v
+                .get("input_modalities")
+                .and_then(|x| x.as_array())
+                .expect("template must declare input_modalities");
+            assert!(
+                modalities.iter().any(|m| m.as_str() == Some("image")),
+                "template must advertise image input"
+            );
+            assert_eq!(
+                v.get("supports_image_detail_original")
+                    .and_then(|x| x.as_bool()),
+                Some(true),
+                "template must allow original-resolution image detail"
+            );
+        }
     }
 
     #[test]

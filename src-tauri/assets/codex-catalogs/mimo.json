@@ -22,11 +22,12 @@
     "limit": 10000
   },
   "supports_parallel_tool_calls": false,
-  "supports_image_detail_original": false,
+  "supports_image_detail_original": true,
   "effective_context_window_percent": 95,
   "experimental_supported_tools": [],
   "input_modalities": [
-    "text"
+    "text",
+    "image"
   ],
   "supports_search_tool": false
 }
