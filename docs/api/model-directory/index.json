@@ -176,7 +176,7 @@
       "name": "OpenCode Go",
       "url": "https://opencode.ai/go",
       "baseUrl": "https://opencode.ai/zen/go/v1",
-      "anthropicUrl": "",
+      "anthropicUrl": "https://opencode.ai/zen/go/v1/messages",
       "modelId": "deepseek-v4-pro",
       "modelIds": [
         "deepseek-v4-pro",
