@@ -13,6 +13,7 @@ const zhHant: Partial<Translations> = {
   'nav.myProjects': '我的AI項目',
   'nav.aiCareer': '我的AI生涯',
   'nav.localServer': '本地大模型',
+  'nav.smartRouter': '智能路由',
   'nav.motherAgent': '一鍵安裝',
   'nav.feedback': '問題回報',
   'nav.changelog': '更新日誌',
@@ -57,6 +58,8 @@ const zhHant: Partial<Translations> = {
   'freeModels.providers': '個平台',
   'freeModels.empty': '沒有符合條件的免費模型',
   'freeModels.fetch': '獲取免費模型',
+  'freeModels.scanning': '發現免費模型：',
+  'freeModels.scanConnecting': '正在挖掘免費模型',
   'freeModels.customAdd': '自定義新增',
   'freeModels.addToRouter': '新增模型到智能路由',
   'freeModels.help': '使用說明',
@@ -79,7 +82,7 @@ const zhHant: Partial<Translations> = {
     '收錄已驗證、相容 OpenAI 介面的免費文字模型，目錄更新無需等待用戶端發版。',
   'freeModels.updated': '目錄更新',
   'freeModels.disclaimer': '免費額度與使用條件可能隨時變更，正式使用前請確認服務商最新規則。',
-  'freeModels.router.title': '免費模型智能路由',
+  'freeModels.router.title': '免切換智能路由',
   'freeModels.router.waiting': '等待新增模型',
   'freeModels.router.noAvailable': '暫無可用模型',
   'freeModels.router.emptyTitle': '目前已接入 0 個模型',
@@ -391,6 +394,7 @@ const zhHant: Partial<Translations> = {
   'ssh.winNote':
     'Windows 部署 SSH 較為複雜。建議在伺服器端下載安裝 EchoBird，然後透過「安裝與修復」部署本機 SSH。',
   'status.running': '執行中',
+  'status.online': '線上',
   'status.offline': '離線',
   'status.notInstalled': '未安裝',
 };

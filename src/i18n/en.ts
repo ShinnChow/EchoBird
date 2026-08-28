@@ -12,6 +12,7 @@ const en: Translations = {
   'nav.appManager': 'App Desktop',
   'nav.myProjects': 'My AI Projects',
   'nav.localServer': 'Local LLM',
+  'nav.smartRouter': 'Smart Router',
   'nav.motherAgent': 'One-Click Install',
   'nav.feedback': 'Feedback',
   'nav.changelog': 'Changelog',
@@ -58,6 +59,8 @@ const en: Translations = {
   'freeModels.providers': 'providers',
   'freeModels.empty': 'No matching free models',
   'freeModels.fetch': 'Get Free Models',
+  'freeModels.scanning': 'Free model found: ',
+  'freeModels.scanConnecting': 'Digging for free models',
   'freeModels.customAdd': 'Custom Add',
   'freeModels.addToRouter': 'Add Model to Smart Router',
   'freeModels.help': 'How It Works',
@@ -82,7 +85,7 @@ const en: Translations = {
   'freeModels.updated': 'Catalog updated',
   'freeModels.disclaimer':
     'Free quotas and eligibility can change at any time. Check the provider terms before relying on a model.',
-  'freeModels.router.title': 'Smart Free Model Router',
+  'freeModels.router.title': 'Hands-Free Smart Router',
   'freeModels.router.waiting': 'Waiting for models',
   'freeModels.router.noAvailable': 'No available models',
   'freeModels.router.emptyTitle': '0 models connected',
@@ -427,6 +430,7 @@ const en: Translations = {
   'ssh.winNote':
     'Windows SSH deployment is more complex than Linux/macOS. Recommended: install EchoBird on the Windows machine first, then use One-Click Install to set up local SSH access for you.',
   'status.running': 'Running',
+  'status.online': 'Online',
   'status.offline': 'Offline',
   'status.complete': 'Complete',
   'status.failed': 'Failed',

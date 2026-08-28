@@ -21,7 +21,6 @@ import {
   Route,
   X,
 } from 'lucide-react';
-import bundledCatalog from '../../data/freeModels.json';
 import * as api from '../../api/tauri';
 import type { FreeModelDirectory, FreeModelEntry } from '../../api/freeModels';
 import { getModelIcon } from '../../components';
@@ -35,6 +34,8 @@ const HUB_TO_NODE_GAP = 72;
 const HUB_ARROW_GAP = 4;
 const HUB_ARROW_HEIGHT = 12;
 const HUB_ARROW_LINE_GAP = 2;
+const SCAN_STEP_MS = 230;
+const SCAN_COMPLETE_MS = 320;
 
 interface FreeModelsContextValue {
   catalog: FreeModelDirectory;
@@ -43,6 +44,8 @@ interface FreeModelsContextValue {
   selectedIds: Set<string>;
   brokenIds: Set<string>;
   refreshing: boolean;
+  scanProvider: string;
+  scanProgress: number;
   refresh: () => Promise<void>;
   addSelectedModel: (model: RouteModelInput) => void;
   toggleSelected: (id: string) => void;
@@ -82,7 +85,32 @@ interface RouteArrow {
 }
 
 const FreeModelsContext = createContext<FreeModelsContextValue | null>(null);
-const bundled = bundledCatalog as FreeModelDirectory;
+const emptyCatalog: FreeModelDirectory = {
+  version: 1,
+  updatedAt: '',
+  models: [],
+};
+const providerPriority = ['nvidia-nim', 'openrouter'];
+
+function providerRank(model: FreeModelEntry): number {
+  const rank = providerPriority.indexOf(model.providerId);
+  return rank === -1 ? providerPriority.length : rank;
+}
+
+function groupModelsForScan(models: FreeModelEntry[]): FreeModelEntry[][] {
+  const groups = new Map<string, FreeModelEntry[]>();
+  models.forEach((model) => {
+    const id = `${model.providerId}:${model.baseUrl}`;
+    const group = groups.get(id);
+    if (group) group.push(model);
+    else groups.set(id, [model]);
+  });
+  return [...groups.values()].sort((left, right) => providerRank(left[0]) - providerRank(right[0]));
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
 
 export function useFreeModels() {
   const value = useContext(FreeModelsContext);
@@ -96,19 +124,41 @@ function shortModelName(modelId: string): string {
 }
 
 export function FreeModelsProvider({ children }: { children: ReactNode }) {
-  const [catalog, setCatalog] = useState<FreeModelDirectory>(bundled);
+  const [catalog, setCatalog] = useState<FreeModelDirectory>(emptyCatalog);
   const [customModels, setCustomModels] = useState<RouteModelNode[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [brokenIds, setBrokenIds] = useState<Set<string>>(() => new Set());
   const [refreshing, setRefreshing] = useState(false);
+  const [scanProvider, setScanProvider] = useState('');
+  const [scanProgress, setScanProgress] = useState(0);
+  const refreshInFlightRef = useRef(false);
   const models = catalog.models;
 
   const refresh = useCallback(async () => {
+    if (refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
+    setCatalog(emptyCatalog);
+    setScanProvider('');
+    setScanProgress(0);
     setRefreshing(true);
     try {
       const remote = await api.getFreeModelDirectory();
-      if (remote) setCatalog(remote);
+      if (!remote) return;
+
+      const groups = groupModelsForScan(remote.models);
+      const revealedModels: FreeModelEntry[] = [];
+      for (const [index, group] of groups.entries()) {
+        setScanProvider(group[0]?.provider ?? '');
+        await wait(SCAN_STEP_MS);
+        revealedModels.push(...group);
+        setCatalog({ ...remote, models: [...revealedModels] });
+        setScanProgress((index + 1) / groups.length);
+      }
+      await wait(SCAN_COMPLETE_MS);
     } finally {
+      refreshInFlightRef.current = false;
+      setScanProvider('');
+      setScanProgress(0);
       setRefreshing(false);
     }
   }, []);
@@ -151,21 +201,6 @@ export function FreeModelsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .getFreeModelDirectory()
-      .then((remote) => {
-        if (!cancelled && remote) setCatalog(remote);
-      })
-      .catch(() => {
-        /* keep bundled fallback */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   return (
     <FreeModelsContext.Provider
       value={{
@@ -175,6 +210,8 @@ export function FreeModelsProvider({ children }: { children: ReactNode }) {
         selectedIds,
         brokenIds,
         refreshing,
+        scanProvider,
+        scanProgress,
         refresh,
         addSelectedModel,
         toggleSelected,
@@ -399,7 +436,7 @@ export function FreeModelsMain() {
 
   return (
     <div className="free-model-router h-full min-h-[620px] px-2 py-1">
-      <div ref={stageRef} className="relative min-h-[550px] pt-6 overflow-hidden">
+      <div ref={stageRef} className="relative h-full min-h-[550px] pt-6 overflow-hidden">
         <svg
           className="absolute inset-0 z-0 h-full w-full pointer-events-none"
           viewBox={`0 0 ${canvasSize.width} ${canvasSize.height}`}
@@ -436,7 +473,7 @@ export function FreeModelsMain() {
         </div>
 
         {selectedModels.length === 0 ? (
-          <div className="relative z-10 min-h-[350px] flex items-center justify-center text-center">
+          <div className="absolute inset-0 z-10 flex items-center justify-center text-center pointer-events-none">
             <div>
               <div className="font-medium text-sm text-cyber-text">
                 {t('freeModels.router.emptyTitle')}
@@ -475,7 +512,6 @@ export function FreeModelsMain() {
                       onClick={() => toggleSelected(model.id)}
                       className="absolute right-2 top-2 h-7 w-7 rounded-md flex items-center justify-center text-cyber-text-muted opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto hover:text-cyber-text hover:bg-cyber-text/10 transition-all"
                       aria-label={`${t('btn.remove')} ${shortModelName(model.modelId)}`}
-                      title={t('btn.remove')}
                     >
                       <X size={14} />
                     </button>
@@ -517,7 +553,7 @@ function FreeModelProviderRow({
   const openDocs = () => shellOpen(group.docsUrl).catch(() => window.open(group.docsUrl, '_blank'));
 
   return (
-    <div className="relative flex items-stretch rounded overflow-hidden bg-cyber-surface">
+    <div className="free-model-provider-enter relative flex items-stretch rounded overflow-hidden bg-cyber-surface">
       <button
         type="button"
         onClick={onAdd}
@@ -580,7 +616,7 @@ function FreeModelProviderRow({
 
 export function FreeModelsPanel() {
   const { t } = useI18n();
-  const { models, selectedIds, refreshing, refresh } = useFreeModels();
+  const { models, selectedIds, refreshing, scanProvider, scanProgress, refresh } = useFreeModels();
   const { setNewModelForm, setEditingModelId, setModelModalDestination, setShowAddModelModal } =
     useModelNexus();
   const providerGroups = useMemo(() => {
@@ -599,7 +635,9 @@ export function FreeModelsPanel() {
         });
       }
     });
-    return [...groups.values()];
+    return [...groups.values()].sort((left, right) => {
+      return providerRank(left.models[0]) - providerRank(right.models[0]);
+    });
   }, [models]);
 
   const openProvider = useCallback(
@@ -635,40 +673,82 @@ export function FreeModelsPanel() {
 
   return (
     <div className="free-model-router h-full min-h-0 flex flex-col">
-      <div className="p-2 flex items-center gap-1 bg-transparent">
+      <div className="p-2 flex items-center gap-2 bg-transparent">
+        <button
+          type="button"
+          onClick={openCustomModel}
+          className="flex-1 h-9 px-3 text-[14px] font-semibold border border-cyber-border rounded-button text-cyber-text-secondary hover:text-cyber-text hover:bg-cyber-text/10 transition-colors flex items-center justify-center gap-2"
+        >
+          <Plus size={14} />
+          {t('freeModels.customAdd')}
+        </button>
         <button
           type="button"
           onClick={() => void refresh()}
           disabled={refreshing}
-          className={`flex items-center gap-1.5 text-sm font-mono px-3 py-1.5 border rounded-button transition-colors ${
+          aria-label={t('freeModels.fetch')}
+          className={`w-9 h-9 flex items-center justify-center border rounded-button transition-colors ${
             !refreshing
               ? 'border-cyber-border text-cyber-text hover:bg-cyber-text/10'
               : 'border-cyber-border text-cyber-text-muted cursor-not-allowed'
           }`}
         >
-          <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
-          {t('freeModels.fetch')}
-        </button>
-        <button
-          type="button"
-          onClick={openCustomModel}
-          className="px-3.5 py-2 text-[14px] font-semibold rounded text-cyber-text-secondary hover:text-cyber-text hover:bg-cyber-elevated transition-colors flex items-center gap-2"
-        >
-          <Plus size={14} />
-          {t('freeModels.customAdd')}
+          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
         </button>
       </div>
-      <div className="flex-1 p-2 overflow-y-auto">
-        <div className="space-y-2">
-          {providerGroups.map((group) => (
-            <FreeModelProviderRow
-              key={group.id}
-              group={group}
-              selected={group.models.some((model) => selectedIds.has(model.id))}
-              onAdd={() => openProvider(group)}
+      {refreshing && (
+        <div className="px-2 pb-2">
+          <div className="h-1 rounded-full overflow-hidden bg-cyber-border/30">
+            <div
+              className="free-model-scan-progress h-full rounded-full bg-cyber-accent"
+              style={{ width: `${Math.max(scanProgress, 0.04) * 100}%` }}
             />
-          ))}
+          </div>
+          <div className="mt-2 text-[11px] text-cyber-text-secondary truncate">
+            {scanProvider ? (
+              <>
+                {t('freeModels.scanning')}
+                {scanProvider}
+              </>
+            ) : (
+              <>
+                {t('freeModels.scanConnecting')}
+                <span className="free-model-scan-dots" aria-hidden="true">
+                  <span>.</span>
+                  <span>.</span>
+                  <span>.</span>
+                </span>
+              </>
+            )}
+          </div>
         </div>
+      )}
+      <div className="flex-1 p-2 overflow-y-auto">
+        {providerGroups.length === 0 ? (
+          <div className="h-full flex items-center justify-center">
+            {!refreshing && (
+              <button
+                type="button"
+                onClick={() => void refresh()}
+                className="flex items-center gap-2 text-sm font-semibold px-3 py-2 border border-cyber-border rounded-button text-cyber-text hover:bg-cyber-text/10 transition-colors"
+              >
+                <RefreshCw size={13} />
+                {t('freeModels.fetch')}
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {providerGroups.map((group) => (
+              <FreeModelProviderRow
+                key={group.id}
+                group={group}
+                selected={group.models.some((model) => selectedIds.has(model.id))}
+                onAdd={() => openProvider(group)}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

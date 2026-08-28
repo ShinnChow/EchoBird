@@ -37,6 +37,7 @@ interface SidebarProps {
   activePage: PageType;
   onPageChange: (page: PageType) => void;
   agentRunning?: boolean;
+  smartRouterOnline?: boolean;
   updateAvailable?: string | null;
   onSettingsClick?: () => void;
 }
@@ -45,6 +46,7 @@ export const Sidebar = ({
   activePage,
   onPageChange,
   agentRunning: _agentRunning = false,
+  smartRouterOnline = false,
   updateAvailable = null,
   onSettingsClick,
 }: SidebarProps) => {
@@ -158,16 +160,26 @@ export const Sidebar = ({
         )}
       </div>
 
-      {isFullEdition && (
-        <div className="pt-4 text-[14px] text-cyber-text-secondary">
-          {t('nav.localServer')}:{' '}
-          {serverRunning ? (
-            <span className="text-cyber-accent font-semibold">{t('status.running')}</span>
+      <div className="pt-4 text-[14px] text-cyber-text-secondary">
+        <div>
+          {t('nav.smartRouter')}:{' '}
+          {smartRouterOnline ? (
+            <span className="text-cyber-accent font-semibold">{t('status.online')}</span>
           ) : (
             <span className="text-cyber-text-muted">{t('status.offline')}</span>
           )}
         </div>
-      )}
+        {isFullEdition && (
+          <div className="mt-1">
+            {t('nav.localServer')}:{' '}
+            {serverRunning ? (
+              <span className="text-cyber-accent font-semibold">{t('status.running')}</span>
+            ) : (
+              <span className="text-cyber-text-muted">{t('status.offline')}</span>
+            )}
+          </div>
+        )}
+      </div>
     </nav>
   );
 };

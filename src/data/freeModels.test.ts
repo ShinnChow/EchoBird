@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import catalog from './freeModels.json';
-import publicCatalog from '../../docs/api/free-models/index.json';
+import catalog from '../../docs/api/free-models/index.json';
 
 describe('free model catalog', () => {
   it('contains unique, directly configurable model entries', () => {
@@ -15,8 +14,7 @@ describe('free model catalog', () => {
     }
   });
 
-  it('keeps the bundled fallback synchronized with the public directory', () => {
-    expect(catalog).toEqual(publicCatalog);
+  it('does not expose source metadata in the public directory', () => {
     expect(catalog).not.toHaveProperty('source');
   });
 });

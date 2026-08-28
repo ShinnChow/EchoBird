@@ -1,5 +1,5 @@
 {
-  "$schema-comment": "Remote-updatable free model catalog. Keep the public and bundled copies synchronized.",
+  "$schema-comment": "Remote-updatable free model catalog.",
   "version": 1,
   "updatedAt": "2026-08-14",
   "models": [

@@ -66,7 +66,12 @@ import { FeedbackMain } from './pages/Feedback';
 import { MyProjectsMain, MyProjectsPanel, MyProjectsBottom } from './pages/MyProjects';
 import { AiCareerMain, AiCareerPanel, AiCareerTitleActions } from './pages/AiCareer';
 import { useMyProjectsStore } from './stores/myProjectsStore';
-import { FreeModelsTitleActions, FreeModelsMain, FreeModelsPanel } from './pages/FreeModels';
+import {
+  FreeModelsTitleActions,
+  FreeModelsMain,
+  FreeModelsPanel,
+  useFreeModels,
+} from './pages/FreeModels';
 
 function SidebarConnected({ onSettingsClick }: { onSettingsClick: () => void }) {
   // Selector form (one field per call) so unrelated store fields like
@@ -76,11 +81,13 @@ function SidebarConnected({ onSettingsClick }: { onSettingsClick: () => void }) 
   const setActivePage = useNavigationStore((s) => s.setActivePage);
   const agentRunning = useNavigationStore((s) => s.agentRunning);
   const updateAvailable = useNavigationStore((s) => s.updateAvailable);
+  const { selectedIds } = useFreeModels();
   return (
     <Sidebar
       activePage={activePage}
       onPageChange={setActivePage}
       agentRunning={agentRunning}
+      smartRouterOnline={selectedIds.size > 0}
       updateAvailable={updateAvailable}
       onSettingsClick={onSettingsClick}
     />

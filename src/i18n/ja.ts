@@ -13,6 +13,7 @@ const ja: Partial<Translations> = {
   'nav.myProjects': 'マイ AI プロジェクト',
   'nav.aiCareer': 'マイ AI キャリア',
   'nav.localServer': 'ローカル LLM',
+  'nav.smartRouter': 'スマートルーター',
   'nav.motherAgent': 'ワンクリックインストール',
   'nav.feedback': 'フィードバック',
   'nav.changelog': '更新履歴',
@@ -57,6 +58,8 @@ const ja: Partial<Translations> = {
   'freeModels.providers': 'プロバイダー',
   'freeModels.empty': '条件に一致する無料モデルはありません',
   'freeModels.fetch': '無料モデルを取得',
+  'freeModels.scanning': '無料モデルを発見：',
+  'freeModels.scanConnecting': '無料モデルを探索中',
   'freeModels.customAdd': 'カスタム追加',
   'freeModels.addToRouter': 'スマートルーターにモデルを追加',
   'freeModels.help': '使い方',
@@ -82,7 +85,7 @@ const ja: Partial<Translations> = {
   'freeModels.updated': 'カタログ更新',
   'freeModels.disclaimer':
     '無料枠や利用条件は変更される場合があります。利用前にプロバイダーの最新条件をご確認ください。',
-  'freeModels.router.title': '無料モデルスマートルーター',
+  'freeModels.router.title': '切り替え不要スマートルーター',
   'freeModels.router.waiting': 'モデルの追加待ち',
   'freeModels.router.noAvailable': '利用可能なモデルなし',
   'freeModels.router.emptyTitle': '接続済みモデルは 0 件です',
@@ -398,6 +401,7 @@ const ja: Partial<Translations> = {
   'ssh.winNote':
     'Windows での SSH 展開は Linux / macOS より複雑です。サーバー側に EchoBird を先にインストールし、「インストール & 修復」から SSH を設定するのを推奨します。',
   'status.running': '実行中',
+  'status.online': 'オンライン',
   'status.offline': 'オフライン',
   'status.complete': '完了',
   'status.failed': '失敗',

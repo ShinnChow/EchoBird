@@ -3,4 +3,5 @@ export {
   FreeModelsTitleActions,
   FreeModelsMain,
   FreeModelsPanel,
+  useFreeModels,
 } from './FreeModels';
