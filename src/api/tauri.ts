@@ -20,6 +20,7 @@ export * from './ssh';
 export * from './secret';
 export * from './bundled';
 export * from './aiCareer';
+export * from './freeModels';
 
 // ─── Tool APIs ───
 

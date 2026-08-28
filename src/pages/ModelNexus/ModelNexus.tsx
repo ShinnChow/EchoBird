@@ -34,6 +34,7 @@ import { ModelNexusContext, useModelNexus } from './context';
 import type { NewModelForm } from './context';
 import type { ModelUsageData } from '../../api/tauri';
 import modelDirectory from '../../data/modelDirectory.json';
+import { useFreeModels } from '../FreeModels/FreeModels';
 
 // ===== Provider =====
 
@@ -63,6 +64,9 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
 
   // Modal state
   const [showAddModelModal, setShowAddModelModal] = useState(false);
+  const [modelModalDestination, setModelModalDestination] = useState<'modelNexus' | 'freeRouter'>(
+    'modelNexus'
+  );
   const [modelModalAnimatingOut, setModelModalAnimatingOut] = useState(false);
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
@@ -81,6 +85,7 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
       setModelModalAnimatingOut(false);
       setShowAddModelModal(false);
       setEditingModelId(null);
+      setModelModalDestination('modelNexus');
     }, 200);
   }, []);
 
@@ -396,6 +401,8 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
         setCursorPos,
         showAddModelModal,
         setShowAddModelModal,
+        modelModalDestination,
+        setModelModalDestination,
         modelModalAnimatingOut,
         editingModelId,
         setEditingModelId,
@@ -1159,6 +1166,7 @@ export function ModelNexusPanel() {
 
 export function AddModelModal() {
   const { t } = useI18n();
+  const { addSelectedModel } = useFreeModels();
   const {
     showAddModelModal,
     modelModalAnimatingOut,
@@ -1170,6 +1178,8 @@ export function AddModelModal() {
     closeModelModal,
     setUserModels,
     setShowAddModelModal,
+    modelModalDestination,
+    setModelModalDestination,
   } = useModelNexus();
 
   if (!showAddModelModal) return null;
@@ -1227,7 +1237,11 @@ export function AddModelModal() {
           <div className="flex items-center gap-2">
             <span className="text-cyber-text font-mono text-sm opacity-60">&gt;_</span>
             <span className="text-base font-bold text-cyber-text">
-              {editingModelId ? t('model.editConfig') : t('btn.addModel')}
+              {editingModelId
+                ? t('model.editConfig')
+                : modelModalDestination === 'freeRouter'
+                  ? t('freeModels.addToRouter')
+                  : t('btn.addModel')}
             </span>
           </div>
           <button
@@ -1450,6 +1464,14 @@ export function AddModelModal() {
                     modelId: newModelForm.modelId,
                   });
                   setUserModels((prev) => [...prev, newModel]);
+                  if (modelModalDestination === 'freeRouter') {
+                    addSelectedModel({
+                      internalId: newModel.internalId,
+                      name: newModel.name,
+                      baseUrl: newModel.baseUrl,
+                      modelId: newModel.modelId ?? newModelForm.modelId,
+                    });
+                  }
                 }
 
                 setEditingModelId(null);
@@ -1461,6 +1483,7 @@ export function AddModelModal() {
                   modelId: '',
                 });
                 setShowAddModelModal(false);
+                setModelModalDestination('modelNexus');
               }
             }}
             className="flex-1 px-4 py-3 text-[14px] font-semibold text-cyber-text hover:bg-cyber-text/10 transition-all"

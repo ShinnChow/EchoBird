@@ -18,6 +18,8 @@ export interface NewModelForm {
   modelIdOptions?: string[];
 }
 
+export type ModelModalDestination = 'modelNexus' | 'freeRouter';
+
 export interface ModelNexusCtx {
   // Models
   userModels: ModelConfig[];
@@ -63,6 +65,8 @@ export interface ModelNexusCtx {
   // Modal
   showAddModelModal: boolean;
   setShowAddModelModal: (v: boolean) => void;
+  modelModalDestination: ModelModalDestination;
+  setModelModalDestination: (destination: ModelModalDestination) => void;
   modelModalAnimatingOut: boolean;
   editingModelId: string | null;
   setEditingModelId: (v: string | null) => void;

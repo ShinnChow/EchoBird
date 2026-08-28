@@ -8,6 +8,7 @@ pub mod codex_catalog;
 pub mod codex_proxy;
 pub mod codex_session_merge;
 pub mod datalog;
+pub mod free_model_directory;
 pub mod json_repair;
 pub mod llm_client;
 pub mod local_llm;

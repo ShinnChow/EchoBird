@@ -10,6 +10,7 @@ import {
   Trophy,
   Monitor,
   Download,
+  Target,
 } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { useI18n } from '../hooks/useI18n';
@@ -24,6 +25,7 @@ export type PageType =
   | 'projects'
   | 'skills'
   | 'models'
+  | 'freeModels'
   | 'apps'
   | 'aiCareer'
   | 'myProjects'
@@ -101,6 +103,12 @@ export const Sidebar = ({
           label={t('nav.modelNexus')}
           active={activePage === 'models'}
           onClick={() => onPageChange('models')}
+        />
+        <NavItem
+          icon={<Target size={20} />}
+          label={t('nav.freeModels')}
+          active={activePage === 'freeModels'}
+          onClick={() => onPageChange('freeModels')}
         />
         <NavItem
           icon={<Download size={20} />}

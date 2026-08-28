@@ -1,19 +1,8 @@
 // Lightweight i18n React Hook + Context (lazy-loaded language packs)
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { useContext, useState, useCallback, useEffect } from 'react';
 import { translate, loadLocale, detectLocale, TKey } from '../i18n';
 import * as api from '../api/tauri';
-
-interface I18nContextValue {
-  locale: string;
-  setLocale: (locale: string) => void;
-  t: (key: TKey) => string;
-}
-
-const I18nContext = createContext<I18nContextValue>({
-  locale: 'en',
-  setLocale: () => {},
-  t: (key) => key,
-});
+import { I18nContext } from './i18nContext';
 
 interface I18nProviderProps {
   children: React.ReactNode;

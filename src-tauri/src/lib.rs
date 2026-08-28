@@ -896,6 +896,7 @@ pub fn run() {
             process_commands::set_download_dir,
             process_commands::get_store_models,
             process_commands::get_model_directory,
+            process_commands::get_free_model_directory,
             process_commands::download_model,
             process_commands::pause_download,
             process_commands::cancel_download,

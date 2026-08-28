@@ -66,6 +66,7 @@ import { FeedbackMain } from './pages/Feedback';
 import { MyProjectsMain, MyProjectsPanel, MyProjectsBottom } from './pages/MyProjects';
 import { AiCareerMain, AiCareerPanel, AiCareerTitleActions } from './pages/AiCareer';
 import { useMyProjectsStore } from './stores/myProjectsStore';
+import { FreeModelsTitleActions, FreeModelsMain, FreeModelsPanel } from './pages/FreeModels';
 
 function SidebarConnected({ onSettingsClick }: { onSettingsClick: () => void }) {
   // Selector form (one field per call) so unrelated store fields like
@@ -276,6 +277,7 @@ function App() {
                                         {is('projects') && t('page.projects')}
                                         {is('skills') && t('page.skills')}
                                         {is('models') && t('page.modelNexus')}
+                                        {is('freeModels') && t('page.freeModels')}
 
                                         {is('apps') && t('page.appManager')}
                                         {is('myProjects') && t('page.myProjects')}
@@ -289,6 +291,7 @@ function App() {
                                         {is('projects') && 'RISING'}
                                         {is('skills') && 'MAGIC'}
                                         {is('models') && 'ROSTER'}
+                                        {is('freeModels') && 'FREE ROUTER'}
                                         {is('apps') && 'DESKTOP'}
                                         {is('myProjects') && 'VIBE CODING'}
                                         {is('aiCareer') && 'CAREER'}
@@ -307,6 +310,9 @@ function App() {
                                     </span>
                                     <span className={page(is('models'))}>
                                       <ModelNexusTitleActions />
+                                    </span>
+                                    <span className={page(is('freeModels'))}>
+                                      <FreeModelsTitleActions />
                                     </span>
                                     <span className={page(is('aiCareer'))}>
                                       <AiCareerTitleActions />
@@ -343,6 +349,13 @@ function App() {
                                   <div className={pageScroll(is('models'))}>
                                     <ModelNexusMain />
                                   </div>
+                                  <div
+                                    className={
+                                      is('freeModels') ? 'flex-1 overflow-y-auto' : 'hidden'
+                                    }
+                                  >
+                                    <FreeModelsMain />
+                                  </div>
 
                                   <div className={pageBlock(is('apps'))}>
                                     <AppManagerMain />
@@ -377,6 +390,9 @@ function App() {
                                 </div>
                                 <div className={page(is('models'))}>
                                   <ModelNexusPanel />
+                                </div>
+                                <div className={page(is('freeModels'))}>
+                                  <FreeModelsPanel />
                                 </div>
 
                                 <div className={page(is('apps') || is('myProjects'))}>
