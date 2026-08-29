@@ -132,17 +132,14 @@ export interface ModelCardProps {
   openaiTested?: boolean; // OpenAI protocol tested
   anthropicTested?: boolean; // Anthropic protocol tested
   isPinging?: boolean; // currently pinging (shows decode animation)
-  selected?: boolean;
   viewMode?: 'config' | 'usage'; // display mode
   usageData?: ModelUsageData; // usage quota data
-  onClick?: () => void;
   onEdit?: () => void; // edit callback
   onDelete?: () => void; // delete callback
   onRefresh?: () => void; // refresh usage callback (usage mode only)
   isRefreshingUsage?: boolean; // usage refresh in progress (usage mode only)
   onAccessKey?: () => void; // open AK/SK config modal (Volcengine usage mode)
   akSkMissing?: boolean; // AK/SK not yet configured -> show hint
-  onProtocolClick?: (protocol: 'openai' | 'anthropic') => void; // protocol tag click
   /** Add top/bottom spacing around the name row so the overlaid top-left drag
    *  handle doesn't cover it, keeping the name left-aligned. Only used by the
    *  Model Center's sortable grid. */
@@ -261,20 +258,16 @@ export const ModelCard = React.memo(
     openaiTested = false,
     anthropicTested = false,
     isPinging = false,
-    selected = false,
-    isActive = false,
     viewMode = 'config',
     usageData,
-    onClick,
     onEdit,
     onDelete,
     onRefresh,
     isRefreshingUsage = false,
     onAccessKey,
     akSkMissing,
-    onProtocolClick: _onProtocolClick,
     dragHandlePad = false,
-  }: ModelCardProps & { isActive?: boolean }) => {
+  }: ModelCardProps) => {
     // Config tab: resolve icon from the MODEL ID only (platform name must not
     // leak in — otherwise a Qwen platform card configured with model id
     // `glm-5.2` matches the「千问」platform rule and shows qianwen.png instead
@@ -293,14 +286,7 @@ export const ModelCard = React.memo(
     }, [viewMode, usageData]);
 
     return (
-      <div
-        className={`h-48 p-4 border bg-cyber-surface ${
-          isActive || selected
-            ? 'border-cyber-accent'
-            : 'border-transparent hover:bg-cyber-elevated'
-        } relative overflow-hidden rounded-card cursor-pointer transition-colors flex flex-col`}
-        onClick={onClick}
-      >
+      <div className="h-48 p-4 border border-transparent bg-cyber-surface hover:bg-cyber-elevated relative overflow-hidden rounded-card cursor-default transition-colors flex flex-col">
         {/* Action buttons — top right, different for config vs usage mode */}
         {viewMode === 'config' ? (
           // Config mode: [删除] [编辑]
@@ -543,7 +529,6 @@ export const ModelCard = React.memo(
       'openaiTested',
       'anthropicTested',
       'isPinging',
-      'selected',
       'viewMode',
       'isRefreshingUsage',
       'akSkMissing',
@@ -553,7 +538,6 @@ export const ModelCard = React.memo(
     for (const k of keys) {
       if (p[k] !== n[k]) return false;
     }
-    if (p.isActive !== n.isActive) return false;
     // Compare protocols array by value
     const pp = prev.protocols || [],
       np = next.protocols || [];

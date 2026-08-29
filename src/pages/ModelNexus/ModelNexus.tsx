@@ -669,7 +669,7 @@ function SortableModelCard({
         {...attributes}
         {...listeners}
         aria-label={dragLabel}
-        className="model-drag-handle absolute top-2 left-2 z-10 p-0.5 text-cyber-text-muted/60 hover:text-cyber-text transition-colors outline-none"
+        className="absolute top-2 left-2 z-10 p-0.5 text-cyber-text-muted/60 hover:text-cyber-text transition-colors outline-none"
       >
         <GripVertical size={14} />
       </button>
@@ -682,18 +682,13 @@ export function ModelNexusMain() {
   const {
     userModels,
     isLoadingModels,
-    selectedModel,
-    setSelectedModel,
     viewMode,
     modelUsageData,
-    testInput,
     setTestOutput: _setTestOutput,
     testProtocol: _testProtocol,
-    setTestProtocol,
     modelLatencies,
     pingingModelIds,
     modelTerminals: _modelTerminals,
-    setModelTerminals,
     isTesting: _isTesting,
     editingModelId: _editingModelId,
     setEditingModelId,
@@ -724,46 +719,6 @@ export function ModelNexusMain() {
     }
     setVolcAkSkModelId(internalId);
   };
-
-  // Stable handlers for model card interactions
-  const handleCardClick = useCallback(
-    (model: (typeof userModels)[0]) => {
-      if (selectedModel === model.internalId) {
-        // Click again to deselect
-        setSelectedModel(null);
-        return;
-      }
-      if (selectedModel) {
-        setModelTerminals((prev) => ({
-          ...prev,
-          [selectedModel]: { input: testInput, output: [] },
-        }));
-      }
-      setSelectedModel(model.internalId);
-      if (model.baseUrl) {
-        setTestProtocol('openai');
-      } else if (model.anthropicUrl) {
-        setTestProtocol('anthropic');
-      }
-    },
-    [selectedModel, testInput, setModelTerminals, setSelectedModel, setTestProtocol]
-  );
-
-  const handleCardProtocolClick = useCallback(
-    (model: (typeof userModels)[0], protocol: 'openai' | 'anthropic') => {
-      setTestProtocol(protocol);
-      if (selectedModel !== model.internalId) {
-        if (selectedModel) {
-          setModelTerminals((prev) => ({
-            ...prev,
-            [selectedModel]: { input: testInput, output: [] },
-          }));
-        }
-        setSelectedModel(model.internalId);
-      }
-    },
-    [selectedModel, testInput, setModelTerminals, setSelectedModel, setTestProtocol]
-  );
 
   const handleCardEdit = useCallback(
     async (model: (typeof userModels)[0]) => {
@@ -872,13 +827,9 @@ export function ModelNexusMain() {
         openaiTested={model.openaiTested}
         anthropicTested={model.anthropicTested}
         isPinging={pingingModelIds.has(model.internalId)}
-        selected={selectedModel === model.internalId}
-        isActive={selectedModel === model.internalId}
         viewMode={viewMode}
         usageData={modelUsageData[model.internalId]}
         dragHandlePad
-        onClick={() => handleCardClick(model)}
-        onProtocolClick={(protocol) => handleCardProtocolClick(model, protocol)}
         onEdit={isDemo ? undefined : () => handleCardEdit(model)}
         onDelete={isDemo ? undefined : () => handleCardDelete(model.internalId)}
         onRefresh={() => refreshSingleUsage(model.internalId)}
@@ -956,8 +907,17 @@ export function ModelNexusMain() {
               container never clips the lifted card or its shadow. */}
           <DragOverlay>
             {activeDragModel && (
-              <div style={{ width: activeDragWidth }} className="pointer-events-none shadow-2xl">
+              <div
+                style={{ width: activeDragWidth }}
+                className="pointer-events-none relative shadow-2xl"
+              >
                 {renderModelCard(activeDragModel)}
+                <span
+                  aria-hidden="true"
+                  className="absolute top-2 left-2 z-10 p-0.5 text-cyber-text-muted/60"
+                >
+                  <GripVertical size={14} />
+                </span>
               </div>
             )}
           </DragOverlay>

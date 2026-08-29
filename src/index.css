@@ -283,12 +283,6 @@ select,
 .cursor-move {
   cursor: default;
 }
-.model-drag-handle {
-  cursor: grab;
-}
-.model-drag-handle:active {
-  cursor: grabbing;
-}
 :disabled,
 [aria-disabled='true'] {
   cursor: not-allowed;
