@@ -2,8 +2,8 @@ name: Refresh Free Model Catalog
 
 on:
   schedule:
-    # Daily discovery; the workflow commits only when a newly verified model appears.
-    - cron: '35 3 * * *'
+    # Twice-daily discovery; the workflow commits only when a newly verified model appears.
+    - cron: '35 3,15 * * *'
   workflow_dispatch:
 
 permissions:
