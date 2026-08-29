@@ -669,7 +669,7 @@ function SortableModelCard({
         {...attributes}
         {...listeners}
         aria-label={dragLabel}
-        className="absolute top-2 left-2 z-10 p-0.5 text-cyber-text-muted/60 hover:text-cyber-text cursor-grab active:cursor-grabbing transition-colors outline-none"
+        className="model-drag-handle absolute top-2 left-2 z-10 p-0.5 text-cyber-text-muted/60 hover:text-cyber-text transition-colors outline-none"
       >
         <GripVertical size={14} />
       </button>
