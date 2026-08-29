@@ -96,9 +96,9 @@ jobs:
       - name: Security audit (cargo)
         run: |
           cargo install cargo-audit --locked --quiet || true
-          # 7 ignored: transitive deps non-applicable to EchoBird (single-user
-          # desktop, no attacker-facing SSH/QUIC/XML services). See
-          # project_release_v5.4.3 memory for dep-tree grounding. Remove an
-          # --ignore when its dep is bumped past the fixed version.
-          cargo audit --file src-tauri/Cargo.lock --ignore RUSTSEC-2026-0074 --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195 --ignore RUSTSEC-2026-0185 --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0154 --ignore RUSTSEC-2026-0153
+          # 4 ignored: quick-xml is only in Tauri's plist/build path; RSA has no
+          # patched release and is used only by the explicit SSH client; rkyv is
+          # an optional lockfile entry absent from every resolved target graph.
+          # Remove an --ignore when its dependency chain gains a fixed release.
+          cargo audit --file src-tauri/Cargo.lock --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195 --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0235
         continue-on-error: true
