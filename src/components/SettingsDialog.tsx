@@ -298,7 +298,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 onClick={() => handleCloseToTrayChange(false)}
                 className={`flex-1 h-9 flex items-center justify-center text-[13px] transition-colors rounded ${
                   closeToTray === false
-                    ? 'bg-cyber-text/15 text-cyber-text font-semibold'
+                    ? 'bg-cyber-elevated text-cyber-text font-semibold'
                     : 'text-cyber-text-secondary hover:text-cyber-text hover:bg-cyber-elevated'
                 }`}
               >
@@ -308,7 +308,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 onClick={() => handleCloseToTrayChange(true)}
                 className={`flex-1 h-9 flex items-center justify-center text-[13px] transition-colors rounded ${
                   closeToTray === true
-                    ? 'bg-cyber-text/15 text-cyber-text font-semibold'
+                    ? 'bg-cyber-elevated text-cyber-text font-semibold'
                     : 'text-cyber-text-secondary hover:text-cyber-text hover:bg-cyber-elevated'
                 }`}
               >
@@ -318,7 +318,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 onClick={() => handleCloseToTrayChange(null)}
                 className={`flex-1 h-9 flex items-center justify-center text-[13px] transition-colors rounded ${
                   closeToTray === null
-                    ? 'bg-cyber-text/15 text-cyber-text font-semibold'
+                    ? 'bg-cyber-elevated text-cyber-text font-semibold'
                     : 'text-cyber-text-secondary hover:text-cyber-text hover:bg-cyber-elevated'
                 }`}
               >
@@ -476,7 +476,7 @@ const ThemeSegmented: React.FC<{
             onClick={() => onChange(o.id)}
             className={`flex-1 h-9 flex items-center justify-center gap-1.5 text-[14px] transition-colors rounded ${
               active
-                ? 'bg-cyber-text/15 text-cyber-text font-semibold'
+                ? 'bg-cyber-elevated text-cyber-text font-semibold'
                 : 'text-cyber-text-secondary hover:text-cyber-text hover:bg-cyber-elevated'
             }`}
           >
