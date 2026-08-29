@@ -42,7 +42,7 @@ jobs:
           --report "${{ runner.temp }}/free-model-catalog-report.json"
 
       - name: Upload maintenance report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: free-model-catalog-report
           path: ${{ runner.temp }}/free-model-catalog-report.json
