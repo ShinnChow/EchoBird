@@ -95,7 +95,7 @@
       "region": "global"
     },
     {
-      "name": "优云智算(glm5.3,dpv4)",
+      "name": "优云智算(V4-Flash)",
       "url": "https://console.compshare.cn/light-gpu/model-subscription",
       "baseUrl": "https://cp.compshare.cn/v1",
       "anthropicUrl": "https://cp.compshare.cn",
