@@ -630,7 +630,7 @@ export function FreeModelsMain() {
 
         <div
           ref={hubRef}
-          className={`free-model-router-hub relative z-10 mx-auto w-[min(270px,80%)] min-h-[118px] rounded-2xl flex flex-col items-center justify-center text-center px-4 py-3 ${
+          className={`free-model-router-hub relative z-10 mx-auto w-[min(270px,80%)] min-h-[118px] rounded-2xl flex flex-col items-center justify-center text-center px-4 py-3 cursor-default ${
             routerOnline ? 'is-running' : selectedModels.length > 0 ? 'is-unavailable' : ''
           }`}
         >
