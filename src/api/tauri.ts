@@ -21,6 +21,7 @@ export * from './secret';
 export * from './bundled';
 export * from './aiCareer';
 export * from './freeModels';
+export * from './smartRouter';
 
 // ─── Tool APIs ───
 

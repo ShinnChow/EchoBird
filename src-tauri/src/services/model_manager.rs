@@ -388,7 +388,10 @@ fn get_built_in_models() -> Vec<ModelConfig> {
 
 /// Get all models (local server + user + built-in)
 pub fn get_models() -> Vec<ModelConfig> {
-    let user_models = get_user_models();
+    let user_models = get_user_models()
+        .into_iter()
+        .filter(|model| model.scope == crate::models::model::ModelScope::ModelCenter)
+        .collect::<Vec<_>>();
     let built_in_models = get_built_in_models();
 
     // Local server model (dynamic injection when running)
@@ -406,14 +409,20 @@ pub fn get_models() -> Vec<ModelConfig> {
             anthropic_tested: None,
             openai_latency: None,
             anthropic_latency: None,
+            scope: crate::models::model::ModelScope::ModelCenter,
         }]
     } else {
         Vec::new()
     };
 
-    // Order: local �?user �?built-in, then apply the user's drag-reorder
+    let smart_router_models: Vec<ModelConfig> = crate::services::smart_router::model_config()
+        .into_iter()
+        .collect();
+
+    // Order: local → smart router → user → built-in, then apply the user's drag-reorder
     let mut all = Vec::new();
     all.extend(local_models);
+    all.extend(smart_router_models);
     all.extend(user_models);
     all.extend(built_in_models);
     apply_user_order(all, &load_model_order())
@@ -467,6 +476,8 @@ pub struct AddModelInput {
     pub api_key: Option<String>,
     #[serde(default)]
     pub model_id: Option<String>,
+    #[serde(default)]
+    pub scope: crate::models::model::ModelScope,
 }
 
 pub fn add_model(input: AddModelInput) -> ModelConfig {
@@ -488,6 +499,7 @@ pub fn add_model(input: AddModelInput) -> ModelConfig {
         anthropic_tested: None,
         openai_latency: None,
         anthropic_latency: None,
+        scope: input.scope,
     };
 
     log::info!(
@@ -907,6 +919,7 @@ mod tests {
             anthropic_tested: None,
             openai_latency: None,
             anthropic_latency: None,
+            scope: crate::models::model::ModelScope::ModelCenter,
         }
     }
 

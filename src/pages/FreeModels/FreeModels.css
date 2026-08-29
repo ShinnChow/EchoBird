@@ -32,27 +32,35 @@
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-dasharray: 5 8;
-  opacity: 0.78;
+  opacity: 0.68;
   vector-effect: non-scaling-stroke;
-  animation: free-model-route-flow 1.1s linear infinite;
+  animation: free-model-route-flow 1.8s linear infinite;
+}
+
+.free-model-route-glow {
+  fill: none;
+  stroke: rgb(var(--accent-rgb));
+  stroke-width: 3.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 0.07 0.93;
+  stroke-dashoffset: 0;
+  opacity: 0;
+  filter: drop-shadow(0 0 3px rgb(var(--accent-rgb)))
+    drop-shadow(0 0 8px rgb(var(--accent-rgb) / 0.65));
+  vector-effect: non-scaling-stroke;
+  animation: free-model-route-glow 3.2s ease-in-out infinite;
 }
 
 .free-model-route-arrow {
   fill: rgb(var(--accent-rgb));
 }
 
-.free-model-route-arrow.is-broken {
-  fill: rgb(var(--error-rgb));
-}
-
-.free-model-route-path.is-broken {
-  stroke: rgb(var(--error-rgb));
-  opacity: 0.45;
-  animation: none;
-}
-
 .free-model-route-node {
-  background: rgb(var(--accent-rgb) / 0.12);
+  background:
+    linear-gradient(rgb(var(--accent-rgb) / 0.12), rgb(var(--accent-rgb) / 0.12)),
+    rgb(var(--bg-base-rgb));
+  cursor: default;
   animation: free-model-node-in 220ms ease-out both;
 }
 
@@ -85,20 +93,33 @@
 }
 
 .free-model-route-node:hover {
-  background: rgb(var(--accent-rgb) / 0.18);
-}
-
-.free-model-route-node.is-broken {
-  background: rgb(var(--error-rgb) / 0.11);
-}
-
-.free-model-route-node.is-broken:hover {
-  background: rgb(var(--error-rgb) / 0.16);
+  background:
+    linear-gradient(rgb(var(--accent-rgb) / 0.18), rgb(var(--accent-rgb) / 0.18)),
+    rgb(var(--bg-base-rgb));
 }
 
 @keyframes free-model-route-flow {
   to {
     stroke-dashoffset: -26;
+  }
+}
+
+@keyframes free-model-route-glow {
+  0% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+  7% {
+    opacity: 0.95;
+  }
+  60% {
+    stroke-dashoffset: -0.93;
+    opacity: 0.95;
+  }
+  68%,
+  100% {
+    stroke-dashoffset: -0.93;
+    opacity: 0;
   }
 }
 
@@ -146,9 +167,14 @@
 
 @media (prefers-reduced-motion: reduce) {
   .free-model-route-path,
+  .free-model-route-glow,
   .free-model-route-node,
   .free-model-provider-enter {
     animation: none;
+  }
+
+  .free-model-route-glow {
+    display: none;
   }
 
   .free-model-scan-progress {

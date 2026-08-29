@@ -526,21 +526,24 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
     [selectedToolData.apiProtocol]
   );
 
-  const { localModels, cloudModels } = useMemo(() => {
+  const { smartRouterModels, localModels, cloudModels } = useMemo(() => {
     const compatible = userModels.filter((model) => {
       const hasOpenAI = toolProtocols.includes('openai') && !!model.baseUrl;
       const hasAnthropic = toolProtocols.includes('anthropic') && !!model.anthropicUrl;
       return hasOpenAI || hasAnthropic;
     });
     return {
+      smartRouterModels: compatible.filter((m) => m.internalId === 'smart-router'),
       localModels: compatible.filter((m) => m.internalId === 'local-server'),
-      cloudModels: compatible.filter((m) => m.internalId !== 'local-server'),
+      cloudModels: compatible.filter(
+        (m) => m.internalId !== 'local-server' && m.internalId !== 'smart-router'
+      ),
     };
   }, [userModels, toolProtocols]);
 
-  const renderModelCard = (model: (typeof userModels)[0]) => {
+  const renderModelCard = (model: (typeof userModels)[0], badge?: 'smart' | 'local') => {
     const isSelected = selectedTool ? toolModelConfig[selectedTool] === model.internalId : false;
-    const isLocalServer = model.internalId === 'local-server';
+    const isLocalModel = model.internalId === 'local-server' || model.internalId === 'smart-router';
 
     const modelHasBoth = !!(model.baseUrl && model.anthropicUrl);
     const toolSupportsBoth =
@@ -574,7 +577,7 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
       try {
         const url = new URL(displayUrl || '');
         const path = url.pathname === '/' ? '' : url.pathname;
-        return url.hostname + path;
+        return url.host + path;
       } catch {
         return displayUrl || 'No URL Configured';
       }
@@ -590,7 +593,7 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
     return (
       <div
         key={model.internalId}
-        className={`relative overflow-hidden p-3 rounded-card cursor-pointer transition-colors mb-2 flex items-center gap-3 border ${
+        className={`relative overflow-hidden p-3 rounded-card cursor-pointer transition-colors flex items-center gap-3 border ${
           isSelected
             ? 'bg-cyber-elevated border-transparent'
             : 'bg-cyber-surface border-transparent hover:bg-cyber-elevated'
@@ -618,7 +621,7 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
                 (e.target as HTMLImageElement).style.display = 'none';
               }}
             />
-          ) : isLocalServer ? (
+          ) : isLocalModel ? (
             <div className="w-6 h-6 flex items-center justify-center text-cyber-accent">
               <ServerIcon size={22} />
             </div>
@@ -635,6 +638,17 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
             <div className="text-sm font-bold truncate leading-none flex-1 min-w-0">
               {model.name || 'Untitled Model'}
             </div>
+            {badge && (
+              <span
+                className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none ${
+                  badge === 'smart'
+                    ? 'bg-cyber-accent/10 text-cyber-accent'
+                    : 'bg-cyber-text/10 text-cyber-text-secondary'
+                }`}
+              >
+                {t(badge === 'smart' ? 'agent.badge.smart' : 'agent.badge.local')}
+              </span>
+            )}
             {showSwitcher && (
               <span
                 className="text-[10px] font-mono cursor-pointer select-none flex-shrink-0 transition-colors text-cyber-text-muted/60 hover:text-cyber-text"
@@ -683,7 +697,7 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
 
     return (
       <div
-        className={`relative overflow-hidden p-3 rounded-card cursor-pointer transition-colors mb-2 flex items-center gap-3 border ${
+        className={`relative overflow-hidden p-3 rounded-card cursor-pointer transition-colors flex items-center gap-3 border ${
           isOfficialPending
             ? 'bg-cyber-elevated border-transparent'
             : 'bg-cyber-surface border-transparent hover:bg-cyber-elevated'
@@ -734,7 +748,11 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
   // Fully empty: no local models, no cloud models, no official endpoint.
   // Show only the centered placeholder — the "select model for X" heading
   // would be misleading when there's nothing to select anyway.
-  const isEmpty = cloudModels.length === 0 && !official && localModels.length === 0;
+  const isEmpty =
+    cloudModels.length === 0 &&
+    !official &&
+    localModels.length === 0 &&
+    smartRouterModels.length === 0;
   if (isEmpty) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
@@ -751,20 +769,12 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
   }
 
   return (
-    <>
-      {/* Local models area */}
-      {localModels.length > 0 && (
-        <div className="mb-4">
-          <div className="text-xs text-cyber-accent/80 mb-2">{t('agent.myLocalModel')}:</div>
-          {localModels.map(renderModelCard)}
-        </div>
-      )}
-      {/* Cloud models area — official endpoint goes first if registered */}
-      <div className="space-y-2">
-        {official && renderOfficialCard(official)}
-        {cloudModels.map(renderModelCard)}
-      </div>
-    </>
+    <div className="space-y-2">
+      {smartRouterModels.map((model) => renderModelCard(model, 'smart'))}
+      {localModels.map((model) => renderModelCard(model, 'local'))}
+      {official && renderOfficialCard(official)}
+      {cloudModels.map((model) => renderModelCard(model))}
+    </div>
   );
 };
 
@@ -901,7 +911,7 @@ export const AppManagerPanel: React.FC = () => {
   return (
     <>
       {/* Header */}
-      <div className="p-2 flex items-center justify-between bg-transparent">
+      <div className="h-10 px-2 flex items-center justify-between bg-transparent">
         <div className="flex gap-1">
           <span className="px-3 py-1.5 text-xs font-bold text-cyber-text">
             {t('agent.modelsTab')}

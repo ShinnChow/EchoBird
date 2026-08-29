@@ -45,6 +45,20 @@ const isVolcengineUrl = (baseUrl: string, anthropicUrl?: string | null) => {
   return url.includes('ark.cn-beijing') || url.includes('volcengine') || url.includes('volces.com');
 };
 
+const visibleModelNexusModels = (models: ModelConfig[]) =>
+  models.filter(
+    (model) => model.internalId !== 'local-server' && model.internalId !== 'smart-router'
+  );
+
+const isValidModelBaseUrl = (value: string) => {
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && Boolean(url.host);
+  } catch {
+    return false;
+  }
+};
+
 export function ModelNexusProvider({ children }: { children: React.ReactNode }) {
   // Models state
   const [userModels, setUserModels] = useState<ModelConfig[]>([]);
@@ -113,7 +127,7 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
       if (api.getModels) {
         try {
           const models = await api.getModels();
-          setUserModels(models);
+          setUserModels(visibleModelNexusModels(models));
         } catch (error) {
           console.error('Load models failed:', error);
         }
@@ -339,7 +353,7 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
         // Reload model list to refresh test status
         if (api.getModels) {
           const updatedModels = await api.getModels();
-          setUserModels(updatedModels);
+          setUserModels(visibleModelNexusModels(updatedModels));
         }
       } else {
         // Sentinel -1 so the model card shows "Error" instead of the
@@ -761,7 +775,7 @@ export function ModelNexusMain() {
         if (found) {
           freshModel = found;
           // Also update the models list with fresh data
-          setUserModels(freshModels);
+          setUserModels(visibleModelNexusModels(freshModels));
         }
       } catch {
         /* fallback to stale model */
@@ -1127,7 +1141,7 @@ export function ModelNexusPanel() {
 
   return (
     <>
-      <div className="p-2 flex items-center justify-between bg-transparent">
+      <div className="h-10 px-2 flex items-center justify-between bg-transparent">
         <div className="flex gap-1">
           <button
             onClick={() => setPanelTab('providers')}
@@ -1166,7 +1180,9 @@ export function ModelNexusPanel() {
 
 export function AddModelModal() {
   const { t } = useI18n();
-  const { addSelectedModel } = useFreeModels();
+  const { showToast } = useToast();
+  const [isSavingModel, setIsSavingModel] = useState(false);
+  const { addSelectedModel, selectedIds } = useFreeModels();
   const {
     showAddModelModal,
     modelModalAnimatingOut,
@@ -1226,6 +1242,9 @@ export function AddModelModal() {
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeModelModal} />
 
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="model-config-dialog-title"
         className={`relative w-[450px] max-w-[90vw] border border-cyber-border/30 bg-cyber-surface shadow-2xl rounded-xl overflow-hidden transition-all duration-200 ${modelModalAnimatingOut ? 'scale-95 opacity-0' : 'scale-100 opacity-100'}`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -1236,7 +1255,7 @@ export function AddModelModal() {
         <div className="px-6 pt-5 pb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-cyber-text font-mono text-sm opacity-60">&gt;_</span>
-            <span className="text-base font-bold text-cyber-text">
+            <span id="model-config-dialog-title" className="text-base font-bold text-cyber-text">
               {editingModelId
                 ? t('model.editConfig')
                 : modelModalDestination === 'freeRouter'
@@ -1246,6 +1265,7 @@ export function AddModelModal() {
           </div>
           <button
             onClick={closeModelModal}
+            aria-label={t('btn.close')}
             className="text-cyber-text-secondary hover:text-cyber-text transition-colors"
           >
             <X size={18} />
@@ -1440,9 +1460,35 @@ export function AddModelModal() {
             {t('model.escCancel')}
           </button>
           <button
+            type="button"
+            disabled={isSavingModel}
             onClick={async () => {
-              if (api.addModel) {
-                if (editingModelId && api.updateModel) {
+              if (isSavingModel) return;
+              if (
+                !newModelForm.name.trim() ||
+                !newModelForm.baseUrl.trim() ||
+                !newModelForm.modelId.trim() ||
+                !newModelForm.apiKey.trim()
+              ) {
+                showToast('warning', t('model.requiredFields'));
+                return;
+              }
+              if (!isValidModelBaseUrl(newModelForm.baseUrl)) {
+                showToast('warning', t('model.invalidOpenaiUrl'));
+                return;
+              }
+              if (
+                modelModalDestination === 'freeRouter' &&
+                !editingModelId &&
+                selectedIds.size >= api.SMART_ROUTER_CANDIDATE_LIMIT
+              ) {
+                showToast('warning', t('freeModels.router.limitReached'));
+                return;
+              }
+
+              setIsSavingModel(true);
+              try {
+                if (editingModelId) {
                   const updatedModel = await api.updateModel(editingModelId, {
                     name: newModelForm.name,
                     baseUrl: newModelForm.baseUrl,
@@ -1462,15 +1508,24 @@ export function AddModelModal() {
                     anthropicUrl: newModelForm.anthropicUrl || undefined,
                     apiKey: newModelForm.apiKey,
                     modelId: newModelForm.modelId,
+                    scope: modelModalDestination === 'freeRouter' ? 'smartRouter' : 'modelCenter',
                   });
-                  setUserModels((prev) => [...prev, newModel]);
                   if (modelModalDestination === 'freeRouter') {
-                    addSelectedModel({
-                      internalId: newModel.internalId,
-                      name: newModel.name,
-                      baseUrl: newModel.baseUrl,
-                      modelId: newModel.modelId ?? newModelForm.modelId,
-                    });
+                    try {
+                      await addSelectedModel({
+                        internalId: newModel.internalId,
+                        name: newModel.name,
+                        baseUrl: newModel.baseUrl,
+                        modelId: newModel.modelId ?? newModelForm.modelId,
+                      });
+                    } catch (error) {
+                      await api.deleteModel(newModel.internalId).catch((rollbackError) => {
+                        console.error('Rollback smart router model failed:', rollbackError);
+                      });
+                      throw error;
+                    }
+                  } else {
+                    setUserModels((prev) => [...prev, newModel]);
                   }
                 }
 
@@ -1484,9 +1539,18 @@ export function AddModelModal() {
                 });
                 setShowAddModelModal(false);
                 setModelModalDestination('modelNexus');
+              } catch (error) {
+                console.error('Save model failed:', error);
+                showToast('error', t('error.requestFailed'));
+              } finally {
+                setIsSavingModel(false);
               }
             }}
-            className="flex-1 px-4 py-3 text-[14px] font-semibold text-cyber-text hover:bg-cyber-text/10 transition-all"
+            className={`flex-1 px-4 py-3 text-[14px] font-semibold transition-all ${
+              isSavingModel
+                ? 'text-cyber-text-muted cursor-not-allowed'
+                : 'text-cyber-text hover:bg-cyber-text/10'
+            }`}
           >
             {t('model.enterSave')}
           </button>

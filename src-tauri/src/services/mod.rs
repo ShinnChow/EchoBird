@@ -19,6 +19,7 @@ pub mod process_manager;
 pub mod pulse_archive;
 pub mod self_update;
 pub mod skill_manager;
+pub mod smart_router;
 pub mod tool_config_manager;
 pub mod tool_manager;
 pub mod tool_patcher;

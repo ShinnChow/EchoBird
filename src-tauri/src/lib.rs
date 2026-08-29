@@ -16,6 +16,7 @@ use commands::model_commands;
 use commands::process_commands;
 use commands::settings_commands;
 use commands::skill_commands;
+use commands::smart_router_commands;
 use commands::tool_commands;
 
 use commands::agent_commands;
@@ -592,6 +593,11 @@ pub fn run() {
             // features still start.
             services::codex_proxy::spawn_proxy_task();
 
+            // Local OpenAI-compatible smart router. It owns a separate fixed
+            // loopback port so Codex's Responses bridge can safely use it as
+            // an upstream without forwarding back into itself.
+            services::smart_router::spawn_proxy_task();
+
             // Initialize resource_dir for correct tools/ path resolution on all platforms
             // (especially Linux where exe is at /usr/bin but tools are at /usr/lib/com.echobird.ai/)
             if let Ok(res_dir) = app.path().resource_dir() {
@@ -875,6 +881,11 @@ pub fn run() {
             model_commands::has_volc_aksk,
             model_commands::clear_volc_aksk,
             model_commands::get_volc_aksk,
+            smart_router_commands::get_smart_router_config,
+            smart_router_commands::get_smart_router_activity,
+            smart_router_commands::get_smart_router_candidates,
+            smart_router_commands::remove_smart_router_candidate,
+            smart_router_commands::set_smart_router_candidates,
             process_commands::start_tool,
             process_commands::start_llm_server,
             process_commands::stop_llm_server,

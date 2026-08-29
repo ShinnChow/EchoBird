@@ -23,5 +23,8 @@ vite.config.ts
 # Tools
 tools
 
+# External reference projects
+references
+
 # Test coverage
 coverage

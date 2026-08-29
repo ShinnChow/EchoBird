@@ -10,7 +10,6 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { IS_MACOS } from './utils/platform';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ERROR_MESSAGES, pickErrorLang } from './components/errorMessages';
-import { FreeModelsProvider } from './pages/FreeModels';
 
 // ── Object.hasOwn polyfill ───────────────────────────────────────────────────
 // ES2022 runtime API; native in Safari 15.4+ (macOS 12.3+), absent in Safari
@@ -193,9 +192,7 @@ async function bootAndRender(): Promise<void> {
     <React.StrictMode>
       <ErrorBoundary>
         <I18nProvider initialLocale={locale}>
-          <FreeModelsProvider>
-            <App />
-          </FreeModelsProvider>
+          <App />
         </I18nProvider>
       </ErrorBoundary>
     </React.StrictMode>

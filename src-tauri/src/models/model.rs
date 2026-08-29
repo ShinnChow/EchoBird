@@ -12,6 +12,20 @@ pub enum ModelType {
     Demo,
 }
 
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ModelScope {
+    #[default]
+    ModelCenter,
+    SmartRouter,
+}
+
+impl ModelScope {
+    fn is_model_center(&self) -> bool {
+        *self == Self::ModelCenter
+    }
+}
+
 /// Model configuration (stored in ~/.echobird/models.json)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -36,6 +50,47 @@ pub struct ModelConfig {
     pub openai_latency: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anthropic_latency: Option<f64>,
+    #[serde(default, skip_serializing_if = "ModelScope::is_model_center")]
+    pub scope: ModelScope,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_scope_defaults_to_model_center() {
+        let model: ModelConfig = serde_json::from_value(serde_json::json!({
+            "internalId": "existing",
+            "name": "Existing",
+            "baseUrl": "https://example.com/v1",
+            "apiKey": "key"
+        }))
+        .unwrap();
+
+        assert_eq!(model.scope, ModelScope::ModelCenter);
+    }
+
+    #[test]
+    fn smart_router_scope_is_serialized() {
+        let value = serde_json::to_value(ModelConfig {
+            internal_id: "router-model".to_string(),
+            name: "Router Model".to_string(),
+            model_id: Some("model-id".to_string()),
+            base_url: "https://example.com/v1".to_string(),
+            api_key: "key".to_string(),
+            anthropic_url: None,
+            model_type: Some(ModelType::Cloud),
+            openai_tested: None,
+            anthropic_tested: None,
+            openai_latency: None,
+            anthropic_latency: None,
+            scope: ModelScope::SmartRouter,
+        })
+        .unwrap();
+
+        assert_eq!(value["scope"], "smartRouter");
+    }
 }
 
 /// Model test result (returned to frontend)

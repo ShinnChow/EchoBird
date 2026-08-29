@@ -24,7 +24,9 @@ import {
 import * as api from '../../api/tauri';
 import type { FreeModelDirectory, FreeModelEntry } from '../../api/freeModels';
 import { getModelIcon } from '../../components';
+import { useToast } from '../../components/Toast';
 import { useI18n } from '../../hooks/useI18n';
+import { useNavigationStore } from '../../stores/navigationStore';
 import { useModelNexus } from '../ModelNexus/context';
 import './FreeModels.css';
 
@@ -36,19 +38,22 @@ const HUB_ARROW_HEIGHT = 12;
 const HUB_ARROW_LINE_GAP = 2;
 const SCAN_STEP_MS = 230;
 const SCAN_COMPLETE_MS = 320;
+const ROUTER_ACTIVITY_POLL_MS = 750;
+const ROUTER_ACTIVITY_GRACE_MS = 2200;
 
 interface FreeModelsContextValue {
   catalog: FreeModelDirectory;
   models: FreeModelEntry[];
   customModels: RouteModelNode[];
   selectedIds: Set<string>;
-  brokenIds: Set<string>;
   refreshing: boolean;
   scanProvider: string;
   scanProgress: number;
+  routerBaseUrl: string;
+  routerOnline: boolean;
   refresh: () => Promise<void>;
-  addSelectedModel: (model: RouteModelInput) => void;
-  toggleSelected: (id: string) => void;
+  addSelectedModel: (model: RouteModelInput) => Promise<void>;
+  removeSelectedModel: (id: string) => Promise<void>;
 }
 
 interface RouteModelInput {
@@ -60,8 +65,10 @@ interface RouteModelInput {
 
 interface RouteModelNode {
   id: string;
+  internalId: string;
   provider: string;
   modelId: string;
+  baseUrl: string;
 }
 
 interface FreeModelProviderGroup {
@@ -75,13 +82,11 @@ interface FreeModelProviderGroup {
 interface RoutePath {
   id: string;
   d: string;
-  broken: boolean;
 }
 
 interface RouteArrow {
   x: number;
   y: number;
-  broken: boolean;
 }
 
 const FreeModelsContext = createContext<FreeModelsContextValue | null>(null);
@@ -124,15 +129,63 @@ function shortModelName(modelId: string): string {
 }
 
 export function FreeModelsProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
+  const { showToast } = useToast();
+  const activePage = useNavigationStore((state) => state.activePage);
   const [catalog, setCatalog] = useState<FreeModelDirectory>(emptyCatalog);
   const [customModels, setCustomModels] = useState<RouteModelNode[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
-  const [brokenIds, setBrokenIds] = useState<Set<string>>(() => new Set());
   const [refreshing, setRefreshing] = useState(false);
   const [scanProvider, setScanProvider] = useState('');
   const [scanProgress, setScanProgress] = useState(0);
+  const [routerBaseUrl, setRouterBaseUrl] = useState('127.0.0.1:53683/v1');
+  const [routerRunning, setRouterRunning] = useState(false);
+  const [usableCandidateCount, setUsableCandidateCount] = useState(0);
   const refreshInFlightRef = useRef(false);
+  const routerMutationRef = useRef<Promise<void>>(Promise.resolve());
+  const selectedIdsRef = useRef<Set<string>>(new Set());
+  const routerLoadedRef = useRef(false);
   const models = catalog.models;
+
+  useEffect(() => {
+    if (routerLoadedRef.current && activePage !== 'freeModels') return;
+    let cancelled = false;
+    Promise.all([api.getSmartRouterConfig(), api.getSmartRouterCandidates()])
+      .then(([router, configuredModels]) => {
+        if (cancelled) return;
+        const modelsById = new Map(configuredModels.map((model) => [model.internalId, model]));
+        const routeModels = router.candidateIds.flatMap((internalId) => {
+          const model = modelsById.get(internalId);
+          if (!model?.modelId || !model.baseUrl) return [];
+          return [
+            {
+              id: internalId,
+              internalId,
+              provider: model.name,
+              modelId: model.modelId,
+              baseUrl: model.baseUrl,
+            },
+          ];
+        });
+        setCustomModels(routeModels);
+        const next = new Set(router.candidateIds);
+        selectedIdsRef.current = next;
+        setSelectedIds((current) => {
+          if (current.size === next.size && [...current].every((id) => next.has(id))) {
+            return current;
+          }
+          return next;
+        });
+        setRouterBaseUrl(router.baseUrl.replace(/^https?:\/\//, ''));
+        setRouterRunning(router.running);
+        setUsableCandidateCount(router.usableCandidateCount);
+        routerLoadedRef.current = true;
+      })
+      .catch((error) => console.error('Load smart router config failed:', error));
+    return () => {
+      cancelled = true;
+    };
+  }, [activePage]);
 
   const refresh = useCallback(async () => {
     if (refreshInFlightRef.current) return;
@@ -143,7 +196,10 @@ export function FreeModelsProvider({ children }: { children: ReactNode }) {
     setRefreshing(true);
     try {
       const remote = await api.getFreeModelDirectory();
-      if (!remote) return;
+      if (!remote) {
+        showToast('warning', t('freeModels.fetchFailed'));
+        return;
+      }
 
       const groups = groupModelsForScan(remote.models);
       const revealedModels: FreeModelEntry[] = [];
@@ -155,51 +211,78 @@ export function FreeModelsProvider({ children }: { children: ReactNode }) {
         setScanProgress((index + 1) / groups.length);
       }
       await wait(SCAN_COMPLETE_MS);
+    } catch (error) {
+      console.error('Fetch free model directory failed:', error);
+      showToast('error', t('freeModels.fetchFailed'));
     } finally {
       refreshInFlightRef.current = false;
       setScanProvider('');
       setScanProgress(0);
       setRefreshing(false);
     }
-  }, []);
+  }, [showToast, t]);
 
-  const addSelectedModel = useCallback(
-    (model: RouteModelInput) => {
-      const catalogModel = catalog.models.find(
-        (entry) => entry.baseUrl === model.baseUrl && entry.modelId === model.modelId
-      );
-      const id = catalogModel?.id ?? `custom:${model.internalId}`;
-      if (!catalogModel) {
-        setCustomModels((current) => [
-          ...current.filter((entry) => entry.id !== id),
-          { id, provider: model.name, modelId: model.modelId },
-        ]);
-      }
-      setSelectedIds((current) => new Set(current).add(id));
-      setBrokenIds((current) => {
-        if (!current.has(id)) return current;
-        const next = new Set(current);
-        next.delete(id);
-        return next;
+  const addSelectedModel = useCallback(async (model: RouteModelInput) => {
+    const id = model.internalId;
+    const addition = routerMutationRef.current
+      .catch(() => undefined)
+      .then(() => {
+        const candidateIds = [...new Set([...selectedIdsRef.current, id])];
+        return api.setSmartRouterCandidates(candidateIds);
       });
-    },
-    [catalog.models]
-  );
+    routerMutationRef.current = addition.then(
+      () => undefined,
+      () => undefined
+    );
 
-  const toggleSelected = useCallback((id: string) => {
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    setBrokenIds((current) => {
-      if (!current.has(id)) return current;
-      const next = new Set(current);
-      next.delete(id);
-      return next;
-    });
+    const router = await addition;
+    if (!router.candidateIds.includes(id)) {
+      throw new Error(`Smart Router rejected candidate: ${id}`);
+    }
+
+    const nextIds = new Set(router.candidateIds);
+    selectedIdsRef.current = nextIds;
+    setSelectedIds(nextIds);
+    setCustomModels((current) => [
+      ...current.filter((entry) => entry.id !== id),
+      {
+        id,
+        internalId: model.internalId,
+        provider: model.name,
+        modelId: model.modelId,
+        baseUrl: model.baseUrl,
+      },
+    ]);
+    setRouterBaseUrl(router.baseUrl.replace(/^https?:\/\//, ''));
+    setRouterRunning(router.running);
+    setUsableCandidateCount(router.usableCandidateCount);
   }, []);
+
+  const removeSelectedModel = useCallback(
+    async (id: string) => {
+      const removal = routerMutationRef.current
+        .catch(() => undefined)
+        .then(() => api.removeSmartRouterCandidate(id));
+      routerMutationRef.current = removal.then(
+        () => undefined,
+        () => undefined
+      );
+      try {
+        const router = await removal;
+        const nextIds = new Set(router.candidateIds);
+        selectedIdsRef.current = nextIds;
+        setSelectedIds(nextIds);
+        setCustomModels((current) => current.filter((model) => model.id !== id));
+        setRouterBaseUrl(router.baseUrl.replace(/^https?:\/\//, ''));
+        setRouterRunning(router.running);
+        setUsableCandidateCount(router.usableCandidateCount);
+      } catch (error) {
+        console.error('Remove smart router candidate failed:', error);
+        showToast('error', t('error.requestFailed'));
+      }
+    },
+    [showToast, t]
+  );
 
   return (
     <FreeModelsContext.Provider
@@ -208,13 +291,14 @@ export function FreeModelsProvider({ children }: { children: ReactNode }) {
         models,
         customModels,
         selectedIds,
-        brokenIds,
         refreshing,
         scanProvider,
         scanProgress,
+        routerBaseUrl,
+        routerOnline: routerRunning && usableCandidateCount > 0,
         refresh,
         addSelectedModel,
-        toggleSelected,
+        removeSelectedModel,
       }}
     >
       {children}
@@ -309,18 +393,52 @@ export function FreeModelsTitleActions() {
 
 export function FreeModelsMain() {
   const { t } = useI18n();
-  const { models, customModels, selectedIds, brokenIds, toggleSelected } = useFreeModels();
+  const { customModels, selectedIds, routerBaseUrl, routerOnline, removeSelectedModel } =
+    useFreeModels();
   const selectedModels = useMemo(
-    () => [...models, ...customModels].filter((model) => selectedIds.has(model.id)),
-    [models, customModels, selectedIds]
+    () => customModels.filter((model) => selectedIds.has(model.id)),
+    [customModels, selectedIds]
   );
-  const healthyCount = selectedModels.length - brokenIds.size;
+  const routerAnthropicBaseUrl = routerBaseUrl.replace(/\/v1\/?$/, '');
   const stageRef = useRef<HTMLDivElement | null>(null);
   const hubRef = useRef<HTMLDivElement | null>(null);
   const nodeRefs = useRef(new Map<string, HTMLDivElement>());
   const [routePaths, setRoutePaths] = useState<RoutePath[]>([]);
+  const [activityPaths, setActivityPaths] = useState<RoutePath[]>([]);
   const [routeArrow, setRouteArrow] = useState<RouteArrow | null>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 1, height: 1 });
+  const [routerActivity, setRouterActivity] = useState<api.SmartRouterActivity>({
+    candidateId: null,
+    active: false,
+    sequence: 0,
+    updatedAtMs: 0,
+  });
+  const [activityObservedAtMs, setActivityObservedAtMs] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    let errorReported = false;
+    const pollActivity = async () => {
+      try {
+        const activity = await api.getSmartRouterActivity();
+        if (!cancelled) {
+          setRouterActivity(activity);
+          setActivityObservedAtMs(Date.now());
+        }
+      } catch (error) {
+        if (!cancelled && !errorReported) {
+          errorReported = true;
+          console.error('Load smart router activity failed:', error);
+        }
+      }
+    };
+    void pollActivity();
+    const timer = window.setInterval(() => void pollActivity(), ROUTER_ACTIVITY_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const setNodeRef = useCallback((id: string, node: HTMLDivElement | null) => {
     if (node) nodeRefs.current.set(id, node);
@@ -355,45 +473,45 @@ export function FreeModelsMain() {
     }
 
     const nextPaths: RoutePath[] = [];
+    const nextActivityPaths: RoutePath[] = [];
+    const parentById = new Map<string, (typeof entries)[number]>();
     const firstRow = rows[0];
     let nextArrow: RouteArrow | null = null;
+    let routeBusY: number | null = null;
+    let routeLineEndY: number | null = null;
     if (firstRow) {
       const arrowY = endY + HUB_ARROW_GAP;
       const lineEndY = arrowY + HUB_ARROW_HEIGHT + HUB_ARROW_LINE_GAP;
+      routeLineEndY = lineEndY;
       if (firstRow.length === 1) {
         const entry = firstRow[0];
-        const broken = brokenIds.has(entry.id);
         nextPaths.push({
           id: entry.id,
-          broken,
           d: `M ${entry.x} ${entry.top - 3} V ${lineEndY}`,
         });
-        nextArrow = { x: endX, y: arrowY, broken };
+        nextArrow = { x: endX, y: arrowY };
       } else {
         const busY = endY + (firstRow[0].top - endY) / 2;
+        routeBusY = busY;
         const firstX = firstRow[0].x;
         const lastX = firstRow[firstRow.length - 1].x;
         const busSegments = [];
         if (firstX < endX - 1) busSegments.push(`M ${firstX} ${busY} H ${endX}`);
         if (lastX > endX + 1) busSegments.push(`M ${lastX} ${busY} H ${endX}`);
-        const allBroken = firstRow.every((entry) => brokenIds.has(entry.id));
         if (busSegments.length > 0) {
           nextPaths.push({
             id: 'hub-bus',
-            broken: allBroken,
             d: busSegments.join(' '),
           });
         }
         nextPaths.push({
           id: 'hub-trunk',
-          broken: allBroken,
           d: `M ${endX} ${busY} V ${lineEndY}`,
         });
-        nextArrow = { x: endX, y: arrowY, broken: allBroken };
+        nextArrow = { x: endX, y: arrowY };
         firstRow.forEach((entry) => {
           nextPaths.push({
             id: entry.id,
-            broken: brokenIds.has(entry.id),
             d: `M ${entry.x} ${entry.top - 3} V ${busY}`,
           });
         });
@@ -407,9 +525,9 @@ export function FreeModelsMain() {
           Math.abs(candidate.x - entry.x) < Math.abs(closest.x - entry.x) ? candidate : closest
         );
         const bridgeY = parent.bottom + (entry.top - parent.bottom) / 2;
+        parentById.set(entry.id, parent);
         nextPaths.push({
           id: entry.id,
-          broken: brokenIds.has(entry.id),
           d:
             Math.abs(entry.x - parent.x) < 1
               ? `M ${entry.x} ${entry.top - 3} V ${parent.bottom + 3}`
@@ -417,10 +535,35 @@ export function FreeModelsMain() {
         });
       });
     });
+
+    if (firstRow && routeLineEndY !== null) {
+      entries.forEach((entry) => {
+        let current = entry;
+        let d = `M ${entry.x} ${entry.top - 3}`;
+        let parent = parentById.get(current.id);
+        while (parent) {
+          const bridgeY = parent.bottom + (current.top - parent.bottom) / 2;
+          d +=
+            Math.abs(current.x - parent.x) < 1
+              ? ` V ${parent.bottom + 3}`
+              : ` V ${bridgeY} H ${parent.x} V ${parent.bottom + 3}`;
+          d += ` V ${parent.top - 3}`;
+          current = parent;
+          parent = parentById.get(current.id);
+        }
+        if (firstRow.length === 1) {
+          d += ` V ${routeLineEndY}`;
+        } else if (routeBusY !== null) {
+          d += ` V ${routeBusY} H ${endX} V ${routeLineEndY}`;
+        }
+        nextActivityPaths.push({ id: entry.id, d });
+      });
+    }
     setCanvasSize({ width: stageBox.width, height: stageBox.height });
     setRoutePaths(nextPaths);
+    setActivityPaths(nextActivityPaths);
     setRouteArrow(nextArrow);
-  }, [brokenIds]);
+  }, []);
 
   useLayoutEffect(() => {
     const frame = requestAnimationFrame(updatePaths);
@@ -428,15 +571,38 @@ export function FreeModelsMain() {
     if (!stage) return () => cancelAnimationFrame(frame);
     const observer = new ResizeObserver(updatePaths);
     observer.observe(stage);
+    if (hubRef.current) observer.observe(hubRef.current);
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
   }, [selectedModels, updatePaths]);
 
+  const activityIsVisible =
+    routerActivity.candidateId !== null &&
+    (routerActivity.active ||
+      activityObservedAtMs - routerActivity.updatedAtMs < ROUTER_ACTIVITY_GRACE_MS);
+  const activeRoutePath = activityIsVisible
+    ? activityPaths.find((path) => path.id === routerActivity.candidateId)
+    : undefined;
+  const routeRowCount = selectedModels.length === 0 ? 0 : Math.ceil(selectedModels.length / 4);
+  const stageMinHeight = Math.max(
+    550,
+    24 +
+      118 +
+      HUB_TO_NODE_GAP +
+      routeRowCount * 72 +
+      Math.max(0, routeRowCount - 1) * NODE_ROW_GAP +
+      24
+  );
+
   return (
     <div className="free-model-router h-full min-h-[620px] px-2 py-1">
-      <div ref={stageRef} className="relative h-full min-h-[550px] pt-6 overflow-hidden">
+      <div
+        ref={stageRef}
+        className="relative h-full pt-6 overflow-hidden"
+        style={{ minHeight: stageMinHeight }}
+      >
         <svg
           className="absolute inset-0 z-0 h-full w-full pointer-events-none"
           viewBox={`0 0 ${canvasSize.width} ${canvasSize.height}`}
@@ -444,32 +610,37 @@ export function FreeModelsMain() {
           aria-hidden="true"
         >
           {routePaths.map((path) => (
-            <path
-              key={path.id}
-              d={path.d}
-              className={path.broken ? 'free-model-route-path is-broken' : 'free-model-route-path'}
-            />
+            <path key={path.id} d={path.d} className="free-model-route-path" />
           ))}
+          {activeRoutePath && (
+            <path
+              key={activeRoutePath.id}
+              d={activeRoutePath.d}
+              pathLength="1"
+              className="free-model-route-glow"
+            />
+          )}
           {routeArrow && (
             <path
               d={`M ${routeArrow.x} ${routeArrow.y} L ${routeArrow.x - 6} ${routeArrow.y + HUB_ARROW_HEIGHT} H ${routeArrow.x + 6} Z`}
-              className={
-                routeArrow.broken ? 'free-model-route-arrow is-broken' : 'free-model-route-arrow'
-              }
+              className="free-model-route-arrow"
             />
           )}
         </svg>
 
         <div
           ref={hubRef}
-          className={`free-model-router-hub relative z-10 mx-auto w-[min(270px,80%)] min-h-[118px] rounded-2xl flex flex-col items-center justify-center text-center px-5 ${
-            healthyCount > 0 ? 'is-running' : selectedModels.length > 0 ? 'is-unavailable' : ''
+          className={`free-model-router-hub relative z-10 mx-auto w-[min(270px,80%)] min-h-[118px] rounded-2xl flex flex-col items-center justify-center text-center px-4 py-3 ${
+            routerOnline ? 'is-running' : selectedModels.length > 0 ? 'is-unavailable' : ''
           }`}
         >
-          <div className="text-xl font-semibold text-cyber-text">
+          <div className="whitespace-nowrap text-xl font-semibold text-cyber-text">
             {t('freeModels.router.title')}
           </div>
-          <div className="mt-2 text-[11px] font-mono free-model-router-state">127.0.0.1:xxx/v1</div>
+          <div className="mt-3 space-y-1.5 text-center text-[10px] font-mono free-model-router-state">
+            <div className="whitespace-nowrap">OpenAI : {routerBaseUrl}</div>
+            <div className="whitespace-nowrap">Anthropic : {routerAnthropicBaseUrl}</div>
+          </div>
         </div>
 
         {selectedModels.length === 0 ? (
@@ -498,18 +669,15 @@ export function FreeModelsMain() {
               }}
             >
               {selectedModels.map((model) => {
-                const broken = brokenIds.has(model.id);
                 return (
                   <div
                     key={model.id}
                     ref={(node) => setNodeRef(model.id, node)}
-                    className={`free-model-route-node group relative min-h-[72px] rounded-lg p-3 pr-10 text-left flex flex-col justify-center ${
-                      broken ? 'is-broken' : ''
-                    }`}
+                    className="free-model-route-node group relative min-h-[72px] rounded-lg p-3 pr-10 text-left flex flex-col justify-center"
                   >
                     <button
                       type="button"
-                      onClick={() => toggleSelected(model.id)}
+                      onClick={() => void removeSelectedModel(model.id)}
                       className="absolute right-2 top-2 h-7 w-7 rounded-md flex items-center justify-center text-cyber-text-muted opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto hover:text-cyber-text hover:bg-cyber-text/10 transition-all"
                       aria-label={`${t('btn.remove')} ${shortModelName(model.modelId)}`}
                     >
@@ -616,7 +784,8 @@ function FreeModelProviderRow({
 
 export function FreeModelsPanel() {
   const { t } = useI18n();
-  const { models, selectedIds, refreshing, scanProvider, scanProgress, refresh } = useFreeModels();
+  const { models, customModels, selectedIds, refreshing, scanProvider, scanProgress, refresh } =
+    useFreeModels();
   const { setNewModelForm, setEditingModelId, setModelModalDestination, setShowAddModelModal } =
     useModelNexus();
   const providerGroups = useMemo(() => {
@@ -673,27 +842,28 @@ export function FreeModelsPanel() {
 
   return (
     <div className="free-model-router h-full min-h-0 flex flex-col">
-      <div className="p-2 flex items-center gap-2 bg-transparent">
-        <button
-          type="button"
-          onClick={openCustomModel}
-          className="flex-1 h-9 px-3 text-[14px] font-semibold border border-cyber-border rounded-button text-cyber-text-secondary hover:text-cyber-text hover:bg-cyber-text/10 transition-colors flex items-center justify-center gap-2"
-        >
-          <Plus size={14} />
-          {t('freeModels.customAdd')}
-        </button>
+      <div className="h-10 px-2 flex items-center gap-2 bg-transparent">
         <button
           type="button"
           onClick={() => void refresh()}
           disabled={refreshing}
-          aria-label={t('freeModels.fetch')}
-          className={`w-9 h-9 flex items-center justify-center border rounded-button transition-colors ${
+          className={`flex-1 h-9 px-3 text-[14px] font-semibold border rounded-button transition-colors flex items-center justify-center gap-2 ${
             !refreshing
-              ? 'border-cyber-border text-cyber-text hover:bg-cyber-text/10'
+              ? 'border-cyber-border text-cyber-text-secondary hover:text-cyber-text hover:bg-cyber-text/10'
               : 'border-cyber-border text-cyber-text-muted cursor-not-allowed'
           }`}
         >
           <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+          {t('freeModels.fetch')}
+        </button>
+        <button
+          type="button"
+          onClick={openCustomModel}
+          aria-label={t('freeModels.customAdd')}
+          title={t('freeModels.customAdd')}
+          className="w-9 h-9 flex items-center justify-center border border-cyber-border rounded-button text-cyber-text hover:bg-cyber-text/10 transition-colors"
+        >
+          <Plus size={16} />
         </button>
       </div>
       {refreshing && (
@@ -727,14 +897,9 @@ export function FreeModelsPanel() {
         {providerGroups.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             {!refreshing && (
-              <button
-                type="button"
-                onClick={() => void refresh()}
-                className="flex items-center gap-2 text-sm font-semibold px-3 py-2 border border-cyber-border rounded-button text-cyber-text hover:bg-cyber-text/10 transition-colors"
-              >
-                <RefreshCw size={13} />
-                {t('freeModels.fetch')}
-              </button>
+              <div className="text-xs text-cyber-text-muted text-center">
+                {t('freeModels.fetchHint')}
+              </div>
             )}
           </div>
         ) : (
@@ -743,7 +908,14 @@ export function FreeModelsPanel() {
               <FreeModelProviderRow
                 key={group.id}
                 group={group}
-                selected={group.models.some((model) => selectedIds.has(model.id))}
+                selected={group.models.some((model) =>
+                  customModels.some(
+                    (routeModel) =>
+                      selectedIds.has(routeModel.internalId) &&
+                      routeModel.baseUrl === model.baseUrl &&
+                      routeModel.modelId === model.modelId
+                  )
+                )}
                 onAdd={() => openProvider(group)}
               />
             ))}

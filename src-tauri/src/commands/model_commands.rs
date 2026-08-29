@@ -19,13 +19,28 @@ pub fn add_model(input: AddModelInput) -> ModelConfig {
 /// Delete a model by internal ID
 #[tauri::command]
 pub fn delete_model(internal_id: String) -> bool {
-    model_manager::delete_model(&internal_id)
+    let deleted = model_manager::delete_model(&internal_id);
+    if deleted {
+        if let Err(error) = crate::services::smart_router::remove_candidate(&internal_id) {
+            log::warn!("Failed to remove deleted model from Smart Router: {error}");
+            crate::services::smart_router::forget_candidate_memory(&internal_id);
+        }
+    }
+    deleted
 }
 
 /// Update a model
 #[tauri::command]
 pub fn update_model(internal_id: String, updates: UpdateModelInput) -> Option<ModelConfig> {
-    model_manager::update_model(&internal_id, updates)
+    let resets_route_memory = updates.base_url.is_some()
+        || updates.anthropic_url.is_some()
+        || updates.api_key.is_some()
+        || updates.model_id.is_some();
+    let updated = model_manager::update_model(&internal_id, updates);
+    if resets_route_memory && updated.is_some() {
+        crate::services::smart_router::forget_candidate_memory(&internal_id);
+    }
+    updated
 }
 
 /// Persist a user-defined model display order (full visible list of

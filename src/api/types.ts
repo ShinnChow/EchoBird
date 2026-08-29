@@ -45,6 +45,7 @@ export interface ModelConfig {
   anthropicTested?: boolean;
   openaiLatency?: number;
   anthropicLatency?: number;
+  scope?: 'modelCenter' | 'smartRouter';
 }
 
 // ─── Skill (favorite) Types ───

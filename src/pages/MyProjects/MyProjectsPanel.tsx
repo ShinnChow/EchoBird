@@ -104,7 +104,7 @@ export const MyProjectsPanel: React.FC = () => {
     <>
       {/* Header (no relay-toggle row — user projects don't have an upstream
           relay concept; that's a Codex / Claude Desktop affordance only). */}
-      <div className="p-2 flex items-center justify-between bg-transparent">
+      <div className="h-10 px-2 flex items-center justify-between bg-transparent">
         <div className="flex gap-1">
           <span className="px-3 py-1.5 text-xs font-bold text-cyber-text">
             {t('agent.modelsTab')}

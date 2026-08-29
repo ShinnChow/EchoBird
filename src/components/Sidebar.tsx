@@ -10,7 +10,6 @@ import {
   Trophy,
   Monitor,
   Download,
-  Target,
 } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { useI18n } from '../hooks/useI18n';
@@ -107,7 +106,22 @@ export const Sidebar = ({
           onClick={() => onPageChange('models')}
         />
         <NavItem
-          icon={<Target size={20} />}
+          icon={
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M11.013 18.582 6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.12 2.12 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.12 2.12 0 0 0 1.597-1.16l2.309-4.679a.53.53 0 0 1 .95 0l2.31 4.679a2.12 2.12 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904L20 11.5" />
+              <path d="M15 18h6" />
+              <path d="M18 15v6" />
+            </svg>
+          }
           label={t('nav.freeModels')}
           active={activePage === 'freeModels'}
           onClick={() => onPageChange('freeModels')}
@@ -160,26 +174,22 @@ export const Sidebar = ({
         )}
       </div>
 
-      <div className="pt-4 text-[14px] text-cyber-text-secondary">
-        <div>
-          {t('nav.smartRouter')}:{' '}
-          {smartRouterOnline ? (
-            <span className="text-cyber-accent font-semibold">{t('status.online')}</span>
-          ) : (
-            <span className="text-cyber-text-muted">{t('status.offline')}</span>
+      {(smartRouterOnline || (isFullEdition && serverRunning)) && (
+        <div className="pt-4 text-[14px] text-cyber-text-secondary">
+          {smartRouterOnline && (
+            <div>
+              {t('nav.smartRouter')}:{' '}
+              <span className="text-cyber-accent font-semibold">{t('status.online')}</span>
+            </div>
+          )}
+          {isFullEdition && serverRunning && (
+            <div className={smartRouterOnline ? 'mt-1' : ''}>
+              {t('nav.localServer')}:{' '}
+              <span className="text-cyber-accent font-semibold">{t('status.running')}</span>
+            </div>
           )}
         </div>
-        {isFullEdition && (
-          <div className="mt-1">
-            {t('nav.localServer')}:{' '}
-            {serverRunning ? (
-              <span className="text-cyber-accent font-semibold">{t('status.running')}</span>
-            ) : (
-              <span className="text-cyber-text-muted">{t('status.offline')}</span>
-            )}
-          </div>
-        )}
-      </div>
+      )}
     </nav>
   );
 };

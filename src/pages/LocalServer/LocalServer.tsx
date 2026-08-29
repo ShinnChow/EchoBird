@@ -1469,7 +1469,7 @@ export const LocalServerPanel: React.FC = () => {
   return (
     <>
       {/* ===== Tab Header ===== */}
-      <div className="p-2 flex items-center justify-between bg-transparent">
+      <div className="h-10 px-2 flex items-center justify-between bg-transparent">
         <div className="flex gap-1">
           <button
             onClick={() => setActiveTab('local')}

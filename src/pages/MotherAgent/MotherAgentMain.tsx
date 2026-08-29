@@ -50,6 +50,7 @@ export function MotherAgentMain() {
         id: m.internalId,
         name: m.name,
         icon: getModelIcon('', m.modelId),
+        iconKind: m.internalId === 'smart-router' ? ('server' as const) : undefined,
       })),
     [models]
   );

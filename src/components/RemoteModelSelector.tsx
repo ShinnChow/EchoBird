@@ -1,12 +1,13 @@
 // RemoteModelSelector — Minimal model dropdown for Mother Agent
 // Text + arrow, no background/border, hover shows soft bg, dropdown opens upward
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Loader2, Check } from 'lucide-react';
+import { ChevronDown, Loader2, Check, Server } from 'lucide-react';
 
 export interface ModelOption {
   id: string;
   name: string;
   icon?: string | null; // icon path from getModelIcon()
+  iconKind?: 'server';
 }
 
 /** A non-model option appended below the models list (after a divider).
@@ -72,7 +73,6 @@ export const RemoteModelSelector: React.FC<RemoteModelSelectorProps> = ({
   const currentModel =
     models.find((m) => m.id === currentModelId) || extras?.find((e) => e.id === currentModelId);
   const displayText = currentModel?.name || placeholder;
-  const displayIcon = currentModel?.icon;
 
   // Tailwind JIT-friendly static class strings (Mother Agent secondary accent)
   const triggerClass =
@@ -81,6 +81,23 @@ export const RemoteModelSelector: React.FC<RemoteModelSelectorProps> = ({
   const selectedItemClass = 'text-cyber-text bg-cyber-text/10';
   const unselectedItemClass = 'text-cyber-text hover:bg-cyber-elevated hover:text-cyber-text';
   const checkClass = 'flex-shrink-0 ml-1 text-cyber-text';
+
+  const renderIcon = (option: ModelOption, sizeClass: string, iconSize: number) => {
+    if (option.iconKind === 'server') {
+      return <Server size={iconSize} className="flex-shrink-0 text-cyber-accent" />;
+    }
+    if (!option.icon) return null;
+    return (
+      <img
+        src={option.icon}
+        alt=""
+        className={`${sizeClass} flex-shrink-0`}
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = 'none';
+        }}
+      />
+    );
+  };
 
   return (
     <div ref={containerRef} className="relative">
@@ -95,16 +112,7 @@ export const RemoteModelSelector: React.FC<RemoteModelSelectorProps> = ({
           <Loader2 size={12} className={spinClass} />
         ) : (
           <>
-            {displayIcon && (
-              <img
-                src={displayIcon}
-                alt=""
-                className="w-3.5 h-3.5 flex-shrink-0"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            )}
+            {currentModel && renderIcon(currentModel, 'w-3.5 h-3.5', 14)}
             <span className="truncate max-w-[140px]">{displayText}</span>
             <ChevronDown
               size={11}
@@ -134,16 +142,7 @@ export const RemoteModelSelector: React.FC<RemoteModelSelectorProps> = ({
               className={`flex items-center gap-2 px-3 py-2 cursor-pointer text-xs font-mono transition-colors
                                 ${model.id === currentModelId ? selectedItemClass : unselectedItemClass}`}
             >
-              {model.icon && (
-                <img
-                  src={model.icon}
-                  alt=""
-                  className="w-4 h-4 flex-shrink-0"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-              )}
+              {renderIcon(model, 'w-4 h-4', 16)}
               <span className="truncate flex-1">{model.name}</span>
               {model.id === currentModelId && <Check size={12} className={checkClass} />}
             </div>
@@ -180,16 +179,7 @@ export const RemoteModelSelector: React.FC<RemoteModelSelectorProps> = ({
                 }}
                 className={`${rowBase} ${rowState}`}
               >
-                {extra.icon && (
-                  <img
-                    src={extra.icon}
-                    alt=""
-                    className="w-4 h-4 flex-shrink-0"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                )}
+                {renderIcon(extra, 'w-4 h-4', 16)}
                 <span className="truncate flex-1">{extra.name}</span>
                 {extra.disabled && extra.disabledLabel && (
                   <span className="flex-shrink-0 text-[10px] text-cyber-text-muted">

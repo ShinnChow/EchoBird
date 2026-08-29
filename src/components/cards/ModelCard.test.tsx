@@ -16,4 +16,14 @@ describe('getModelIcon', () => {
     expect(getModelIcon('', 'deepseek-v4-pro')).toBe('./icons/models/deepseek.svg');
     expect(getModelIcon('', 'gpt-5.5')).toBe('./icons/models/chatgpt.svg');
   });
+
+  it('maps free-router provider rows to their supplied icons', () => {
+    expect(getModelIcon('Cerebras', '')).toBe('./icons/models/cerebras.svg');
+    expect(getModelIcon('ModelScope (API-Inference)', '')).toBe('./icons/models/modelscope.svg');
+    expect(getModelIcon('Ollama Cloud', '')).toBe('./icons/models/ollama.svg');
+    expect(getModelIcon('SambaNova Cloud', '')).toBe('./icons/models/sambanova.svg');
+    expect(getModelIcon('Scaleway Generative APIs', '')).toBe('./icons/models/scaleway.svg');
+    expect(getModelIcon('Typhoon (SCB 10X)', '')).toBe('./icons/models/typhoon.svg');
+    expect(getModelIcon('W&B Inference', '')).toBe('./icons/models/wandb.svg');
+  });
 });
