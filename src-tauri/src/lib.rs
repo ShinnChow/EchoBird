@@ -418,6 +418,59 @@ struct WindowStateRecord {
 const MIN_WINDOW_WIDTH: u32 = 800;
 const MIN_WINDOW_HEIGHT: u32 = 600;
 
+fn window_work_area_overlap(
+    state: &WindowStateRecord,
+    area: &tauri::PhysicalRect<i32, u32>,
+) -> u64 {
+    let left = i64::from(state.x).max(i64::from(area.position.x));
+    let top = i64::from(state.y).max(i64::from(area.position.y));
+    let right = (i64::from(state.x) + i64::from(state.width))
+        .min(i64::from(area.position.x) + i64::from(area.size.width));
+    let bottom = (i64::from(state.y) + i64::from(state.height))
+        .min(i64::from(area.position.y) + i64::from(area.size.height));
+
+    right.saturating_sub(left).max(0) as u64 * bottom.saturating_sub(top).max(0) as u64
+}
+
+fn fit_window_state_to_work_area(
+    state: &WindowStateRecord,
+    area: &tauri::PhysicalRect<i32, u32>,
+    preserve_position: bool,
+) -> WindowStateRecord {
+    let width = state
+        .width
+        .max(MIN_WINDOW_WIDTH)
+        .min(area.size.width.max(1));
+    let height = state
+        .height
+        .max(MIN_WINDOW_HEIGHT)
+        .min(area.size.height.max(1));
+    let area_x = i64::from(area.position.x);
+    let area_y = i64::from(area.position.y);
+    let max_x = area_x + i64::from(area.size.width) - i64::from(width);
+    let max_y = area_y + i64::from(area.size.height) - i64::from(height);
+
+    let (x, y) = if preserve_position {
+        (
+            i64::from(state.x).clamp(area_x, max_x),
+            i64::from(state.y).clamp(area_y, max_y),
+        )
+    } else {
+        (
+            area_x + i64::from(area.size.width.saturating_sub(width)) / 2,
+            area_y + i64::from(area.size.height.saturating_sub(height)) / 2,
+        )
+    };
+
+    WindowStateRecord {
+        width,
+        height,
+        x: x as i32,
+        y: y as i32,
+        maximized: state.maximized,
+    }
+}
+
 fn window_state_path() -> Option<std::path::PathBuf> {
     dirs::home_dir().map(|h| h.join(".echobird").join("window-state.json"))
 }
@@ -442,14 +495,38 @@ fn save_window_state(record: &WindowStateRecord) {
 
 fn apply_window_state(window: &tauri::WebviewWindow, state: &WindowStateRecord) {
     use tauri::{PhysicalPosition, PhysicalSize};
-    // Apply position first, then size — restoring on a different
-    // monitor than the saved one is fine because Windows / macOS clamp
-    // the position to the closest valid screen region.
-    let width = state.width.max(MIN_WINDOW_WIDTH);
-    let height = state.height.max(MIN_WINDOW_HEIGHT);
-    let _ = window.set_position(PhysicalPosition::new(state.x, state.y));
-    let _ = window.set_size(PhysicalSize::new(width, height));
-    if state.maximized {
+
+    let monitors = window.available_monitors().unwrap_or_default();
+    let saved_monitor = monitors
+        .iter()
+        .map(|monitor| monitor.work_area())
+        .map(|area| (window_work_area_overlap(state, area), area))
+        .filter(|(overlap, _)| *overlap > 0)
+        .max_by_key(|(overlap, _)| *overlap)
+        .map(|(_, area)| area);
+    let fallback_monitor = window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| window.primary_monitor().ok().flatten());
+    let restored = saved_monitor
+        .map(|area| fit_window_state_to_work_area(state, area, true))
+        .or_else(|| {
+            fallback_monitor
+                .as_ref()
+                .map(|monitor| fit_window_state_to_work_area(state, monitor.work_area(), false))
+        })
+        .unwrap_or_else(|| WindowStateRecord {
+            width: state.width.max(MIN_WINDOW_WIDTH),
+            height: state.height.max(MIN_WINDOW_HEIGHT),
+            ..state.clone()
+        });
+
+    // Size first so the final position can be clamped against the actual
+    // restored dimensions when the display layout changed between launches.
+    let _ = window.set_size(PhysicalSize::new(restored.width, restored.height));
+    let _ = window.set_position(PhysicalPosition::new(restored.x, restored.y));
+    if restored.maximized {
         let _ = window.maximize();
     }
 }
@@ -978,4 +1055,71 @@ pub fn run() {
                 _ => {}
             }
         });
+}
+
+#[cfg(test)]
+mod window_state_tests {
+    use super::*;
+
+    fn state(width: u32, height: u32, x: i32, y: i32) -> WindowStateRecord {
+        WindowStateRecord {
+            width,
+            height,
+            x,
+            y,
+            maximized: false,
+        }
+    }
+
+    fn area(width: u32, height: u32) -> tauri::PhysicalRect<i32, u32> {
+        tauri::PhysicalRect {
+            position: (0, 0).into(),
+            size: (width, height).into(),
+        }
+    }
+
+    #[test]
+    fn keeps_a_visible_saved_window_unchanged() {
+        let saved = state(1400, 900, 200, 100);
+        let area = area(1920, 1040);
+
+        let restored = fit_window_state_to_work_area(&saved, &area, true);
+
+        assert_eq!(restored.width, 1400);
+        assert_eq!(restored.height, 900);
+        assert_eq!((restored.x, restored.y), (200, 100));
+    }
+
+    #[test]
+    fn shrinks_a_saved_window_to_a_smaller_display_work_area() {
+        let saved = state(2400, 1400, 0, 0);
+        let area = area(1366, 728);
+
+        let restored = fit_window_state_to_work_area(&saved, &area, true);
+
+        assert_eq!(restored.width, 1366);
+        assert_eq!(restored.height, 728);
+        assert_eq!((restored.x, restored.y), (0, 0));
+    }
+
+    #[test]
+    fn clamps_a_partly_offscreen_window_back_into_view() {
+        let saved = state(1200, 800, 1000, 500);
+        let area = area(1920, 1040);
+
+        let restored = fit_window_state_to_work_area(&saved, &area, true);
+
+        assert_eq!((restored.x, restored.y), (720, 240));
+    }
+
+    #[test]
+    fn centers_a_window_when_its_saved_display_is_gone() {
+        let saved = state(1200, 800, 2560, 200);
+        let area = area(1920, 1040);
+
+        assert_eq!(window_work_area_overlap(&saved, &area), 0);
+        let restored = fit_window_state_to_work_area(&saved, &area, false);
+
+        assert_eq!((restored.x, restored.y), (360, 120));
+    }
 }
