@@ -72,10 +72,6 @@ scripts/*
 !scripts/merge_aihot.py
 !scripts/inject_pinned.py
 !scripts/pulse_pinned.json
-!scripts/refresh_free_models.py
-!scripts/tests/
-!scripts/tests/test_refresh_free_models.py
-scripts/tests/__pycache__/
 
 # llama-server binaries (downloaded during CI build)
 electron/tools/llama-server/bin/
