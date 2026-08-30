@@ -69,7 +69,6 @@ export const MyProjectsMain: React.FC = () => {
   const ensureBuiltinDirs = useMyProjectsStore((s) => s.ensureBuiltinDirs);
   const builtinDirs = useMyProjectsStore((s) => s.builtinDirs);
   const hiddenBuiltins = useMyProjectsStore((s) => s.hiddenBuiltins);
-  const selectedUserProjectId = useMyProjectsStore((s) => s.selectedUserProjectId);
   const setSelectedUserProjectId = useMyProjectsStore((s) => s.setSelectedUserProjectId);
   const detectedTools = useToolsStore((s) => s.detectedTools);
   // Reuse AppManager's selection state. Built-ins set their linkedToolId
@@ -77,7 +76,7 @@ export const MyProjectsMain: React.FC = () => {
   // flow. Pure user projects don't have a linkedToolId yet — selecting
   // them currently clears the right panel until Phase D wires their
   // dedicated launch path.
-  const { selectedTool, setSelectedTool } = useAppManager();
+  const { setSelectedTool } = useAppManager();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -150,7 +149,6 @@ export const MyProjectsMain: React.FC = () => {
               key={p.id}
               project={p}
               isBuiltin
-              selected={!!p.linkedToolId && selectedTool === p.linkedToolId}
               onSelect={() => handleSelect(p)}
               onEdit={openEdit}
             />
@@ -160,7 +158,6 @@ export const MyProjectsMain: React.FC = () => {
               key={p.id}
               project={p}
               isBuiltin={false}
-              selected={selectedUserProjectId === p.id}
               onSelect={() => handleSelect(p)}
               onEdit={openEdit}
             />
@@ -194,10 +191,9 @@ export const MyProjectsMain: React.FC = () => {
 const ProjectToolCard: React.FC<{
   project: MyProject;
   isBuiltin: boolean;
-  selected: boolean;
   onSelect: () => void;
   onEdit: (id: string) => void;
-}> = ({ project, isBuiltin, selected, onSelect, onEdit }) => {
+}> = ({ project, isBuiltin, onSelect, onEdit }) => {
   const { t } = useI18n();
   const detectedTools = useToolsStore((s) => s.detectedTools);
   const deleteProject = useMyProjectsStore((s) => s.deleteProject);
@@ -232,7 +228,6 @@ const ProjectToolCard: React.FC<{
       detectedPath={project.launcherPath}
       configPath={project.modelsJsonPath}
       activeModel={activeModelDisplay}
-      selected={selected}
       onClick={onSelect}
       actions={
         // Bracketed mono text — same visual as ModelCard's [delete] / [edit]

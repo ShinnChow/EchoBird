@@ -762,14 +762,10 @@ export function SkillsTitleActions() {
 
 function SkillCard({
   skill,
-  selected,
-  onSelect,
   onEdit,
   onDelete,
 }: {
   skill: Omit<Skill, 'lang'>;
-  selected: boolean;
-  onSelect: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
 }) {
@@ -797,22 +793,7 @@ function SkillCard({
   };
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
-      className={`group w-full text-left bg-cyber-surface rounded-card border transition-colors h-48 p-4 flex flex-col cursor-pointer relative overflow-hidden ${
-        selected
-          ? 'border-cyber-accent'
-          : 'border-cyber-border/15 hover:border-cyber-border/40 hover:bg-cyber-elevated'
-      }`}
-    >
+    <div className="group w-full text-left bg-cyber-surface rounded-card border border-cyber-border/15 hover:border-cyber-border/40 hover:bg-cyber-elevated transition-colors h-48 p-4 flex flex-col cursor-default relative overflow-hidden">
       {(onEdit || onDelete) && (
         <div className="absolute top-2 right-2 flex gap-1.5 z-10">
           {onDelete && (
@@ -887,10 +868,6 @@ export function SkillsMain() {
     openEditSkill,
     deleteSkill,
   } = useSkills();
-  const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
-  const handleSelect = useCallback((id: string) => {
-    setSelectedSkillId((prev) => (prev === id ? null : id));
-  }, []);
   // Only zh-Hans gets the CN list (Bilibili / Datawhale / 飞桨 etc. on CN-domestic
   // platforms). zh-Hant (TW/HK/MO) and ja users see the EN list — TW/HK builders
   // follow the international AI stack (Anthropic Academy / LangChain / HF), not the
@@ -961,8 +938,6 @@ export function SkillsMain() {
           <SkillCard
             key={c.id}
             skill={c}
-            selected={selectedSkillId === c.id}
-            onSelect={() => handleSelect(c.id)}
             onEdit={tab === 'fav' ? () => openEditSkill(c as SkillConfig) : undefined}
             onDelete={tab === 'fav' ? () => deleteSkill(c.id) : undefined}
           />

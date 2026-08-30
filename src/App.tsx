@@ -352,7 +352,13 @@ function App() {
                                     <div className={pageScroll(is('projects'))}>
                                       <AiProjectsMain />
                                     </div>
-                                    <div className={pageScroll(is('skills'))}>
+                                    <div
+                                      className={
+                                        is('skills')
+                                          ? 'flex-1 overflow-y-auto slim-scroll'
+                                          : 'hidden'
+                                      }
+                                    >
                                       <SkillsMain />
                                     </div>
                                     <div className={pageScroll(is('models'))}>
