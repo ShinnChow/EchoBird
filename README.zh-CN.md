@@ -48,6 +48,15 @@
       感谢 <strong>88API</strong> 赞助了本项目!88API 是一站式 Token 聚合平台:一个 API Key 即可稳定接入 GPT、Claude、Gemini、Grok、DeepSeek、Kimi、GLM 等语言与编程模型,以及 GPT-Image、Gemini、Grok 等图片模型,Seedance、Veo、MiniMax Hailuo H3、Kling 等视频模型和 Whisper、TTS 等语音能力,从文案、出图、改图到视频生成与配音全覆盖。新用户注册送体验额度,可先检测模型能力;站内有人工客服值守。海外企业资质运营、稳定不跑路,支持正规发票,充值比例 1:1。
     </td>
   </tr>
+  <tr>
+    <td width="150" align="center">
+      <a href="https://grooroute.com/register?aff=FWGVPMYENJQ8"><img src="docs/sponsors/grooroute.png" width="92" alt="GrooRoute" /></a>
+    </td>
+    <td>
+      <a href="https://grooroute.com/register?aff=FWGVPMYENJQ8"><strong>GrooRoute</strong></a> — Claude 与 GPT 官方原模型<br/>
+      感谢 <strong>GrooRoute</strong> 赞助了本项目!现已开放 Claude 与 GPT 官方原模型。我们邀请每一个有好奇心的人，用上最先进的智能。国内直连，即开即用——一行配置，接入 Fable 5、GPT-5.6 在内的前沿模型。通过<a href="https://grooroute.com/register?aff=FWGVPMYENJQ8">此链接</a>注册即可开用。
+    </td>
+  </tr>
 </table>
 
 赞助联系：[hi@echobird.ai](mailto:hi@echobird.ai)

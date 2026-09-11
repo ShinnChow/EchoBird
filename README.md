@@ -50,6 +50,15 @@
       Thanks to <strong>88API</strong> for sponsoring this project! 88API is a one-stop token aggregation platform: a single API key provides stable access to language &amp; coding models — GPT, Claude, Gemini, Grok, DeepSeek, Kimi, GLM and more — along with image models (GPT-Image, Gemini, Grok), video models (Seedance, Veo, MiniMax Hailuo H3, Kling) and speech (Whisper, TTS), covering everything from copywriting and image creation/editing to video generation and voice-overs. New users get free trial credits to test model capabilities, with human support on site. Operated with overseas corporate credentials — stable and dependable, official invoices, and a 1:1 top-up ratio.
     </td>
   </tr>
+  <tr>
+    <td width="150" align="center">
+      <a href="https://grooroute.com/register?aff=FWGVPMYENJQ8"><img src="docs/sponsors/grooroute.png" width="92" alt="GrooRoute" /></a>
+    </td>
+    <td>
+      <a href="https://grooroute.com/register?aff=FWGVPMYENJQ8"><strong>GrooRoute</strong></a> — Official Claude and GPT models<br/>
+      Thanks to <strong>GrooRoute</strong> for sponsoring this project! Official Claude and GPT models are now available. We invite everyone with a curious mind to explore advanced AI, including Fable 5 and GPT-5.6. Connect directly from mainland China and get started with a single line of configuration — <a href="https://grooroute.com/register?aff=FWGVPMYENJQ8">sign up here</a>.
+    </td>
+  </tr>
 </table>
 
 Sponsorship contact: [hi@echobird.ai](mailto:hi@echobird.ai)

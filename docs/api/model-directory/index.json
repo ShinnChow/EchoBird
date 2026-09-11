@@ -405,6 +405,26 @@
         "kimi-k3"
       ],
       "region": "cn"
+    },
+    {
+      "name": "GrooRoute",
+      "url": "https://grooroute.com/register?aff=FWGVPMYENJQ8",
+      "baseUrl": "https://grooroute.com/v1",
+      "anthropicUrl": "https://grooroute.com",
+      "modelId": "gpt-5.6-sol",
+      "modelIds": [
+        "gpt-5.6-sol",
+        "gpt-6-astra",
+        "gpt-5.6-terra",
+        "gpt-5.6-luna",
+        "gpt-5.5",
+        "claude-opus-5",
+        "claude-sonnet-5",
+        "claude-fable-5",
+        "claude-fable-5-1",
+        "claude-haiku-4-5"
+      ],
+      "region": "cn"
     }
   ]
 }
