@@ -1141,7 +1141,7 @@ export function AddModelModal() {
   const { t } = useI18n();
   const { showToast } = useToast();
   const [isSavingModel, setIsSavingModel] = useState(false);
-  const { addSelectedModel, selectedIds } = useFreeModels();
+  const { addSelectedModel, updateSelectedModel, selectedIds } = useFreeModels();
   const {
     showAddModelModal,
     modelModalAnimatingOut,
@@ -1456,6 +1456,12 @@ export function AddModelModal() {
                     modelId: newModelForm.modelId,
                   });
                   if (updatedModel) {
+                    updateSelectedModel({
+                      internalId: updatedModel.internalId,
+                      name: updatedModel.name,
+                      baseUrl: updatedModel.baseUrl,
+                      modelId: updatedModel.modelId ?? newModelForm.modelId,
+                    });
                     setUserModels((prev) =>
                       prev.map((m) => (m.internalId === editingModelId ? updatedModel : m))
                     );

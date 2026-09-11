@@ -300,7 +300,7 @@ function App() {
                                           {is('projects') && 'RISING'}
                                           {is('skills') && 'MAGIC'}
                                           {is('models') && 'ROSTER'}
-                                          {is('freeModels') && 'FREE ROUTER'}
+                                          {is('freeModels') && 'SMART ROUTER'}
                                           {is('apps') && 'DESKTOP'}
                                           {is('myProjects') && 'VIBE CODING'}
                                           {is('aiCareer') && 'CAREER'}

@@ -166,8 +166,6 @@ struct RouteMemory {
     #[serde(default = "route_memory_version")]
     version: u32,
     #[serde(default)]
-    last_success_id: Option<String>,
-    #[serde(default)]
     candidates: HashMap<String, CandidateHealth>,
 }
 
@@ -175,7 +173,6 @@ impl Default for RouteMemory {
     fn default() -> Self {
         Self {
             version: route_memory_version(),
-            last_success_id: None,
             candidates: HashMap::new(),
         }
     }
@@ -305,14 +302,7 @@ pub(crate) fn retain_candidate_memory(candidate_ids: &[String]) {
     memory
         .candidates
         .retain(|candidate_id, _| valid.contains(candidate_id.as_str()));
-    let removed_preferred = memory
-        .last_success_id
-        .as_deref()
-        .is_some_and(|candidate_id| !valid.contains(candidate_id));
-    if removed_preferred {
-        memory.last_success_id = None;
-    }
-    if memory.candidates.len() != previous_len || removed_preferred {
+    if memory.candidates.len() != previous_len {
         save_route_memory(&route_memory_path(), &memory);
     }
 }
@@ -323,11 +313,7 @@ pub(crate) fn forget_candidate_memory(candidate_id: &str) {
         return;
     };
     let removed = memory.candidates.remove(candidate_id).is_some();
-    let removed_preferred = memory.last_success_id.as_deref() == Some(candidate_id);
-    if removed_preferred {
-        memory.last_success_id = None;
-    }
-    if removed || removed_preferred {
+    if removed {
         save_route_memory(&route_memory_path(), &memory);
     }
 }
@@ -1213,7 +1199,7 @@ fn prioritized_candidates(state: &AppState, candidates: Vec<Candidate>) -> Vec<C
         persist_route_memory(state, &memory);
     }
 
-    let mut available: Vec<Candidate> = candidates
+    candidates
         .into_iter()
         .filter(|candidate| {
             !memory
@@ -1222,17 +1208,7 @@ fn prioritized_candidates(state: &AppState, candidates: Vec<Candidate>) -> Vec<C
                 .and_then(|health| health.cooldown_until_ms)
                 .is_some_and(|until| until > now)
         })
-        .collect();
-    if let Some(preferred) = memory.last_success_id.as_deref() {
-        if let Some(index) = available
-            .iter()
-            .position(|candidate| candidate.internal_id == preferred)
-        {
-            let candidate = available.remove(index);
-            available.insert(0, candidate);
-        }
-    }
-    available
+        .collect()
 }
 
 fn mark_success(state: &AppState, candidate: &Candidate) {
@@ -1240,11 +1216,7 @@ fn mark_success(state: &AppState, candidate: &Candidate) {
         return;
     };
     let removed_failure = memory.candidates.remove(&candidate.internal_id).is_some();
-    let changed_preferred = memory.last_success_id.as_deref() != Some(&candidate.internal_id);
-    if changed_preferred {
-        memory.last_success_id = Some(candidate.internal_id.clone());
-    }
-    if removed_failure || changed_preferred {
+    if removed_failure {
         persist_route_memory(state, &memory);
     }
 }
@@ -1642,6 +1614,78 @@ mod tests {
     }
 
     #[test]
+    fn configured_order_wins_over_previous_success_and_survives_reordering() {
+        let state = AppState::for_tests().unwrap();
+        let addr = SocketAddr::from(([127, 0, 0, 1], 1));
+        let first = candidate(addr, "first");
+        let second = candidate(addr, "second");
+        let third = candidate(addr, "third");
+
+        mark_success(&state, &third);
+        let ordered =
+            prioritized_candidates(&state, vec![first.clone(), second.clone(), third.clone()]);
+        assert_eq!(
+            ordered
+                .iter()
+                .map(|model| model.internal_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["first", "second", "third"]
+        );
+
+        let reordered = prioritized_candidates(&state, vec![second, third, first]);
+        assert_eq!(
+            reordered
+                .iter()
+                .map(|model| model.internal_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["second", "third", "first"]
+        );
+    }
+
+    #[test]
+    fn first_candidate_regains_priority_after_cooldown() {
+        let state = AppState::for_tests().unwrap();
+        let addr = SocketAddr::from(([127, 0, 0, 1], 1));
+        let first = candidate(addr, "first");
+        let second = candidate(addr, "second");
+
+        mark_failure(&state, &first, FailureClass::RateLimit, None);
+        mark_success(&state, &second);
+        let available = prioritized_candidates(&state, vec![first.clone(), second.clone()]);
+        assert_eq!(available.len(), 1);
+        assert_eq!(available[0].internal_id, "second");
+
+        state
+            .route_memory
+            .lock()
+            .unwrap()
+            .candidates
+            .get_mut("first")
+            .unwrap()
+            .cooldown_until_ms = Some(now_ms().saturating_sub(1));
+        let recovered = prioritized_candidates(&state, vec![first, second]);
+        assert_eq!(recovered.len(), 2);
+        assert_eq!(recovered[0].internal_id, "first");
+    }
+
+    #[test]
+    fn legacy_success_memory_does_not_override_configured_order() {
+        let state = AppState::for_tests().unwrap();
+        *state.route_memory.lock().unwrap() = serde_json::from_value(json!({
+            "version": 1,
+            "lastSuccessId": "second",
+            "candidates": {}
+        }))
+        .unwrap();
+        let addr = SocketAddr::from(([127, 0, 0, 1], 1));
+        let available = prioritized_candidates(
+            &state,
+            vec![candidate(addr, "first"), candidate(addr, "second")],
+        );
+        assert_eq!(available[0].internal_id, "first");
+    }
+
+    #[test]
     fn route_memory_survives_round_trip_and_skips_cooldown() {
         let state = AppState::for_tests().unwrap();
         let addr = SocketAddr::from(([127, 0, 0, 1], 1));
@@ -1650,7 +1694,7 @@ mod tests {
 
         mark_success(&state, &second);
         let ordered = prioritized_candidates(&state, vec![first.clone(), second.clone()]);
-        assert_eq!(ordered[0].internal_id, "second");
+        assert_eq!(ordered[0].internal_id, "first");
 
         mark_failure(&state, &second, FailureClass::RateLimit, None);
         let serialized = {

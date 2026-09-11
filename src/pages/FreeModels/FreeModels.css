@@ -56,10 +56,14 @@
   fill: rgb(var(--accent-rgb));
 }
 
-.free-model-route-node {
+.free-model-route-node,
+.free-model-route-priority {
   background:
     linear-gradient(rgb(var(--accent-rgb) / 0.12), rgb(var(--accent-rgb) / 0.12)),
     rgb(var(--bg-base-rgb));
+}
+
+.free-model-route-node {
   cursor: default;
   animation: free-model-node-in 220ms ease-out both;
 }
@@ -68,6 +72,18 @@
   display: grid;
   width: 100%;
   justify-content: center;
+}
+
+.free-model-route-priority {
+  color: rgb(var(--accent-rgb));
+  border: 2px solid rgb(var(--accent-rgb) / 0.7);
+}
+
+.free-model-route-node.is-dragging {
+  animation: none;
+  box-shadow:
+    0 0 0 1px rgb(var(--accent-rgb) / 0.7),
+    0 8px 24px rgb(0 0 0 / 0.25);
 }
 
 .free-model-scan-progress {
@@ -92,7 +108,8 @@
   animation: free-model-provider-in 180ms ease-out both;
 }
 
-.free-model-route-node:hover {
+.free-model-route-node:hover,
+.free-model-route-node:hover .free-model-route-priority {
   background:
     linear-gradient(rgb(var(--accent-rgb) / 0.18), rgb(var(--accent-rgb) / 0.18)),
     rgb(var(--bg-base-rgb));
