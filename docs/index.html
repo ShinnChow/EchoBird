@@ -470,7 +470,7 @@
 
         /* ── Showcase: a "monitor" — main screen + right-side tab list,
            top bar carries window dots, screen title, and light/dark toggle.
-           One frame, all 10 screenshots reachable via tab + theme. ── */
+           One frame, all page previews reachable via tab + theme. ── */
         .showcase-section {
             position: relative;
             z-index: 1;
@@ -1623,7 +1623,7 @@
     </section>
 
     <!-- Showcase: monitor-style frame with tab list + light/dark switcher.
-         All 10 screenshots (5 pages × 2 themes × i18n lang) reachable here. -->
+         Six pages with localized screenshots; all except App Desktop support both themes. -->
     <section id="showcase" class="showcase-section">
         <div class="section-head reveal">
             <div class="section-eyebrow" data-i18n="showcase.eyebrow">界面预览</div>
@@ -1674,6 +1674,15 @@
                     <div class="tab-meta">
                         <div class="tab-name">模型中心</div>
                         <div class="tab-desc">管理 + 一键测速</div>
+                    </div>
+                </button>
+                <button class="showcase-tab" data-tab="router" type="button"
+                        data-name-zh="智能路由" data-name-en="Smart Router"
+                        data-desc-zh="免切换 · 按优先级自动尝试" data-desc-en="Auto-route by priority">
+                    <div class="tab-ico"><i class="fa-solid fa-route"></i></div>
+                    <div class="tab-meta">
+                        <div class="tab-name">智能路由</div>
+                        <div class="tab-desc">免切换 · 按优先级自动尝试</div>
                     </div>
                 </button>
                 <button class="showcase-tab" data-tab="localllm" type="button"
