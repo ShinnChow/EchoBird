@@ -1623,7 +1623,7 @@
     </section>
 
     <!-- Showcase: monitor-style frame with tab list + light/dark switcher.
-         Six pages with localized screenshots; all except App Desktop support both themes. -->
+         Six pages with localized screenshots; all support both themes. -->
     <section id="showcase" class="showcase-section">
         <div class="section-head reveal">
             <div class="section-eyebrow" data-i18n="showcase.eyebrow">界面预览</div>
@@ -1644,7 +1644,7 @@
                     <button class="theme-btn active" data-theme="dark" type="button">
                         ☾&nbsp;<span data-i18n="showcase.themeDark">深色</span>
                     </button>
-                    <button class="theme-btn" data-theme="light" type="button" disabled>
+                    <button class="theme-btn" data-theme="light" type="button">
                         ☀&nbsp;<span data-i18n="showcase.themeLight">浅色</span>
                     </button>
                 </div>
@@ -1656,15 +1656,6 @@
                     <div class="tab-meta">
                         <div class="tab-name">应用桌面</div>
                         <div class="tab-desc">启动 + 管理</div>
-                    </div>
-                </button>
-                <button class="showcase-tab" data-tab="news" type="button"
-                        data-name-zh="AI 资讯" data-name-en="AI News"
-                        data-desc-zh="每天的 AI 简报" data-desc-en="Daily AI brief">
-                    <div class="tab-ico"><i class="fa-solid fa-newspaper"></i></div>
-                    <div class="tab-meta">
-                        <div class="tab-name">AI 资讯</div>
-                        <div class="tab-desc">每天的 AI 简报</div>
                     </div>
                 </button>
                 <button class="showcase-tab" data-tab="model" type="button"
@@ -1683,6 +1674,15 @@
                     <div class="tab-meta">
                         <div class="tab-name">智能路由</div>
                         <div class="tab-desc">免切换 · 按优先级自动尝试</div>
+                    </div>
+                </button>
+                <button class="showcase-tab" data-tab="news" type="button"
+                        data-name-zh="AI 资讯" data-name-en="AI News"
+                        data-desc-zh="每天的 AI 简报" data-desc-en="Daily AI brief">
+                    <div class="tab-ico"><i class="fa-solid fa-newspaper"></i></div>
+                    <div class="tab-meta">
+                        <div class="tab-name">AI 资讯</div>
+                        <div class="tab-desc">每天的 AI 简报</div>
                     </div>
                 </button>
                 <button class="showcase-tab" data-tab="localllm" type="button"
@@ -1991,9 +1991,8 @@
 
         function updateShowcase() {
             const lang = (document.documentElement.lang || 'zh-CN').toLowerCase().startsWith('zh') ? 'cn' : 'en';
-            const theme = showcaseTab === 'desktop' ? 'dark' : showcaseTheme;
+            const theme = showcaseTheme;
             document.querySelectorAll('.theme-btn').forEach(btn => {
-                btn.disabled = showcaseTab === 'desktop' && btn.dataset.theme === 'light';
                 btn.classList.toggle('active', btn.dataset.theme === theme);
             });
             const img = document.getElementById('showcase-img');
