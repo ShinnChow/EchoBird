@@ -1,16 +1,6 @@
 // Sidebar navigation component
 import { useState, useEffect } from 'react';
-import {
-  Box,
-  Server,
-  Newspaper,
-  Star,
-  Sparkles,
-  FolderHeart,
-  Trophy,
-  Monitor,
-  Download,
-} from 'lucide-react';
+import { Box, Server, FolderHeart, Trophy, Monitor, Download } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { useI18n } from '../hooks/useI18n';
 import * as api from '../api/tauri';
@@ -20,9 +10,6 @@ declare const __APP_EDITION__: string;
 const isFullEdition = __APP_EDITION__ === 'full';
 
 export type PageType =
-  | 'news'
-  | 'projects'
-  | 'skills'
   | 'models'
   | 'freeModels'
   | 'apps'
@@ -132,26 +119,8 @@ export const Sidebar = ({
           active={activePage === 'mother'}
           onClick={() => onPageChange('mother')}
         />
-        {/* Divider — the three primary actions sit above it; content pages below */}
+        {/* Divider — primary actions above; career and project tools below */}
         <div className="border-t border-cyber-border/50" />
-        <NavItem
-          icon={<Newspaper size={20} />}
-          label={t('nav.news')}
-          active={activePage === 'news'}
-          onClick={() => onPageChange('news')}
-        />
-        <NavItem
-          icon={<Star size={20} />}
-          label={t('nav.projects')}
-          active={activePage === 'projects'}
-          onClick={() => onPageChange('projects')}
-        />
-        <NavItem
-          icon={<Sparkles size={20} />}
-          label={t('nav.skills')}
-          active={activePage === 'skills'}
-          onClick={() => onPageChange('skills')}
-        />
         <NavItem
           icon={<Trophy size={20} />}
           label={t('nav.aiCareer')}

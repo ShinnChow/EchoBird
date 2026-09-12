@@ -127,21 +127,6 @@ Gemini Desktop · Coffee CLI
 
 ## Screenshots
 
-### AI News & Star Projects — your daily AI brief
-
-> Day & night, side by side — the rest of the screenshots below follow your GitHub theme.
-
-<table>
-<tr>
-  <td width="50%"><img src="docs/screenshots/news-en-light.png" alt="AI News (Light)" /></td>
-  <td width="50%"><img src="docs/screenshots/news-en-dark.png" alt="AI News (Dark)" /></td>
-</tr>
-<tr>
-  <td align="center"><sub>☀️ Light theme</sub></td>
-  <td align="center"><sub>🌙 Dark theme</sub></td>
-</tr>
-</table>
-
 ### Model Nexus — the unified model data hub, configure once
 
 <picture>

@@ -62,5 +62,4 @@ clippy/test, not optional.
 ## Commit policy
 
 Commit only when asked. Push only when asked. Keep history linear (rebase onto
-`origin/main` when the remote has moved — there is an automated `chore(pulse)`
-commit that frequently lands upstream).
+`origin/main` when the remote has moved).

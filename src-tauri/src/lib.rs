@@ -15,7 +15,6 @@ use commands::mod_stub;
 use commands::model_commands;
 use commands::process_commands;
 use commands::settings_commands;
-use commands::skill_commands;
 use commands::smart_router_commands;
 use commands::tool_commands;
 
@@ -23,7 +22,6 @@ use commands::agent_commands;
 use commands::ai_career_commands;
 use commands::bundled_commands;
 use commands::parasite_commands;
-use commands::pulse_commands;
 use commands::secret_commands;
 use commands::ssh_commands;
 
@@ -954,10 +952,6 @@ pub fn run() {
             model_commands::test_model,
             model_commands::ping_model,
             model_commands::is_key_destroyed,
-            skill_commands::get_skills,
-            skill_commands::add_skill,
-            skill_commands::delete_skill,
-            skill_commands::update_skill,
             model_commands::query_model_usage,
             model_commands::save_volc_aksk,
             model_commands::has_volc_aksk,
@@ -1016,9 +1010,6 @@ pub fn run() {
             parasite_commands::parasite_reset,
             bundled_commands::get_mother_hints,
             bundled_commands::get_install_index,
-            pulse_commands::pulse_save,
-            pulse_commands::pulse_load_all,
-            pulse_commands::pulse_list_dates,
             ai_career_commands::ai_career_family_history,
             ai_career_commands::ai_career_heatmap,
             ai_career_commands::ai_career_token_bytes,

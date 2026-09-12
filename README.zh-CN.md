@@ -122,21 +122,6 @@ Gemini Desktop · Coffee CLI
 
 ## 界面截图
 
-### AI 资讯 & 明星项目 —— 每天的 AI 简报
-
-> 白天和晚上,左右对照看一眼 —— 下面其他截图会跟着你 GitHub 的主题切换。
-
-<table>
-<tr>
-  <td width="50%"><img src="docs/screenshots/news-cn-light.png" alt="AI 资讯(浅色)" /></td>
-  <td width="50%"><img src="docs/screenshots/news-cn-dark.png" alt="AI 资讯(深色)" /></td>
-</tr>
-<tr>
-  <td align="center"><sub>☀️ 浅色主题</sub></td>
-  <td align="center"><sub>🌙 深色主题</sub></td>
-</tr>
-</table>
-
 ### 模型中心 —— 模型数据中枢,一处配置,四处生效
 
 <picture>

@@ -190,7 +190,7 @@ export function AiCareerMain() {
 }
 
 // Title-bar refresh button (rendered by App.tsx in the page-title actions
-// slot, like AI 资讯 / 明星项目). Bumps the store's refreshKey to re-scan.
+// slot). Bumps the store's refreshKey to re-scan.
 export function AiCareerTitleActions() {
   const { t } = useI18n();
   const refresh = useAiCareerStore((s) => s.refresh);

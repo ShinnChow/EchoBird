@@ -64,14 +64,8 @@ lint-output.txt
 # One-off / scratch files (do not commit)
 tmp/
 .agent/
-# scripts/ is mostly scratch, but a few entries are real CI artifacts.
-# Ignore everything by default and whitelist the keepers explicitly.
+# Local scratch scripts (no longer used by CI).
 scripts/*
-!scripts/build_en_pulse.py
-!scripts/filter_pulse.py
-!scripts/merge_aihot.py
-!scripts/inject_pinned.py
-!scripts/pulse_pinned.json
 
 # llama-server binaries (downloaded during CI build)
 electron/tools/llama-server/bin/
