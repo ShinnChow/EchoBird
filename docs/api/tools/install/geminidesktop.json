@@ -1,34 +1,39 @@
 {
     "id": "geminidesktop",
     "displayName": "Gemini Desktop",
-    "homepage": "https://gemini.google/mac/",
-    "docs": "https://gemini.google/mac/",
+    "homepage": "https://gemini.google/desktop/",
+    "docs": "https://gemini.google/desktop/",
     "kind": "desktop_app",
-    "platforms": ["macos"],
+    "platforms": ["windows", "macos"],
     "install": {
-        "macos_download": "Open https://gemini.google/mac/ in the browser to download the official .dmg. Saves to ~/Downloads by default.",
-        "windows": "NOT SUPPORTED. Gemini Desktop is macOS-only. If the user is on Windows or Linux, tell them: 'Gemini Desktop only supports macOS. Use the web version at https://gemini.google.com/ on Windows / Linux.'",
-        "linux": "NOT SUPPORTED. Gemini Desktop is macOS-only.",
-        "note": "Requires Apple Silicon and macOS 15.0 (Sequoia) or later. Intel Macs, Windows, and Linux are not supported by this native app. Tell the user the download location and drag Gemini.app to /Applications, then verify the app opens."
+        "windows_download": "Download https://gemini.google/download/windows/ (follow redirects) to the user's Downloads folder as GeminiSetup.exe. This is the official Windows download linked from https://gemini.google/desktop/.",
+        "macos_download": "Download https://gemini.google/download/mac/ (follow redirects) to ~/Downloads/Gemini.dmg, or use the macOS download at https://gemini.google/desktop/.",
+        "linux": "NOT SUPPORTED. Use the web version at https://gemini.google.com/ on Linux.",
+        "note": "Windows requires Windows 10 or later (x64 or ARM64), at least 8 GB RAM and 200 MB free disk space. macOS requires Apple Silicon and macOS 15.0 (Sequoia) or later; Intel Macs are unsupported. A stable internet connection and a Google account with access to Gemini are required. Windows installation and update guidance: https://support.google.com/gemini/answer/18263854."
     },
     "install_flow": {
-        "summary": "Download .dmg → user double-clicks → drags Gemini.app to /Applications",
+        "summary": "Check OS and architecture → download the official installer → open it and hand off to the user → verify after the user finishes.",
         "agent_steps": [
-            "Check macOS version and architecture first: require macOS 15.0+ and Apple Silicon. If unsupported, use https://gemini.google.com/ in a browser.",
-            "Download the .dmg to ~/Downloads using `curl -L -o`.",
-            "After download finishes, tell the user the EXACT file path (e.g. '~/Downloads/Gemini.dmg').",
-            "Open the .dmg with `open ~/Downloads/Gemini.dmg`.",
-            "Tell the user: 'Gemini 安装窗口已打开,请把 Gemini.app 拖到 Applications 文件夹完成安装。' / 'The .dmg is open — drag Gemini.app to your Applications folder.'",
-            "Do NOT try to automate the GUI install."
+            "Check the local OS, architecture and requirements in install.note. Windows 10+ x64/ARM64 and macOS 15.0+ Apple Silicon are supported. For unsupported systems, offer https://gemini.google.com/.",
+            "Windows: download the official windows_download URL with Invoke-WebRequest -OutFile to a resolved full path under the user's Downloads folder named GeminiSetup.exe. macOS: download the macos_download URL with curl -L -o to ~/Downloads/Gemini.dmg. If an entry point fails, read https://gemini.google/desktop/ for the current official download link; do not invent a CDN URL or WinGet package ID.",
+            "After a successful download, tell the user the EXACT saved file path. Windows: open it with Start-Process -FilePath using that resolved path, without -Wait. macOS: open the .dmg with `open ~/Downloads/Gemini.dmg`.",
+            "Windows: tell the user to finish the GeminiSetup.exe installer. macOS: tell the user to drag Gemini.app to Applications. Do NOT automate the GUI install or use unverified silent flags. Stop this turn after handing off; downloading or opening the installer is not installation success.",
+            "When the user returns after completing installation, verify Gemini appears in the Start menu on Windows or /Applications on macOS and opens. Leave Google sign-in to the user inside Gemini."
         ],
         "tell_user": [
             "Download location (full path)",
-            "That the .dmg was opened",
-            "That they should drag Gemini.app to /Applications"
+            "Whether the installer opened and which steps the user must finish",
+            "Whether installation and first launch were verified after the user completed setup"
         ]
     },
+    "update": {
+        "windows": "Open Gemini. When an update notification appears, let the user choose Restart to update. Do not invent CLI update commands or overwrite Gemini CLI configuration."
+    },
+    "identity_guard": {
+        "description": "Gemini Desktop is Google's official GUI app from gemini.google/desktop/. It is not Gemini CLI (@google/gemini-cli), a third-party desktop wrapper, or a browser shortcut. Sign in inside the app; do not configure it through ~/.gemini/settings.json."
+    },
     "network_requirements": {
-        "test_urls": ["https://gemini.google", "https://gemini.google.com"],
+        "test_urls": ["https://gemini.google", "https://dl.google.com", "https://gemini.google.com"],
         "blocked_regions": {
             "zh-CN": "gemini.google may be blocked in mainland China — a VPN/proxy is usually required."
         },

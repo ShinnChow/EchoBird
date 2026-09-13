@@ -165,7 +165,7 @@ When the install JSON has `"kind": "desktop_app"` (Claude Desktop, ChatGPT, Gemi
 
    After firing the wrapped command, tell the user plainly: *"Installer launched — please follow the wizard prompts. I'll be here when you need the next step."* Then **STOP** — do not call `shell_exec` again to verify the install, do not run `<binary> --version` to check, just hand off and end the turn.
 
-7. **Platform compatibility.** Read `platforms` in the install JSON. If the user's OS is not listed (e.g. Gemini Desktop on Windows), refuse politely and point them to the web alternative — do NOT try to install anyway.
+7. **Platform compatibility.** Read `platforms` in the install JSON. If the user's OS is not listed (e.g. Gemini Desktop on Linux), refuse politely and point them to the web alternative — do NOT try to install anyway.
 
 ---
 
