@@ -151,7 +151,7 @@ const ja: Partial<Translations> = {
   'settings.launchAtStartup': '起動時に開く',
   'closeDialog.title': 'ウィンドウの閉じ方',
   'closeDialog.hint':
-    '注意：ChatGPT / Codex CLI / Claude デスクトップ版 / Claude Code のモデルを切り替えている場合、終了すると使用できなくなります。',
+    '注意：Claude Desktop / Claude Code が EchoBird 経由でモデルリクエストを転送している場合、終了すると使用できなくなります。',
   'btn.addModel': 'モデル追加',
   'btn.save': '保存',
   'btn.close': '閉じる',
@@ -261,15 +261,9 @@ const ja: Partial<Translations> = {
   'aiDesktop.emptyInstall': 'すべてのアプリがインストールされています。',
   'agent.codexRelayLabel': 'API Router',
   'agent.codexRelayHint':
-    'API 中継または API Router が提供するデータ転送方式。サードパーティモデルで有効にするとフル接続になりますが、ツールに「よそ者」と判定される場合があります。',
+    'API 中継または API Router が提供するデータ転送方式。サードパーティモデルで有効にするとフル接続になりますが、Claude に「よそ者」と判定される場合があります。',
   'agent.claude1mHint':
     'オンにするとモデル id に [1m] を付加し、1M コンテキストを有効化します。購入したモデルの公式ドキュメントで「モデルid+[1m]」の対応を必ず確認してください。',
-  'agent.codexResponsesLabel': 'Responses',
-  'agent.codexResponsesHint':
-    '公式 GPT モデルの中継ステーションやサードパーティモデルが Responses に対応していれば、有効化してネイティブに接続できます。（購入したモデルの公式ドキュメントをよく読み、Responses プロトコルに対応しているか確認してください。）',
-  'agent.codexWebSearchLabel': 'Web Search',
-  'agent.codexWebSearchHint':
-    '一部のサードパーティモデルでは web_search の個別の有効化または追加課金が必要です（購入したモデルの公式ドキュメントをよく読み、web_search への対応可否と有効化方法を確認してください）',
   'agent.installViaMother': 'AI 自動インストール',
   'tool.models': 'モデル',
   'tool.app': 'アプリ',
@@ -300,7 +294,9 @@ const ja: Partial<Translations> = {
   'key.encrypted': '全体暗号化済み — 環境が変化すると API キーは自動消去されます',
   'key.destroyed': '環境の変化を検出。API キーが自動消去されました。再度入力してください',
   'hint.devInvite':
-    'ChatGPT / Codex CLI / Claude Desktop / Claude Code のモデルを切り替えた後は、EchoBird を起動したままにしてください。',
+    'Claude Desktop / Claude Code で API Router を有効にせずにサードパーティモデルへ切り替える場合、モデルリクエストを転送するため EchoBird を起動したままにしてください。',
+  'hint.responsesRequired':
+    'ChatGPT / Codex CLI に接続するには、サードパーティモデルが Responses をサポートしている必要があります。',
   'hint.myProjects':
     'Vibe Coding したアプリ / ゲームのモデルを切り替え。リバーシ / AI 翻訳 の models.json を参考にするか、あなたのプロジェクトにコピーしてください。',
   'mother.selectModel': 'モデルを選択',

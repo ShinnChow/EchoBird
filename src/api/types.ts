@@ -115,24 +115,9 @@ export interface ApplyModelInput {
   apiKey: string;
   model: string;
   protocol?: string;
-  /**
-   * Codex-only. When true, write the real upstream URL and API key
-   * straight into ~/.codex/config.toml + auth.json so Codex talks to
-   * the upstream directly. Bypasses our local protocol-bridging proxy.
-   * Used for relay stations that already speak the Responses protocol.
-   * Other tools ignore this field.
-   */
+  /** Claude Desktop / Claude Code only. Connect directly to the selected
+   * Anthropic-compatible relay instead of EchoBird's model-id router. */
   relayMode?: boolean;
-  /**
-   * Codex-only. When true, the local proxy stays in the path and still
-   * rewrites the model id, but forwards the request to the upstream's
-   * native `/responses` endpoint verbatim instead of translating it
-   * down to Chat Completions. For third-party models that natively
-   * support the Responses protocol but still need model-id rewriting
-   * (so they can't use the proxy-bypassing relay mode). Mutually
-   * exclusive with `relayMode`. Other tools ignore this field.
-   */
-  responsesPassthrough?: boolean;
   /**
    * Claude Code relay-only. When true (and `relayMode` is on), append `[1m]`
    * to the model id written to the 1M-capable env vars (`ANTHROPIC_MODEL` /

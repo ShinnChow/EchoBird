@@ -6,24 +6,12 @@ use super::{
     write_json_file, ApplyResult, ModelInfo,
 };
 use crate::services::codex_catalog;
-use crate::services::codex_proxy::CODEX_PROXY_PORT;
 use std::fs;
 use std::path::Path;
 
-/// Canonical Codex config identity. Every apply_codex run produces a
-/// config.toml with the same provider name and display model regardless
-/// of which third-party endpoint is actually behind the proxy — keeps
-/// the config file clean and avoids stale orphan sections accumulating
-/// across model switches. The launcher proxy translates the display
-/// model to the real provider's model ID when forwarding requests.
+/// Canonical Codex config identity. Every apply_codex run reuses this
+/// provider section so model switches do not accumulate stale sections.
 const CODEX_PROVIDER: &str = "OpenAI";
-
-/// Codex's display model alias. Pinned in Bridge and Relay sessions so
-/// Codex thinks it's talking to a gpt-5 family model (model-id deception
-/// moat); the proxy / relay station rewrites to the real id. Exposed
-/// `pub(crate)` so `codex_proxy::config_manager` can pass it to
-/// `write_codex_canonical_fields` on the pre-spawn self-heal path.
-pub(crate) const CODEX_DISPLAY_MODEL: &str = "gpt-5.5";
 
 // ─── Per-model capability registry ───
 //
@@ -35,7 +23,7 @@ pub(crate) const CODEX_DISPLAY_MODEL: &str = "gpt-5.5";
 // provider's official model specs so apply_codex / apply_zcode stay
 // data-driven — no model-id branching inside the apply logic.
 
-pub(crate) const DEFAULT_CODEX_CONTEXT_WINDOW: u64 = 1_000_000;
+const DEFAULT_CODEX_CONTEXT_WINDOW: u64 = 1_000_000;
 
 /// Look up a model's real context window (in tokens). Returns
 /// `DEFAULT_CODEX_CONTEXT_WINDOW` for models the registry does not list —
@@ -56,6 +44,16 @@ fn codex_compact_limit_for(context_window: u64) -> u64 {
     context_window * 9 / 10
 }
 
+fn codex_web_search_mode(base_url: &str) -> &'static str {
+    if codex_catalog::url_matches_domain(base_url, "deepseek.com")
+        || codex_catalog::url_matches_domain(base_url, "xiaomimimo.com")
+    {
+        "disabled"
+    } else {
+        "live"
+    }
+}
+
 // Codex CLI and ChatGPT desktop share ~/.codex/config.toml.
 
 /// Apply our 10 canonical Codex fields surgically — overwrite if
@@ -72,24 +70,15 @@ fn codex_compact_limit_for(context_window: u64) -> u64 {
 /// tool's edits in place and Codex would behave wrong (wrong model id,
 /// wrong wire protocol, wrong reasoning effort).
 ///
-/// Used by both:
-///   • `apply_codex` (this file) — every model switch
-///   • `codex_proxy::config_manager::ensure_canonical_config` — every
-///     Codex spawn (pre-launch self-heal)
-///
-/// `codex_base_url` is the URL Codex will see in config.toml. In Bridge
-/// mode this is `http://127.0.0.1:53682/v1`; in Relay and Responses-
-/// direct modes it's the real upstream URL (Codex skips our proxy).
-/// Write the model id the caller chose — Bridge and Relay sessions pin
-/// Codex's `gpt-5.5` display alias (CODEX_DISPLAY_MODEL); a Responses
-/// direct-connect session passes the real upstream model id (e.g.
-/// `glm-5.2`) so Codex talks to the third party in its own id.
+/// `codex_base_url` and `model` are always the real upstream values.
+/// Codex CLI and ChatGPT connect to the provider's Responses endpoint
+/// directly; EchoBird no longer runs a Responses-to-Chat bridge.
 ///
 /// `context_window` is the real token limit of the selected model. Codex
 /// writes it as `model_context_window` and derives
 /// `model_auto_compact_token_limit` as 90% of it, so a model whose window
 /// is smaller than the historic 1M default is not over-claimed.
-pub(crate) fn write_codex_canonical_fields(
+fn write_codex_canonical_fields(
     content: &str,
     codex_base_url: &str,
     model: &str,
@@ -99,8 +88,7 @@ pub(crate) fn write_codex_canonical_fields(
     // helpers go through `content.lines().collect().join("\n")` which
     // strips trailing newlines; without re-adding it, a canonical-input
     // round-trip would always show as a one-byte diff and trigger
-    // pointless rewrites (e.g. ensure_canonical_config flapping from
-    // "already-canonical" to "drifted" on every Codex spawn).
+    // pointless rewrites on repeated model applications.
     let trailing_nl = content.ends_with('\n');
     let mut c = content.to_string();
 
@@ -118,13 +106,8 @@ pub(crate) fn write_codex_canonical_fields(
     // gateway that only knows the real id → 4xx. Strip it on every write
     // so the canonical set we write below is the full top-level truth.
     c = toml_delete_top(&c, "review_model");
-    // Evict any stale `model_catalog_json` from a previous Responses-direct
-    // session. The line is conditional (only written by apply_codex for
-    // passthrough + bundled-vendor catalogs), so a plain overwrite-or-insert
-    // helper would never remove it after switching back to bridge/relay mode
-    // or to a non-catalog vendor — leaving config.toml pointing at a catalog
-    // that no longer matches the selected model. apply_codex re-adds it when
-    // the catalog applies.
+    // Evict a stale `model_catalog_json` before conditionally re-adding the
+    // catalog for the newly selected vendor.
     c = toml_delete_top(&c, "model_catalog_json");
     // Top-level raw (bool, int).
     c = toml_write_top_raw(&c, "disable_response_storage", "true");
@@ -134,6 +117,17 @@ pub(crate) fn write_codex_canonical_fields(
         "model_auto_compact_token_limit",
         &codex_compact_limit_for(context_window).to_string(),
     );
+    c = toml_write_top(&c, "web_search", codex_web_search_mode(codex_base_url));
+
+    // MiMo's official Codex configuration requires this top-level capability
+    // flag for model_reasoning_effort to take effect. Remove the pair first so
+    // switching away from MiMo cannot leak its model-specific settings.
+    c = toml_delete_top(&c, "model_supports_reasoning_summaries");
+    c = toml_delete_top(&c, "model_reasoning_summary");
+    if codex_catalog::url_matches_domain(codex_base_url, "xiaomimimo.com") {
+        c = toml_write_top_raw(&c, "model_supports_reasoning_summaries", "true");
+        c = toml_write_top(&c, "model_reasoning_summary", "none");
+    }
 
     // [model_providers.OpenAI] string keys.
     let table = format!("model_providers.{}", CODEX_PROVIDER);
@@ -162,24 +156,18 @@ fn codex_catalog_referenced(content: &str, our_path: &str) -> bool {
     !referenced.is_empty() && (referenced == our_path || referenced == "~/.codex/models.json")
 }
 
-pub(super) fn apply_codex(tool_id: &str, model_info: &ModelInfo) -> ApplyResult {
-    // Two write modes, picked by `model_info.relay_mode`:
-    //
-    // • Bridge (default): config.toml's base_url is permanently
-    //   "http://127.0.0.1:53682/v1" (CODEX_PROXY_PORT). The proxy
-    //   reads ~/.echobird/codex.json on every request and forwards
-    //   with Responses ↔ Chat translation as needed. Same shape
-    //   across model switches, so Codex's runtime state in config.toml
-    //   ([projects.*] trust, [tui.*] NUX) survives switches.
-    //
-    // • Relay (relay_mode = true): config.toml's base_url is the
-    //   provider's REAL upstream URL. Codex talks to it directly. Used
-    //   for relay stations (cc-vibe.com etc.) that already speak the
-    //   Responses protocol — no proxy hop, no translation. The local
-    //   proxy stays running but Codex doesn't touch it for this
-    //   provider.
-
+pub(crate) fn apply_codex(tool_id: &str, model_info: &ModelInfo) -> ApplyResult {
     let codex_dir = dirs::home_dir().unwrap_or_default().join(".codex");
+    let state_dir = echobird_dir();
+    apply_codex_at(tool_id, model_info, &codex_dir, &state_dir)
+}
+
+pub(crate) fn apply_codex_at(
+    tool_id: &str,
+    model_info: &ModelInfo,
+    codex_dir: &Path,
+    state_dir: &Path,
+) -> ApplyResult {
     let config_path = codex_dir.join("config.toml");
     let auth_path = codex_dir.join("auth.json");
 
@@ -202,22 +190,7 @@ pub(super) fn apply_codex(tool_id: &str, model_info: &ModelInfo) -> ApplyResult 
         .trim_end_matches('/')
         .to_string();
 
-    // Reject ONLY the codex_proxy's own port (53682). Applying that as the
-    // upstream would make the proxy forward every request back to itself —
-    // an infinite loop. Other 127.0.0.1 ports are legitimate upstreams
-    // (most importantly 127.0.0.1:11434, EchoBird's local-LLM proxy that
-    // sits in front of llama-server), so the broader "no localhost"
-    // blanket-ban previously here was too aggressive and made Codex +
-    // local-LLM combinations impossible.
-    if base_url.contains(":53682") {
-        return ApplyResult {
-            success: false,
-            message: "Cannot use EchoBird's own Codex proxy (127.0.0.1:53682) as the provider — that would create a forwarding loop. Pick a real provider, or use the local LLM endpoint (127.0.0.1:11434).".to_string(),
-        };
-    }
-
-    // For local-LLM endpoints (127.0.0.1 / localhost — but NOT our own
-    // codex_proxy port 53682, which we already rejected above), llama-server
+    // For local-LLM endpoints (127.0.0.1 / localhost), llama-server
     // ignores the API key entirely. Codex CLI, on the other hand, refuses to
     // start when OPENAI_API_KEY is empty. Substitute a non-empty dummy so
     // users don't have to invent a fake key in the Model Center just to use
@@ -242,41 +215,9 @@ pub(super) fn apply_codex(tool_id: &str, model_info: &ModelInfo) -> ApplyResult 
     // model's actual token budget rather than the historic 1M default.
     let context_window = model_context_window_for(model_id);
 
-    // Resolve the URL + model id Codex itself will see in its config.toml.
-    // Three routing modes:
-    //   • Bridge (default): base_url = our proxy port; model = "gpt-5.5"
-    //     display alias. The proxy reads ~/.echobird/codex.json per request
-    //     and forwards with Responses ↔ Chat translation as needed.
-    //   • Relay (relay_mode): base_url = real upstream; model = "gpt-5.5"
-    //     display alias (relay stations accept the alias and map it
-    //     themselves — keep the model-id deception moat). Codex skips the
-    //     proxy entirely.
-    //   • Responses direct (responses_passthrough): base_url = real
-    //     upstream; model = the REAL upstream model id (e.g. "glm-5.2").
-    //     For third parties that natively speak the Responses protocol —
-    //     Codex connects straight to them, no proxy hop, no translation,
-    //     no id spoof. The two direct modes are mutually exclusive (UI
-    //     auto-flips), so we force passthrough off when relay is on.
-    let relay_mode = model_info.relay_mode.unwrap_or(false);
-    let responses_passthrough = !relay_mode && model_info.responses_passthrough.unwrap_or(false);
-    let direct_mode = relay_mode || responses_passthrough;
-    let proxy_base_url = format!("http://127.0.0.1:{}/v1", CODEX_PROXY_PORT);
-    let codex_base_url = if direct_mode {
-        base_url.clone()
-    } else {
-        proxy_base_url.clone()
-    };
-    // Direct Responses connect needs the real model id; every other mode
-    // pins Codex's "gpt-5.5" display alias.
-    let codex_model = if responses_passthrough {
-        model_id
-    } else {
-        CODEX_DISPLAY_MODEL
-    };
-
     ensure_parent(&config_path);
 
-    // Canonicalize ALL 10 fields we own, every time. Overwrite-in-place
+    // Canonicalize every field we own. Overwrite-in-place
     // if present, insert if missing. This is the bottom-out for sibling
     // model-switchers (cc-switch, manual edits, etc.) that may have
     // rewritten our keys to point at a different provider — we restore
@@ -285,44 +226,23 @@ pub(super) fn apply_codex(tool_id: &str, model_info: &ModelInfo) -> ApplyResult 
     // and any unrelated user-edited top-level keys stay untouched.
     let existing = fs::read_to_string(&config_path).unwrap_or_default();
     let mut new_content =
-        write_codex_canonical_fields(&existing, &codex_base_url, codex_model, context_window);
+        write_codex_canonical_fields(&existing, &base_url, model_id, context_window);
 
-    // web_search: user toggle. `Some(false)` → "disabled" (Codex removes
-    // its built-in search tool); ON → "live" — unrestricted live retrieval,
-    // i.e. actual real-time web search. NOT Codex's default "cached": that
-    // uses an OpenAI-maintained index with NO external web access, which is
-    // meaningless for our third-party upstreams (OpenAI's index doesn't
-    // cover them) and isn't "web search on" as a user expects the toggle to
-    // mean. Written here (not in write_codex_canonical_fields) so the
-    // pre-spawn self-heal leaves the user's choice untouched.
-    let web_search_value = if model_info.web_search == Some(false) {
-        "disabled"
-    } else {
-        "live"
-    };
-    new_content = toml_write_top(&new_content, "web_search", web_search_value);
-
-    // Model catalog — Responses-direct third parties (DeepSeek / MiniMax /
-    // MiMo) need `model_catalog_json` so Codex knows the real model's
-    // context window, reasoning levels, and tool capabilities. Only written
-    // in passthrough mode (Codex talks to the upstream directly with the
-    // real model id); bridge + relay keep the display-alias shape and get no
-    // catalog line. Vendors without a bundled catalog keep today's behavior.
+    // Model catalog — direct third-party providers (DeepSeek / MiniMax / MiMo)
+    // need `model_catalog_json` so Codex knows the real model's context window,
+    // reasoning levels, and tool capabilities. Vendors without a bundled
+    // catalog keep Codex's default behavior.
     // The stale line is evicted by `write_codex_canonical_fields` on every
-    // canonicalize, so switching away from passthrough (or to a non-catalog
-    // vendor) can't leave a dangling pointer.
-    let catalog_template = if responses_passthrough {
-        codex_catalog::template_for_url(&base_url)
-    } else {
-        None
-    };
+    // canonicalize, so switching to a non-catalog vendor cannot leave a
+    // dangling pointer.
+    let catalog_template = codex_catalog::template_for_url(&base_url);
     if let Some(template_str) = catalog_template {
         let catalog_path = codex_catalog::models_json_path();
         let template = serde_json::from_str(template_str).unwrap_or_default();
         // Stamp the SELECTED model onto the vendor capability template and
-        // write a single-entry catalog — we never enumerate a vendor's model
-        // versions, so `deepseek-v5-flash` / `mimo-v2.6` need no bundled
-        // asset change.
+        // write a single-entry catalog. Unknown model versions remain usable
+        // with conservative capabilities; vendor-documented image models are
+        // opted in by `build_catalog`.
         let catalog = codex_catalog::build_catalog(
             &template,
             model_id,
@@ -340,7 +260,7 @@ pub(super) fn apply_codex(tool_id: &str, model_info: &ModelInfo) -> ApplyResult 
             );
         }
     } else {
-        // Leaving catalog mode (passthrough off, or a non-bundled vendor):
+        // Leaving a bundled vendor for a non-bundled vendor:
         // the canonical write evicted the `model_catalog_json` line, so Codex
         // no longer reads the file. Delete the stale file at OUR canonical
         // path so the switch is disk-clean too — but ONLY when the previous
@@ -372,7 +292,7 @@ pub(super) fn apply_codex(tool_id: &str, model_info: &ModelInfo) -> ApplyResult 
     // back. We keep one snapshot per session — apply_codex called multiple
     // times in a row preserves the FIRST snapshot, not the most recent
     // (which would clobber the original OAuth state with our apikey state).
-    let auth_backup_path = echobird_dir().join("codex-auth.bak.json");
+    let auth_backup_path = state_dir.join("codex-auth.bak.json");
     if auth_path.exists() && !auth_backup_path.exists() {
         if let Ok(existing) = fs::read(&auth_path) {
             ensure_parent(&auth_backup_path);
@@ -393,26 +313,12 @@ pub(super) fn apply_codex(tool_id: &str, model_info: &ModelInfo) -> ApplyResult 
         };
     }
 
-    // The live relay — in Bridge mode the proxy reads this on every
-    // request, so it must reflect the upstream we want forwarded to.
-    // In Relay mode the proxy is bypassed for Codex, but we still
-    // write the same file so `read_codex` (used by the model-picker
-    // UI to round-trip the current selection) and ensure_canonical_config
-    // (which reads `relayMode` to decide whether to self-heal config.toml)
-    // both see consistent state.
-    let relay_path = echobird_dir().join("codex.json");
-    let relay = serde_json::json!({
-        "apiKey": api_key,
-        "baseUrl": base_url,
-        "displayModel": CODEX_DISPLAY_MODEL,
-        "actualModel": model_id,
-        "modelName": model_info.name.as_deref().unwrap_or(model_id),
-        "providerId": CODEX_PROVIDER,
-        "relayMode": relay_mode,
-        "responsesPassthrough": responses_passthrough,
-        "contextWindow": context_window,
-    });
-    let _ = write_json_file(&relay_path, &relay);
+    // Remove the relay file used by pre-direct versions. Current selection is
+    // fully represented by config.toml + auth.json now.
+    let legacy_relay_path = state_dir.join("codex.json");
+    if legacy_relay_path.exists() {
+        let _ = fs::remove_file(legacy_relay_path);
+    }
 
     let display = if tool_id == "chatgptdesktop" {
         "ChatGPT"
@@ -439,7 +345,7 @@ pub(super) fn read_codex() -> Option<ModelInfo> {
     }
 
     let provider_id = toml_read_top(&content, "model_provider");
-    let mut base_url = if provider_id.is_empty() {
+    let base_url = if provider_id.is_empty() {
         None
     } else {
         let value = toml_read_table_value(
@@ -454,31 +360,7 @@ pub(super) fn read_codex() -> Option<ModelInfo> {
         }
     };
 
-    // If base_url is EchoBird's own codex_proxy (port 53682), read the real
-    // provider URL from the relay file for UI display. The launcher rewrites
-    // config.toml to point at 127.0.0.1:53682 while running, but the UI should
-    // show users the actual provider they configured (e.g., api.xiaomimimo.com).
-    // This does NOT affect Codex's runtime behavior — Codex always reads from
-    // config.toml, which the launcher controls. Matching ONLY :53682 (not all
-    // 127.0.0.1) means a legitimate local-LLM endpoint such as
-    // 127.0.0.1:11434 stays visible as-is — that IS the real provider.
-    if let Some(ref url) = base_url {
-        if url.contains(":53682") {
-            base_url = read_codex_relay_base_url();
-        }
-    }
-
-    // When we wrote the canonical OpenAI provider, config.toml's `model`
-    // is the display alias ("gpt-5.5"), not the real third-party model.
-    // The UI needs the real one to round-trip a meaningful selection back
-    // to the user — read it from the relay file. Fall back to the
-    // config.toml value for non-canonical setups (e.g., user manually
-    // edited their config to point at a different provider).
-    let model = if provider_id == CODEX_PROVIDER {
-        read_codex_relay_model().unwrap_or(model_from_toml)
-    } else {
-        model_from_toml
-    };
+    let model = model_from_toml;
 
     // API key now lives in ~/.codex/auth.json (preferred_auth_method=apikey).
     // Fall back to the legacy env_key path for configs written before this change.
@@ -508,27 +390,8 @@ pub(super) fn read_codex() -> Option<ModelInfo> {
         protocol: Some("openai".to_string()),
         display_model: None,
         relay_mode: None,
-        responses_passthrough: None,
-        web_search: None,
         one_m_context: None,
     })
-}
-
-fn read_codex_relay_base_url() -> Option<String> {
-    let relay_path = echobird_dir().join("codex.json");
-    let content = fs::read_to_string(relay_path).ok()?;
-    let v: serde_json::Value = serde_json::from_str(&content).ok()?;
-    v.get("baseUrl").and_then(|x| x.as_str()).map(String::from)
-}
-
-fn read_codex_relay_model() -> Option<String> {
-    let relay_path = echobird_dir().join("codex.json");
-    let content = fs::read_to_string(relay_path).ok()?;
-    let v: serde_json::Value = serde_json::from_str(&content).ok()?;
-    v.get("actualModel")
-        .or_else(|| v.get("modelName"))
-        .and_then(|x| x.as_str())
-        .map(String::from)
 }
 
 fn read_codex_auth_key(codex_dir: &Path) -> Option<String> {
@@ -658,18 +521,16 @@ mod tests {
     }
 
     #[test]
-    fn write_codex_canonical_fields_evicts_review_model_in_bridge_mode_too() {
-        // Bridge mode (proxy base_url + gpt-5.5 alias) must ALSO strip a
-        // stale review_model — the pre-spawn self-heal runs write_codex
-        // _canonical_fields too, and a cold start shouldn't leave a stale
-        // value lying around even when not on direct connect.
+    fn write_codex_canonical_fields_evicts_review_model_for_every_provider() {
+        // A stale review_model must be removed regardless of the selected
+        // direct provider.
         let stale = "model = \"gpt-5.5\"\n\
                      review_model = \"gpt-5.5\"\n\
                      [model_providers.OpenAI]\n";
         let out = write_codex_canonical_fields(
             stale,
-            "http://127.0.0.1:53682/v1",
-            "gpt-5.5",
+            "https://provider.example/v1",
+            "provider-model",
             DEFAULT_CODEX_CONTEXT_WINDOW,
         );
         assert!(!out.contains("review_model"));
@@ -677,12 +538,8 @@ mod tests {
 
     #[test]
     fn write_codex_canonical_fields_evicts_stale_model_catalog_json() {
-        // Regression: `model_catalog_json` is conditional (apply_codex writes
-        // it only for Responses passthrough + bundled-vendor catalogs). After
-        // switching back to bridge mode — or to a non-catalog vendor — the
-        // stale line must not survive, or config.toml points at a catalog that
-        // no longer matches the selected model. Same never-delete-helper
-        // problem as review_model: the canonical write owns the eviction.
+        // Switching to a non-catalog vendor must not retain another vendor's
+        // catalog path.
         let stale = "model_provider = \"OpenAI\"\n\
                      model = \"gpt-5.5\"\n\
                      model_catalog_json = \"C:/Users/x/.codex/models.json\"\n\
@@ -690,8 +547,8 @@ mod tests {
                      name = \"OpenAI\"\n";
         let out = write_codex_canonical_fields(
             stale,
-            "http://127.0.0.1:53682/v1",
-            "gpt-5.5",
+            "https://provider.example/v1",
+            "provider-model",
             DEFAULT_CODEX_CONTEXT_WINDOW,
         );
         assert!(
@@ -759,6 +616,7 @@ mod tests {
             out.contains("model_auto_compact_token_limit = 184320"),
             "got: {out}"
         );
+        assert!(out.contains("web_search = \"live\""), "got: {out}");
         assert!(
             !out.contains("model_context_window = 1000000"),
             "got: {out}"
@@ -767,5 +625,44 @@ mod tests {
             !out.contains("model_auto_compact_token_limit = 900000"),
             "got: {out}"
         );
+    }
+
+    #[test]
+    fn official_deepseek_and_mimo_configs_disable_web_search() {
+        for base_url in [
+            "https://api.deepseek.com",
+            "https://api.xiaomimimo.com/v1",
+            "https://token-plan-cn.xiaomimimo.com/v1",
+        ] {
+            let out = write_codex_canonical_fields(
+                "",
+                base_url,
+                "provider-model",
+                DEFAULT_CODEX_CONTEXT_WINDOW,
+            );
+            assert!(out.contains("web_search = \"disabled\""), "got: {out}");
+        }
+    }
+
+    #[test]
+    fn mimo_reasoning_flags_do_not_leak_to_other_providers() {
+        let mimo = write_codex_canonical_fields(
+            "",
+            "https://api.xiaomimimo.com/v1",
+            "mimo-v2.5-pro",
+            DEFAULT_CODEX_CONTEXT_WINDOW,
+        );
+        assert!(mimo.contains("model_supports_reasoning_summaries = true"));
+        assert!(mimo.contains("model_reasoning_summary = \"none\""));
+
+        let other = write_codex_canonical_fields(
+            &mimo,
+            "https://provider.example/v1",
+            "provider-model",
+            DEFAULT_CODEX_CONTEXT_WINDOW,
+        );
+        assert!(!other.contains("model_supports_reasoning_summaries"));
+        assert!(!other.contains("model_reasoning_summary"));
+        assert!(other.contains("web_search = \"live\""));
     }
 }

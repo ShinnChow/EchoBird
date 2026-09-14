@@ -27,7 +27,7 @@ tools/
 Tools that are installed as separate executables:
 
 - **claudecode**: Claude Code CLI
-- **codex**: Codex CLI (with protocol translation proxy)
+- **codex**: Codex CLI (direct Responses API configuration)
 - **aider**: Aider AI pair programming
 - **cursor**: Cursor IDE
 - **openclaw**: OpenClaw agent
@@ -183,7 +183,7 @@ To add support for a new AI tool:
 
 ### Codex CLI
 
-Codex requires a protocol translation proxy because it only speaks Responses API, but most providers only support Chat Completions API.
+EchoBird configures Codex to call the selected provider's Responses endpoint directly and enables live web search.
 
 See [codex/README.md](codex/README.md) for details.
 

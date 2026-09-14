@@ -30,10 +30,8 @@ use claudecode::{
     restore_claudecode_to_official,
 };
 use claudedesktop::{apply_claudedesktop, read_claudedesktop, restore_claudedesktop_to_official};
-use codex::{apply_codex, read_codex, restore_codex_to_official};
-pub(crate) use codex::{
-    write_codex_canonical_fields, CODEX_DISPLAY_MODEL, DEFAULT_CODEX_CONTEXT_WINDOW,
-};
+pub(crate) use codex::{apply_codex, apply_codex_at};
+use codex::{read_codex, restore_codex_to_official};
 use dsh::{apply_dsh, read_dsh, restore_dsh_to_official};
 use generic::{apply_generic_json, read_generic_json};
 use grok::{apply_grok, read_grok, restore_grok_to_official};
@@ -72,32 +70,10 @@ pub struct ModelInfo {
     pub protocol: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_model: Option<String>,
-    /// When true, write the provider's REAL base_url + api_key into
-    /// ~/.codex/config.toml + ~/.codex/auth.json so Codex talks to the
-    /// upstream directly, bypassing our local proxy. Used for relay
-    /// stations (cc-vibe.com etc.) that already serve the Responses
-    /// protocol natively — protocol-translation isn't needed.
-    /// Only consumed by `apply_codex`; other tools ignore it.
+    /// Claude Desktop / Claude Code only. Connect directly to the selected
+    /// Anthropic-compatible relay instead of EchoBird's model-id router.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub relay_mode: Option<bool>,
-    /// Codex-only. When true, write the provider's REAL base_url + the
-    /// REAL model id (not our "gpt-5.5" display alias) into
-    /// ~/.codex/config.toml so Codex talks to the upstream directly,
-    /// bypassing our local proxy. For third-party models that natively
-    /// speak the Responses protocol (e.g. Volcengine ARK `glm-5.2`) —
-    /// no proxy hop, no Responses→Chat translation, no model-id spoof.
-    /// Mutually exclusive with `relay_mode` (UI auto-flips so both are
-    /// never on). Only consumed by `apply_codex`; other tools ignore it.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub responses_passthrough: Option<bool>,
-    /// Codex-only. `Some(false)` → write `web_search = "disabled"` into
-    /// config.toml so Codex removes its built-in web-search tool; otherwise
-    /// `web_search = "live"` (unrestricted real-time retrieval). Note: NOT
-    /// Codex's default `"cached"` — that's an OpenAI-maintained index with
-    /// no external web access, useless for our third-party upstreams.
-    /// Consumed by `apply_codex`; other tools ignore it.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub web_search: Option<bool>,
     /// Claude Code relay-only. When `Some(true)` AND `relay_mode` is on,
     /// append `[1m]` to the 1M-capable env vars (`ANTHROPIC_MODEL` /
     /// `ANTHROPIC_DEFAULT_SONNET_MODEL` / `ANTHROPIC_DEFAULT_OPUS_MODEL` / `ANTHROPIC_DEFAULT_FABLE_MODEL`)
@@ -507,7 +483,7 @@ pub async fn get_tool_model_info(tool_id: &str) -> Option<ModelInfo> {
 //  Simple TOML helpers (top-level key = "value" only)
 // ════════════════════════════════════════════════════════════════
 
-fn toml_read_top(content: &str, key: &str) -> String {
+pub(crate) fn toml_read_top(content: &str, key: &str) -> String {
     for line in content.lines() {
         let t = line.trim();
         if t.starts_with('[') || t.starts_with('#') || t.is_empty() {
@@ -644,8 +620,7 @@ fn toml_write_top_raw(content: &str, key: &str, value: &str) -> String {
 /// reformatting, no comment loss. Used by `apply_codex` to canonicalize
 /// `[model_providers.OpenAI]` fields without clobbering Codex's own
 /// runtime state (`[projects.*]` trust, `[tui.*]` NUX, etc.) that sits
-/// in the same file. Also reused by `codex_proxy::config_manager::
-/// ensure_canonical_config` for its drift-recovery branch.
+/// in the same file.
 pub(crate) fn toml_write_table_value(content: &str, table: &str, key: &str, value: &str) -> String {
     let header = format!("[{}]", table);
     let mut lines: Vec<String> = content.lines().map(String::from).collect();
@@ -758,7 +733,7 @@ fn toml_write_table_value_raw(content: &str, table: &str, key: &str, value: &str
     lines.join("\n")
 }
 
-fn toml_read_table_value(content: &str, table: &str, key: &str) -> String {
+pub(crate) fn toml_read_table_value(content: &str, table: &str, key: &str) -> String {
     let header = format!("[{}]", table);
     let mut in_table = false;
 

@@ -5,7 +5,8 @@ pub mod anthropic_proxy;
 pub mod auto_fix;
 pub mod bundled_assets;
 pub mod codex_catalog;
-pub mod codex_proxy;
+#[path = "codex_proxy/mod.rs"]
+pub mod codex_runtime;
 pub mod codex_session_merge;
 pub mod datalog;
 pub mod free_model_directory;

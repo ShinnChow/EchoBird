@@ -634,9 +634,8 @@ pub fn run() {
         // Single-instance guard. Must be the FIRST plugin registered (Tauri
         // requirement). When EchoBird is launched again while already running
         // — e.g. the user double-clicks the desktop shortcut while the window
-        // is minimized to tray — the OS would otherwise spawn a second process
-        // (Windows has no app-level dedup; the codex proxy's fixed port 53682
-        // just logs EADDRINUSE and the duplicate window still opens). Instead,
+        // is minimized to tray — the OS would otherwise spawn a second process.
+        // Instead,
         // the second launch hands off to this primary instance and we restore
         // and focus the existing window rather than opening a new one.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
@@ -661,21 +660,26 @@ pub fn run() {
             kill_stale_llama_server();
             log::info!("[Setup] Cleaned up any leftover llama-server processes");
 
-            // Rust codex_proxy. Binds 127.0.0.1:53682 as a background
-            // task and serves POST /v1/responses by translating Codex's
-            // Responses-API request to upstream Chat Completions, then
-            // translating the streaming response back. Replaced the
-            // Node-based launcher (tools/codex/lib/*.cjs) that earlier
-            // versions shipped — end users no longer need Node installed.
-            //
-            // If port 53682 is already held by another EchoBird instance
-            // the bind fails and we log + continue, so EchoBird's other
-            // features still start.
-            services::codex_proxy::spawn_proxy_task();
+            // Older releases pointed Codex and ChatGPT at EchoBird's local
+            // Responses-to-Chat bridge. Migrate that config before starting
+            // services so already-running clients do not keep calling a route
+            // that no longer exists.
+            if let Some(codex_dir) = services::codex_runtime::default_codex_dir() {
+                match services::codex_runtime::migrate_legacy_proxy_config(&codex_dir) {
+                    Ok(true) => log::info!("[Setup] migrated legacy Codex proxy config"),
+                    Ok(false) => {}
+                    Err(e) => {
+                        log::warn!("[Setup] legacy Codex proxy migration failed (non-fatal): {e}")
+                    }
+                }
+            }
 
-            // Local OpenAI-compatible smart router. It owns a separate fixed
-            // loopback port so Codex's Responses bridge can safely use it as
-            // an upstream without forwarding back into itself.
+            // Claude Desktop and Claude Code share one local Anthropic proxy
+            // for model-id rewriting. Codex CLI and ChatGPT connect directly
+            // to their configured Responses endpoint.
+            services::anthropic_proxy::spawn_proxy_task();
+
+            // Local OpenAI-compatible smart router on its own loopback port.
             services::smart_router::spawn_proxy_task();
 
             // Initialize resource_dir for correct tools/ path resolution on all platforms

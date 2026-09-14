@@ -122,30 +122,22 @@ impl ProcessManager {
 
         // Priority 0: Codex pre-flight + launch entry.
         //
-        // CLI always goes through here so the codex-specific PRE-FLIGHT runs
-        // (start_codex_native → ensure_canonical_config writes
-        // ~/.codex/config.toml = the 127.0.0.1 proxy, + bypass_onboarding).
-        // The launch itself then uses the SAME generic start_cli_tool path as
-        // claude/opencode — config and launch are separate concerns, so no
-        // codex-specific launch logic is needed: once config.toml points at
-        // the proxy, every codex invocation (ours or the user's own) routes
-        // through it.
+        // CLI always goes through here so the Codex-specific onboarding bypass
+        // runs. The launch itself then
+        // uses the same generic start_cli_tool path as Claude and OpenCode.
         //
-        // Desktop only goes here when a third-party (non-OpenAI) relay
-        // is configured — that's the only case where the proxy is
-        // actually needed. Skipping otherwise preserves Desktop's normal
+        // Desktop only goes here when a third-party (non-OpenAI) provider
+        // is configured. Skipping otherwise preserves Desktop's normal
         // launchUri path (Priority 2.9), which is the *only* way to
         // start a Microsoft Store install of ChatGPT; direct-exe
         // spawn would fail with "not found" because Store packages live
         // under \\WindowsApps\... not \\Programs\\.
         //
-        // Phase 7: replaced the Node launcher (cmd /C node codex-launcher.cjs)
-        // with a Rust-native spawn that calls the same pre-flight helpers
-        // (ensure_canonical_config + bypass_onboarding) and resolves the
-        // Codex binary in-process. Users no longer need Node installed.
+        // The Rust-native launcher performs pre-flight migration/onboarding
+        // work and resolves the Codex binary in-process.
         let needs_native_path = match tool_id {
             "codex" => true,
-            "chatgptdesktop" => Self::codex_has_third_party_relay(),
+            "chatgptdesktop" => Self::codex_has_third_party_provider(),
             _ => false,
         };
         if needs_native_path {
@@ -259,56 +251,45 @@ impl ProcessManager {
         Err(format!("No executable or command found for tool '{}'. The tool may be installed but not in PATH.", tool_id))
     }
 
-    /// True iff ~/.echobird/codex.json points at a non-OpenAI endpoint.
-    /// Used to decide whether ChatGPT desktop needs to route through the
-    /// dual-spoof launcher (third-party endpoints only) or can take the
-    /// normal launchUri / GUI-exe path.
-    fn codex_has_third_party_relay() -> bool {
-        let relay_path = match dirs::home_dir() {
-            Some(h) => h.join(".echobird").join("codex.json"),
+    /// True iff ~/.codex/config.toml points at a non-OpenAI endpoint.
+    /// Used to select the native ChatGPT desktop launch path for third-party
+    /// configurations while official OpenAI keeps the normal launch URI path.
+    fn codex_has_third_party_provider() -> bool {
+        let config_path = match crate::services::codex_runtime::default_codex_dir() {
+            Some(dir) => dir.join("config.toml"),
             None => {
-                log::warn!("[codex_has_third_party_relay] No home directory found");
+                log::warn!("[codex_has_third_party_provider] No Codex config directory found");
                 return false;
             }
         };
 
         log::info!(
-            "[codex_has_third_party_relay] Checking relay config at: {:?}",
-            relay_path
+            "[codex_has_third_party_provider] Checking config at: {:?}",
+            config_path
         );
 
-        if !relay_path.exists() {
-            log::warn!("[codex_has_third_party_relay] Relay config file does not exist");
-            return false;
-        }
-
-        let content = match std::fs::read_to_string(&relay_path) {
+        let content = match std::fs::read_to_string(&config_path) {
             Ok(c) => c,
             Err(e) => {
-                log::error!(
-                    "[codex_has_third_party_relay] Failed to read relay config: {}",
+                log::warn!(
+                    "[codex_has_third_party_provider] Failed to read config: {}",
                     e
                 );
                 return false;
             }
         };
 
-        let cfg: serde_json::Value = match serde_json::from_str(&content) {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!(
-                    "[codex_has_third_party_relay] Failed to parse relay config JSON: {}",
-                    e
-                );
-                return false;
-            }
-        };
-
-        let base_url = cfg.get("baseUrl").and_then(|v| v.as_str()).unwrap_or("");
-        let is_third_party = !base_url.is_empty() && !base_url.contains("api.openai.com");
+        let provider =
+            crate::services::tool_config_manager::toml_read_top(&content, "model_provider");
+        let base_url = crate::services::tool_config_manager::toml_read_table_value(
+            &content,
+            &format!("model_providers.{provider}"),
+            "base_url",
+        );
+        let is_third_party = is_third_party_codex_base_url(&base_url);
 
         log::info!(
-            "[codex_has_third_party_relay] baseUrl='{}', is_third_party={}",
+            "[codex_has_third_party_provider] baseUrl='{}', is_third_party={}",
             base_url,
             is_third_party
         );
@@ -319,9 +300,7 @@ impl ProcessManager {
     /// Start Codex (CLI or Desktop) natively in Rust. Replaces the
     /// Phase 1-6 `node codex-launcher.cjs` indirection.
     ///
-    /// Pre-flight: writes the canonical config.toml + patches Codex's
-    /// global-state JSON so onboarding is skipped. Both helpers are
-    /// idempotent and cheap when nothing has drifted.
+    /// Pre-flight patches Codex's global-state JSON so onboarding is skipped.
     ///
     /// Spawn:
     ///   • Desktop mode tries the standalone .exe first (Programs install
@@ -332,27 +311,10 @@ impl ProcessManager {
     ///     TTY. If that's missing we fall back to `codex.cmd` (loses TTY
     ///     in some shells but still launches).
     fn start_codex_native(&mut self, tool_id: &str, cwd: Option<&str>) -> Result<(), String> {
-        use crate::services::codex_proxy;
+        use crate::services::codex_runtime;
 
-        // Pre-flight helpers — both no-op when state is already correct.
-        if let Some(codex_dir) = codex_proxy::default_codex_dir() {
-            let cfg_path = codex_dir.join(codex_proxy::CODEX_CONFIG_FILENAME);
-            // Relay path passed explicitly: ensure_canonical_config
-            // reads it to detect relay-mode and skip the drift check
-            // when the user has chosen to bypass the proxy.
-            let relay_path = codex_proxy::default_relay_dir()
-                .map(|d| d.join(codex_proxy::RELAY_FILENAME))
-                .unwrap_or_default();
-            match codex_proxy::ensure_canonical_config(&cfg_path, &relay_path) {
-                Ok(out) if out.wrote => {
-                    log::info!("[ProcessManager] config.toml self-healed ({})", out.reason)
-                }
-                Ok(_) => {}
-                Err(e) => {
-                    log::warn!("[ProcessManager] ensure_canonical_config failed (non-fatal): {e}")
-                }
-            }
-            if let Err(e) = codex_proxy::bypass_onboarding(&codex_dir) {
+        if let Some(codex_dir) = codex_runtime::default_codex_dir() {
+            if let Err(e) = codex_runtime::bypass_onboarding(&codex_dir) {
                 log::warn!("[ProcessManager] bypass_onboarding failed (non-fatal): {e}");
             }
 
@@ -369,11 +331,9 @@ impl ProcessManager {
             self.start_codex_desktop_native(tool_id)
         } else {
             // Codex CLI launches through the SAME generic path as claude /
-            // opencode: pass the bare `codex` command and let the shell
+            // OpenCode: pass the bare `codex` command and let the shell
             // resolve + exec it (the npm shim's `#!/usr/bin/env node` shebang
-            // is honoured). Proxy routing lives entirely in config.toml
-            // (written by the pre-flight above) — config and launch are
-            // separate concerns, so the launch needs no codex-specific logic.
+            // is honoured). Configuration and launch are separate concerns.
             // OPENAI_* env is suppressed for codex inside start_cli_tool.
             self.start_cli_tool(tool_id, "codex", cwd)
         }
@@ -382,9 +342,9 @@ impl ProcessManager {
     /// ChatGPT desktop: try direct .exe spawn first, fall back to the
     /// Windows Store shell URI if the binary lookup misses.
     fn start_codex_desktop_native(&mut self, tool_id: &str) -> Result<(), String> {
-        use crate::services::codex_proxy;
+        use crate::services::codex_runtime;
 
-        if let Some(exe) = codex_proxy::resolve_desktop_binary() {
+        if let Some(exe) = codex_runtime::resolve_desktop_binary() {
             log::info!(
                 "[ProcessManager] Launching ChatGPT desktop (native exe): {:?}",
                 exe
@@ -399,11 +359,11 @@ impl ProcessManager {
         // publisher hash) over the hardcoded paths.json URI, so beta-channel
         // installs launch correctly. Fall back to paths.json when the scan
         // finds nothing (or on non-Windows).
-        let uri = codex_proxy::resolve_desktop_launch_uri_scanned().or_else(|| {
+        let uri = codex_runtime::resolve_desktop_launch_uri_scanned().or_else(|| {
             let tools_dir = crate::services::tool_manager::find_tools_dir();
             tools_dir
                 .as_deref()
-                .and_then(codex_proxy::resolve_desktop_launch_uri)
+                .and_then(codex_runtime::resolve_desktop_launch_uri)
         });
         if let Some(uri) = uri {
             log::info!(
@@ -526,10 +486,9 @@ impl ProcessManager {
             }
         }
 
-        // Codex carries its upstream out-of-band (~/.codex/config.toml + the
-        // 127.0.0.1 proxy) — config and launch are separate concerns. Never
-        // inject OPENAI_* env for it: that would make Codex bypass the proxy
-        // and hit the third-party endpoint directly.
+        // Codex carries its upstream in ~/.codex/config.toml + auth.json.
+        // Configuration and launch are separate concerns, so do not inject
+        // duplicate OPENAI_* environment variables.
         if tool_id == "codex" {
             api_key_env = None;
             base_url_env = None;
@@ -1400,6 +1359,11 @@ impl ProcessManager {
     }
 }
 
+fn is_third_party_codex_base_url(base_url: &str) -> bool {
+    !base_url.is_empty()
+        && !crate::services::codex_catalog::url_matches_domain(base_url, "api.openai.com")
+}
+
 // ─── Platform helpers ───
 
 // Resolve cmd.exe via %COMSPEC% / %SystemRoot%\System32 instead of trusting
@@ -1516,4 +1480,19 @@ pub async fn start_tool(
     let mgr = get_manager().await;
     let mut mgr = mgr.lock().await;
     mgr.start_tool(tool_id, start_command, cwd).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_third_party_codex_base_url;
+
+    #[test]
+    fn codex_provider_classification_uses_domain_boundaries() {
+        assert!(!is_third_party_codex_base_url(""));
+        assert!(!is_third_party_codex_base_url("https://api.openai.com/v1"));
+        assert!(is_third_party_codex_base_url(
+            "https://api.openai.com.example/v1"
+        ));
+        assert!(is_third_party_codex_base_url("https://api.deepseek.com/v1"));
+    }
 }

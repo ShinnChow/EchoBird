@@ -211,10 +211,6 @@ export type TKey =
   | 'agent.codexRelayLabel'
   | 'agent.codexRelayHint'
   | 'agent.claude1mHint'
-  | 'agent.codexResponsesLabel'
-  | 'agent.codexResponsesHint'
-  | 'agent.codexWebSearchLabel'
-  | 'agent.codexWebSearchHint'
   // Tool categories
   | 'toolCat.all'
   | 'toolCat.ide'
@@ -286,6 +282,7 @@ export type TKey =
   | 'key.destroyed'
   // Developer invite hint
   | 'hint.devInvite'
+  | 'hint.responsesRequired'
   // Mother Agent
   | 'mother.selectModel'
   | 'mother.hintInstall'

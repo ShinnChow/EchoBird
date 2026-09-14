@@ -523,6 +523,11 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
 
   const { smartRouterModels, localModels, cloudModels } = useMemo(() => {
     const compatible = userModels.filter((model) => {
+      const requiresResponses = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
+      const isChatOnlyLocalEndpoint =
+        model.internalId === 'local-server' || model.internalId === 'smart-router';
+      if (requiresResponses && isChatOnlyLocalEndpoint) return false;
+
       const hasOpenAI = toolProtocols.includes('openai') && !!model.baseUrl;
       const hasAnthropic = toolProtocols.includes('anthropic') && !!model.anthropicUrl;
       return hasOpenAI || hasAnthropic;
@@ -534,7 +539,7 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
         (m) => m.internalId !== 'local-server' && m.internalId !== 'smart-router'
       ),
     };
-  }, [userModels, toolProtocols]);
+  }, [userModels, toolProtocols, selectedTool]);
 
   const renderModelCard = (model: (typeof userModels)[0], badge?: 'smart' | 'local') => {
     const isSelected = selectedTool ? toolModelConfig[selectedTool] === model.internalId : false;
@@ -774,9 +779,8 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
 };
 
 // A single routing toggle: label + switch + themed help glyph with an
-// interactive tooltip. Used for the Codex / Claude-Desktop "API Router"
-// toggle and the Codex-only "Responses" toggle. The tooltip stays open while
-// the pointer is over the glyph OR the tooltip itself.
+// interactive tooltip. The tooltip stays open while the pointer is over the
+// glyph OR the tooltip itself.
 interface RoutingToggleProps {
   label: string;
   hint: string;
@@ -871,10 +875,6 @@ export const AppManagerPanel: React.FC = () => {
     modelProtocolSelection,
     setModelProtocolSelection,
     appliedPulse,
-    codexResponsesPassthrough,
-    setCodexResponsesPassthrough,
-    codexWebSearch,
-    setCodexWebSearch,
     claudeDesktopRelayMode,
     setClaudeDesktopRelayMode,
     claudeCodeRelayMode,
@@ -884,17 +884,11 @@ export const AppManagerPanel: React.FC = () => {
   } = useAppManager();
 
   // API Router ("relay-mode") toggle: shown for Claude Desktop AND Claude Code
-  // (each binds its own relay flag). Codex CLI / ChatGPT desktop instead show the
-  // Responses + Web Search toggles below. All of these toggles are
-  // independent — there is no mutual exclusion among them.
-  const isCodexApp = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
+  // (each binds its own relay flag).
   const isClaudeDesktopApp = selectedTool === 'claudedesktop';
   const isClaudeCodeApp = selectedTool === 'claudecode';
-  // Codex dropped the API Router toggle (it has Web Search now); relay is shown
-  // for Claude Desktop + Claude Code, each binding its own flag.
+  // Relay is shown for Claude Desktop + Claude Code, each binding its own flag.
   const showRelayToggle = isClaudeDesktopApp || isClaudeCodeApp;
-  const showWebSearchToggle = isCodexApp;
-  const showResponsesToggle = isCodexApp;
   const relayModeValue = isClaudeDesktopApp ? claudeDesktopRelayMode : claudeCodeRelayMode;
   const setRelayModeValue = isClaudeDesktopApp ? setClaudeDesktopRelayMode : setClaudeCodeRelayMode;
   // 1M-context toggle: Claude Code ONLY, and only once API Router is on. Hidden
@@ -919,35 +913,16 @@ export const AppManagerPanel: React.FC = () => {
         )}
       </div>
 
-      {/* Toggle row: mounted when ANY toggle applies — Codex shows the
-          Responses + Web Search toggles; Claude Desktop and Claude Code show the
-          API Router toggle, and Claude Code additionally shows a 1M toggle when
+      {/* Toggle row: Claude Desktop and Claude Code show the API Router toggle,
+          and Claude Code additionally shows a 1M toggle when
           API Router is on. Each toggle inside is INDIVIDUALLY gated and binds
           to the flag for the selected app (relayModeValue / setRelayModeValue
-          resolve per-app), so no cross-wiring between Codex / Claude Desktop /
+          resolve per-app), so no cross-wiring between Claude Desktop and
           Claude Code. For apps with no toggles nothing renders and the model
           list below claims the space — the user preferred no reserved gap when
           toggles are absent. */}
-      {(showResponsesToggle || showWebSearchToggle || showRelayToggle || show1mToggle) && (
+      {(showRelayToggle || show1mToggle) && (
         <div className="px-3 h-9 flex items-center gap-2">
-          {showResponsesToggle && (
-            <RoutingToggle
-              key="responses"
-              label={t('agent.codexResponsesLabel')}
-              hint={t('agent.codexResponsesHint')}
-              checked={codexResponsesPassthrough}
-              onChange={setCodexResponsesPassthrough}
-            />
-          )}
-          {showWebSearchToggle && (
-            <RoutingToggle
-              key="websearch"
-              label={t('agent.codexWebSearchLabel')}
-              hint={t('agent.codexWebSearchHint')}
-              checked={codexWebSearch}
-              onChange={setCodexWebSearch}
-            />
-          )}
           {showRelayToggle && (
             <RoutingToggle
               key="relay"
@@ -1087,10 +1062,8 @@ export const AppManagerBottom: React.FC = () => {
     <div className="flex-shrink-0 flex flex-col mt-2">
       <div className="mx-2 border-t border-cyber-border"></div>
       <div className="flex items-center justify-end gap-8 px-6 py-5">
-        {/* Page-aware hint copy: AppManager warns against closing EchoBird mid-
-            session (Codex / Claude config swap stays applied while we run);
-            "我的AI项目" instead tells the user to crib from Reversi/Translator
-            models.json when Vibe-Coding their own AI project. */}
+        {/* Page-aware hint copy: direct Responses clients get a compatibility
+            reminder; Claude proxy clients get the keep-running reminder. */}
         <PageAwareHint />
         {/* Launch button */}
         <div className="relative w-64 h-14 flex-shrink-0">
@@ -1228,17 +1201,23 @@ export const AppManagerBottom: React.FC = () => {
 // Orange instructional copy shown at the bottom-left of the launch row.
 // Branches on activePage so the same AppManagerBottom can serve both
 // "应用桌面" and "我的AI项目" without duplicating the rest of the row.
-const PageAwareHint: React.FC = () => {
+export const PageAwareHint: React.FC = () => {
   const { t } = useI18n();
-  const { viewMode } = useAppManager();
+  const { viewMode, selectedTool } = useAppManager();
   const activePage = useNavigationStore((s) => s.activePage);
   const key =
     activePage === 'myProjects'
       ? 'hint.myProjects'
       : viewMode === 'install'
         ? 'aiDesktop.installHint'
-        : 'hint.devInvite';
-  return <div className="flex-1 text-[15px] font-medium text-cyber-accent">{t(key)}</div>;
+        : selectedTool === 'claudedesktop' || selectedTool === 'claudecode'
+          ? 'hint.devInvite'
+          : selectedTool === 'chatgptdesktop' || selectedTool === 'codex'
+            ? 'hint.responsesRequired'
+            : null;
+  return (
+    <div className="flex-1 text-[15px] font-medium text-cyber-accent">{key ? t(key) : null}</div>
+  );
 };
 
 // ===== Apply Error Modal =====

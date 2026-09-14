@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { LocalTool, ModelConfig } from '../../api/types';
 import type { TKey } from '../../i18n';
+import { useNavigationStore } from '../../stores/navigationStore';
 import { AppManagerContext, type AppManagerContextType } from './context';
 
 vi.mock('../../components', () => ({
@@ -66,6 +67,30 @@ describe('ModelListSection', () => {
     expect(markup.indexOf('Auto Router')).toBeLessThan(markup.indexOf('Local Model'));
     expect(markup.indexOf('Local Model')).toBeLessThan(markup.indexOf('Cloud Model'));
   });
+
+  it.each(['codex', 'chatgptdesktop'])(
+    'hides Chat Completions-only local endpoints from %s',
+    async (toolId) => {
+      vi.stubGlobal('__APP_EDITION__', 'full');
+      const { ModelListSection } = await import('./AppManagerComponents');
+      const markup = renderToStaticMarkup(
+        <ModelListSection
+          selectedToolData={{ ...tool, id: toolId }}
+          userModels={models}
+          toolModelConfig={{}}
+          selectedTool={toolId}
+          handleSelectModel={() => undefined}
+          modelProtocolSelection={{}}
+          setModelProtocolSelection={() => undefined}
+          t={(key) => labels[key] ?? key}
+        />
+      );
+
+      expect(markup).not.toContain('Auto Router');
+      expect(markup).not.toContain('Local Model');
+      expect(markup).toContain('Cloud Model');
+    }
+  );
 });
 
 describe('AppManager views', () => {
@@ -110,5 +135,46 @@ describe('AppManager views', () => {
   ] as const)('%s explains an empty list', async (mode, tools, message) => {
     const markup = await renderView(mode, [...tools]);
     expect(markup).toContain(message);
+  });
+});
+
+describe('PageAwareHint', () => {
+  const renderHint = async (selectedTool: string | null) => {
+    vi.stubGlobal('__APP_EDITION__', 'full');
+    useNavigationStore.setState({ activePage: 'apps' });
+    const { PageAwareHint } = await import('./AppManagerComponents');
+    const context: Partial<AppManagerContextType> = {
+      viewMode: 'desktop',
+      selectedTool,
+    };
+    return renderToStaticMarkup(
+      <AppManagerContext.Provider value={context as AppManagerContextType}>
+        <PageAwareHint />
+      </AppManagerContext.Provider>
+    );
+  };
+
+  it.each(['claudedesktop', 'claudecode'])(
+    'shows the keep-running reminder only for %s',
+    async (toolId) => {
+      const markup = await renderHint(toolId);
+      expect(markup).toContain('hint.devInvite');
+      expect(markup).not.toContain('hint.responsesRequired');
+    }
+  );
+
+  it.each(['chatgptdesktop', 'codex'])(
+    'shows the Responses compatibility reminder for %s',
+    async (toolId) => {
+      const markup = await renderHint(toolId);
+      expect(markup).toContain('hint.responsesRequired');
+      expect(markup).not.toContain('hint.devInvite');
+    }
+  );
+
+  it('shows neither tool-specific reminder for other tools', async () => {
+    const markup = await renderHint('test-tool');
+    expect(markup).not.toContain('hint.devInvite');
+    expect(markup).not.toContain('hint.responsesRequired');
   });
 });

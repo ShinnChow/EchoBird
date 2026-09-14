@@ -137,7 +137,7 @@ const en: Translations = {
   // Close Dialog
   'closeDialog.title': 'CLOSE BEHAVIOR',
   'closeDialog.hint':
-    'Note: If your ChatGPT / Codex CLI / Claude Desktop / Claude Code has switched models, quitting will make it unusable.',
+    'Note: If Claude Desktop / Claude Code is routing model requests through EchoBird, quitting will make it unusable.',
   // Buttons
   'btn.addModel': 'ADD MODEL',
   'btn.save': 'Save',
@@ -257,15 +257,9 @@ const en: Translations = {
   'agent.modelsTab': 'MODELS',
   'agent.codexRelayLabel': 'API Router',
   'agent.codexRelayHint':
-    'A data-forwarding scheme provided by an API relay or API Router. Enabling it for a third-party model gives direct, full integration, but the tool may treat it as an "outsider".',
+    'A data-forwarding scheme provided by an API relay or API Router. Enabling it for a third-party model gives direct, full integration, but Claude may treat it as an "outsider".',
   'agent.claude1mHint':
     'When on, appends [1m] to the model id to enable the 1M context window. Carefully read the official docs of the model you purchased to confirm whether it supports the "model id + [1m]" convention.',
-  'agent.codexResponsesLabel': 'Responses',
-  'agent.codexResponsesHint':
-    'Enable this for native integration if your model — official GPT relay station or third-party model — supports the Responses protocol. (Carefully read the official documentation of the model you purchased to confirm whether it supports the Responses protocol.)',
-  'agent.codexWebSearchLabel': 'Web Search',
-  'agent.codexWebSearchHint':
-    'Some third-party models require web_search to be separately enabled or billed. (Carefully read the official documentation of the model you purchased to confirm whether web_search is supported and how to enable it.)',
   'agent.installViaMother': 'AI Auto-Install',
   // ToolCard labels
   'tool.models': 'Models',
@@ -302,7 +296,9 @@ const en: Translations = {
   'key.encrypted': 'Encrypted globally — API Key will self-destruct if environment changes',
   'key.destroyed': 'Environment change detected — API Key has self-destructed, please re-enter',
   'hint.devInvite':
-    'After switching the ChatGPT / Codex CLI / Claude Desktop / Claude Code model, keep EchoBird running.',
+    'When switching Claude Desktop / Claude Code to a third-party model without API Router, keep EchoBird running to forward model requests.',
+  'hint.responsesRequired':
+    'Third-party models must support Responses to connect successfully with ChatGPT / Codex CLI.',
   'hint.myProjects':
     "Swap the model on your vibe-coded app or game — reference Reversi's and AI Translator's models.json, or just copy it to your project.",
   // Mother Agent

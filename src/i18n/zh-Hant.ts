@@ -146,7 +146,7 @@ const zhHant: Partial<Translations> = {
   'settings.launchAtStartup': '開機啟動',
   'closeDialog.title': '視窗關閉方式',
   'closeDialog.hint':
-    '注意：如果你的 ChatGPT / Codex CLI / Claude 桌面端 / Claude Code 已切換模型，結束會導致無法使用。',
+    '注意：如果 Claude 桌面端 / Claude Code 正透過 EchoBird 轉送模型請求，結束會導致無法使用。',
   'btn.addModel': '新增模型',
   'btn.save': '儲存',
   'btn.close': '關閉',
@@ -253,15 +253,9 @@ const zhHant: Partial<Translations> = {
   'aiDesktop.emptyInstall': '所有應用均已安裝。',
   'agent.codexRelayLabel': 'API Router',
   'agent.codexRelayHint':
-    '由 API 中轉站或 API Router 提供的資料轉發方案，第三方模型開啟則全量接入，但可能會被工具判定為“外鄉人”。',
+    '由 API 中轉站或 API Router 提供的資料轉發方案，第三方模型開啟則全量接入，但可能會被 Claude 判定為“外鄉人”。',
   'agent.claude1mHint':
     '開啟後向模型 id 附加 [1m] 以使用 1M 上下文。請仔細閱讀你購買模型的官方文件，確認是否支援「模型id+[1m]」。',
-  'agent.codexResponsesLabel': 'Responses',
-  'agent.codexResponsesHint':
-    '官方 GPT 模型的中轉站和第三方模型支援 Responses 可開啟此項，原生接入（仔細閱讀你購買模型的官方文件，是否支援 Responses 協定）',
-  'agent.codexWebSearchLabel': 'Web Search',
-  'agent.codexWebSearchHint':
-    '部分第三方模型 web_search 需要另行開通或計費（仔細閱讀你購買模型的官方文件，確認是否支援及如何開通 web_search 能力）',
   'agent.installViaMother': 'AI 自動安裝',
   'tool.models': '模型',
   'tool.app': '應用',
@@ -292,7 +286,9 @@ const zhHant: Partial<Translations> = {
   'key.encrypted': '已全域加密，任何環境變動時 API Key 將自毀',
   'key.destroyed': '偵測到環境已變動，API Key 已自毀，請重新輸入',
   'hint.devInvite':
-    '切換 ChatGPT / Codex CLI / Claude 桌面端 / Claude Code 的模型後，請保持 EchoBird 執行。',
+    'Claude 桌面端 / Claude Code 切換模型時，第三方模型如果未開啟 API Router，則會透過 EchoBird 轉送模型請求，請保持 EchoBird 執行。',
+  'hint.responsesRequired':
+    'ChatGPT / Codex CLI 切換模型時，第三方模型必須支援 Responses 才能成功接入。',
   'hint.myProjects':
     '給你 Vibe Coding 的應用或遊戲切換模型，參考黑白棋和 AI 翻譯的 models.json 或複製它到你的專案。',
   'mother.selectModel': '選擇模型',

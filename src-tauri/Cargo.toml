@@ -77,11 +77,8 @@ url = "2"
 rand = "0.8"
 futures-util = "0.3"
 
-# HTTP server for the Codex Responses↔Chat proxy (Rust rewrite of the
-# old tools/codex/lib/*.cjs launcher). Binds 127.0.0.1:53682 as a
-# background tokio task.
+# Local HTTP servers for the Anthropic model-id router and smart router.
 axum = "0.8"
-tower = "0.5"
 http-body-util = "0.1"
 bytes = "1"
 tokio-stream = "0.1"

@@ -1,7 +1,7 @@
 //! Model configuration for claudedesktop.
 
 use super::{echobird_dir, read_json_file, write_json_file, ApplyResult, ModelInfo};
-use crate::services::codex_proxy::CODEX_PROXY_PORT;
+use crate::services::anthropic_proxy::ANTHROPIC_PROXY_PORT;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -165,7 +165,7 @@ pub(super) fn apply_claudedesktop(model_info: &ModelInfo) -> ApplyResult {
     // Two routing modes, picked by `model_info.relay_mode`:
     //
     // • Bridge (default): Desktop's gateway hits our local Anthropic
-    //   proxy on `127.0.0.1:CODEX_PROXY_PORT/v1/messages`. The proxy
+    //   proxy on `127.0.0.1:ANTHROPIC_PROXY_PORT/v1/messages`. The proxy
     //   reads the real upstream URL, API key, and model id fresh from
     //   ~/.echobird/claudedesktop.json on every request, rewrites the
     //   Anthropic-only model id (Desktop hardcodes claude-sonnet-4-*
@@ -182,7 +182,7 @@ pub(super) fn apply_claudedesktop(model_info: &ModelInfo) -> ApplyResult {
     //   model-id rewrite is lost, so the upstream sees whatever id
     //   Desktop chose (claude-sonnet-4-*, …) — fine for stations that
     //   accept those, broken for raw Chat-only providers.
-    let proxy_base = format!("http://127.0.0.1:{}", CODEX_PROXY_PORT);
+    let proxy_base = format!("http://127.0.0.1:{}", ANTHROPIC_PROXY_PORT);
     let relay_mode = model_info.relay_mode.unwrap_or(false);
     let (gateway_base_url, gateway_api_key) = if relay_mode {
         (anthropic_url.clone(), api_key.clone())
@@ -392,8 +392,6 @@ pub(super) fn read_claudedesktop() -> Option<ModelInfo> {
         protocol: Some("anthropic".to_string()),
         display_model: None,
         relay_mode: None,
-        responses_passthrough: None,
-        web_search: None,
         one_m_context: None,
     })
 }

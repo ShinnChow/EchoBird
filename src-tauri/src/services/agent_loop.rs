@@ -1097,10 +1097,8 @@ fn build_assistant_message(
 /// an orphan tool_result that Anthropic-style upstreams reject with
 /// "tool_result block has no preceding tool_use" (issue #106).
 ///
-/// Mirror of `ensure_tool_outputs_paired` in codex_proxy (which handles
-/// the reverse case: orphan `tool_use` without `tool_result`). The two
-/// directions exist independently because Mother Agent owns its own
-/// trim path and never goes through codex_proxy's pairing pass.
+/// This handles the reverse case from the output-pairing pass: orphan
+/// `tool_use` without `tool_result`.
 ///
 /// Strategy:
 ///   1. Pass 1 — collect every `tool_use` id currently present.

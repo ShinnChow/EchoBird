@@ -1715,7 +1715,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util",
- "tower",
  "url",
  "uuid",
  "which",

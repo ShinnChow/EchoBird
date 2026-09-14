@@ -183,23 +183,6 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const [claudeCodeRelayMode, setClaudeCodeRelayModeRaw] = useState<boolean>(() =>
     readBool('echobird_claudecode_relay_mode', false)
   );
-  // Codex-only "Responses passthrough" toggle. Default OFF (legacy Bridge
-  // translation). When ON, config.toml still points at the 127.0.0.1 proxy (so
-  // model-id rewrite keeps happening), but the proxy forwards to the upstream's
-  // native /responses endpoint verbatim instead of translating down to Chat.
-  // For third-party models that natively speak Responses. Shared across Codex
-  // CLI + ChatGPT desktop (both read ~/.codex/config.toml).
-  const [codexResponsesPassthrough, setCodexResponsesPassthroughRaw] = useState<boolean>(() =>
-    readBool('echobird_codex_responses_passthrough', false)
-  );
-  // Codex-only web-search toggle. Default ON → write web_search="live"
-  // (real-time retrieval); OFF writes web_search="disabled" so Codex removes
-  // its built-in search tool. NOT Codex's default "cached" — that's an
-  // OpenAI-maintained index with no external web access, useless for our
-  // third-party upstreams.
-  const [codexWebSearch, setCodexWebSearchRaw] = useState<boolean>(() =>
-    readBool('echobird_codex_web_search', true)
-  );
   // Claude Code relay-only 1M-context toggle. When on AND API Router is on,
   // apply_claudecode appends `[1m]` to the model id (MODEL / OPUS / SONNET / FABLE env
   // vars only — HAIKU + SUBAGENT stay bare) so Claude Code budgets the 1M
@@ -251,8 +234,6 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     toolId: string,
     internalId: string,
     relayOverride?: boolean,
-    passthroughOverride?: boolean,
-    webSearchOverride?: boolean,
     oneMOverride?: boolean
   ): Promise<true | string | false> => {
     const model = userModels.find((m) => m.internalId === internalId);
@@ -289,23 +270,18 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
       `[AppManager] Applying model to ${toolId}: protocol=${selectedProtocol}, url=${apiUrl}`
     );
 
-    // Codex apps + Claude Desktop honor the relay-mode toggle from the
-    // right panel. Other tools ignore the field — apply_codex and
-    // apply_claudedesktop are the only consumers and short-circuit on
-    // tool_id mismatch.
-    const isCodexApp = toolId === 'codex' || toolId === 'chatgptdesktop';
+    // Claude apps honor the relay-mode toggle from the right panel.
+    // Codex CLI and ChatGPT now always connect directly to the selected
+    // provider's Responses endpoint, so they need no routing flags.
     const isClaudeDesktopApp = toolId === 'claudedesktop';
     const isClaudeCodeApp = toolId === 'claudecode';
     const isClaudeApp = isClaudeDesktopApp || isClaudeCodeApp;
-    // Codex no longer exposes API Router (it has Web Search instead); relay is
-    // Claude-only now. Claude Code rides the same model-id-rewrite proxy as
+    // Relay is Claude-only. Claude Code rides the same model-id-rewrite proxy as
     // Claude Desktop (relay ON = direct, OFF = our proxy/bridge), with its own
     // claudeCodeRelayMode flag + backend relay file.
     const isRelayCapableApp = isClaudeApp;
     const currentRelayMode = isClaudeDesktopApp ? claudeDesktopRelayMode : claudeCodeRelayMode;
     const effectiveRelay = isClaudeApp ? (relayOverride ?? currentRelayMode) : false;
-    const effectivePassthrough = isCodexApp && (passthroughOverride ?? codexResponsesPassthrough);
-    const effectiveWebSearch = isCodexApp ? (webSearchOverride ?? codexWebSearch) : false;
     // 1M context — Claude Code relay-only. Guard on effectiveRelay so the
     // flag is never sent for bridge applies (bridge writes no model id, so
     // [1m] would be moot anyway — keeps the field semantically relay-only).
@@ -320,9 +296,6 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         model: model.modelId || '',
         protocol: selectedProtocol,
         ...(isRelayCapableApp ? { relayMode: effectiveRelay } : {}),
-        ...(isCodexApp
-          ? { responsesPassthrough: effectivePassthrough, webSearch: effectiveWebSearch }
-          : {}),
         ...(isClaudeCodeApp ? { oneMContext: effective1m } : {}),
       });
 
@@ -343,54 +316,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     }
   };
 
-  // Responses-passthrough setter — mirrors setCodexWebSearch (shared across
-  // Codex CLI + Desktop, re-applies on flip so the effect is immediate).
-  const setCodexResponsesPassthrough = useCallback(
-    (v: boolean) => {
-      setCodexResponsesPassthroughRaw(v);
-      writeBool('echobird_codex_responses_passthrough', v);
-      const codexToolId = (['codex', 'chatgptdesktop'] as const).find(
-        (id) => !!toolModelConfig[id]
-      );
-      if (!codexToolId) return;
-      const pendingInternalId = toolModelConfig[codexToolId];
-      if (!pendingInternalId || isOfficialModelSentinel(pendingInternalId)) return;
-      void applyModelConfig(codexToolId, pendingInternalId, undefined, v).then((result) => {
-        if (result !== true) {
-          setApplyError(typeof result === 'string' ? result : t('key.destroyed'));
-        }
-      });
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [toolModelConfig, t, userModels]
-  );
-
-  // Web-search setter — mirrors setCodexResponsesPassthrough: persist + re-apply
-  // the active Codex model so the change lands immediately.
-  const setCodexWebSearch = useCallback(
-    (v: boolean) => {
-      setCodexWebSearchRaw(v);
-      writeBool('echobird_codex_web_search', v);
-      const codexToolId = (['codex', 'chatgptdesktop'] as const).find(
-        (id) => !!toolModelConfig[id]
-      );
-      if (!codexToolId) return;
-      const pendingInternalId = toolModelConfig[codexToolId];
-      if (!pendingInternalId || isOfficialModelSentinel(pendingInternalId)) return;
-      void applyModelConfig(codexToolId, pendingInternalId, undefined, undefined, v).then(
-        (result) => {
-          if (result !== true) {
-            setApplyError(typeof result === 'string' ? result : t('key.destroyed'));
-          }
-        }
-      );
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [toolModelConfig, t, userModels]
-  );
-
-  // Claude Desktop relay-mode setter — mirrors the Codex toggle setters but
-  // scoped to the claudedesktop tool. Re-applies on toggle flip so the
+  // Claude Desktop relay-mode setter. Re-applies on toggle flip so the
   // user sees an immediate effect (profile JSON gets rewritten with the
   // new gateway URL + key on the next /v1/messages request, no Desktop
   // restart required after the first 3p activation).
@@ -445,16 +371,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
       writeBool('echobird_claudecode_1m_mode', v);
       const pendingInternalId = toolModelConfig['claudecode'];
       if (!pendingInternalId || isOfficialModelSentinel(pendingInternalId)) return;
-      // oneMOverride is the 6th positional arg; relay/passthrough/webSearch
-      // pass undefined so each resolves to its current state.
-      void applyModelConfig(
-        'claudecode',
-        pendingInternalId,
-        undefined,
-        undefined,
-        undefined,
-        v
-      ).then((result) => {
+      void applyModelConfig('claudecode', pendingInternalId, undefined, v).then((result) => {
         if (result !== true) {
           setApplyError(typeof result === 'string' ? result : t('key.destroyed'));
         }
@@ -628,10 +545,6 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         userModels,
         modelProtocolSelection,
         setModelProtocolSelection,
-        codexResponsesPassthrough,
-        setCodexResponsesPassthrough,
-        codexWebSearch,
-        setCodexWebSearch,
         claudeDesktopRelayMode,
         setClaudeDesktopRelayMode,
         claudeCodeRelayMode,

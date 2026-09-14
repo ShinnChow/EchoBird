@@ -115,8 +115,6 @@ pub(super) fn read_workbuddy() -> Option<ModelInfo> {
         protocol: None,
         display_model: None,
         relay_mode: None,
-        responses_passthrough: None,
-        web_search: None,
         one_m_context: None,
     })
 }

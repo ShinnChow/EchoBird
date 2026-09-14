@@ -222,8 +222,6 @@ pub(super) fn read_grok() -> Option<ModelInfo> {
         protocol: Some("openai".to_string()),
         display_model: None,
         relay_mode: None,
-        responses_passthrough: None,
-        web_search: None,
         one_m_context: None,
     })
 }

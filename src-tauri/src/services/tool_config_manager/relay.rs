@@ -105,8 +105,6 @@ pub(super) fn read_echobird_relay(tool_id: &str) -> Option<ModelInfo> {
             .map(|s| s.to_string()),
         display_model: None,
         relay_mode: None,
-        responses_passthrough: None,
-        web_search: None,
         one_m_context: None,
     })
 }
