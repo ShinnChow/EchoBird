@@ -301,8 +301,6 @@ const en: Translations = {
   // API Key encryption + developer hint
   'key.encrypted': 'Encrypted globally — API Key will self-destruct if environment changes',
   'key.destroyed': 'Environment change detected — API Key has self-destructed, please re-enter',
-  'hint.mimoDesktopBeta':
-    'Beta: sets the default for new tasks. Apply & Launch restarts the app; Modify Only requires a manual restart. Existing tasks may keep their model.',
   'hint.devInvite':
     'After switching the ChatGPT / Codex CLI / Claude Desktop / Claude Code model, keep EchoBird running.',
   'hint.myProjects':

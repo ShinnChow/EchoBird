@@ -1040,6 +1040,7 @@ export const AppManagerPanel: React.FC = () => {
 export const AppManagerBottom: React.FC = () => {
   const { t, locale } = useI18n();
   const activePage = useNavigationStore((s) => s.activePage);
+  const goToMother = useNavigationStore((s) => s.goToMother);
   const {
     viewMode,
     selectedTool,
@@ -1091,22 +1092,42 @@ export const AppManagerBottom: React.FC = () => {
             models.json when Vibe-Coding their own AI project. */}
         <PageAwareHint />
         {/* Launch button */}
-        {/* Launch button */}
-        <button
-          onClick={handlePrimaryClick}
-          disabled={buttonDisabled}
-          className={`w-64 h-14 text-lg font-bold font-mono tracking-widest transition-colors flex-shrink-0 rounded-lg cjk-btn border shadow-lg ${
-            buttonDisabled
-              ? 'bg-cyber-border text-cyber-text-secondary border-transparent shadow-none cursor-not-allowed'
-              : 'bg-cyber-accent text-white border-cyber-accent hover:bg-cyber-accent-secondary hover:border-cyber-accent-secondary shadow-cyber-accent/30'
-          }`}
-        >
-          {isInstallAction
-            ? t('btn.installOneClick')
-            : willLaunch
-              ? t('btn.launchApp')
-              : t('btn.modifyOnly')}
-        </button>
+        <div className="relative w-64 h-14 flex-shrink-0">
+          <button
+            onClick={handlePrimaryClick}
+            disabled={buttonDisabled}
+            className={`w-full h-14 text-lg font-bold font-mono tracking-widest transition-colors rounded-lg cjk-btn border shadow-lg ${
+              buttonDisabled
+                ? 'bg-cyber-border text-cyber-text-secondary border-transparent shadow-none cursor-not-allowed'
+                : 'bg-cyber-accent text-white border-cyber-accent hover:bg-cyber-accent-secondary hover:border-cyber-accent-secondary shadow-cyber-accent/30'
+            }`}
+          >
+            {isInstallAction
+              ? t('btn.installOneClick')
+              : willLaunch
+                ? t('btn.launchApp')
+                : t('btn.modifyOnly')}
+          </button>
+          {activePage === 'apps' && selectedToolData?.installed && !isInstallAction && (
+            <button
+              type="button"
+              onClick={() =>
+                goToMother(
+                  t('mother.hintUninstall').replace(
+                    '{agent}',
+                    toolDisplayName(selectedToolData, locale)
+                  )
+                )
+              }
+              className="absolute top-full left-1/2 -translate-x-1/2 mt-2 max-w-full whitespace-nowrap text-xs text-cyber-text-secondary hover:text-cyber-accent hover:underline transition-colors"
+            >
+              {t('mother.hintUninstall').replace(
+                '{agent}',
+                toolDisplayName(selectedToolData, locale)
+              )}
+            </button>
+          )}
+        </div>
         {/* Reserve the controls' space while installing so the action stays aligned.
             Apps without model configuration keep the controls visible but disabled. */}
         <div
@@ -1205,16 +1226,14 @@ export const AppManagerBottom: React.FC = () => {
 // "应用桌面" and "我的AI项目" without duplicating the rest of the row.
 const PageAwareHint: React.FC = () => {
   const { t } = useI18n();
-  const { selectedTool, viewMode } = useAppManager();
+  const { viewMode } = useAppManager();
   const activePage = useNavigationStore((s) => s.activePage);
   const key =
     activePage === 'myProjects'
       ? 'hint.myProjects'
       : viewMode === 'install'
         ? 'aiDesktop.installHint'
-        : selectedTool === 'mimodesktop'
-          ? 'hint.mimoDesktopBeta'
-          : 'hint.devInvite';
+        : 'hint.devInvite';
   return <div className="flex-1 text-[15px] font-medium text-cyber-accent">{t(key)}</div>;
 };
 

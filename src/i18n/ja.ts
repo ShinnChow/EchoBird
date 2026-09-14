@@ -299,8 +299,6 @@ const ja: Partial<Translations> = {
   'store.ready': '✓ 準備完了',
   'key.encrypted': '全体暗号化済み — 環境が変化すると API キーは自動消去されます',
   'key.destroyed': '環境の変化を検出。API キーが自動消去されました。再度入力してください',
-  'hint.mimoDesktopBeta':
-    'ベータ版：新規タスクの既定モデルを設定します。「適用して起動」はアプリを再起動し、「変更のみ」は手動再起動が必要です。既存のタスクは元のモデルを保持する場合があります。',
   'hint.devInvite':
     'ChatGPT / Codex CLI / Claude Desktop / Claude Code のモデルを切り替えた後は、EchoBird を起動したままにしてください。',
   'hint.myProjects':

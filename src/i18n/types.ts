@@ -286,7 +286,6 @@ export type TKey =
   | 'key.destroyed'
   // Developer invite hint
   | 'hint.devInvite'
-  | 'hint.mimoDesktopBeta'
   // Mother Agent
   | 'mother.selectModel'
   | 'mother.hintInstall'

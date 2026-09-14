@@ -291,8 +291,6 @@ const zhHant: Partial<Translations> = {
   'store.ready': '✓ 就緒',
   'key.encrypted': '已全域加密，任何環境變動時 API Key 將自毀',
   'key.destroyed': '偵測到環境已變動，API Key 已自毀，請重新輸入',
-  'hint.mimoDesktopBeta':
-    '測試版：設定新任務預設模型。「套用並啟動」會重新啟動程式；「僅修改」需手動重新啟動。既有任務可能保留原模型。',
   'hint.devInvite':
     '切換 ChatGPT / Codex CLI / Claude 桌面端 / Claude Code 的模型後，請保持 EchoBird 執行。',
   'hint.myProjects':
@@ -364,7 +362,7 @@ const zhHant: Partial<Translations> = {
   'mother.hintShowSpecs': '查看伺服器的硬體配置',
   'mother.hintShowSpecsLocal': '查看本機的硬體配置',
   'mother.hintTroubleshoot': '{agent} 不好用了，幫我修復',
-  'mother.hintUninstall': '完全解除安裝 {agent}',
+  'mother.hintUninstall': '徹底解除安裝 {agent}',
   'mother.hintNetworkInfo': '查看內網/公網 IP',
   'mother.hintSecurityAudit': '偵測可疑活動',
   'mother.hintDetectCuda': '檢測 CUDA 模組狀態',
