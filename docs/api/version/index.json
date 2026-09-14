@@ -1,6 +1,6 @@
 {
-  "version": "5.7.2",
-  "releaseDate": "2026-09-11",
+  "version": "5.7.3",
+  "releaseDate": "2026-09-14",
   "releaseNotes": "Codex 与 ChatGPT 原生 Responses 接入，模型切换更直接！\n\n## 新增\n\n- ChatGPT 与 Codex CLI 切换第三方模型时，直接连接供应商的 Responses 接口，并移除旧 CodexProxy 协议转换和相关开关。\n- 应用桌面新增卸载快捷入口；Mother Agent 运行状态会显示在侧边栏。\n- Mother Agent 在 Windows 上支持识别和安装 Gemini 桌面端。\n\n## 优化与修复\n\n- Web Search 默认启用；DeepSeek 与 MiMo 按官方要求自动禁用，并同步两家的图片、搜索与推理能力目录。\n- 精简非核心新闻、项目和热门 Skills 入口，让界面更聚焦。\n- 优化 Claude Desktop / Claude Code 与 ChatGPT / Codex CLI 的接入提示，明确 API Router、Responses 和 EchoBird 常驻条件。",
   "releaseNotesI18n": {
     "zh-cn": "Codex 与 ChatGPT 原生 Responses 接入，模型切换更直接！\n\n## 新增\n\n- ChatGPT 与 Codex CLI 切换第三方模型时，直接连接供应商的 Responses 接口，并移除旧 CodexProxy 协议转换和相关开关。\n- 应用桌面新增卸载快捷入口；Mother Agent 运行状态会显示在侧边栏。\n- Mother Agent 在 Windows 上支持识别和安装 Gemini 桌面端。\n\n## 优化与修复\n\n- Web Search 默认启用；DeepSeek 与 MiMo 按官方要求自动禁用，并同步两家的图片、搜索与推理能力目录。\n- 精简非核心新闻、项目和热门 Skills 入口，让界面更聚焦。\n- 优化 Claude Desktop / Claude Code 与 ChatGPT / Codex CLI 的接入提示，明确 API Router、Responses 和 EchoBird 常驻条件。",
