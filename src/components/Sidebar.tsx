@@ -1,6 +1,6 @@
 // Sidebar navigation component
 import { useState, useEffect } from 'react';
-import { Box, Server, FolderHeart, Trophy, Monitor, Download } from 'lucide-react';
+import { Box, Server, FolderHeart, Trophy, Monitor, Download, RefreshCw } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { useI18n } from '../hooks/useI18n';
 import * as api from '../api/tauri';
@@ -31,7 +31,7 @@ interface SidebarProps {
 export const Sidebar = ({
   activePage,
   onPageChange,
-  agentRunning: _agentRunning = false,
+  agentRunning = false,
   smartRouterOnline = false,
   updateAvailable = null,
   onSettingsClick,
@@ -118,6 +118,11 @@ export const Sidebar = ({
           label={t('nav.motherAgent')}
           active={activePage === 'mother'}
           onClick={() => onPageChange('mother')}
+          trailing={
+            agentRunning && (
+              <RefreshCw size={14} aria-hidden="true" className="animate-spin text-cyber-accent" />
+            )
+          }
         />
         {/* Divider — primary actions above; career and project tools below */}
         <div className="border-t border-cyber-border/50" />

@@ -303,8 +303,8 @@ export function MotherAgentProvider({ children }: { children: React.ReactNode })
 
   // Notify parent about running state
   useEffect(() => {
-    onAgentRunningChange?.(!!agentModel);
-  }, [agentModel, onAgentRunningChange]);
+    onAgentRunningChange(isProcessing);
+  }, [isProcessing, onAgentRunningChange]);
 
   // Chat scroll is managed by MotherAgentMain so the user can scroll up
   // freely while the agent is streaming.

@@ -7,10 +7,11 @@ export interface NavItemProps {
   active?: boolean;
   onClick?: () => void;
   color?: 'accent' | 'warning' | 'secondary' | 'blue';
+  trailing?: React.ReactNode;
 }
 
 export const NavItem = React.memo(
-  ({ icon, label, active = false, onClick, color = 'accent' }: NavItemProps) => {
+  ({ icon, label, active = false, onClick, color = 'accent', trailing }: NavItemProps) => {
     const colorClasses =
       color === 'warning'
         ? 'bg-cyber-warning/15 text-cyber-warning'
@@ -28,6 +29,7 @@ export const NavItem = React.memo(
       >
         {icon}
         <span>{label}</span>
+        {trailing && <span className="ml-auto flex-shrink-0">{trailing}</span>}
       </div>
     );
   }

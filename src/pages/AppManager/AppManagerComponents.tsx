@@ -1062,6 +1062,7 @@ export const AppManagerBottom: React.FC = () => {
   // actually on the machine.
   const isUninstalled = !!selectedToolData && !selectedToolData.installed;
   const isInstallAction = isUninstalled || (activePage === 'apps' && viewMode === 'install');
+  const isBuiltInApp = selectedTool === 'reversi' || selectedTool === 'translator';
   const hasModelSelected = !!(selectedTool && toolModelConfig[selectedTool]);
   // What will a click actually do?
   //  - "Apply" runs only when the user picked a model AND agreed to the config-write policy.
@@ -1108,25 +1109,28 @@ export const AppManagerBottom: React.FC = () => {
                 ? t('btn.launchApp')
                 : t('btn.modifyOnly')}
           </button>
-          {activePage === 'apps' && selectedToolData?.installed && !isInstallAction && (
-            <button
-              type="button"
-              onClick={() =>
-                goToMother(
-                  t('mother.hintUninstall').replace(
-                    '{agent}',
-                    toolDisplayName(selectedToolData, locale)
+          {activePage === 'apps' &&
+            selectedToolData?.installed &&
+            !isInstallAction &&
+            !isBuiltInApp && (
+              <button
+                type="button"
+                onClick={() =>
+                  goToMother(
+                    t('mother.hintUninstall').replace(
+                      '{agent}',
+                      toolDisplayName(selectedToolData, locale)
+                    )
                   )
-                )
-              }
-              className="absolute top-full left-1/2 -translate-x-1/2 mt-2 max-w-full whitespace-nowrap text-xs text-cyber-text-secondary hover:text-cyber-accent hover:underline transition-colors"
-            >
-              {t('mother.hintUninstall').replace(
-                '{agent}',
-                toolDisplayName(selectedToolData, locale)
-              )}
-            </button>
-          )}
+                }
+                className="absolute top-full left-1/2 -translate-x-1/2 mt-2 max-w-full whitespace-nowrap text-xs text-cyber-text-secondary hover:text-cyber-accent hover:underline transition-colors"
+              >
+                {t('mother.hintUninstall').replace(
+                  '{agent}',
+                  toolDisplayName(selectedToolData, locale)
+                )}
+              </button>
+            )}
         </div>
         {/* Reserve the controls' space while installing so the action stays aligned.
             Apps without model configuration keep the controls visible but disabled. */}
