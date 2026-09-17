@@ -1,7 +1,7 @@
 {
   "$schema-comment": "Remote-updatable free model catalog.",
   "version": 1,
-  "updatedAt": "2026-08-30",
+  "updatedAt": "2026-09-17",
   "models": [
     {
       "id": "typhoon:typhoon-v2.5-30b-a3b-instruct",
@@ -2130,6 +2130,22 @@
       "phoneRequired": true,
       "commercialOk": false,
       "verifiedAt": "2026-08-30"
+    },
+    {
+      "id": "nvidia-nim:meta/muse-glimmer-30b",
+      "providerId": "nvidia-nim",
+      "provider": "NVIDIA NIM",
+      "modelId": "meta/muse-glimmer-30b",
+      "baseUrl": "https://integrate.api.nvidia.com/v1",
+      "freeType": "trial-credit",
+      "freeTier": "Trial credit, phone verification required",
+      "rateLimits": "Some models have reduced context windows on the free trial",
+      "notes": "\"Evaluation only, not production\" per NVIDIA's own Trial Terms of Service — NVIDIA may discontinue the trial at any time with no continuity obligation",
+      "docsUrl": "https://build.nvidia.com/",
+      "cardRequired": false,
+      "phoneRequired": true,
+      "commercialOk": false,
+      "verifiedAt": "2026-09-17"
     }
   ]
 }
