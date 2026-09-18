@@ -120,6 +120,14 @@ impl ProcessManager {
             crate::services::tool_manager::is_vscode_extension(tool_id),
         );
 
+        // Merge for both official and third-party launches, after desktop
+        // shutdown and before choosing the native/Store/CLI launch route.
+        if matches!(tool_id, "codex" | "chatgptdesktop") {
+            if let Some(codex_dir) = crate::services::codex_runtime::default_codex_dir() {
+                crate::services::codex_session_merge::merge_codex_history(&codex_dir);
+            }
+        }
+
         // Priority 0: Codex pre-flight + launch entry.
         //
         // CLI always goes through here so the Codex-specific onboarding bypass
@@ -317,14 +325,6 @@ impl ProcessManager {
             if let Err(e) = codex_runtime::bypass_onboarding(&codex_dir) {
                 log::warn!("[ProcessManager] bypass_onboarding failed (non-fatal): {e}");
             }
-
-            // Cross-provider history merge: retag every prior Codex session
-            // to the provider config.toml now points at, so conversations
-            // from other configs (official `openai`, our `OpenAI`, `gemini`,
-            // …) all show up instead of being hidden by Codex's per-provider
-            // filter. Self-healing + never fatal — a locked DB (Codex still
-            // running) or any error is logged and skipped.
-            crate::services::codex_session_merge::merge_codex_history(&codex_dir);
         }
 
         if tool_id == "chatgptdesktop" {

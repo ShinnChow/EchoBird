@@ -58,6 +58,7 @@ async-trait = "0.1"
 # Platform helpers
 dirs = "6"
 image = "0.25"
+fs2 = "0.4"
 
 # SQLite — OpenCode's authoritative session store is `opencode.db`; its
 # `storage/` JSON dir is vestigial (only legacy sessions), so we MUST read the
