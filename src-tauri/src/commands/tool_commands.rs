@@ -1,6 +1,7 @@
 // Tauri Commands for tool operations — exposed to frontend via invoke()
 
 use crate::models::tool::DetectedTool;
+use crate::services::codex_accounts::{self, CodexAccountSummary};
 use crate::services::tool_config_manager::{self, ApplyResult, ModelInfo};
 use crate::services::tool_manager;
 
@@ -137,6 +138,33 @@ pub async fn apply_model_to_tool(
 #[tauri::command]
 pub async fn restore_tool_to_official(tool_id: String) -> Result<ApplyResult, String> {
     Ok(tool_config_manager::restore_tool_to_official(&tool_id).await)
+}
+
+#[tauri::command]
+pub fn list_codex_accounts() -> Result<Vec<CodexAccountSummary>, String> {
+    codex_accounts::list_accounts()
+}
+
+#[tauri::command]
+pub fn capture_current_codex_account() -> Result<CodexAccountSummary, String> {
+    codex_accounts::capture_current_account()
+}
+
+#[tauri::command]
+pub fn switch_codex_account(account_id: String) -> Result<CodexAccountSummary, String> {
+    codex_accounts::switch_account(&account_id)
+}
+
+#[tauri::command]
+pub async fn refresh_codex_account_quota(
+    account_id: String,
+) -> Result<CodexAccountSummary, String> {
+    codex_accounts::refresh_account_quota(&account_id).await
+}
+
+#[tauri::command]
+pub fn delete_codex_account(account_id: String) -> Result<(), String> {
+    codex_accounts::delete_account(&account_id)
 }
 
 /// Apply a model config to a user-authored project's models.json.

@@ -88,9 +88,48 @@ describe('ModelListSection', () => {
 
       expect(markup).not.toContain('Auto Router');
       expect(markup).not.toContain('Local Model');
+      expect(markup).not.toContain('OpenAI Official');
       expect(markup).toContain('Cloud Model');
     }
   );
+});
+
+describe('CodexAccountSection', () => {
+  it('renders saved accounts with pending selection and current-state metadata', async () => {
+    vi.stubGlobal('__APP_EDITION__', 'full');
+    const { CodexAccountSection } = await import('./AppManagerComponents');
+    const context: Partial<AppManagerContextType> = {
+      codexAccounts: [
+        {
+          id: 'account-1',
+          email: 'first@example.com',
+          plan: 'prolite',
+          quotaPercent: 32,
+          active: true,
+        },
+      ],
+      selectedCodexAccountId: 'account-1',
+      setSelectedCodexAccountId: () => {},
+      isLoadingCodexAccounts: false,
+      refreshingCodexAccountId: null,
+      captureCurrentCodexAccount: async () => {},
+      refreshCodexAccountQuota: async () => {},
+      deleteCodexAccount: async () => {},
+    };
+
+    const markup = renderToStaticMarkup(
+      <AppManagerContext.Provider value={context as AppManagerContextType}>
+        <CodexAccountSection />
+      </AppManagerContext.Provider>
+    );
+
+    expect(markup).toContain('first@example.com');
+    expect(markup).toContain('Pro 5X');
+    expect(markup).toContain('32%');
+    expect(markup).toContain('aria-checked="true"');
+    expect(markup).toContain('agent.refreshAccount');
+    expect((markup.match(/role="tooltip"/g) || []).length).toBe(2);
+  });
 });
 
 describe('AppManager views', () => {

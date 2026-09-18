@@ -251,6 +251,12 @@ const ja: Partial<Translations> = {
   'toolCat.utility': 'ユーティリティ',
   'toolCat.science': 'サイエンス',
   'agent.modelsTab': 'モデル',
+  'agent.addCurrentAccount': '現在ログイン中のアカウントを追加',
+  'agent.refreshAccount': 'アカウントの使用量を更新',
+  'agent.deleteAccountTitle': '保存済みアカウントを削除',
+  'agent.deleteAccountConfirm':
+    '{email} のローカルスナップショットを削除しますか？現在のアプリはログアウトされません。',
+  'agent.configWarning': '設定の警告',
   'aiDesktop.officialWebsite': '公式サイト：',
   'aiDesktop.githubRepository': 'GitHub リポジトリ：',
   'aiDesktop.desktopView': 'インストール済み',

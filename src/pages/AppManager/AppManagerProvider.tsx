@@ -4,6 +4,7 @@ import { EFFORT_PULSE_ONESHOT_MS } from '../../components';
 import { useI18n } from '../../hooks/useI18n';
 import * as api from '../../api/tauri';
 import type { ModelConfig } from '../../api/types';
+import type { CodexAccount } from '../../api/tauri';
 import { AppManagerContext } from './context';
 import { useToolsStore } from '../../stores/toolsStore';
 import { useNavigationStore } from '../../stores/navigationStore';
@@ -28,7 +29,7 @@ interface AppManagerProviderProps {
 
 export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children }) => {
   const { t, locale } = useI18n();
-  const _confirm = useConfirm();
+  const confirm = useConfirm();
 
   // From stores (replaces drilled props)
   const {
@@ -99,6 +100,116 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [isLaunching, setIsLaunching] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [codexAccounts, setCodexAccounts] = useState<CodexAccount[]>([]);
+  const [selectedCodexAccountId, setSelectedCodexAccountIdRaw] = useState<string | null>(null);
+  const [isLoadingCodexAccounts, setIsLoadingCodexAccounts] = useState(false);
+  const [refreshingCodexAccountId, setRefreshingCodexAccountId] = useState<string | null>(null);
+
+  const isCodexTool = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
+  const [toolModelConfig, setToolModelConfig] = useState<Record<string, string | null>>({
+    claudecode: null,
+    openclaw: null,
+    opencode: null,
+    codex: null,
+    hermes: null,
+    zcode: null,
+  });
+  const selectCodexAccount = useCallback(
+    (accountId: string | null) => {
+      setSelectedCodexAccountIdRaw(accountId);
+      if (!selectedTool || (selectedTool !== 'codex' && selectedTool !== 'chatgptdesktop')) return;
+      setToolModelConfig((prev) => ({
+        ...prev,
+        codex: null,
+        chatgptdesktop: null,
+      }));
+    },
+    [selectedTool]
+  );
+  const loadCodexAccounts = useCallback(async () => {
+    setIsLoadingCodexAccounts(true);
+    try {
+      const accounts = await api.listCodexAccounts();
+      setCodexAccounts(accounts);
+    } catch (error) {
+      console.error('[AppManager] Failed to load Codex accounts:', error);
+    } finally {
+      setIsLoadingCodexAccounts(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isCodexTool) return;
+    let ignore = false;
+    void api
+      .listCodexAccounts()
+      .then((accounts) => {
+        if (ignore) return;
+        setCodexAccounts(accounts);
+        const currentModel = selectedTool ? toolModelConfig[selectedTool] : null;
+        if (!currentModel) {
+          setSelectedCodexAccountIdRaw((current) => {
+            if (current && accounts.some((account) => account.id === current)) return current;
+            return accounts.find((account) => account.active)?.id ?? null;
+          });
+        }
+      })
+      .catch((error) => console.error('[AppManager] Failed to load Codex accounts:', error));
+    return () => {
+      ignore = true;
+    };
+  }, [isCodexTool, selectedTool, toolModelConfig]);
+
+  const captureCurrentCodexAccount = useCallback(async () => {
+    setIsLoadingCodexAccounts(true);
+    try {
+      const captured = await api.captureCurrentCodexAccount();
+      await loadCodexAccounts();
+      selectCodexAccount(captured.id);
+    } catch (error) {
+      setApplyError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsLoadingCodexAccounts(false);
+    }
+  }, [loadCodexAccounts, selectCodexAccount]);
+
+  const deleteCodexAccount = useCallback(
+    async (account: CodexAccount) => {
+      const approved = await confirm({
+        title: t('agent.deleteAccountTitle'),
+        message: t('agent.deleteAccountConfirm').replace('{email}', account.email),
+        confirmText: t('btn.delete'),
+        type: 'danger',
+      });
+      if (!approved) return;
+      try {
+        await api.deleteCodexAccount(account.id);
+        setSelectedCodexAccountIdRaw((current) => (current === account.id ? null : current));
+        await loadCodexAccounts();
+      } catch (error) {
+        setApplyError(error instanceof Error ? error.message : String(error));
+      }
+    },
+    [confirm, loadCodexAccounts, t]
+  );
+
+  const refreshCodexAccountQuota = useCallback(
+    async (account: CodexAccount) => {
+      if (refreshingCodexAccountId || isLoadingCodexAccounts) return;
+      setRefreshingCodexAccountId(account.id);
+      try {
+        const refreshed = await api.refreshCodexAccountQuota(account.id);
+        setCodexAccounts((current) =>
+          current.map((item) => (item.id === refreshed.id ? refreshed : item))
+        );
+      } catch (error) {
+        setApplyError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setRefreshingCodexAccountId(null);
+      }
+    },
+    [isLoadingCodexAccounts, refreshingCodexAccountId]
+  );
 
   // One-shot "applied!" pulse. When a model config takes effect (via
   // handleLaunch) the just-applied model's card plays the effort pulse once.
@@ -203,18 +314,11 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     setSelectedTool(null);
     setApplyError(null);
   };
-  // Tool model config (single selection - one model per tool)
-  const [toolModelConfig, setToolModelConfig] = useState<Record<string, string | null>>({
-    claudecode: null,
-    openclaw: null,
-    opencode: null,
-    codex: null,
-    hermes: null,
-    zcode: null,
-  });
-
   // Set tool model (single selection) - UI state update
   const handleSelectModel = (toolId: string, modelId: string) => {
+    if (toolId === 'codex' || toolId === 'chatgptdesktop') {
+      setSelectedCodexAccountIdRaw(null);
+    }
     setToolModelConfig((prev) => ({
       ...prev,
       [toolId]: modelId,
@@ -427,10 +531,30 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     const isLaunchable = !!toolData?.launchFile;
     const noModelConfig = !!toolData?.noModelConfig;
 
-    // Write model config to file only when the "apply via official config" checkbox is on.
-    // Launchable tools (e.g. games) always pass config via URL hash, never via file write.
-    // no-model-config tools (e.g. desktop apps) skip config writes entirely.
-    if (!noModelConfig && agreedConfigPolicy && !isLaunchable && toolModelConfig[selectedTool]) {
+    // An OpenAI account and a third-party API model are one exclusive choice.
+    // Selecting an account restores the official provider before writing that
+    // account's auth snapshot; selecting a model clears the account choice.
+    if (isCodexTool && selectedCodexAccountId) {
+      const restoreResult = await applyRestore(selectedTool);
+      if (restoreResult !== true) {
+        setApplyError(typeof restoreResult === 'string' ? restoreResult : t('key.destroyed'));
+        setIsLaunching(false);
+        return;
+      }
+      try {
+        await api.switchCodexAccount(selectedCodexAccountId);
+        await loadCodexAccounts();
+      } catch (error) {
+        setApplyError(error instanceof Error ? error.message : String(error));
+        setIsLaunching(false);
+        return;
+      }
+    } else if (
+      !noModelConfig &&
+      agreedConfigPolicy &&
+      !isLaunchable &&
+      toolModelConfig[selectedTool]
+    ) {
       const pending = toolModelConfig[selectedTool]!;
       const applyResult = isOfficialModelSentinel(pending)
         ? await applyRestore(selectedTool)
@@ -535,6 +659,14 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         toolModelConfig,
         handleSelectModel,
         handleRestoreModel,
+        codexAccounts,
+        selectedCodexAccountId,
+        setSelectedCodexAccountId: selectCodexAccount,
+        isLoadingCodexAccounts,
+        refreshingCodexAccountId,
+        captureCurrentCodexAccount,
+        refreshCodexAccountQuota,
+        deleteCodexAccount,
         selectedToolData,
         applyError,
         setApplyError,

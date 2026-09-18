@@ -23,7 +23,7 @@ mod vibe_trading;
 mod workbuddy;
 mod zcode;
 
-use crate::services::tool_manager;
+use crate::services::{codex_accounts, tool_manager};
 use aider::{apply_aider, read_aider};
 use claudecode::{
     apply_claudecode, normalize_model_info_for_tool, read_claudecode,
@@ -360,7 +360,8 @@ pub async fn restore_tool_to_official(tool_id: &str) -> ApplyResult {
     };
 
     if matches!(tool_id, "codex" | "chatgptdesktop") {
-        return restore_codex_to_official(tool_id, &config_path);
+        let codex_config_path = codex_accounts::codex_home().unwrap_or_default();
+        return restore_codex_to_official(tool_id, &codex_config_path.join("config.toml"));
     }
     if tool_id == "claudedesktop" {
         return restore_claudedesktop_to_official();

@@ -5,6 +5,7 @@ use super::{
     toml_write_table_value, toml_write_table_value_raw, toml_write_top, toml_write_top_raw,
     write_json_file, ApplyResult, ModelInfo,
 };
+use crate::services::codex_accounts;
 use crate::services::codex_catalog;
 use std::fs;
 use std::path::Path;
@@ -157,7 +158,7 @@ fn codex_catalog_referenced(content: &str, our_path: &str) -> bool {
 }
 
 pub(crate) fn apply_codex(tool_id: &str, model_info: &ModelInfo) -> ApplyResult {
-    let codex_dir = dirs::home_dir().unwrap_or_default().join(".codex");
+    let codex_dir = codex_accounts::codex_home().unwrap_or_default();
     let state_dir = echobird_dir();
     apply_codex_at(tool_id, model_info, &codex_dir, &state_dir)
 }
@@ -209,6 +210,40 @@ pub(crate) fn apply_codex_at(
     } else {
         raw_api_key
     };
+
+    // Establish every rollback point before touching Codex's live config. A
+    // failed account snapshot must stop the apply before auth.json changes.
+    let auth_backup_path = state_dir.join("codex-auth.bak.json");
+    if auth_path.exists() && !auth_backup_path.exists() {
+        let existing_auth = match fs::read(&auth_path) {
+            Ok(value) => value,
+            Err(error) => {
+                return ApplyResult {
+                    success: false,
+                    message: format!("Codex auth backup read error: {error}"),
+                };
+            }
+        };
+        ensure_parent(&auth_backup_path);
+        if let Err(error) = fs::write(&auth_backup_path, existing_auth) {
+            return ApplyResult {
+                success: false,
+                message: format!("Codex auth backup write error: {error}"),
+            };
+        }
+    }
+    if codex_accounts::has_effective_oauth_snapshot(&auth_path, &auth_backup_path) {
+        if let Err(error) = codex_accounts::save_effective_snapshot_at(
+            &auth_path,
+            &auth_backup_path,
+            &state_dir.join("codex-accounts"),
+        ) {
+            return ApplyResult {
+                success: false,
+                message: format!("Codex account backup error: {error}"),
+            };
+        }
+    }
 
     // Resolve the real context window for the selected model so Codex writes
     // `model_context_window` / `model_auto_compact_token_limit` matching the
@@ -287,19 +322,6 @@ pub(crate) fn apply_codex_at(
         }
     }
 
-    // Back up any existing auth.json (OAuth-token sign-ins, prior api-key
-    // configs, etc.) before overwriting so restore-to-official can put it
-    // back. We keep one snapshot per session — apply_codex called multiple
-    // times in a row preserves the FIRST snapshot, not the most recent
-    // (which would clobber the original OAuth state with our apikey state).
-    let auth_backup_path = state_dir.join("codex-auth.bak.json");
-    if auth_path.exists() && !auth_backup_path.exists() {
-        if let Ok(existing) = fs::read(&auth_path) {
-            ensure_parent(&auth_backup_path);
-            let _ = fs::write(&auth_backup_path, existing);
-        }
-    }
-
     // Write the api-key auth.json that Codex v0.130+ expects.
     let auth_payload = serde_json::json!({ "OPENAI_API_KEY": api_key });
     ensure_parent(&auth_path);
@@ -336,7 +358,7 @@ pub(crate) fn apply_codex_at(
 }
 
 pub(super) fn read_codex() -> Option<ModelInfo> {
-    let codex_dir = dirs::home_dir()?.join(".codex");
+    let codex_dir = codex_accounts::codex_home().ok()?;
     let content = fs::read_to_string(codex_dir.join("config.toml")).ok()?;
 
     let model_from_toml = toml_read_top(&content, "model");
@@ -458,11 +480,12 @@ pub(super) fn restore_codex_to_official(tool_id: &str, config_path: &Path) -> Ap
                 .unwrap_or(Path::new(""))
                 .join("auth.json");
             let auth_backup_path = echobird_dir().join("codex-auth.bak.json");
-            if auth_backup_path.exists() {
-                if let Ok(bak) = fs::read(&auth_backup_path) {
-                    let _ = fs::write(&auth_path, bak);
-                    let _ = fs::remove_file(&auth_backup_path);
-                }
+            if let Err(error) = codex_accounts::restore_legacy_oauth(&auth_path, &auth_backup_path)
+            {
+                return ApplyResult {
+                    success: false,
+                    message: format!("Failed to restore Codex account: {error}"),
+                };
             }
 
             let relay_path = echobird_dir().join("codex.json");

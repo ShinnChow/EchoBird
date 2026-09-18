@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { ModelConfig, LocalTool } from '../../api/types';
+import type { CodexAccount } from '../../api/tauri';
 
 // ===== Context =====
 
@@ -16,6 +17,14 @@ export interface AppManagerContextType {
   handleSelectModel: (toolId: string, modelId: string) => void;
   /** Restore the tool's config back to its official vendor endpoint */
   handleRestoreModel: (toolId: string) => Promise<void>;
+  codexAccounts: CodexAccount[];
+  selectedCodexAccountId: string | null;
+  setSelectedCodexAccountId: (id: string | null) => void;
+  isLoadingCodexAccounts: boolean;
+  refreshingCodexAccountId: string | null;
+  captureCurrentCodexAccount: () => Promise<void>;
+  refreshCodexAccountQuota: (account: CodexAccount) => Promise<void>;
+  deleteCodexAccount: (account: CodexAccount) => Promise<void>;
   selectedToolData: LocalTool | undefined;
   applyError: string | null;
   setApplyError: (v: string | null) => void;

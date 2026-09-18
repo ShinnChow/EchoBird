@@ -255,6 +255,12 @@ const en: Translations = {
   'toolCat.science': 'Science',
   // Agent Worker tabs
   'agent.modelsTab': 'MODELS',
+  'agent.addCurrentAccount': 'Add current signed-in account',
+  'agent.refreshAccount': 'Refresh account quota',
+  'agent.deleteAccountTitle': 'Delete saved account',
+  'agent.deleteAccountConfirm':
+    'Delete the saved snapshot for {email}? This does not sign out the current app.',
+  'agent.configWarning': 'Configuration warning',
   'agent.codexRelayLabel': 'API Router',
   'agent.codexRelayHint':
     'A data-forwarding scheme provided by an API relay or API Router. Enabling it for a third-party model gives direct, full integration, but Claude may treat it as an "outsider".',

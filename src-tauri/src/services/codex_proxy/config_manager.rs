@@ -10,6 +10,12 @@ const CONFIG_FILENAME: &str = "config.toml";
 const LEGACY_RELAY_FILENAME: &str = "codex.json";
 
 pub fn default_codex_dir() -> Option<PathBuf> {
+    if let Ok(path) = std::env::var("CODEX_HOME") {
+        let path = path.trim().trim_matches('"').trim_matches('\'').trim();
+        if !path.is_empty() {
+            return Some(PathBuf::from(path));
+        }
+    }
     if let Ok(path) = std::env::var("ECHOBIRD_CODEX_CONFIG_DIR") {
         if !path.is_empty() {
             return Some(PathBuf::from(path));

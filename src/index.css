@@ -454,6 +454,42 @@ html.is-macos .page-scroll::-webkit-scrollbar {
   filter: invert(1) brightness(0.88);
 }
 
+/* Account controls use white pills in the light theme and black pills in the
+   dark theme. */
+[data-theme='light'] .account-pill {
+  background: rgb(var(--bg-input-rgb));
+  color: rgb(var(--text-primary-rgb));
+}
+
+[data-theme='dark'] .account-pill {
+  background: rgb(var(--bg-deep-rgb));
+  color: rgb(var(--text-primary-rgb));
+}
+
+.account-pill .text-cyber-bg {
+  color: rgb(var(--text-primary-rgb));
+}
+
+.account-pill .border-cyber-bg {
+  border-color: rgb(var(--text-primary-rgb));
+}
+
+.account-pill .bg-cyber-bg {
+  background-color: rgb(var(--text-primary-rgb));
+}
+
+.account-pill .bg-cyber-bg\/20 {
+  background-color: rgb(var(--text-primary-rgb) / 0.2);
+}
+
+[data-theme='light'] img.codex-account-button-icon {
+  filter: invert(1) brightness(0.18);
+}
+
+[data-theme='dark'] img.codex-account-button-icon {
+  filter: none;
+}
+
 /* Logos with near-black backgrounds invert in dark mode so they read on
    the near-black page. */
 [data-theme='dark'] img[src*='/icons/models/yi.svg'],

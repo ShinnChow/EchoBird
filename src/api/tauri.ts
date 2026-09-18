@@ -41,6 +41,34 @@ export async function restoreToolToOfficial(
   return invoke('restore_tool_to_official', { toolId });
 }
 
+export interface CodexAccount {
+  id: string;
+  email: string;
+  plan?: string;
+  quotaPercent?: number | null;
+  active: boolean;
+}
+
+export async function listCodexAccounts(): Promise<CodexAccount[]> {
+  return invoke('list_codex_accounts');
+}
+
+export async function captureCurrentCodexAccount(): Promise<CodexAccount> {
+  return invoke('capture_current_codex_account');
+}
+
+export async function switchCodexAccount(accountId: string): Promise<CodexAccount> {
+  return invoke('switch_codex_account', { accountId });
+}
+
+export async function refreshCodexAccountQuota(accountId: string): Promise<CodexAccount> {
+  return invoke('refresh_codex_account_quota', { accountId });
+}
+
+export async function deleteCodexAccount(accountId: string): Promise<void> {
+  return invoke('delete_codex_account', { accountId });
+}
+
 // ─── Process APIs ───
 
 export async function startTool(

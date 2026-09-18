@@ -4,6 +4,7 @@ pub mod ai_career;
 pub mod anthropic_proxy;
 pub mod auto_fix;
 pub mod bundled_assets;
+pub mod codex_accounts;
 pub mod codex_catalog;
 #[path = "codex_proxy/mod.rs"]
 pub mod codex_runtime;

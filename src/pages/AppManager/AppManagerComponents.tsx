@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   PointerSensor,
@@ -22,8 +22,10 @@ import {
   Server as ServerIcon,
   Box as BoxIcon,
   ExternalLink,
+  LoaderCircle,
   RefreshCw,
   Settings,
+  Trash2,
 } from 'lucide-react';
 import { getModelIcon, EffortPulse } from '../../components';
 import { useI18n } from '../../hooks/useI18n';
@@ -675,7 +677,9 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
   };
 
   // Official-endpoint card — first item, like cc-switch's "Claude Official"
-  const official = selectedTool ? getOfficialEndpoint(selectedTool) : undefined;
+  const accountReplacesOfficial = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
+  const official =
+    selectedTool && !accountReplacesOfficial ? getOfficialEndpoint(selectedTool) : undefined;
   const officialSentinel = selectedTool ? officialModelSentinel(selectedTool) : '';
   const isOfficialPending = !!(selectedTool && toolModelConfig[selectedTool] === officialSentinel);
 
@@ -775,6 +779,166 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
       {official && renderOfficialCard(official)}
       {cloudModels.map((model) => renderModelCard(model))}
     </div>
+  );
+};
+
+export const CodexAccountSection: React.FC = () => {
+  const { t } = useI18n();
+  const {
+    codexAccounts,
+    selectedCodexAccountId,
+    setSelectedCodexAccountId,
+    isLoadingCodexAccounts,
+    refreshingCodexAccountId,
+    captureCurrentCodexAccount,
+    refreshCodexAccountQuota,
+    deleteCodexAccount,
+  } = useAppManager();
+
+  return (
+    <section className="mb-3 border-b border-cyber-border pb-3">
+      <button
+        type="button"
+        onClick={() => void captureCurrentCodexAccount()}
+        disabled={isLoadingCodexAccounts}
+        className="account-pill mb-2 flex h-12 w-full items-center justify-center gap-2 rounded-full px-3 text-base font-bold transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-50"
+      >
+        <img src="/icons/tools/codex.svg" alt="" className="codex-account-button-icon h-5 w-5" />
+        {t('agent.addCurrentAccount')}
+      </button>
+      {codexAccounts.length > 0 && (
+        <div className="space-y-2">
+          {codexAccounts.map((account) => {
+            const selected = selectedCodexAccountId === account.id;
+            const isRefreshing = refreshingCodexAccountId === account.id;
+            const normalizedPlan = account.plan?.trim().toLowerCase().replace(/[-_]/g, ' ') ?? '';
+            const planLabel = ['pro', 'prolite', 'pro lite'].includes(normalizedPlan)
+              ? 'Pro 5X'
+              : normalizedPlan.replace(/\b\w/g, (letter) => letter.toUpperCase());
+            return (
+              <div
+                key={account.id}
+                role="radio"
+                aria-checked={selected}
+                tabIndex={0}
+                onClick={() => setSelectedCodexAccountId(account.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelectedCodexAccountId(account.id);
+                  }
+                }}
+                className="account-pill grid h-12 cursor-pointer grid-cols-[16px_minmax(0,1fr)_44px] items-center gap-2 rounded-full border border-transparent px-3 transition-opacity hover:opacity-90"
+              >
+                <span
+                  className="flex h-[16px] w-[16px] flex-shrink-0 items-center justify-center rounded-full border-2 border-cyber-bg"
+                  aria-hidden="true"
+                >
+                  {selected && <span className="h-[8px] w-[8px] rounded-full bg-cyber-bg" />}
+                </span>
+                <span className="grid min-w-0 auto-rows-[16px] items-center">
+                  <span className="block truncate text-[13px] font-semibold leading-[16px] text-cyber-bg">
+                    {account.email}
+                  </span>
+                  <span className="flex h-[16px] items-center gap-1.5">
+                    <span className="h-1.5 min-w-0 max-w-[130px] flex-1 overflow-hidden rounded-full bg-cyber-bg/20">
+                      <span
+                        className="block h-full rounded-full bg-cyber-bg"
+                        style={{ width: `${account.quotaPercent ?? 0}%` }}
+                      />
+                    </span>
+                    <span className="flex-shrink-0 text-[12px] font-semibold leading-[16px] text-cyber-bg">
+                      {account.quotaPercent ?? 0}%
+                    </span>
+                  </span>
+                </span>
+                <span className="grid auto-rows-[16px] items-center justify-items-center">
+                  {planLabel && (
+                    <span className="whitespace-nowrap text-[12px] font-semibold leading-[16px] text-cyber-bg">
+                      {planLabel}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1.5">
+                    <AccountIconButton
+                      label={t('agent.refreshAccount')}
+                      ariaLabel={`${t('agent.refreshAccount')} ${account.email}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void refreshCodexAccountQuota(account);
+                      }}
+                    >
+                      {isRefreshing ? (
+                        <LoaderCircle size={12} className="animate-spin" aria-hidden="true" />
+                      ) : (
+                        <RefreshCw size={12} aria-hidden="true" />
+                      )}
+                    </AccountIconButton>
+                    <AccountIconButton
+                      label={t('btn.delete')}
+                      ariaLabel={`${t('btn.delete')} ${account.email}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void deleteCodexAccount(account);
+                      }}
+                    >
+                      <Trash2 size={11} aria-hidden="true" />
+                    </AccountIconButton>
+                  </span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+};
+
+interface AccountIconButtonProps {
+  label: string;
+  ariaLabel: string;
+  disabled?: boolean;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  children: React.ReactNode;
+}
+
+const AccountIconButton: React.FC<AccountIconButtonProps> = ({
+  label,
+  ariaLabel,
+  disabled,
+  onClick,
+  children,
+}) => {
+  const [open, setOpen] = useState(false);
+  const tooltipId = useId();
+  return (
+    <span
+      className="relative inline-flex"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        aria-describedby={open ? tooltipId : undefined}
+        disabled={disabled}
+        onClick={onClick}
+        className="flex h-5 w-5 items-center justify-center rounded-full text-cyber-bg transition-opacity hover:bg-cyber-bg/10 disabled:cursor-wait disabled:opacity-40"
+      >
+        {children}
+      </button>
+      <span
+        id={tooltipId}
+        role="tooltip"
+        className={`pointer-events-none absolute bottom-full left-1/2 z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded border border-cyber-border bg-cyber-elevated px-2 py-1 text-[10px] leading-none text-cyber-text shadow-cyber-card transition-opacity ${
+          open ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        {label}
+      </span>
+    </span>
   );
 };
 
@@ -896,6 +1060,7 @@ export const AppManagerPanel: React.FC = () => {
   // already budget the full window, so [1m] would be moot) and for Claude
   // Desktop (its 1M support comes from the backend profile in bridge mode).
   const show1mToggle = isClaudeCodeApp && claudeCodeRelayMode;
+  const showCodexAccounts = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
 
   return (
     <>
@@ -987,6 +1152,7 @@ export const AppManagerPanel: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-2 h-full">
+              {showCodexAccounts && <CodexAccountSection />}
               <ModelListSection
                 selectedToolData={selectedToolData}
                 userModels={userModels}
@@ -1021,6 +1187,7 @@ export const AppManagerBottom: React.FC = () => {
     selectedTool,
     selectedToolData,
     toolModelConfig,
+    selectedCodexAccountId,
     launchAfterApply,
     setLaunchAfterApply,
     isLaunching,
@@ -1039,12 +1206,15 @@ export const AppManagerBottom: React.FC = () => {
   const isInstallAction = isUninstalled || (activePage === 'apps' && viewMode === 'install');
   const isBuiltInApp = selectedTool === 'reversi' || selectedTool === 'translator';
   const hasModelSelected = !!(selectedTool && toolModelConfig[selectedTool]);
+  const hasAccountSelected =
+    (selectedTool === 'codex' || selectedTool === 'chatgptdesktop') && !!selectedCodexAccountId;
   // What will a click actually do?
   //  - "Apply" runs only when the user picked a model AND agreed to the config-write policy.
   //  - "Launch" runs whenever launchAfterApply is on, or unconditionally for desktop/no-config apps.
   // Many tools already work out of the box, so launching without picking a model must stay enabled —
   // forcing model selection just to start a CLI was the long-standing bug.
-  const willApply = !noModelConfig && agreedConfigPolicy && hasModelSelected;
+  const willApply =
+    hasAccountSelected || (!noModelConfig && agreedConfigPolicy && hasModelSelected);
   const willLaunch = launchAfterApply || noModelConfig;
   const buttonDisabled =
     !selectedToolData || isLaunching || (!isUninstalled && !willApply && !willLaunch);
@@ -1251,7 +1421,7 @@ export const AppManagerErrorModal: React.FC = () => {
             <line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
           <span className="text-sm font-mono font-bold tracking-wider text-red-400">
-            API Key Warning
+            {t('agent.configWarning')}
           </span>
         </div>
         <div className="px-5 pb-5">
