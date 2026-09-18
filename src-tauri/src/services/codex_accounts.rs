@@ -158,10 +158,47 @@ async fn request_usage(
     if let Some(account_id) = account_id.filter(|value| !value.is_empty()) {
         request = request.header("ChatGPT-Account-Id", account_id);
     }
-    request
-        .send()
-        .await
-        .map_err(|error| format!("Quota request failed: {error}"))
+    request.send().await.map_err(|error| {
+        if error.is_timeout() {
+            "Quota refresh timed out. Check your network or proxy settings.".to_string()
+        } else if error.is_connect() {
+            "Unable to reach the quota service. Check your network or proxy settings.".to_string()
+        } else {
+            "Quota refresh could not be completed. Check your network or proxy settings."
+                .to_string()
+        }
+    })
+}
+
+fn quota_response_detail(body: &Value) -> Option<String> {
+    let detail = body
+        .get("error")
+        .and_then(|error| {
+            error
+                .as_str()
+                .or_else(|| error.get("code").and_then(Value::as_str))
+                .or_else(|| error.get("message").and_then(Value::as_str))
+        })
+        .or_else(|| body.get("message").and_then(Value::as_str))?;
+    let detail = detail.trim();
+    if detail.is_empty() {
+        return None;
+    }
+    Some(detail.chars().take(96).collect())
+}
+
+fn quota_http_error(status: u16, body: &Value) -> String {
+    let message = match status {
+        401 => "Quota authentication expired. Refresh the account or sign in again.",
+        403 => "Quota access was denied for this account.",
+        429 => "Quota service rate limited the request. Try again later.",
+        500..=599 => "Quota service is temporarily unavailable. Try again later.",
+        _ => "Quota request failed.",
+    };
+    match quota_response_detail(body) {
+        Some(detail) => format!("{message} (HTTP {status}: {detail})"),
+        None => format!("{message} (HTTP {status})"),
+    }
 }
 
 fn non_empty_string(value: Option<&Value>) -> Option<String> {
@@ -871,10 +908,7 @@ pub async fn refresh_account_quota(account_id: &str) -> Result<CodexAccountSumma
         .await
         .map_err(|error| format!("Quota response was invalid: {error}"))?;
     if !status.is_success() {
-        return Err(format!(
-            "Quota request failed with HTTP {}",
-            status.as_u16()
-        ));
+        return Err(quota_http_error(status.as_u16(), &body));
     }
     let plan = non_empty_string(body.get("plan_type")).or_else(|| metadata.plan.clone());
     let mut quota_percent = quota_percent_from_usage(&body)?;

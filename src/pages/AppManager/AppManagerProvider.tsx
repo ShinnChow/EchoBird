@@ -18,6 +18,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog';
 // icon — a model counts as MiMo when its name/modelId contains xiaomi / 小米 / mimo.
 const MIMO_KEYS = ['xiaomi', '小米', 'mimo'];
 const CODEX_OAUTH_TIMEOUT_SECONDS = 60;
+const MAX_CONCURRENT_CODEX_QUOTA_REFRESHES = 5;
 const isMimoModel = (m?: ModelConfig): boolean => {
   if (!m) return false;
   const text = `${m.name} ${m.modelId || ''}`.toLowerCase();
@@ -106,7 +107,10 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const [isLoadingCodexAccounts, setIsLoadingCodexAccounts] = useState(false);
   const [isAddingCodexAccount, setIsAddingCodexAccount] = useState(false);
   const [codexOAuthRemainingSeconds, setCodexOAuthRemainingSeconds] = useState(0);
-  const [refreshingCodexAccountId, setRefreshingCodexAccountId] = useState<string | null>(null);
+  const [refreshingCodexAccountIds, setRefreshingCodexAccountIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const refreshingCodexAccountIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!isAddingCodexAccount) return;
@@ -212,20 +216,33 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
 
   const refreshCodexAccountQuota = useCallback(
     async (account: CodexAccount) => {
-      if (refreshingCodexAccountId || isLoadingCodexAccounts) return;
-      setRefreshingCodexAccountId(account.id);
+      const refreshing = refreshingCodexAccountIdsRef.current;
+      if (
+        isLoadingCodexAccounts ||
+        refreshing.has(account.id) ||
+        refreshing.size >= MAX_CONCURRENT_CODEX_QUOTA_REFRESHES
+      )
+        return;
+      refreshing.add(account.id);
+      setRefreshingCodexAccountIds(new Set(refreshing));
       try {
         const refreshed = await api.refreshCodexAccountQuota(account.id);
         setCodexAccounts((current) =>
           current.map((item) => (item.id === refreshed.id ? refreshed : item))
         );
       } catch (error) {
-        setApplyError(error instanceof Error ? error.message : String(error));
+        const message = error instanceof Error ? error.message : String(error);
+        setApplyError(
+          t('agent.refreshAccountFailed')
+            .replace('{email}', account.email)
+            .replace('{error}', message)
+        );
       } finally {
-        setRefreshingCodexAccountId(null);
+        refreshing.delete(account.id);
+        setRefreshingCodexAccountIds(new Set(refreshing));
       }
     },
-    [isLoadingCodexAccounts, refreshingCodexAccountId]
+    [isLoadingCodexAccounts, setApplyError, t]
   );
 
   // One-shot "applied!" pulse. When a model config takes effect (via
@@ -682,7 +699,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         isLoadingCodexAccounts,
         isAddingCodexAccount,
         codexOAuthRemainingSeconds,
-        refreshingCodexAccountId,
+        refreshingCodexAccountIds,
         addCodexAccount,
         refreshCodexAccountQuota,
         deleteCodexAccount,

@@ -832,7 +832,7 @@ export const CodexAccountSection: React.FC<{ showDivider?: boolean }> = ({
     isLoadingCodexAccounts,
     isAddingCodexAccount,
     codexOAuthRemainingSeconds,
-    refreshingCodexAccountId,
+    refreshingCodexAccountIds,
     addCodexAccount,
     refreshCodexAccountQuota,
     deleteCodexAccount,
@@ -862,7 +862,7 @@ export const CodexAccountSection: React.FC<{ showDivider?: boolean }> = ({
         <div className="space-y-2">
           {codexAccounts.map((account) => {
             const selected = selectedCodexAccountId === account.id;
-            const isRefreshing = refreshingCodexAccountId === account.id;
+            const isRefreshing = refreshingCodexAccountIds.has(account.id);
             const normalizedPlan = account.plan?.trim().toLowerCase().replace(/[-_]/g, ' ') ?? '';
             const planLabel = ['pro', 'prolite', 'pro lite'].includes(normalizedPlan)
               ? 'Pro 5X'

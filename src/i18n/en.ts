@@ -258,6 +258,7 @@ const en: Translations = {
   'agent.addCurrentAccount': 'Add Account',
   'agent.waitingForBrowser': 'Waiting for browser ({seconds})',
   'agent.refreshAccount': 'Refresh account quota',
+  'agent.refreshAccountFailed': 'Failed to refresh quota for {email}: {error}',
   'agent.deleteAccountTitle': 'Delete saved account',
   'agent.deleteAccountConfirm':
     'Delete the saved snapshot for {email}? This does not sign out the current app.',

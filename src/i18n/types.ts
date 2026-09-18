@@ -209,6 +209,7 @@ export type TKey =
   | 'agent.addCurrentAccount'
   | 'agent.waitingForBrowser'
   | 'agent.refreshAccount'
+  | 'agent.refreshAccountFailed'
   | 'agent.deleteAccountTitle'
   | 'agent.deleteAccountConfirm'
   | 'agent.configWarning'

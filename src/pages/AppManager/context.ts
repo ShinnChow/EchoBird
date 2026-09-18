@@ -23,7 +23,7 @@ export interface AppManagerContextType {
   isLoadingCodexAccounts: boolean;
   isAddingCodexAccount: boolean;
   codexOAuthRemainingSeconds: number;
-  refreshingCodexAccountId: string | null;
+  refreshingCodexAccountIds: Set<string>;
   addCodexAccount: () => Promise<void>;
   refreshCodexAccountQuota: (account: CodexAccount) => Promise<void>;
   deleteCodexAccount: (account: CodexAccount) => Promise<void>;

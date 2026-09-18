@@ -254,6 +254,7 @@ const ja: Partial<Translations> = {
   'agent.addCurrentAccount': 'アカウントを追加',
   'agent.waitingForBrowser': 'ブラウザ操作を待機中({seconds})',
   'agent.refreshAccount': 'アカウントの使用量を更新',
+  'agent.refreshAccountFailed': '{email} の使用量更新に失敗しました: {error}',
   'agent.deleteAccountTitle': '保存済みアカウントを削除',
   'agent.deleteAccountConfirm':
     '{email} のローカルスナップショットを削除しますか？現在のアプリはログアウトされません。',
