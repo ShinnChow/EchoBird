@@ -478,6 +478,21 @@ interface ModelListSectionProps {
   t: (key: TKey) => string;
 }
 
+function isModelCompatibleWithTool(
+  model: ModelConfig,
+  toolProtocols: string[],
+  selectedTool: string | null
+): boolean {
+  const requiresResponses = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
+  const isChatOnlyLocalEndpoint =
+    model.internalId === 'local-server' || model.internalId === 'smart-router';
+  if (requiresResponses && isChatOnlyLocalEndpoint) return false;
+
+  const hasOpenAI = toolProtocols.includes('openai') && !!model.baseUrl;
+  const hasAnthropic = toolProtocols.includes('anthropic') && !!model.anthropicUrl;
+  return hasOpenAI || hasAnthropic;
+}
+
 // The coral "effort pulse" played once on a model card the instant its config
 // is applied (生效). It OVERLAYS the card (z-20, above the model info) and fills
 // it, so for its ~11s it obscures the icon / name / URL, plays, then dissolves to
@@ -524,16 +539,9 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
   );
 
   const { smartRouterModels, localModels, cloudModels } = useMemo(() => {
-    const compatible = userModels.filter((model) => {
-      const requiresResponses = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
-      const isChatOnlyLocalEndpoint =
-        model.internalId === 'local-server' || model.internalId === 'smart-router';
-      if (requiresResponses && isChatOnlyLocalEndpoint) return false;
-
-      const hasOpenAI = toolProtocols.includes('openai') && !!model.baseUrl;
-      const hasAnthropic = toolProtocols.includes('anthropic') && !!model.anthropicUrl;
-      return hasOpenAI || hasAnthropic;
-    });
+    const compatible = userModels.filter((model) =>
+      isModelCompatibleWithTool(model, toolProtocols, selectedTool)
+    );
     return {
       smartRouterModels: compatible.filter((m) => m.internalId === 'smart-router'),
       localModels: compatible.filter((m) => m.internalId === 'local-server'),
@@ -813,7 +821,9 @@ const QuotaCountdown: React.FC<{ resetAt?: number | null }> = ({ resetAt }) => {
   );
 };
 
-export const CodexAccountSection: React.FC = () => {
+export const CodexAccountSection: React.FC<{ showDivider?: boolean }> = ({
+  showDivider = true,
+}) => {
   const { t } = useI18n();
   const {
     codexAccounts,
@@ -827,7 +837,7 @@ export const CodexAccountSection: React.FC = () => {
   } = useAppManager();
 
   return (
-    <section className="mb-3 border-b border-cyber-border pb-3">
+    <section className={showDivider ? 'mb-3 border-b border-cyber-border pb-3' : undefined}>
       <button
         type="button"
         onClick={() => void addCodexAccount()}
@@ -1071,6 +1081,10 @@ export const AppManagerPanel: React.FC = () => {
   // Desktop (its 1M support comes from the backend profile in bridge mode).
   const show1mToggle = isClaudeCodeApp && claudeCodeRelayMode;
   const showCodexAccounts = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
+  const selectedToolProtocols = selectedToolData?.apiProtocol || ['openai', 'anthropic'];
+  const hasVisibleModels = userModels.some((model) =>
+    isModelCompatibleWithTool(model, selectedToolProtocols, selectedTool)
+  );
 
   return (
     <>
@@ -1162,7 +1176,7 @@ export const AppManagerPanel: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-2 h-full">
-              {showCodexAccounts && <CodexAccountSection />}
+              {showCodexAccounts && <CodexAccountSection showDivider={hasVisibleModels} />}
               <ModelListSection
                 selectedToolData={selectedToolData}
                 userModels={userModels}

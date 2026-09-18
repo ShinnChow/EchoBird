@@ -120,7 +120,7 @@ describe('CodexAccountSection', () => {
 
     const markup = renderToStaticMarkup(
       <AppManagerContext.Provider value={context as AppManagerContextType}>
-        <CodexAccountSection />
+        <CodexAccountSection showDivider={false} />
       </AppManagerContext.Provider>
     );
 
@@ -130,6 +130,7 @@ describe('CodexAccountSection', () => {
     expect(markup).toContain('aria-checked="true"');
     expect(markup).toContain('agent.refreshAccount');
     expect(markup).not.toContain('role="tooltip"');
+    expect(markup).not.toContain('border-b');
   });
 });
 
