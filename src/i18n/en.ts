@@ -255,7 +255,7 @@ const en: Translations = {
   'toolCat.science': 'Science',
   // Agent Worker tabs
   'agent.modelsTab': 'MODELS',
-  'agent.addCurrentAccount': 'Add account',
+  'agent.addCurrentAccount': 'Add Account',
   'agent.refreshAccount': 'Refresh account quota',
   'agent.deleteAccountTitle': 'Delete saved account',
   'agent.deleteAccountConfirm':
