@@ -21,6 +21,8 @@ export interface AppManagerContextType {
   selectedCodexAccountId: string | null;
   setSelectedCodexAccountId: (id: string | null) => void;
   isLoadingCodexAccounts: boolean;
+  isAddingCodexAccount: boolean;
+  codexOAuthRemainingSeconds: number;
   refreshingCodexAccountId: string | null;
   addCodexAccount: () => Promise<void>;
   refreshCodexAccountQuota: (account: CodexAccount) => Promise<void>;

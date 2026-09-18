@@ -830,6 +830,8 @@ export const CodexAccountSection: React.FC<{ showDivider?: boolean }> = ({
     selectedCodexAccountId,
     setSelectedCodexAccountId,
     isLoadingCodexAccounts,
+    isAddingCodexAccount,
+    codexOAuthRemainingSeconds,
     refreshingCodexAccountId,
     addCodexAccount,
     refreshCodexAccountQuota,
@@ -841,12 +843,19 @@ export const CodexAccountSection: React.FC<{ showDivider?: boolean }> = ({
       <button
         type="button"
         onClick={() => void addCodexAccount()}
-        disabled={isLoadingCodexAccounts}
+        disabled={isLoadingCodexAccounts || isAddingCodexAccount}
         className="account-pill mb-2 flex h-12 w-full items-center justify-center rounded-full px-3 text-[17px] font-bold leading-6 transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-50"
       >
         <span className="flex translate-y-px items-center gap-2.5">
           <img src="/icons/tools/codex.svg" alt="" className="codex-account-button-icon h-6 w-6" />
-          <span>{t('agent.addCurrentAccount')}</span>
+          <span>
+            {isAddingCodexAccount
+              ? t('agent.waitingForBrowser').replace(
+                  '{seconds}',
+                  String(codexOAuthRemainingSeconds)
+                )
+              : t('agent.addCurrentAccount')}
+          </span>
         </span>
       </button>
       {codexAccounts.length > 0 && (

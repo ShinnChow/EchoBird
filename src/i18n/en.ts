@@ -256,6 +256,7 @@ const en: Translations = {
   // Agent Worker tabs
   'agent.modelsTab': 'MODELS',
   'agent.addCurrentAccount': 'Add Account',
+  'agent.waitingForBrowser': 'Waiting for browser ({seconds})',
   'agent.refreshAccount': 'Refresh account quota',
   'agent.deleteAccountTitle': 'Delete saved account',
   'agent.deleteAccountConfirm':

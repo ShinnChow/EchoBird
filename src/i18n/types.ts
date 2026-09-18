@@ -207,6 +207,7 @@ export type TKey =
   | 'agent.noModelConfig'
   | 'agent.modelsTab'
   | 'agent.addCurrentAccount'
+  | 'agent.waitingForBrowser'
   | 'agent.refreshAccount'
   | 'agent.deleteAccountTitle'
   | 'agent.deleteAccountConfirm'

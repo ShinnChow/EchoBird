@@ -21,7 +21,7 @@ const OAUTH_FALLBACK_REDIRECT_PORT: u16 = 1457;
 const OAUTH_REDIRECT_PATH: &str = "/auth/callback";
 const OAUTH_SCOPES: &str =
     "openid profile email offline_access api.connectors.read api.connectors.invoke";
-const OAUTH_TIMEOUT_SECONDS: u64 = 300;
+const OAUTH_TIMEOUT_SECONDS: u64 = 60;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

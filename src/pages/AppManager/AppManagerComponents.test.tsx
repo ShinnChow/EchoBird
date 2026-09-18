@@ -112,6 +112,8 @@ describe('CodexAccountSection', () => {
       selectedCodexAccountId: 'account-1',
       setSelectedCodexAccountId: () => {},
       isLoadingCodexAccounts: false,
+      isAddingCodexAccount: false,
+      codexOAuthRemainingSeconds: 0,
       refreshingCodexAccountId: null,
       addCodexAccount: async () => {},
       refreshCodexAccountQuota: async () => {},

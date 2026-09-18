@@ -245,6 +245,7 @@ const zhHant: Partial<Translations> = {
   'toolCat.science': '科研',
   'agent.modelsTab': '模型',
   'agent.addCurrentAccount': '新增帳號',
+  'agent.waitingForBrowser': '等待瀏覽器操作({seconds})',
   'agent.refreshAccount': '重新整理帳號額度',
   'agent.deleteAccountTitle': '刪除已儲存帳號',
   'agent.deleteAccountConfirm': '刪除 {email} 的本機快照？目前應用程式不會因此登出。',

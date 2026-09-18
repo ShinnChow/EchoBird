@@ -225,6 +225,7 @@ const zhHans: Partial<Translations> = {
   'toolCat.science': '科研',
   'agent.modelsTab': '模型',
   'agent.addCurrentAccount': '添加账号',
+  'agent.waitingForBrowser': '等待浏览器操作({seconds})',
   'agent.refreshAccount': '刷新账号额度',
   'agent.deleteAccountTitle': '删除已保存账号',
   'agent.deleteAccountConfirm': '删除 {email} 的本地快照？当前应用不会因此退出登录。',

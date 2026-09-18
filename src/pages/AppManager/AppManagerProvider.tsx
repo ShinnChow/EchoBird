@@ -17,6 +17,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog';
 // every other model applies silently. Same keys ModelCard uses for the Xiaomi
 // icon — a model counts as MiMo when its name/modelId contains xiaomi / 小米 / mimo.
 const MIMO_KEYS = ['xiaomi', '小米', 'mimo'];
+const CODEX_OAUTH_TIMEOUT_SECONDS = 60;
 const isMimoModel = (m?: ModelConfig): boolean => {
   if (!m) return false;
   const text = `${m.name} ${m.modelId || ''}`.toLowerCase();
@@ -103,7 +104,20 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const [codexAccounts, setCodexAccounts] = useState<CodexAccount[]>([]);
   const [selectedCodexAccountId, setSelectedCodexAccountIdRaw] = useState<string | null>(null);
   const [isLoadingCodexAccounts, setIsLoadingCodexAccounts] = useState(false);
+  const [isAddingCodexAccount, setIsAddingCodexAccount] = useState(false);
+  const [codexOAuthRemainingSeconds, setCodexOAuthRemainingSeconds] = useState(0);
   const [refreshingCodexAccountId, setRefreshingCodexAccountId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAddingCodexAccount) return;
+    const deadline = Date.now() + CODEX_OAUTH_TIMEOUT_SECONDS * 1000;
+    const update = () => {
+      setCodexOAuthRemainingSeconds(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
+    };
+    update();
+    const timer = setInterval(update, 250);
+    return () => clearInterval(timer);
+  }, [isAddingCodexAccount]);
 
   const isCodexTool = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
   const [toolModelConfig, setToolModelConfig] = useState<Record<string, string | null>>({
@@ -161,6 +175,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   }, [isCodexTool, selectedTool, toolModelConfig]);
 
   const addCodexAccount = useCallback(async () => {
+    setIsAddingCodexAccount(true);
     setIsLoadingCodexAccounts(true);
     try {
       const captured = await api.addCodexAccountViaOAuth();
@@ -169,6 +184,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     } catch (error) {
       setApplyError(error instanceof Error ? error.message : String(error));
     } finally {
+      setIsAddingCodexAccount(false);
+      setCodexOAuthRemainingSeconds(0);
       setIsLoadingCodexAccounts(false);
     }
   }, [loadCodexAccounts, selectCodexAccount]);
@@ -663,6 +680,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         selectedCodexAccountId,
         setSelectedCodexAccountId: selectCodexAccount,
         isLoadingCodexAccounts,
+        isAddingCodexAccount,
+        codexOAuthRemainingSeconds,
         refreshingCodexAccountId,
         addCodexAccount,
         refreshCodexAccountQuota,

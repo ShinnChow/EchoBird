@@ -252,6 +252,7 @@ const ja: Partial<Translations> = {
   'toolCat.science': 'サイエンス',
   'agent.modelsTab': 'モデル',
   'agent.addCurrentAccount': 'アカウントを追加',
+  'agent.waitingForBrowser': 'ブラウザ操作を待機中({seconds})',
   'agent.refreshAccount': 'アカウントの使用量を更新',
   'agent.deleteAccountTitle': '保存済みアカウントを削除',
   'agent.deleteAccountConfirm':
