@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   PointerSensor,
@@ -782,6 +782,37 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
   );
 };
 
+function formatQuotaCountdown(resetAt: number, now: number): string {
+  const minutes = Math.max(0, Math.ceil((resetAt * 1000 - now) / 60_000));
+  if (minutes >= 24 * 60) {
+    const days = Math.floor(minutes / (24 * 60));
+    const hours = Math.floor((minutes % (24 * 60)) / 60);
+    return `${days}d${hours}h`;
+  }
+  if (minutes >= 60) {
+    return `${Math.floor(minutes / 60)}h${minutes % 60}m`;
+  }
+  return `${minutes}m`;
+}
+
+const QuotaCountdown: React.FC<{ resetAt?: number | null }> = ({ resetAt }) => {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    if (!resetAt) return;
+    const initial = setTimeout(() => setNow(Date.now()), 0);
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(timer);
+    };
+  }, [resetAt]);
+  return (
+    <span className="w-[64px] flex-shrink-0 text-center text-[12px] font-semibold leading-[16px] text-cyber-text">
+      {resetAt && now ? formatQuotaCountdown(resetAt, now) : ''}
+    </span>
+  );
+};
+
 export const CodexAccountSection: React.FC = () => {
   const { t } = useI18n();
   const {
@@ -790,7 +821,7 @@ export const CodexAccountSection: React.FC = () => {
     setSelectedCodexAccountId,
     isLoadingCodexAccounts,
     refreshingCodexAccountId,
-    captureCurrentCodexAccount,
+    addCodexAccount,
     refreshCodexAccountQuota,
     deleteCodexAccount,
   } = useAppManager();
@@ -799,12 +830,14 @@ export const CodexAccountSection: React.FC = () => {
     <section className="mb-3 border-b border-cyber-border pb-3">
       <button
         type="button"
-        onClick={() => void captureCurrentCodexAccount()}
+        onClick={() => void addCodexAccount()}
         disabled={isLoadingCodexAccounts}
-        className="account-pill mb-2 flex h-12 w-full items-center justify-center gap-2 rounded-full px-3 text-base font-bold transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-50"
+        className="account-pill mb-2 flex h-12 w-full items-center justify-center rounded-full px-3 text-[17px] font-bold leading-6 transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-50"
       >
-        <img src="/icons/tools/codex.svg" alt="" className="codex-account-button-icon h-5 w-5" />
-        {t('agent.addCurrentAccount')}
+        <span className="flex translate-y-px items-center gap-2.5">
+          <img src="/icons/tools/codex.svg" alt="" className="codex-account-button-icon h-6 w-6" />
+          <span>{t('agent.addCurrentAccount')}</span>
+        </span>
       </button>
       {codexAccounts.length > 0 && (
         <div className="space-y-2">
@@ -837,30 +870,30 @@ export const CodexAccountSection: React.FC = () => {
                   {selected && <span className="h-[8px] w-[8px] rounded-full bg-cyber-bg" />}
                 </span>
                 <span className="grid min-w-0 auto-rows-[16px] items-center">
-                  <span className="block truncate text-[13px] font-semibold leading-[16px] text-cyber-bg">
+                  <span className="block truncate text-[13px] font-semibold leading-[16px] text-cyber-text">
                     {account.email}
                   </span>
-                  <span className="flex h-[16px] items-center gap-1.5">
-                    <span className="h-1.5 min-w-0 max-w-[130px] flex-1 overflow-hidden rounded-full bg-cyber-bg/20">
+                  <span className="flex h-[16px] items-center justify-between">
+                    <span className="h-1.5 min-w-0 max-w-[80px] flex-1 overflow-hidden rounded-full bg-cyber-border">
                       <span
                         className="block h-full rounded-full bg-cyber-bg"
                         style={{ width: `${account.quotaPercent ?? 0}%` }}
                       />
                     </span>
-                    <span className="flex-shrink-0 text-[12px] font-semibold leading-[16px] text-cyber-bg">
+                    <span className="w-[30px] flex-shrink-0 text-right text-[12px] font-semibold leading-[16px] text-cyber-text">
                       {account.quotaPercent ?? 0}%
                     </span>
+                    <QuotaCountdown resetAt={account.quotaResetAt} />
                   </span>
                 </span>
                 <span className="grid auto-rows-[16px] items-center justify-items-center">
                   {planLabel && (
-                    <span className="whitespace-nowrap text-[12px] font-semibold leading-[16px] text-cyber-bg">
+                    <span className="whitespace-nowrap text-[12px] font-semibold leading-[16px] text-cyber-text">
                       {planLabel}
                     </span>
                   )}
                   <span className="flex items-center gap-1.5">
                     <AccountIconButton
-                      label={t('agent.refreshAccount')}
                       ariaLabel={`${t('agent.refreshAccount')} ${account.email}`}
                       onClick={(event) => {
                         event.stopPropagation();
@@ -874,7 +907,6 @@ export const CodexAccountSection: React.FC = () => {
                       )}
                     </AccountIconButton>
                     <AccountIconButton
-                      label={t('btn.delete')}
                       ariaLabel={`${t('btn.delete')} ${account.email}`}
                       onClick={(event) => {
                         event.stopPropagation();
@@ -895,7 +927,6 @@ export const CodexAccountSection: React.FC = () => {
 };
 
 interface AccountIconButtonProps {
-  label: string;
   ariaLabel: string;
   disabled?: boolean;
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
@@ -903,42 +934,21 @@ interface AccountIconButtonProps {
 }
 
 const AccountIconButton: React.FC<AccountIconButtonProps> = ({
-  label,
   ariaLabel,
   disabled,
   onClick,
   children,
 }) => {
-  const [open, setOpen] = useState(false);
-  const tooltipId = useId();
   return (
-    <span
-      className="relative inline-flex"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
-      onBlur={() => setOpen(false)}
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={onClick}
+      className="account-icon-button flex h-5 w-5 items-center justify-center rounded-full transition-colors disabled:cursor-wait disabled:opacity-40"
     >
-      <button
-        type="button"
-        aria-label={ariaLabel}
-        aria-describedby={open ? tooltipId : undefined}
-        disabled={disabled}
-        onClick={onClick}
-        className="flex h-5 w-5 items-center justify-center rounded-full text-cyber-bg transition-opacity hover:bg-cyber-bg/10 disabled:cursor-wait disabled:opacity-40"
-      >
-        {children}
-      </button>
-      <span
-        id={tooltipId}
-        role="tooltip"
-        className={`pointer-events-none absolute bottom-full left-1/2 z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded border border-cyber-border bg-cyber-elevated px-2 py-1 text-[10px] leading-none text-cyber-text shadow-cyber-card transition-opacity ${
-          open ? 'opacity-100' : 'opacity-0'
-        }`}
-      >
-        {label}
-      </span>
-    </span>
+      {children}
+    </button>
   );
 };
 

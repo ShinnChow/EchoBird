@@ -105,6 +105,7 @@ describe('CodexAccountSection', () => {
           email: 'first@example.com',
           plan: 'prolite',
           quotaPercent: 32,
+          quotaResetAt: 1_800_000_000,
           active: true,
         },
       ],
@@ -112,7 +113,7 @@ describe('CodexAccountSection', () => {
       setSelectedCodexAccountId: () => {},
       isLoadingCodexAccounts: false,
       refreshingCodexAccountId: null,
-      captureCurrentCodexAccount: async () => {},
+      addCodexAccount: async () => {},
       refreshCodexAccountQuota: async () => {},
       deleteCodexAccount: async () => {},
     };
@@ -128,7 +129,7 @@ describe('CodexAccountSection', () => {
     expect(markup).toContain('32%');
     expect(markup).toContain('aria-checked="true"');
     expect(markup).toContain('agent.refreshAccount');
-    expect((markup.match(/role="tooltip"/g) || []).length).toBe(2);
+    expect(markup).not.toContain('role="tooltip"');
   });
 });
 

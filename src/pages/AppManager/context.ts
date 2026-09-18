@@ -22,7 +22,7 @@ export interface AppManagerContextType {
   setSelectedCodexAccountId: (id: string | null) => void;
   isLoadingCodexAccounts: boolean;
   refreshingCodexAccountId: string | null;
-  captureCurrentCodexAccount: () => Promise<void>;
+  addCodexAccount: () => Promise<void>;
   refreshCodexAccountQuota: (account: CodexAccount) => Promise<void>;
   deleteCodexAccount: (account: CodexAccount) => Promise<void>;
   selectedToolData: LocalTool | undefined;

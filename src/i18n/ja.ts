@@ -251,7 +251,7 @@ const ja: Partial<Translations> = {
   'toolCat.utility': 'ユーティリティ',
   'toolCat.science': 'サイエンス',
   'agent.modelsTab': 'モデル',
-  'agent.addCurrentAccount': '現在ログイン中のアカウントを追加',
+  'agent.addCurrentAccount': 'アカウントを追加',
   'agent.refreshAccount': 'アカウントの使用量を更新',
   'agent.deleteAccountTitle': '保存済みアカウントを削除',
   'agent.deleteAccountConfirm':

@@ -151,6 +151,13 @@ pub fn capture_current_codex_account() -> Result<CodexAccountSummary, String> {
 }
 
 #[tauri::command]
+pub async fn add_codex_account_via_oauth(
+    app_handle: tauri::AppHandle,
+) -> Result<CodexAccountSummary, String> {
+    codex_accounts::add_account_via_oauth(app_handle).await
+}
+
+#[tauri::command]
 pub fn switch_codex_account(account_id: String) -> Result<CodexAccountSummary, String> {
     codex_accounts::switch_account(&account_id)
 }

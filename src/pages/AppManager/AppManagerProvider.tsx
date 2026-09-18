@@ -160,10 +160,10 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     };
   }, [isCodexTool, selectedTool, toolModelConfig]);
 
-  const captureCurrentCodexAccount = useCallback(async () => {
+  const addCodexAccount = useCallback(async () => {
     setIsLoadingCodexAccounts(true);
     try {
-      const captured = await api.captureCurrentCodexAccount();
+      const captured = await api.addCodexAccountViaOAuth();
       await loadCodexAccounts();
       selectCodexAccount(captured.id);
     } catch (error) {
@@ -664,7 +664,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         setSelectedCodexAccountId: selectCodexAccount,
         isLoadingCodexAccounts,
         refreshingCodexAccountId,
-        captureCurrentCodexAccount,
+        addCodexAccount,
         refreshCodexAccountQuota,
         deleteCodexAccount,
         selectedToolData,

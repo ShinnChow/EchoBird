@@ -454,40 +454,62 @@ html.is-macos .page-scroll::-webkit-scrollbar {
   filter: invert(1) brightness(0.88);
 }
 
-/* Account controls use white pills in the light theme and black pills in the
-   dark theme. */
+/* Account pills use a compact inverse black/white treatment. Keep every
+   child tied to the pill's current color so icons remain visible on hover. */
 [data-theme='light'] .account-pill {
-  background: rgb(var(--bg-input-rgb));
-  color: rgb(var(--text-primary-rgb));
+  background-color: #ffffff;
+  color: #000000;
 }
 
 [data-theme='dark'] .account-pill {
-  background: rgb(var(--bg-deep-rgb));
-  color: rgb(var(--text-primary-rgb));
+  background-color: #000000;
+  color: #ffffff;
 }
 
-.account-pill .text-cyber-bg {
-  color: rgb(var(--text-primary-rgb));
+.account-pill .text-cyber-text {
+  color: currentColor;
+}
+
+.account-pill .text-cyber-text-secondary {
+  color: currentColor;
+  opacity: 0.72;
 }
 
 .account-pill .border-cyber-bg {
-  border-color: rgb(var(--text-primary-rgb));
+  border-color: currentColor;
 }
 
 .account-pill .bg-cyber-bg {
-  background-color: rgb(var(--text-primary-rgb));
+  background-color: currentColor;
 }
 
-.account-pill .bg-cyber-bg\/20 {
-  background-color: rgb(var(--text-primary-rgb) / 0.2);
+.account-pill .bg-cyber-border {
+  background-color: currentColor;
 }
 
-[data-theme='light'] img.codex-account-button-icon {
-  filter: invert(1) brightness(0.18);
+[data-theme='light'] .account-pill .bg-cyber-border {
+  background-color: rgb(0 0 0 / 0.22);
 }
 
-[data-theme='dark'] img.codex-account-button-icon {
-  filter: none;
+[data-theme='dark'] .account-pill .bg-cyber-border {
+  background-color: rgb(255 255 255 / 0.22);
+}
+
+.account-pill .account-icon-button {
+  color: currentColor;
+  opacity: 0.72;
+}
+
+[data-theme='light'] .account-pill .account-icon-button:hover {
+  background-color: rgb(0 0 0 / 0.1);
+  color: #000000;
+  opacity: 1;
+}
+
+[data-theme='dark'] .account-pill .account-icon-button:hover {
+  background-color: rgb(255 255 255 / 0.12);
+  color: #ffffff;
+  opacity: 1;
 }
 
 /* Logos with near-black backgrounds invert in dark mode so they read on

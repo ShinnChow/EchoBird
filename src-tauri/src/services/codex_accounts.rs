@@ -4,12 +4,24 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
+use tauri::AppHandle;
+use tauri_plugin_shell::ShellExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpListener;
 
 const LEGACY_BACKUP_FILE: &str = "codex-auth.bak.json";
 #[cfg(target_os = "macos")]
 const KEYCHAIN_SERVICE: &str = "Codex Auth";
 const OAUTH_TOKEN_URL: &str = "https://auth.openai.com/oauth/token";
 const OAUTH_CLIENT_ID: &str = "app_EMoamEEZ73f0CkXaXp7hrann";
+const OAUTH_AUTHORIZE_URL: &str = "https://auth.openai.com/oauth/authorize";
+const OAUTH_HOSTED_AUTH_URL: &str = "https://chatgpt.com/codex/desktop-auth";
+const OAUTH_REDIRECT_PORT: u16 = 1455;
+const OAUTH_FALLBACK_REDIRECT_PORT: u16 = 1457;
+const OAUTH_REDIRECT_PATH: &str = "/auth/callback";
+const OAUTH_SCOPES: &str =
+    "openid profile email offline_access api.connectors.read api.connectors.invoke";
+const OAUTH_TIMEOUT_SECONDS: u64 = 300;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -18,6 +30,7 @@ pub struct CodexAccountSummary {
     pub email: String,
     pub plan: Option<String>,
     pub quota_percent: Option<i32>,
+    pub quota_reset_at: Option<i64>,
     pub active: bool,
 }
 
@@ -33,7 +46,11 @@ struct AccountMetadata {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AccountQuotaCache {
+    #[serde(default)]
     quota_percent: Option<i32>,
+    #[serde(default)]
+    quota_reset_at: Option<i64>,
+    #[serde(default)]
     plan: Option<String>,
 }
 
@@ -377,18 +394,28 @@ fn build_summary(
     }
     CodexAccountSummary {
         active: active_id == Some(metadata.id.as_str()),
-        quota_percent: quota.and_then(|cache| cache.quota_percent),
+        quota_percent: quota.as_ref().and_then(|cache| cache.quota_percent),
+        quota_reset_at: quota.and_then(|cache| cache.quota_reset_at),
         id: metadata.id,
         email: metadata.email,
         plan: metadata.plan,
     }
 }
 
+fn quota_window_from_usage(body: &Value) -> Option<&Value> {
+    let rate_limit = body.get("rate_limit")?;
+    rate_limit
+        .get("secondary_window")
+        .filter(|window| !window.is_null())
+        .or_else(|| {
+            rate_limit
+                .get("primary_window")
+                .filter(|window| !window.is_null())
+        })
+}
+
 fn quota_percent_from_usage(body: &Value) -> Result<Option<i32>, String> {
-    let Some(window) = body
-        .get("rate_limit")
-        .and_then(|rate_limit| rate_limit.get("secondary_window"))
-    else {
+    let Some(window) = quota_window_from_usage(body) else {
         return Ok(None);
     };
     let used = [
@@ -412,6 +439,37 @@ fn quota_percent_from_usage(body: &Value) -> Result<Option<i32>, String> {
     .iter()
     .find_map(|key| window.get(*key).and_then(Value::as_f64));
     Ok(remaining.map(|value| value.round().clamp(0.0, 100.0) as i32))
+}
+
+fn quota_reset_at_from_usage(body: &Value) -> Option<i64> {
+    let window = quota_window_from_usage(body)?;
+    let normalize = |mut value: i64| {
+        if value > 1_000_000_000_000 {
+            value /= 1000;
+        }
+        value
+    };
+    if let Some(value) = window
+        .get("reset_at")
+        .or_else(|| window.get("resetAt"))
+        .and_then(|value| {
+            value
+                .as_i64()
+                .or_else(|| value.as_str().and_then(|text| text.parse().ok()))
+        })
+    {
+        return Some(normalize(value));
+    }
+    window
+        .get("reset_after_seconds")
+        .or_else(|| window.get("resetAfterSeconds"))
+        .and_then(|value| {
+            value
+                .as_i64()
+                .or_else(|| value.as_str().and_then(|text| text.parse().ok()))
+        })
+        .filter(|value| *value >= 0)
+        .map(|value| chrono::Utc::now().timestamp() + value)
 }
 
 pub(crate) fn save_effective_snapshot_at(
@@ -441,6 +499,198 @@ fn valid_account_id(account_id: &str) -> bool {
         && account_id
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn base64url(bytes: &[u8]) -> String {
+    use base64::Engine as _;
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+}
+
+fn random_token() -> String {
+    let mut bytes = [0u8; 32];
+    rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut bytes);
+    base64url(&bytes)
+}
+
+fn build_oauth_url(redirect_uri: &str, state: &str, code_challenge: &str) -> String {
+    let mut inner_query = url::form_urlencoded::Serializer::new(String::new());
+    inner_query.append_pair("response_type", "code");
+    inner_query.append_pair("client_id", OAUTH_CLIENT_ID);
+    inner_query.append_pair("redirect_uri", redirect_uri);
+    inner_query.append_pair("scope", OAUTH_SCOPES);
+    inner_query.append_pair("code_challenge", code_challenge);
+    inner_query.append_pair("code_challenge_method", "S256");
+    inner_query.append_pair("id_token_add_organizations", "true");
+    inner_query.append_pair("codex_cli_simplified_flow", "true");
+    inner_query.append_pair("codex_streamlined_login", "true");
+    inner_query.append_pair("state", state);
+    inner_query.append_pair("originator", "Codex Desktop");
+    let inner_url = format!("{OAUTH_AUTHORIZE_URL}?{}", inner_query.finish());
+
+    let mut hosted_query = url::form_urlencoded::Serializer::new(String::new());
+    hosted_query.append_pair("authorize_url", &inner_url);
+    hosted_query.append_pair("codex_streamlined_login", "true");
+    hosted_query.append_pair("no_universal_links", "1");
+    format!("{OAUTH_HOSTED_AUTH_URL}?{}", hosted_query.finish())
+}
+
+#[allow(deprecated)]
+fn open_browser(app_handle: &AppHandle, url: &str) -> Result<(), String> {
+    app_handle
+        .shell()
+        .open(url, None)
+        .map_err(|error| format!("Failed to open the authorization page: {error}"))
+}
+
+fn callback_response(status: &str, body: &str) -> Vec<u8> {
+    format!(
+        "HTTP/1.1 {status}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len(),
+    )
+    .into_bytes()
+}
+
+fn parse_callback_request(request: &str) -> Result<(String, String), String> {
+    let line = request
+        .lines()
+        .next()
+        .ok_or_else(|| "OAuth callback request was empty".to_string())?;
+    let target = line
+        .strip_prefix("GET ")
+        .and_then(|value| value.split_whitespace().next())
+        .ok_or_else(|| "OAuth callback request was invalid".to_string())?;
+    let url = url::Url::parse(&format!("http://localhost{target}"))
+        .map_err(|error| format!("OAuth callback URL was invalid: {error}"))?;
+    if url.path() != OAUTH_REDIRECT_PATH {
+        return Err("OAuth callback path was invalid".to_string());
+    }
+    let params = url
+        .query_pairs()
+        .into_owned()
+        .collect::<std::collections::HashMap<_, _>>();
+    let state = params
+        .get("state")
+        .cloned()
+        .ok_or_else(|| "OAuth callback did not include state".to_string())?;
+    let code = params
+        .get("code")
+        .cloned()
+        .ok_or_else(|| "OAuth callback did not include code".to_string())?;
+    Ok((state, code))
+}
+
+async fn exchange_oauth_code(
+    code: &str,
+    verifier: &str,
+    redirect_uri: &str,
+) -> Result<Value, String> {
+    let response = reqwest::Client::new()
+        .post("https://auth.openai.com/oauth/token")
+        .form(&[
+            ("grant_type", "authorization_code"),
+            ("code", code),
+            ("redirect_uri", redirect_uri),
+            ("client_id", OAUTH_CLIENT_ID),
+            ("code_verifier", verifier),
+        ])
+        .send()
+        .await
+        .map_err(|error| format!("OAuth token exchange failed: {error}"))?;
+    let status = response.status();
+    let body: Value = response
+        .json()
+        .await
+        .map_err(|error| format!("OAuth token response was invalid: {error}"))?;
+    if !status.is_success() {
+        return Err(format!(
+            "OAuth token exchange failed with HTTP {}",
+            status.as_u16()
+        ));
+    }
+    Ok(body)
+}
+
+fn store_oauth_token_response(token_response: &Value) -> Result<CodexAccountSummary, String> {
+    let access_token = non_empty_string(token_response.get("access_token"))
+        .ok_or_else(|| "OAuth token response has no access token".to_string())?;
+    let id_token = non_empty_string(token_response.get("id_token"))
+        .ok_or_else(|| "OAuth token response has no id token".to_string())?;
+    let refresh_token = non_empty_string(token_response.get("refresh_token"));
+    let auth = serde_json::json!({
+        "auth_mode": "chatgpt",
+        "tokens": {
+            "id_token": id_token,
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "account_id": Value::Null,
+        }
+    });
+    let raw = serde_json::to_vec_pretty(&auth)
+        .map_err(|error| format!("Failed to encode OAuth account: {error}"))?;
+    let metadata = save_snapshot(&raw, &auth, &account_store_dir()?)?;
+    Ok(build_summary(metadata, None, &account_store_dir()?))
+}
+
+pub async fn add_account_via_oauth(app_handle: AppHandle) -> Result<CodexAccountSummary, String> {
+    let verifier = random_token();
+    let challenge = base64url(&Sha256::digest(verifier.as_bytes()));
+    let state = random_token();
+    let mut listener = None;
+    for port in [OAUTH_REDIRECT_PORT, OAUTH_FALLBACK_REDIRECT_PORT] {
+        if let Ok(candidate) = TcpListener::bind(("127.0.0.1", port)).await {
+            listener = Some(candidate);
+            break;
+        }
+    }
+    let listener = listener.ok_or_else(|| {
+        format!(
+            "OAuth callback ports {} and {} are already in use",
+            OAUTH_REDIRECT_PORT, OAUTH_FALLBACK_REDIRECT_PORT
+        )
+    })?;
+    let port = listener
+        .local_addr()
+        .map_err(|error| format!("Could not read OAuth callback port: {error}"))?
+        .port();
+    let redirect_uri = format!("http://localhost:{port}{OAUTH_REDIRECT_PATH}");
+    let auth_url = build_oauth_url(&redirect_uri, &state, &challenge);
+    open_browser(&app_handle, &auth_url)?;
+
+    let (mut stream, _) = tokio::time::timeout(
+        std::time::Duration::from_secs(OAUTH_TIMEOUT_SECONDS),
+        listener.accept(),
+    )
+    .await
+    .map_err(|_| "OAuth login timed out".to_string())?
+    .map_err(|error| format!("OAuth callback listener failed: {error}"))?;
+    let mut request = vec![0u8; 8192];
+    let size = stream
+        .read(&mut request)
+        .await
+        .map_err(|error| format!("Could not read OAuth callback: {error}"))?;
+    let callback = parse_callback_request(&String::from_utf8_lossy(&request[..size]));
+    let (callback_state, code) = match callback {
+        Ok(value) if value.0 == state => value,
+        Ok(_) => {
+            let _ = stream
+                .write_all(&callback_response("400 Bad Request", "State mismatch"))
+                .await;
+            return Err("OAuth state mismatch".to_string());
+        }
+        Err(error) => {
+            let _ = stream
+                .write_all(&callback_response("400 Bad Request", &error))
+                .await;
+            return Err(error);
+        }
+    };
+    let _ = callback_state;
+    stream
+        .write_all(&callback_response("200 OK", "<html><body><h2>Authorization complete</h2><p>You can close this window.</p></body></html>"))
+        .await
+        .map_err(|error| format!("Could not respond to OAuth callback: {error}"))?;
+    let token_response = exchange_oauth_code(&code, &verifier, &redirect_uri).await?;
+    store_oauth_token_response(&token_response)
 }
 
 fn list_accounts_at(
@@ -626,16 +876,29 @@ pub async fn refresh_account_quota(account_id: &str) -> Result<CodexAccountSumma
             status.as_u16()
         ));
     }
+    let plan = non_empty_string(body.get("plan_type")).or_else(|| metadata.plan.clone());
     let mut quota_percent = quota_percent_from_usage(&body)?;
+    if quota_percent.is_none()
+        && plan
+            .as_deref()
+            .is_some_and(|value| value.eq_ignore_ascii_case("free"))
+    {
+        quota_percent = Some(100);
+    }
+    let mut quota_reset_at = quota_reset_at_from_usage(&body);
     if quota_percent.is_none() {
         quota_percent =
             read_quota_cache(&store_dir, account_id).and_then(|cache| cache.quota_percent);
     }
-    let plan = non_empty_string(body.get("plan_type"));
+    if quota_reset_at.is_none() {
+        quota_reset_at =
+            read_quota_cache(&store_dir, account_id).and_then(|cache| cache.quota_reset_at);
+    }
     write_private_file(
         &quota_path(&store_dir, account_id),
         serde_json::to_string(&serde_json::json!({
             "quotaPercent": quota_percent,
+            "quotaResetAt": quota_reset_at,
             "plan": plan,
         }))
         .map_err(|error| format!("Failed to encode quota: {error}"))?
@@ -710,6 +973,7 @@ mod tests {
         assert_eq!(first.email, "first@example.com");
         assert_eq!(first.plan.as_deref(), Some("pro"));
         assert_eq!(first.quota_percent, None);
+        assert_eq!(first.quota_reset_at, None);
         assert_eq!(fs::read_dir(&store_dir).unwrap().count(), 1);
         let stored = fs::read_to_string(store_dir.join(format!("{}.json", first.id))).unwrap();
         assert!(stored.contains("refresh-2"));
@@ -767,10 +1031,69 @@ mod tests {
     }
 
     #[test]
-    fn missing_weekly_window_is_not_an_error() {
+    fn primary_window_is_used_when_weekly_window_is_missing() {
         let body = json!({
-            "rate_limit": { "primary_window": { "used_percent": 10 } }
+            "rate_limit": {
+                "primary_window": {
+                    "used_percent": 10,
+                    "reset_after_seconds": 3600
+                },
+                "secondary_window": null
+            }
         });
-        assert_eq!(quota_percent_from_usage(&body).unwrap(), None);
+        assert_eq!(quota_percent_from_usage(&body).unwrap(), Some(90));
+        assert!(quota_reset_at_from_usage(&body).is_some());
+    }
+
+    #[test]
+    fn free_account_can_report_full_weekly_quota_and_reset() {
+        let body = json!({
+            "rate_limit": {
+                "secondary_window": {
+                    "used_percent": 0,
+                    "reset_at": 1_800_000_000
+                }
+            }
+        });
+        assert_eq!(quota_percent_from_usage(&body).unwrap(), Some(100));
+        assert_eq!(quota_reset_at_from_usage(&body), Some(1_800_000_000));
+    }
+
+    #[test]
+    fn oauth_url_uses_the_official_hosted_login_wrapper() {
+        let url = url::Url::parse(&build_oauth_url(
+            "http://localhost:1455/auth/callback",
+            "state",
+            "challenge",
+        ))
+        .unwrap();
+        assert_eq!(url.host_str(), Some("chatgpt.com"));
+        assert_eq!(url.path(), "/codex/desktop-auth");
+        assert_eq!(
+            url.query_pairs()
+                .find(|(key, _)| key == "codex_streamlined_login")
+                .map(|(_, value)| value.into_owned()),
+            Some("true".to_string())
+        );
+        let inner = url
+            .query_pairs()
+            .find(|(key, _)| key == "authorize_url")
+            .and_then(|(_, value)| url::Url::parse(&value).ok())
+            .unwrap();
+        assert_eq!(inner.host_str(), Some("auth.openai.com"));
+        assert_eq!(
+            inner
+                .query_pairs()
+                .find(|(key, _)| key == "redirect_uri")
+                .map(|(_, value)| value.into_owned()),
+            Some("http://localhost:1455/auth/callback".to_string())
+        );
+        assert_eq!(
+            inner
+                .query_pairs()
+                .find(|(key, _)| key == "codex_streamlined_login")
+                .map(|(_, value)| value.into_owned()),
+            Some("true".to_string())
+        );
     }
 }

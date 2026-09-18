@@ -46,6 +46,7 @@ export interface CodexAccount {
   email: string;
   plan?: string;
   quotaPercent?: number | null;
+  quotaResetAt?: number | null;
   active: boolean;
 }
 
@@ -55,6 +56,10 @@ export async function listCodexAccounts(): Promise<CodexAccount[]> {
 
 export async function captureCurrentCodexAccount(): Promise<CodexAccount> {
   return invoke('capture_current_codex_account');
+}
+
+export async function addCodexAccountViaOAuth(): Promise<CodexAccount> {
+  return invoke('add_codex_account_via_oauth');
 }
 
 export async function switchCodexAccount(accountId: string): Promise<CodexAccount> {

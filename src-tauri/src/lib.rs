@@ -944,6 +944,7 @@ pub fn run() {
             tool_commands::restore_tool_to_official,
             tool_commands::list_codex_accounts,
             tool_commands::capture_current_codex_account,
+            tool_commands::add_codex_account_via_oauth,
             tool_commands::switch_codex_account,
             tool_commands::refresh_codex_account_quota,
             tool_commands::delete_codex_account,
