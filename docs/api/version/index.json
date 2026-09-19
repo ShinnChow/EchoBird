@@ -1,6 +1,6 @@
 {
-  "version": "5.7.3",
-  "releaseDate": "2026-09-14",
+  "version": "5.7.4",
+  "releaseDate": "2026-09-19",
   "releaseNotes": "ChatGPT 账号切换、模型列表与桌面工具支持全面升级！\n\n## 新增\n\n- 应用桌面支持保存、添加、切换、刷新和删除 ChatGPT / Codex OAuth 账号，显示套餐、额度和 OAuth 倒计时。\n- Windows 支持识别和启动 Claude Science。\n\n## 优化与修复\n\n- 右侧模型列表显示用量余额或百分比，并可直接刷新、编辑和删除模型；模型中心与应用桌面保持同步。\n- 精简模型列表交互，移除没有实际价值的协议切换入口。\n- 移除 Trae / Trae CN 工具及其安装资源。\n- 加固 Codex 历史记录合并、账号 token 刷新和 Responses 配置。",
   "releaseNotesI18n": {
     "zh-cn": "ChatGPT 账号切换、模型列表与桌面工具支持全面升级！\n\n## 新增\n\n- 应用桌面支持保存、添加、切换、刷新和删除 ChatGPT / Codex OAuth 账号，显示套餐、额度和 OAuth 倒计时。\n- Windows 支持识别和启动 Claude Science。\n\n## 优化与修复\n\n- 右侧模型列表显示用量余额或百分比，并可直接刷新、编辑和删除模型；模型中心与应用桌面保持同步。\n- 精简模型列表交互，移除没有实际价值的协议切换入口。\n- 移除 Trae / Trae CN 工具及其安装资源。\n- 加固 Codex 历史记录合并、账号 token 刷新和 Responses 配置。",
