@@ -259,3 +259,31 @@ describe('PageAwareHint', () => {
     expect(markup).not.toContain('hint.responsesRequired');
   });
 });
+
+describe('Claude Desktop 1M control', () => {
+  it.each([false, true])('shows the independent switch with API Router=%s', async (relay) => {
+    const { AppManagerPanel } = await import('./AppManagerComponents');
+    const { ModelNexusContext } = await import('../ModelNexus/context');
+    const { ConfirmDialogProvider } = await import('../../components/ConfirmDialog');
+    const context = {
+      selectedTool: 'claudedesktop',
+      selectedToolData: null,
+      userModels: [],
+      claudeDesktopRelayMode: relay,
+      claudeDesktop1mMode: true,
+      claude1mMode: false,
+      claudeCodeAccounts: { selectedId: null },
+    } as unknown as AppManagerContextType;
+    const markup = renderToStaticMarkup(
+      <ConfirmDialogProvider>
+        <ModelNexusContext.Provider value={{} as React.ContextType<typeof ModelNexusContext>}>
+          <AppManagerContext.Provider value={context}>
+            <AppManagerPanel />
+          </AppManagerContext.Provider>
+        </ModelNexusContext.Provider>
+      </ConfirmDialogProvider>
+    );
+    expect(markup).toMatch(/aria-checked="true" aria-label="1M"/);
+    expect(markup).toContain('agent.claude1mHint');
+  });
+});

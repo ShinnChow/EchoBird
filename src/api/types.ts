@@ -127,7 +127,8 @@ export interface ApplyModelInput {
    * `ANTHROPIC_DEFAULT_HAIKU_MODEL` and `CLAUDE_CODE_SUBAGENT_MODEL` never
    * get the suffix — no 1M concept. No effect in bridge mode (bridge writes
    * no model id — CC uses its built-in claude-* ids, which already budget the
-   * full window). Other tools ignore this field.
+   * full window). Claude Desktop uses this as prefer1m in either routing mode.
+   * Other tools ignore this field.
    */
   oneMContext?: boolean;
 }

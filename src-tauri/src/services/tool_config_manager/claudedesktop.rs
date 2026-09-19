@@ -223,19 +223,8 @@ pub(super) fn apply_claudedesktop(model_info: &ModelInfo) -> ApplyResult {
     } else {
         "claude-opus-5"
     };
-    // 1M context: Claude Desktop expresses the long-context variant via a
-    // `supports1m: true` flag on the model entry — NOT a `[1m]` name suffix
-    // (Desktop's profile schema rejects the suffix). This flag is exactly what
-    // Desktop's "Offer 1M-context variant" UI toggle sets; the name stays the
-    // plain id. Set in BOTH routing modes. In bridge mode the entry name is
-    // the canonical claude-* id and every request passes our proxy, which
-    // strips any `[1m]` the client attaches. In relay mode Desktop talks to
-    // the third-party upstream directly with the real model id; but Desktop's
-    // 1M variant is itself a secondary, user-selected pick inside Desktop, so
-    // `<real-id>[1m]` only reaches the upstream when the user explicitly
-    // chooses it there (mirroring Desktop's native behavior). We just
-    // advertise support; whether to actually send `[1m]` is the user's call.
-    //
+    // Offer the 1M variant in both routing modes. prefer1m selects it by default
+    // without changing the model ID or adding a [1m] suffix.
     // We deliberately do NOT set `anthropicFamilyTier` / `isFamilyDefault`.
     // They were added to try to make the 1M variant the default, which turned
     // out to be an unfixable Desktop-side bug. Worse, hardcoding a tier
@@ -253,6 +242,10 @@ pub(super) fn apply_claudedesktop(model_info: &ModelInfo) -> ApplyResult {
         serde_json::Value::String(real_model_id.to_string()),
     );
     model_entry.insert("supports1m".to_string(), serde_json::Value::Bool(true));
+    model_entry.insert(
+        "prefer1m".to_string(),
+        serde_json::Value::Bool(model_info.one_m_context.unwrap_or(false)),
+    );
     let model_entry = serde_json::Value::Object(model_entry);
     let profile = serde_json::json!({
         "disableDeploymentModeChooser": true,

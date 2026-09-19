@@ -357,6 +357,9 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const [claude1mMode, setClaude1mModeRaw] = useState<boolean>(() =>
     readBool('echobird_claudecode_1m_mode', false)
   );
+  const [claudeDesktop1mMode, setClaudeDesktop1mModeRaw] = useState<boolean>(() =>
+    readBool('echobird_claudedesktop_1m_mode', false)
+  );
   const [viewMode, setViewModeRaw] = useState<'desktop' | 'install'>('desktop');
   const setViewMode = (mode: 'desktop' | 'install') => {
     if (mode === viewMode) return;
@@ -445,10 +448,10 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     const isRelayCapableApp = isClaudeApp;
     const currentRelayMode = isClaudeDesktopApp ? claudeDesktopRelayMode : claudeCodeRelayMode;
     const effectiveRelay = isClaudeApp ? (relayOverride ?? currentRelayMode) : false;
-    // 1M context — Claude Code relay-only. Guard on effectiveRelay so the
-    // flag is never sent for bridge applies (bridge writes no model id, so
-    // [1m] would be moot anyway — keeps the field semantically relay-only).
-    const effective1m = isClaudeCodeApp && effectiveRelay && (oneMOverride ?? claude1mMode);
+    // Desktop controls prefer1m in either routing mode; Code remains relay-only.
+    const effective1m = isClaudeDesktopApp
+      ? (oneMOverride ?? claudeDesktop1mMode)
+      : isClaudeCodeApp && effectiveRelay && (oneMOverride ?? claude1mMode);
 
     try {
       const result = await api.applyModelToTool(toolId, {
@@ -459,7 +462,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         model: model.modelId || '',
         protocol: selectedProtocol,
         ...(isRelayCapableApp ? { relayMode: effectiveRelay } : {}),
-        ...(isClaudeCodeApp ? { oneMContext: effective1m } : {}),
+        ...(isClaudeApp ? { oneMContext: effective1m } : {}),
       });
 
       if (result?.success) {
@@ -497,7 +500,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     },
     // (applyModelConfig stays excluded — it's recreated every render.)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [toolModelConfig, t, userModels]
+    [toolModelConfig, t, userModels, claudeDesktop1mMode]
   );
 
   // Claude Code relay-mode setter — mirrors setClaudeDesktopRelayMode but
@@ -546,6 +549,22 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     // the user's API Router setting.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [toolModelConfig, t, userModels, claudeCodeRelayMode]
+  );
+
+  const setClaudeDesktop1mMode = useCallback(
+    (v: boolean) => {
+      setClaudeDesktop1mModeRaw(v);
+      writeBool('echobird_claudedesktop_1m_mode', v);
+      const pendingInternalId = toolModelConfig['claudedesktop'];
+      if (!pendingInternalId || isOfficialModelSentinel(pendingInternalId)) return;
+      void applyModelConfig('claudedesktop', pendingInternalId, undefined, v).then((result) => {
+        if (result !== true) {
+          setApplyError(typeof result === 'string' ? result : t('key.destroyed'));
+        }
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [toolModelConfig, t, userModels, claudeDesktopRelayMode]
   );
 
   // Restore = delete the tool's config file. The tool itself regenerates
@@ -757,6 +776,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         setClaudeDesktopRelayMode,
         claudeCodeRelayMode,
         setClaudeCodeRelayMode,
+        claudeDesktop1mMode,
+        setClaudeDesktop1mMode,
         claude1mMode,
         setClaude1mMode,
         appliedPulse,

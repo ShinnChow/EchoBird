@@ -1,5 +1,6 @@
 import { ClaudeCodeAccountSection } from './ClaudeCodeAccountSection';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   DndContext,
   PointerSensor,
@@ -1017,13 +1018,48 @@ const AccountIconButton: React.FC<AccountIconButtonProps> = ({
 // glyph OR the tooltip itself.
 interface RoutingToggleProps {
   label: string;
-  hint: string;
+  hint?: string;
   checked: boolean;
   onChange: (v: boolean) => void;
 }
 
 function RoutingToggle({ label, hint, checked, onChange }: RoutingToggleProps) {
   const [open, setOpen] = useState(false);
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const tooltipRef = useRef<HTMLSpanElement>(null);
+  const [position, setPosition] = useState<{
+    left: number;
+    top: number;
+    caret: number;
+    above: boolean;
+  } | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const anchor = anchorRef.current?.getBoundingClientRect();
+      const tooltip = tooltipRef.current?.getBoundingClientRect();
+      if (!anchor || !tooltip) return;
+      const left = Math.max(
+        8,
+        Math.min(anchor.right - tooltip.width, window.innerWidth - tooltip.width - 8)
+      );
+      const above = anchor.bottom + 6 + tooltip.height > window.innerHeight - 8;
+      const top = Math.max(8, above ? anchor.top - tooltip.height - 6 : anchor.bottom + 6);
+      setPosition({
+        left,
+        top,
+        above,
+        caret: Math.max(8, Math.min(anchor.left + anchor.width / 2 - left - 4, tooltip.width - 16)),
+      });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open, hint]);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clear any pending close timer on unmount so it can't fire after teardown.
@@ -1036,6 +1072,7 @@ function RoutingToggle({ label, hint, checked, onChange }: RoutingToggleProps) {
 
   const showTip = () => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
+    if (!open) setPosition(null);
     setOpen(true);
   };
   // Small grace delay so moving the pointer from "?" across the gap into the
@@ -1067,31 +1104,48 @@ function RoutingToggle({ label, hint, checked, onChange }: RoutingToggleProps) {
       {/* Help glyph — themed, interactive tooltip (not the native browser one).
           onMouseEnter/Leave on this wrapper covers both the glyph and the
           tooltip (a descendant), so the tooltip stays open while hovered. */}
-      <span
-        className="relative inline-flex items-center"
-        onMouseEnter={showTip}
-        onMouseLeave={scheduleHide}
-      >
+      {hint && (
         <span
-          aria-label={hint}
-          className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-cyber-elevated font-sans text-xs font-medium leading-none text-cyber-text-secondary cursor-help select-none hover:bg-cyber-accent/15 hover:text-cyber-accent transition-colors"
+          ref={anchorRef}
+          className="relative inline-flex items-center"
+          onMouseEnter={showTip}
+          onMouseLeave={scheduleHide}
         >
-          ?
-        </span>
-        <span
-          role="tooltip"
-          className={`absolute right-0 top-full z-[100] mt-1.5 w-72 rounded border border-cyber-accent/40 bg-cyber-elevated px-3 py-2 text-[11px] leading-relaxed text-cyber-text shadow-cyber-card backdrop-blur-sm transition-opacity ${
-            open ? 'opacity-100' : 'pointer-events-none opacity-0'
-          }`}
-        >
-          {/* Caret — rotated square poking up out of the tooltip's top edge. */}
           <span
-            aria-hidden="true"
-            className="absolute -top-1 right-2 h-2 w-2 rotate-45 border-l border-t border-cyber-accent/40 bg-cyber-elevated"
-          />
-          {hint}
+            aria-label={hint}
+            className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-cyber-elevated font-sans text-xs font-medium leading-none text-cyber-text-secondary cursor-help select-none hover:bg-cyber-accent/15 hover:text-cyber-accent transition-colors"
+          >
+            ?
+          </span>
+          {open &&
+            createPortal(
+              <span
+                ref={tooltipRef}
+                role="tooltip"
+                onMouseEnter={showTip}
+                onMouseLeave={scheduleHide}
+                style={{
+                  left: position?.left ?? 0,
+                  top: position?.top ?? 0,
+                  visibility: position ? 'visible' : 'hidden',
+                  width: 'min(288px, calc(100vw - 16px))',
+                  maxHeight: 'calc(100vh - 16px)',
+                }}
+                className="fixed z-[10000] rounded border border-cyber-accent/40 bg-cyber-elevated px-3 py-2 text-[11px] leading-relaxed text-cyber-text shadow-cyber-card backdrop-blur-sm"
+              >
+                <span
+                  aria-hidden="true"
+                  style={{ left: position?.caret ?? 0 }}
+                  className={`absolute h-2 w-2 rotate-45 border-cyber-accent/40 bg-cyber-elevated ${position?.above ? '-bottom-1 border-r border-b' : '-top-1 border-l border-t'}`}
+                />
+                <span className="block overflow-y-auto" style={{ maxHeight: 'calc(100vh - 34px)' }}>
+                  {hint}
+                </span>
+              </span>,
+              document.body
+            )}
         </span>
-      </span>
+      )}
     </div>
   );
 }
@@ -1123,6 +1177,8 @@ export const AppManagerPanel: React.FC = () => {
     claudeCodeRelayMode,
     claudeCodeAccounts,
     setClaudeCodeRelayMode,
+    claudeDesktop1mMode,
+    setClaudeDesktop1mMode,
     claude1mMode,
     setClaude1mMode,
   } = useAppManager();
@@ -1135,11 +1191,9 @@ export const AppManagerPanel: React.FC = () => {
   const showRelayToggle = isClaudeDesktopApp || (isClaudeCodeApp && !claudeCodeAccounts.selectedId);
   const relayModeValue = isClaudeDesktopApp ? claudeDesktopRelayMode : claudeCodeRelayMode;
   const setRelayModeValue = isClaudeDesktopApp ? setClaudeDesktopRelayMode : setClaudeCodeRelayMode;
-  // 1M-context toggle: Claude Code ONLY, and only once API Router is on. Hidden
-  // in bridge mode (bridge writes no model id — CC's built-in claude-* ids
-  // already budget the full window, so [1m] would be moot) and for Claude
-  // Desktop (its 1M support comes from the backend profile in bridge mode).
-  const show1mToggle = isClaudeCodeApp && claudeCodeRelayMode && !claudeCodeAccounts.selectedId;
+  const show1mToggle =
+    isClaudeDesktopApp ||
+    (isClaudeCodeApp && claudeCodeRelayMode && !claudeCodeAccounts.selectedId);
   const showCodexAccounts = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
   const selectedToolProtocols = selectedToolData?.apiProtocol || ['openai', 'anthropic'];
   const hasVisibleModels = userModels.some((model) =>
@@ -1162,8 +1216,8 @@ export const AppManagerPanel: React.FC = () => {
           key="1m"
           label="1M"
           hint={t('agent.claude1mHint')}
-          checked={claude1mMode}
-          onChange={setClaude1mMode}
+          checked={isClaudeDesktopApp ? claudeDesktop1mMode : claude1mMode}
+          onChange={isClaudeDesktopApp ? setClaudeDesktop1mMode : setClaude1mMode}
         />
       )}
     </div>

@@ -47,6 +47,9 @@ export interface AppManagerContextType {
    *  own proxy route + relay file on the backend). */
   claudeCodeRelayMode: boolean;
   setClaudeCodeRelayMode: (v: boolean) => void;
+  /** Desktop profile prefer1m, independent of API Router. */
+  claudeDesktop1mMode: boolean;
+  setClaudeDesktop1mMode: (v: boolean) => void;
   /** Claude Code relay-only 1M-context toggle. When on AND API Router is on,
    *  apply_claudecode appends `[1m]` to the model id (MODEL / OPUS / SONNET / FABLE
    *  env vars only — HAIKU + SUBAGENT stay bare) so Claude Code budgets the
