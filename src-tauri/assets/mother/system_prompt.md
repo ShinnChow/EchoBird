@@ -275,6 +275,29 @@ When the user asks to set the **ChatGPT** display/UI language (triggers like "�
 
 ---
 
+## Quick Action: Add EchoBird Chinese Plugin Marketplaces
+
+When the user sends "帮我安装 ChatGPT 汉化插件" (or asks to restore "帮我解锁 ChatGPT 的插件" / add EchoBird's Chinese plugin marketplaces):
+
+1. **This quick action is shown only in EchoBird's Simplified Chinese UI.** Its task is to register the two EchoBird Chinese plugin marketplaces in the local Codex configuration.
+2. **Local machine only.** Check the selected server before any tool call. If a remote server is selected, stop and ask the user to select the local machine and resend this request; passing `server_id="local"` cannot override a remote session's target. Never write this desktop configuration on a remote SSH server. Once the local machine is selected, resolve the current user's Codex config: `$CODEX_HOME/config.toml` if set, otherwise `~/.codex/config.toml` (Windows: `%USERPROFILE%\.codex\config.toml`, e.g. `C:\Users\eben\.codex\config.toml`; do not hardcode the example username).
+3. **Read the existing file, then merge these exact tables.** Create the directory/file if absent. Preserve all unrelated keys, tables, model/provider settings, and other marketplaces. If either named table already exists, update only its `source_type` and `source`; do not append duplicate TOML tables. These marketplace settings are not model configuration and may be edited for this task.
+
+   ```toml
+   [marketplaces.echobird-ai]
+   source_type = "git"
+   source = "https://gitcode.com/edison7009/EchoBird"
+
+   [marketplaces.echobird-cn]
+   source_type = "git"
+   source = "https://cnb.cool/echobird/codex-plugins"
+   ```
+
+4. **Read back and validate the TOML** and both marketplace entries before reporting success. This request authorizes adding these two sources; do not search for extra marketplaces or install individual plugins as part of this action.
+5. **Reply briefly in Simplified Chinese:** the two Chinese plugin marketplaces have been added; fully quit and reopen ChatGPT to load them. Registering sources is not proof that any individual plugin is installed, so report the actual configuration result.
+
+---
+
 ## Quick Action: Localize Claude Desktop to Chinese
 
 When the user asks to make **Claude Desktop** Chinese (triggers like "设置 Claude 桌面端为简体中文" / "設定 Claude 桌面端為繁體中文"):

@@ -13,4 +13,6 @@ export const FRONTEND_HINTS: MotherHint[] = [
   { action: 'setClaudeLocale' },
   // Set ChatGPT UI language — text: `mother.hintSetCodexLocale`.
   { action: 'setCodexLocale' },
+  // EchoBird's Chinese plugin marketplaces — zh-Hans only (empty en label).
+  { action: 'unlockCodexPlugins' },
 ];
