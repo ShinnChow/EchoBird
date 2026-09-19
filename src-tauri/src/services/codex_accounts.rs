@@ -57,7 +57,7 @@ struct AccountQuotaCache {
 fn echobird_dir() -> Result<PathBuf, String> {
     dirs::home_dir()
         .map(|home| home.join(".echobird"))
-        .ok_or_else(|| "Could not resolve home directory".to_string())
+        .ok_or_else(|| "accountError.home".to_string())
 }
 
 pub(crate) fn codex_home() -> Result<PathBuf, String> {
@@ -69,7 +69,7 @@ pub(crate) fn codex_home() -> Result<PathBuf, String> {
     }
     dirs::home_dir()
         .map(|home| home.join(".codex"))
-        .ok_or_else(|| "Could not resolve home directory".to_string())
+        .ok_or_else(|| "accountError.home".to_string())
 }
 
 fn account_store_dir() -> Result<PathBuf, String> {
@@ -99,7 +99,7 @@ async fn refresh_auth_tokens(auth: &mut Value) -> Result<(), String> {
     let refresh_token = auth
         .get("tokens")
         .and_then(|tokens| non_empty_string(tokens.get("refresh_token")))
-        .ok_or_else(|| "This account has no refresh token".to_string())?;
+        .ok_or_else(|| "accountError.loginRequired".to_string())?;
     let response = reqwest::Client::new()
         .post(OAUTH_TOKEN_URL)
         .header(reqwest::header::ACCEPT, "application/json")
@@ -112,24 +112,21 @@ async fn refresh_auth_tokens(auth: &mut Value) -> Result<(), String> {
         }))
         .send()
         .await
-        .map_err(|error| format!("Token refresh request failed: {error}"))?;
+        .map_err(|error| format!("accountError.network|{error}"))?;
     let status = response.status();
     let body: Value = response
         .json()
         .await
-        .map_err(|error| format!("Token refresh response was invalid: {error}"))?;
+        .map_err(|error| format!("accountError.format|{error}"))?;
     if !status.is_success() {
-        return Err(format!(
-            "Token refresh failed with HTTP {}",
-            status.as_u16()
-        ));
+        return Err(format!("accountError.auth|HTTP {}", status.as_u16()));
     }
     let access_token = non_empty_string(body.get("access_token"))
-        .ok_or_else(|| "Token refresh response has no access token".to_string())?;
+        .ok_or_else(|| "accountError.format".to_string())?;
     let tokens = auth
         .get_mut("tokens")
         .and_then(Value::as_object_mut)
-        .ok_or_else(|| "Saved account has no token object".to_string())?;
+        .ok_or_else(|| "accountError.invalidAccount".to_string())?;
     tokens.insert("access_token".to_string(), Value::String(access_token));
     if let Some(id_token) = non_empty_string(body.get("id_token")) {
         tokens.insert("id_token".to_string(), Value::String(id_token));
@@ -160,12 +157,9 @@ async fn request_usage(
     }
     request.send().await.map_err(|error| {
         if error.is_timeout() {
-            "Quota refresh timed out. Check your network or proxy settings.".to_string()
-        } else if error.is_connect() {
-            "Unable to reach the quota service. Check your network or proxy settings.".to_string()
+            "accountError.quotaTimeout".to_string()
         } else {
-            "Quota refresh could not be completed. Check your network or proxy settings."
-                .to_string()
+            "accountError.network".to_string()
         }
     })
 }
@@ -189,15 +183,15 @@ fn quota_response_detail(body: &Value) -> Option<String> {
 
 fn quota_http_error(status: u16, body: &Value) -> String {
     let message = match status {
-        401 => "Quota authentication expired. Refresh the account or sign in again.",
-        403 => "Quota access was denied for this account.",
-        429 => "Quota service rate limited the request. Try again later.",
-        500..=599 => "Quota service is temporarily unavailable. Try again later.",
-        _ => "Quota request failed.",
+        401 => "accountError.loginRequired",
+        403 => "accountError.denied",
+        429 => "accountError.rateLimited",
+        500..=599 => "accountError.unavailable",
+        _ => "accountError.quota",
     };
     match quota_response_detail(body) {
-        Some(detail) => format!("{message} (HTTP {status}: {detail})"),
-        None => format!("{message} (HTTP {status})"),
+        Some(detail) => format!("{message}|HTTP {status}|{detail}"),
+        None => format!("{message}|HTTP {status}"),
     }
 }
 
@@ -249,7 +243,7 @@ fn read_keychain_raw(base_dir: &Path) -> Result<Option<Vec<u8>>, String> {
         .arg(keychain_account(base_dir))
         .args(["-w"])
         .output()
-        .map_err(|error| format!("Failed to read Codex Keychain: {error}"))?;
+        .map_err(|error| format!("accountError.keychain|{error}"))?;
     if !output.status.success() {
         return Ok(None);
     }
@@ -269,19 +263,19 @@ fn read_keychain_raw(_base_dir: &Path) -> Result<Option<Vec<u8>>, String> {
 #[cfg(target_os = "macos")]
 fn write_keychain_raw(base_dir: &Path, raw: &[u8]) -> Result<(), String> {
     let secret = String::from_utf8(raw.to_vec())
-        .map_err(|error| format!("Codex Keychain payload is not UTF-8: {error}"))?;
+        .map_err(|error| format!("accountError.keychain|{error}"))?;
     let output = std::process::Command::new("security")
         .args(["add-generic-password", "-U", "-s", KEYCHAIN_SERVICE, "-a"])
         .arg(keychain_account(base_dir))
         .arg("-w")
         .arg(&secret)
         .output()
-        .map_err(|error| format!("Failed to write Codex Keychain: {error}"))?;
+        .map_err(|error| format!("accountError.keychain|{error}"))?;
     if output.status.success() {
         Ok(())
     } else {
         Err(format!(
-            "Failed to write Codex Keychain: {}",
+            "accountError.keychain|{}",
             String::from_utf8_lossy(&output.stderr).trim()
         ))
     }
@@ -312,9 +306,7 @@ fn is_oauth_auth(auth: &Value) -> bool {
 
 fn metadata_from_auth(auth: &Value, raw: &[u8]) -> Result<AccountMetadata, String> {
     if !is_oauth_auth(auth) {
-        return Err(
-            "The current Codex credentials are not a signed-in ChatGPT account".to_string(),
-        );
+        return Err("accountError.noAccount".to_string());
     }
 
     let id_payload = token_payload(auth, "id_token");
@@ -375,23 +367,20 @@ fn effective_snapshot(auth_path: &Path, backup_path: &Path) -> Result<(Vec<u8>, 
     if let Some(snapshot) = read_current_oauth_snapshot(auth_path) {
         return Ok(snapshot);
     }
-    read_oauth_snapshot(backup_path).ok_or_else(|| {
-        "No signed-in ChatGPT account was found. Sign in with ChatGPT or Codex first.".to_string()
-    })
+    read_oauth_snapshot(backup_path).ok_or_else(|| "accountError.noAccount".to_string())
 }
 
 fn write_private_file(path: &Path, raw: &[u8]) -> Result<(), String> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|error| format!("Failed to create account directory: {error}"))?;
+        fs::create_dir_all(parent).map_err(|error| format!("accountError.write|{error}"))?;
     }
-    fs::write(path, raw).map_err(|error| format!("Failed to save account: {error}"))?;
+    fs::write(path, raw).map_err(|error| format!("accountError.write|{error}"))?;
 
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(path, fs::Permissions::from_mode(0o600))
-            .map_err(|error| format!("Failed to secure account file: {error}"))?;
+            .map_err(|error| format!("accountError.write|{error}"))?;
     }
     Ok(())
 }
@@ -591,7 +580,7 @@ fn open_browser(app_handle: &AppHandle, url: &str) -> Result<(), String> {
     app_handle
         .shell()
         .open(url, None)
-        .map_err(|error| format!("Failed to open the authorization page: {error}"))
+        .map_err(|error| format!("accountError.browser|{error}"))
 }
 
 fn callback_response(status: &str, body: &str) -> Vec<u8> {
@@ -606,15 +595,15 @@ fn parse_callback_request(request: &str) -> Result<(String, String), String> {
     let line = request
         .lines()
         .next()
-        .ok_or_else(|| "OAuth callback request was empty".to_string())?;
+        .ok_or_else(|| "accountError.authResponse".to_string())?;
     let target = line
         .strip_prefix("GET ")
         .and_then(|value| value.split_whitespace().next())
-        .ok_or_else(|| "OAuth callback request was invalid".to_string())?;
+        .ok_or_else(|| "accountError.authResponse".to_string())?;
     let url = url::Url::parse(&format!("http://localhost{target}"))
-        .map_err(|error| format!("OAuth callback URL was invalid: {error}"))?;
+        .map_err(|error| format!("accountError.authResponse|{error}"))?;
     if url.path() != OAUTH_REDIRECT_PATH {
-        return Err("OAuth callback path was invalid".to_string());
+        return Err("accountError.authResponse".to_string());
     }
     let params = url
         .query_pairs()
@@ -623,11 +612,11 @@ fn parse_callback_request(request: &str) -> Result<(String, String), String> {
     let state = params
         .get("state")
         .cloned()
-        .ok_or_else(|| "OAuth callback did not include state".to_string())?;
+        .ok_or_else(|| "accountError.state".to_string())?;
     let code = params
         .get("code")
         .cloned()
-        .ok_or_else(|| "OAuth callback did not include code".to_string())?;
+        .ok_or_else(|| "accountError.authResponse".to_string())?;
     Ok((state, code))
 }
 
@@ -647,26 +636,23 @@ async fn exchange_oauth_code(
         ])
         .send()
         .await
-        .map_err(|error| format!("OAuth token exchange failed: {error}"))?;
+        .map_err(|error| format!("accountError.auth|{error}"))?;
     let status = response.status();
     let body: Value = response
         .json()
         .await
-        .map_err(|error| format!("OAuth token response was invalid: {error}"))?;
+        .map_err(|error| format!("accountError.authResponse|{error}"))?;
     if !status.is_success() {
-        return Err(format!(
-            "OAuth token exchange failed with HTTP {}",
-            status.as_u16()
-        ));
+        return Err(format!("accountError.auth|HTTP {}", status.as_u16()));
     }
     Ok(body)
 }
 
 fn store_oauth_token_response(token_response: &Value) -> Result<CodexAccountSummary, String> {
     let access_token = non_empty_string(token_response.get("access_token"))
-        .ok_or_else(|| "OAuth token response has no access token".to_string())?;
+        .ok_or_else(|| "accountError.authResponse".to_string())?;
     let id_token = non_empty_string(token_response.get("id_token"))
-        .ok_or_else(|| "OAuth token response has no id token".to_string())?;
+        .ok_or_else(|| "accountError.authResponse".to_string())?;
     let refresh_token = non_empty_string(token_response.get("refresh_token"));
     let auth = serde_json::json!({
         "auth_mode": "chatgpt",
@@ -677,13 +663,40 @@ fn store_oauth_token_response(token_response: &Value) -> Result<CodexAccountSumm
             "account_id": Value::Null,
         }
     });
-    let raw = serde_json::to_vec_pretty(&auth)
-        .map_err(|error| format!("Failed to encode OAuth account: {error}"))?;
+    let raw =
+        serde_json::to_vec_pretty(&auth).map_err(|error| format!("accountError.format|{error}"))?;
     let metadata = save_snapshot(&raw, &auth, &account_store_dir()?)?;
     Ok(build_summary(metadata, None, &account_store_dir()?))
 }
 
-pub async fn add_account_via_oauth(app_handle: AppHandle) -> Result<CodexAccountSummary, String> {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OAuthCallbackMessages {
+    complete: String,
+    close_window: String,
+    failed: String,
+}
+
+fn callback_page(title: &str, message: &str) -> String {
+    fn escape(value: &str) -> String {
+        value
+            .replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;")
+            .replace('\'', "&#39;")
+    }
+    format!(
+        "<html><head><meta charset=\"utf-8\"></head><body><h2>{}</h2><p>{}</p></body></html>",
+        escape(title),
+        escape(message)
+    )
+}
+
+pub async fn add_account_via_oauth(
+    app_handle: AppHandle,
+    callback_messages: OAuthCallbackMessages,
+) -> Result<CodexAccountSummary, String> {
     let verifier = random_token();
     let challenge = base64url(&Sha256::digest(verifier.as_bytes()));
     let state = random_token();
@@ -696,13 +709,13 @@ pub async fn add_account_via_oauth(app_handle: AppHandle) -> Result<CodexAccount
     }
     let listener = listener.ok_or_else(|| {
         format!(
-            "OAuth callback ports {} and {} are already in use",
+            "accountError.ports|{} {}",
             OAUTH_REDIRECT_PORT, OAUTH_FALLBACK_REDIRECT_PORT
         )
     })?;
     let port = listener
         .local_addr()
-        .map_err(|error| format!("Could not read OAuth callback port: {error}"))?
+        .map_err(|error| format!("accountError.authResponse|{error}"))?
         .port();
     let redirect_uri = format!("http://localhost:{port}{OAUTH_REDIRECT_PATH}");
     let auth_url = build_oauth_url(&redirect_uri, &state, &challenge);
@@ -713,34 +726,43 @@ pub async fn add_account_via_oauth(app_handle: AppHandle) -> Result<CodexAccount
         listener.accept(),
     )
     .await
-    .map_err(|_| "OAuth login timed out".to_string())?
-    .map_err(|error| format!("OAuth callback listener failed: {error}"))?;
+    .map_err(|_| "accountError.expired".to_string())?
+    .map_err(|error| format!("accountError.authResponse|{error}"))?;
     let mut request = vec![0u8; 8192];
     let size = stream
         .read(&mut request)
         .await
-        .map_err(|error| format!("Could not read OAuth callback: {error}"))?;
+        .map_err(|error| format!("accountError.authResponse|{error}"))?;
     let callback = parse_callback_request(&String::from_utf8_lossy(&request[..size]));
     let (callback_state, code) = match callback {
         Ok(value) if value.0 == state => value,
         Ok(_) => {
             let _ = stream
-                .write_all(&callback_response("400 Bad Request", "State mismatch"))
+                .write_all(&callback_response(
+                    "400 Bad Request",
+                    &callback_page(&callback_messages.failed, ""),
+                ))
                 .await;
-            return Err("OAuth state mismatch".to_string());
+            return Err("accountError.state".to_string());
         }
         Err(error) => {
             let _ = stream
-                .write_all(&callback_response("400 Bad Request", &error))
+                .write_all(&callback_response(
+                    "400 Bad Request",
+                    &callback_page(&callback_messages.failed, ""),
+                ))
                 .await;
             return Err(error);
         }
     };
     let _ = callback_state;
     stream
-        .write_all(&callback_response("200 OK", "<html><body><h2>Authorization complete</h2><p>You can close this window.</p></body></html>"))
+        .write_all(&callback_response(
+            "200 OK",
+            &callback_page(&callback_messages.complete, &callback_messages.close_window),
+        ))
         .await
-        .map_err(|error| format!("Could not respond to OAuth callback: {error}"))?;
+        .map_err(|error| format!("accountError.authResponse|{error}"))?;
     let token_response = exchange_oauth_code(&code, &verifier, &redirect_uri).await?;
     store_oauth_token_response(&token_response)
 }
@@ -755,9 +777,7 @@ fn list_accounts_at(
     }
 
     let mut accounts = Vec::new();
-    for entry in fs::read_dir(store_dir)
-        .map_err(|error| format!("Failed to read saved accounts: {error}"))?
-    {
+    for entry in fs::read_dir(store_dir).map_err(|error| format!("accountError.read|{error}"))? {
         let Ok(entry) = entry else { continue };
         if entry.path().extension().and_then(|value| value.to_str()) != Some("json") {
             continue;
@@ -786,7 +806,7 @@ fn switch_account_at(
     store_dir: &Path,
 ) -> Result<CodexAccountSummary, String> {
     if !valid_account_id(account_id) {
-        return Err("Invalid account id".to_string());
+        return Err("accountError.invalidAccount".to_string());
     }
 
     if let Ok((raw, auth)) = effective_snapshot(auth_path, backup_path) {
@@ -794,9 +814,9 @@ fn switch_account_at(
     }
 
     let saved_path = store_dir.join(format!("{account_id}.json"));
-    let raw = fs::read(&saved_path).map_err(|_| "Saved account not found".to_string())?;
+    let raw = fs::read(&saved_path).map_err(|_| "accountError.invalidAccount".to_string())?;
     let auth: Value = serde_json::from_slice(&raw)
-        .map_err(|error| format!("Saved account is invalid: {error}"))?;
+        .map_err(|error| format!("accountError.invalidAccount|{error}"))?;
     let metadata = metadata_from_auth(&auth, &raw)?;
 
     let keychain_is_current = read_keychain_raw(auth_path.parent().unwrap_or(Path::new("")))
@@ -826,8 +846,7 @@ pub(crate) fn restore_legacy_oauth(auth_path: &Path, backup_path: &Path) -> Resu
     if !backup_path.exists() {
         return Ok(false);
     }
-    let raw =
-        fs::read(backup_path).map_err(|error| format!("Failed to read account backup: {error}"))?;
+    let raw = fs::read(backup_path).map_err(|error| format!("accountError.read|{error}"))?;
     let keychain_was_used = read_keychain_raw(auth_path.parent().unwrap_or(Path::new("")))
         .ok()
         .flatten()
@@ -836,8 +855,7 @@ pub(crate) fn restore_legacy_oauth(auth_path: &Path, backup_path: &Path) -> Resu
     if keychain_was_used {
         write_keychain_raw(auth_path.parent().unwrap_or(Path::new("")), &raw)?;
     }
-    fs::remove_file(backup_path)
-        .map_err(|error| format!("Failed to remove account backup: {error}"))?;
+    fs::remove_file(backup_path).map_err(|error| format!("accountError.write|{error}"))?;
     Ok(true)
 }
 
@@ -854,45 +872,44 @@ pub fn switch_account(account_id: &str) -> Result<CodexAccountSummary, String> {
 
 pub fn delete_account(account_id: &str) -> Result<(), String> {
     if !valid_account_id(account_id) {
-        return Err("Invalid account id".to_string());
+        return Err("accountError.invalidAccount".to_string());
     }
     let path = account_store_dir()?.join(format!("{account_id}.json"));
     if path.exists() {
-        fs::remove_file(path).map_err(|error| format!("Failed to delete account: {error}"))?;
+        fs::remove_file(path).map_err(|error| format!("accountError.write|{error}"))?;
     }
     let quota = quota_path(&account_store_dir()?, account_id);
     if quota.exists() {
-        fs::remove_file(quota)
-            .map_err(|error| format!("Failed to delete account quota: {error}"))?;
+        fs::remove_file(quota).map_err(|error| format!("accountError.write|{error}"))?;
     }
     Ok(())
 }
 
 pub async fn refresh_account_quota(account_id: &str) -> Result<CodexAccountSummary, String> {
     if !valid_account_id(account_id) {
-        return Err("Invalid account id".to_string());
+        return Err("accountError.invalidAccount".to_string());
     }
     let codex_dir = codex_home()?;
     let store_dir = account_store_dir()?;
     let saved_path = store_dir.join(format!("{account_id}.json"));
-    let raw = fs::read(&saved_path).map_err(|_| "Saved account not found".to_string())?;
+    let raw = fs::read(&saved_path).map_err(|_| "accountError.invalidAccount".to_string())?;
     let mut auth: Value = serde_json::from_slice(&raw)
-        .map_err(|error| format!("Saved account is invalid: {error}"))?;
+        .map_err(|error| format!("accountError.invalidAccount|{error}"))?;
     let metadata = metadata_from_auth(&auth, &raw)?;
     let chatgpt_account_id = account_id_from_auth(&auth);
     let mut access_token = auth
         .get("tokens")
         .and_then(|tokens| non_empty_string(tokens.get("access_token")))
-        .ok_or_else(|| "This account has no access token for quota lookup".to_string())?;
+        .ok_or_else(|| "accountError.loginRequired".to_string())?;
 
     if jwt_is_expired(&access_token) {
         refresh_auth_tokens(&mut auth).await?;
         access_token = auth
             .get("tokens")
             .and_then(|tokens| non_empty_string(tokens.get("access_token")))
-            .ok_or_else(|| "Token refresh produced no access token".to_string())?;
+            .ok_or_else(|| "accountError.format".to_string())?;
         let refreshed_raw = serde_json::to_vec_pretty(&auth)
-            .map_err(|error| format!("Failed to encode refreshed account: {error}"))?;
+            .map_err(|error| format!("accountError.write|{error}"))?;
         write_private_file(&saved_path, &refreshed_raw)?;
         persist_active_snapshot(&codex_dir, account_id, &refreshed_raw)?;
     }
@@ -903,9 +920,9 @@ pub async fn refresh_account_quota(account_id: &str) -> Result<CodexAccountSumma
         access_token = auth
             .get("tokens")
             .and_then(|tokens| non_empty_string(tokens.get("access_token")))
-            .ok_or_else(|| "Token refresh produced no access token".to_string())?;
+            .ok_or_else(|| "accountError.format".to_string())?;
         let refreshed_raw = serde_json::to_vec_pretty(&auth)
-            .map_err(|error| format!("Failed to encode refreshed account: {error}"))?;
+            .map_err(|error| format!("accountError.write|{error}"))?;
         write_private_file(&saved_path, &refreshed_raw)?;
         persist_active_snapshot(&codex_dir, account_id, &refreshed_raw)?;
         response = request_usage(&access_token, chatgpt_account_id.as_deref()).await?;
@@ -914,7 +931,7 @@ pub async fn refresh_account_quota(account_id: &str) -> Result<CodexAccountSumma
     let body: Value = response
         .json()
         .await
-        .map_err(|error| format!("Quota response was invalid: {error}"))?;
+        .map_err(|error| format!("accountError.format|{error}"))?;
     if !status.is_success() {
         return Err(quota_http_error(status.as_u16(), &body));
     }
@@ -943,7 +960,7 @@ pub async fn refresh_account_quota(account_id: &str) -> Result<CodexAccountSumma
             "quotaResetAt": quota_reset_at,
             "plan": plan,
         }))
-        .map_err(|error| format!("Failed to encode quota: {error}"))?
+        .map_err(|error| format!("accountError.quota|{error}"))?
         .as_bytes(),
     )?;
 
@@ -954,6 +971,16 @@ pub async fn refresh_account_quota(account_id: &str) -> Result<CodexAccountSumma
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn callback_page_preserves_localized_text_and_escapes_html() {
+        let page = callback_page("認証 <script>", "A&B");
+        assert!(page.contains("charset=\"utf-8\""));
+        assert!(page.contains("認証 &lt;script&gt;"));
+        assert!(page.contains("A&amp;B"));
+        assert!(!page.contains("<script>"));
+    }
+
     use serde_json::json;
 
     fn temp_dir(name: &str) -> PathBuf {
@@ -1075,7 +1102,7 @@ mod tests {
         write_private_file(&auth_path, br#"{"OPENAI_API_KEY":"sk-test"}"#).unwrap();
 
         let error = save_effective_snapshot_at(&auth_path, &backup_path, &store_dir).unwrap_err();
-        assert!(error.contains("No signed-in ChatGPT account"));
+        assert!(error.contains("accountError.noAccount"));
         let _ = fs::remove_dir_all(dir);
     }
 

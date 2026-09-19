@@ -153,8 +153,9 @@ pub fn capture_current_codex_account() -> Result<CodexAccountSummary, String> {
 #[tauri::command]
 pub async fn add_codex_account_via_oauth(
     app_handle: tauri::AppHandle,
+    callback_messages: codex_accounts::OAuthCallbackMessages,
 ) -> Result<CodexAccountSummary, String> {
-    codex_accounts::add_account_via_oauth(app_handle).await
+    codex_accounts::add_account_via_oauth(app_handle, callback_messages).await
 }
 
 #[tauri::command]

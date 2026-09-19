@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-const LOGIN_REQUIRED: &str = "Claude Code 登录已失效，请重新添加账号。";
+const LOGIN_REQUIRED: &str = "accountError.loginRequired";
 pub(super) static ACCOUNT_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -46,7 +46,7 @@ pub(crate) fn config_dir() -> Result<PathBuf, String> {
 }
 
 fn home() -> Result<PathBuf, String> {
-    dirs::home_dir().ok_or_else(|| "无法获取用户目录".to_string())
+    dirs::home_dir().ok_or_else(|| "accountError.home".to_string())
 }
 
 fn config_path() -> Result<PathBuf, String> {
@@ -67,20 +67,21 @@ fn store() -> Result<PathBuf, String> {
 
 fn account_path(dir: &Path, id: &str) -> Result<PathBuf, String> {
     if id.len() != 64 || !id.bytes().all(|c| c.is_ascii_hexdigit()) {
-        return Err("无效的 Claude Code 账号".to_string());
+        return Err("accountError.invalidAccount".to_string());
     }
     Ok(dir.join(format!("{id}.json")))
 }
 
 fn read_json(path: &Path) -> Result<Value, String> {
-    let raw = fs::read(path).map_err(|_| format!("无法读取 {}", path.display()))?;
-    serde_json::from_slice(&raw).map_err(|_| format!("{} 格式错误", path.display()))
+    let raw = fs::read(path).map_err(|_| format!("accountError.read|{}", path.display()))?;
+    serde_json::from_slice(&raw).map_err(|_| format!("accountError.format|{}", path.display()))
 }
 
 fn write_json(path: &Path, value: &impl Serialize) -> Result<(), String> {
     use std::io::Write;
-    fs::create_dir_all(path.parent().ok_or("无效的文件路径")?).map_err(|e| e.to_string())?;
-    let bytes = serde_json::to_vec_pretty(value).map_err(|e| e.to_string())?;
+    fs::create_dir_all(path.parent().ok_or("accountError.write")?)
+        .map_err(|e| format!("accountError.write|{e}"))?;
+    let bytes = serde_json::to_vec_pretty(value).map_err(|e| format!("accountError.format|{e}"))?;
     let mut options = fs::OpenOptions::new();
     options.write(true).create(true).truncate(true);
     #[cfg(unix)]
@@ -90,11 +91,15 @@ fn write_json(path: &Path, value: &impl Serialize) -> Result<(), String> {
     }
     let temporary = path.with_extension(format!("{}.tmp", uuid::Uuid::new_v4()));
     let result = (|| {
-        let mut file = options.open(&temporary).map_err(|e| e.to_string())?;
-        file.write_all(&bytes).map_err(|e| e.to_string())?;
-        file.sync_all().map_err(|e| e.to_string())?;
+        let mut file = options
+            .open(&temporary)
+            .map_err(|e| format!("accountError.write|{e}"))?;
+        file.write_all(&bytes)
+            .map_err(|e| format!("accountError.write|{e}"))?;
+        file.sync_all()
+            .map_err(|e| format!("accountError.write|{e}"))?;
         drop(file);
-        fs::rename(&temporary, path).map_err(|e| e.to_string())
+        fs::rename(&temporary, path).map_err(|e| format!("accountError.write|{e}"))
     })();
     if result.is_err() {
         let _ = fs::remove_file(&temporary);
@@ -122,7 +127,7 @@ fn read_credentials() -> Result<Value, String> {
         let output = std::process::Command::new("security")
             .args(["find-generic-password", "-s", &keychain_service()?, "-w"])
             .output()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| format!("accountError.keychain|{e}"))?;
         if output.status.success() {
             return serde_json::from_slice(&output.stdout).map_err(|_| LOGIN_REQUIRED.to_string());
         }
@@ -144,14 +149,14 @@ fn write_credentials(value: &Value) -> Result<(), String> {
                 "-s",
                 &keychain_service()?,
                 "-a",
-                &std::env::var("USER").map_err(|e| e.to_string())?,
+                &std::env::var("USER").map_err(|e| format!("accountError.keychain|{e}"))?,
                 "-w",
                 &value.to_string(),
             ])
             .output()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| format!("accountError.keychain|{e}"))?;
         if !output.status.success() {
-            return Err("无法写入 Claude Code 钥匙串".to_string());
+            return Err("accountError.keychain".to_string());
         }
         return Ok(());
     }
@@ -224,7 +229,7 @@ fn current() -> Result<SavedAccount, String> {
 
 fn load(dir: &Path, id: &str) -> Result<SavedAccount, String> {
     serde_json::from_value(read_json(&account_path(dir, id)?)?)
-        .map_err(|_| "保存的 Claude Code 账号格式错误".to_string())
+        .map_err(|_| "accountError.invalidAccount".to_string())
 }
 
 fn save(dir: &Path, account: &SavedAccount) -> Result<(), String> {
@@ -264,8 +269,8 @@ pub async fn list() -> Result<Vec<ClaudeCodeAccount>, String> {
         return Ok(vec![]);
     }
     let mut accounts = vec![];
-    for entry in fs::read_dir(&dir).map_err(|e| e.to_string())? {
-        let path = entry.map_err(|e| e.to_string())?.path();
+    for entry in fs::read_dir(&dir).map_err(|e| format!("accountError.read|{e}"))? {
+        let path = entry.map_err(|e| format!("accountError.read|{e}"))?.path();
         let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
             continue;
         };
@@ -290,7 +295,7 @@ pub(super) fn save_login(credentials: &Value, config: &Value) -> Result<ClaudeCo
 fn merge_oauth(target: &mut Value, key: &str, value: &Value) -> Result<(), String> {
     target
         .as_object_mut()
-        .ok_or("Claude Code 配置格式错误")?
+        .ok_or("accountError.format")?
         .insert(key.to_string(), value.clone());
     Ok(())
 }
@@ -318,7 +323,7 @@ pub async fn switch(id: &str) -> Result<ClaudeCodeAccount, String> {
     write_json(&config_file, &config)?;
     if let Err(error) = write_credentials(&credentials) {
         write_json(&config_file, &original_config)
-            .map_err(|rollback| format!("{error}; 恢复原账号配置失败: {rollback}"))?;
+            .map_err(|rollback| format!("accountError.rollback|{error} {rollback}"))?;
         return Err(error);
     }
     account.summary.active = true;
@@ -345,7 +350,7 @@ async fn request_quota(token: &str) -> Result<reqwest::Response, String> {
         .timeout(Duration::from_secs(15))
         .send()
         .await
-        .map_err(|_| "额度刷新失败，请检查网络后重试".to_string())
+        .map_err(|_| "accountError.network".to_string())
 }
 
 async fn renew(dir: &Path, account: &mut SavedAccount) -> Result<(), String> {
@@ -363,15 +368,15 @@ async fn renew(dir: &Path, account: &mut SavedAccount) -> Result<(), String> {
         }))
         .send()
         .await
-        .map_err(|_| "登录凭据刷新失败，请检查网络后重试".to_string())?;
+        .map_err(|_| "accountError.network".to_string())?;
     if !response.status().is_success() {
-        return Err("Claude Code 登录已失效，请重新添加账号。".to_string());
+        return Err("accountError.loginRequired".to_string());
     }
     let body: Value = response
         .json()
         .await
-        .map_err(|_| "登录凭据响应格式错误".to_string())?;
-    let token = text(&body, "access_token").ok_or("登录凭据响应缺少令牌")?;
+        .map_err(|_| "accountError.format".to_string())?;
+    let token = text(&body, "access_token").ok_or("accountError.format")?;
     account.oauth["accessToken"] = json!(token);
     if let Some(token) = text(&body, "refresh_token") {
         account.oauth["refreshToken"] = json!(token);
@@ -406,19 +411,19 @@ pub async fn refresh(id: &str) -> Result<ClaudeCodeAccount, String> {
     }
     let status = response.status();
     if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
-        return Err("Claude Code 登录已失效，请重新添加账号。".to_string());
+        return Err("accountError.loginRequired".to_string());
     }
     if !status.is_success() {
-        return Err(format!("额度刷新失败 (HTTP {})", status.as_u16()));
+        return Err(format!("accountError.quota|HTTP {}", status.as_u16()));
     }
     let body: Value = response
         .json()
         .await
-        .map_err(|_| "额度响应格式错误".to_string())?;
+        .map_err(|_| "accountError.format".to_string())?;
     let five_hour = quota(&body["five_hour"]);
     let seven_day = quota(&body["seven_day"]);
     if five_hour.is_none() && seven_day.is_none() {
-        return Err("暂时无法读取 Claude Code 额度".to_string());
+        return Err("accountError.quota".to_string());
     }
     account.summary.five_hour = five_hour;
     account.summary.seven_day = seven_day;
@@ -431,7 +436,7 @@ pub async fn delete(id: &str) -> Result<(), String> {
     let _guard = ACCOUNT_LOCK.lock().await;
     let path = account_path(&store()?, id)?;
     if path.exists() {
-        fs::remove_file(path).map_err(|e| e.to_string())?;
+        fs::remove_file(path).map_err(|e| format!("accountError.write|{e}"))?;
     }
     Ok(())
 }

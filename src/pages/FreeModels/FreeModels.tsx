@@ -181,13 +181,13 @@ export function FreeModelsProvider({ children }: { children: ReactNode }) {
     const modelsById = new Map(configuredModels.map((model) => [model.internalId, model]));
     const routeModels = router.candidateIds.flatMap((internalId) => {
       const model = modelsById.get(internalId);
-      if (!model?.modelId || !model.baseUrl) return [];
+      if (!model) return [];
       return [
         {
           id: internalId,
           internalId,
           provider: model.name,
-          modelId: model.modelId,
+          modelId: model.modelId ?? '',
           baseUrl: model.baseUrl,
         },
       ];
@@ -292,19 +292,24 @@ export function FreeModelsProvider({ children }: { children: ReactNode }) {
     [loadRouter]
   );
 
-  const updateSelectedModel = useCallback((model: RouteModelInput) => {
-    routerMutationRef.current = routerMutationRef.current
-      .catch(() => undefined)
-      .then(() => {
-        setCustomModels((current) =>
-          current.map((entry) =>
-            entry.id === model.internalId
-              ? { ...entry, provider: model.name, modelId: model.modelId, baseUrl: model.baseUrl }
-              : entry
-          )
-        );
-      });
-  }, []);
+  const updateSelectedModel = useCallback(
+    (model: RouteModelInput) => {
+      routerMutationRef.current = routerMutationRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          setCustomModels((current) =>
+            current.map((entry) =>
+              entry.id === model.internalId
+                ? { ...entry, provider: model.name, modelId: model.modelId, baseUrl: model.baseUrl }
+                : entry
+            )
+          );
+          await loadRouter();
+        })
+        .catch((error) => console.error('Refresh smart router after model update failed:', error));
+    },
+    [loadRouter]
+  );
 
   const removeSelectedModel = useCallback(
     async (id: string) => {
@@ -1226,15 +1231,13 @@ export function FreeModelsPanel() {
                 {userModels.map((model) => {
                   const selected = selectedIds.has(model.internalId);
                   const adding = addingId === model.internalId;
-                  const incomplete =
-                    !model.baseUrl.trim() || !model.modelId?.trim() || !model.apiKey.trim();
                   const iconSrc = getModelIcon('', model.modelId || '');
                   return (
                     <button
                       key={model.internalId}
                       type="button"
                       onClick={() => void addSavedModel(model)}
-                      disabled={selected || Boolean(addingId) || incomplete}
+                      disabled={selected || Boolean(addingId)}
                       aria-label={`${t(selected ? 'freeModels.saved.added' : 'freeModels.addToRouter')}: ${model.name} — ${model.modelId ?? ''}`}
                       className="w-full min-h-[64px] flex items-center gap-3 p-3 rounded bg-cyber-surface text-left transition-colors enabled:hover:bg-cyber-elevated disabled:cursor-default"
                     >
@@ -1264,11 +1267,6 @@ export function FreeModelsPanel() {
                         <span className="block text-[10px] text-cyber-text-secondary truncate leading-tight mt-1 opacity-70">
                           {model.modelId}
                         </span>
-                        {incomplete && (
-                          <span className="block text-[10px] text-cyber-text-muted mt-1">
-                            {t('freeModels.saved.incomplete')}
-                          </span>
-                        )}
                       </span>
                     </button>
                   );

@@ -1426,16 +1426,7 @@ export function AddModelModal() {
             disabled={isSavingModel}
             onClick={async () => {
               if (isSavingModel) return;
-              if (
-                !newModelForm.name.trim() ||
-                !newModelForm.baseUrl.trim() ||
-                !newModelForm.modelId.trim() ||
-                !newModelForm.apiKey.trim()
-              ) {
-                showToast('warning', t('model.requiredFields'));
-                return;
-              }
-              if (!isValidModelBaseUrl(newModelForm.baseUrl)) {
+              if (newModelForm.baseUrl.trim() && !isValidModelBaseUrl(newModelForm.baseUrl)) {
                 showToast('warning', t('model.invalidOpenaiUrl'));
                 return;
               }

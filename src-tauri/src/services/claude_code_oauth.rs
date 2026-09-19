@@ -45,8 +45,8 @@ pub fn start() -> Result<LoginStart, String> {
         busy: false,
         snapshots: None,
     };
-    let mut url =
-        reqwest::Url::parse("https://claude.com/cai/oauth/authorize").map_err(|e| e.to_string())?;
+    let mut url = reqwest::Url::parse("https://claude.com/cai/oauth/authorize")
+        .map_err(|e| format!("accountError.auth|{e}"))?;
     url.query_pairs_mut()
         .append_pair("code", "true")
         .append_pair("client_id", CLIENT_ID)
@@ -64,12 +64,12 @@ pub fn start() -> Result<LoginStart, String> {
         authorization_url: url.to_string(),
         expires_at: pending.expires_at,
     };
-    *PENDING.lock().map_err(|_| "无法开始授权")? = Some(pending);
+    *PENDING.lock().map_err(|_| "accountError.auth")? = Some(pending);
     Ok(result)
 }
 
 pub fn cancel(id: &str) -> Result<(), String> {
-    let mut pending = PENDING.lock().map_err(|_| "无法取消授权")?;
+    let mut pending = PENDING.lock().map_err(|_| "accountError.cancelled")?;
     if pending.as_ref().is_some_and(|p| p.id == id) {
         *pending = None;
     }
@@ -82,10 +82,10 @@ fn parse_code<'a>(input: &'a str, expected_state: &str) -> Result<&'a str, Strin
         .split_once('#')
         .map_or((input, None), |(code, state)| (code, Some(state)));
     if code.is_empty() || code.contains(char::is_whitespace) || code.contains("://") {
-        return Err("请粘贴浏览器返回的完整授权码".to_string());
+        return Err("accountError.code".to_string());
     }
     if state.is_some_and(|state| state != expected_state) {
-        return Err("授权码不属于本次登录，请重新复制".to_string());
+        return Err("accountError.state".to_string());
     }
     Ok(code)
 }
@@ -106,13 +106,13 @@ fn login_snapshots(tokens: &Value, profile: &Value) -> Result<(Value, Value), St
     let token = tokens["access_token"]
         .as_str()
         .filter(|s| !s.is_empty())
-        .ok_or("授权响应缺少令牌")?;
+        .ok_or("accountError.authResponse")?;
     let account = profile_fields(&tokens["account"], &profile["account"]);
     let organization = profile_fields(&tokens["organization"], &profile["organization"]);
     let email = account["email"]
         .as_str()
         .or_else(|| account["email_address"].as_str())
-        .ok_or("授权响应缺少账号邮箱，请重新添加账号")?;
+        .ok_or("accountError.authResponse")?;
     let plan = organization["organization_type"]
         .as_str()
         .and_then(|s| s.strip_prefix("claude_"));
@@ -136,7 +136,7 @@ async fn exchange(pending: &PendingLogin, code: &str) -> Result<(Value, Value), 
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(20))
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format!("accountError.auth|{e}"))?;
     let response = client
         .post("https://platform.claude.com/v1/oauth/token")
         .json(&json!({
@@ -145,15 +145,20 @@ async fn exchange(pending: &PendingLogin, code: &str) -> Result<(Value, Value), 
         }))
         .send()
         .await
-        .map_err(|_| "授权失败，请检查网络后重试")?;
+        .map_err(|_| "accountError.network")?;
     if !response.status().is_success() {
         return Err(format!(
-            "授权失败 (HTTP {})，请检查授权码或重新添加账号",
+            "accountError.auth|HTTP {}",
             response.status().as_u16()
         ));
     }
-    let tokens: Value = response.json().await.map_err(|_| "授权响应格式错误")?;
-    let access_token = tokens["access_token"].as_str().ok_or("授权响应缺少令牌")?;
+    let tokens: Value = response
+        .json()
+        .await
+        .map_err(|_| "accountError.authResponse")?;
+    let access_token = tokens["access_token"]
+        .as_str()
+        .ok_or("accountError.authResponse")?;
     let profile = match client
         .get("https://api.anthropic.com/api/oauth/profile")
         .bearer_auth(access_token)
@@ -171,16 +176,16 @@ async fn exchange(pending: &PendingLogin, code: &str) -> Result<(Value, Value), 
 
 pub async fn complete(id: &str, input: &str) -> Result<ClaudeCodeAccount, String> {
     let (pending, code) = {
-        let mut guard = PENDING.lock().map_err(|_| "无法读取授权状态")?;
+        let mut guard = PENDING.lock().map_err(|_| "accountError.auth")?;
         let pending = guard
             .as_mut()
             .filter(|p| p.id == id)
-            .ok_or("授权已取消，请重新添加账号")?;
+            .ok_or("accountError.cancelled")?;
         if pending.expires_at <= chrono::Utc::now().timestamp() {
-            return Err("授权已超时，请重新添加账号".to_string());
+            return Err("accountError.expired".to_string());
         }
         if pending.busy {
-            return Err("正在完成授权".to_string());
+            return Err("accountError.busy".to_string());
         }
         let code = parse_code(input, &pending.state)?.to_string();
         pending.busy = true;
@@ -191,14 +196,14 @@ pub async fn complete(id: &str, input: &str) -> Result<ClaudeCodeAccount, String
         None => exchange(&pending, &code).await,
     };
     let _account_guard = claude_code_accounts::ACCOUNT_LOCK.lock().await;
-    let mut guard = PENDING.lock().map_err(|_| "无法读取授权状态")?;
+    let mut guard = PENDING.lock().map_err(|_| "accountError.auth")?;
     let current = guard
         .as_mut()
         .filter(|p| p.id == id)
-        .ok_or("授权已取消，请重新添加账号")?;
+        .ok_or("accountError.cancelled")?;
     current.busy = false;
     if current.expires_at <= chrono::Utc::now().timestamp() {
-        return Err("授权已超时，请重新添加账号".to_string());
+        return Err("accountError.expired".to_string());
     }
     let (credentials, config) = result?;
     // An authorization code is single-use. Retain the exchanged login if saving fails.
@@ -253,7 +258,7 @@ mod tests {
         let retry = start().unwrap();
         PENDING.lock().unwrap().as_mut().unwrap().snapshots = Some((json!({}), json!({})));
         let error = complete(&retry.login_id, "test").await.err().unwrap();
-        assert!(error.contains("登录已失效"));
+        assert!(error.contains("accountError.loginRequired"));
         let guard = PENDING.lock().unwrap();
         assert!(guard.as_ref().unwrap().snapshots.is_some());
         assert!(!guard.as_ref().unwrap().busy);

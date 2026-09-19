@@ -489,7 +489,7 @@ fn resolve_candidates() -> Vec<Candidate> {
                 return None;
             }
             let api_key = model_manager::decrypt_key_for_use(&model.api_key);
-            if api_key.is_empty() {
+            if api_key.trim().is_empty() {
                 return None;
             }
 

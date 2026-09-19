@@ -1,3 +1,4 @@
+import { accountError } from '../../utils/accountError';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as api from '../../api/tauri';
@@ -38,8 +39,10 @@ export function useClaudeCodeAccounts(
     submittingRef.current = null;
     setSubmitting(false);
     if (pending)
-      void api.cancelClaudeCodeLogin(pending.loginId).catch((error) => showError(String(error)));
-  }, [showError]);
+      void api
+        .cancelClaudeCodeLogin(pending.loginId)
+        .catch((error) => showError(accountError(error, t)));
+  }, [showError, t]);
 
   useEffect(() => {
     if (!login) return;
@@ -86,12 +89,12 @@ export function useClaudeCodeAccounts(
         }
       })
       .catch((error) => {
-        if (!ignore) showError(String(error));
+        if (!ignore) showError(accountError(error, t));
       });
     return () => {
       ignore = true;
     };
-  }, [enabled, hasModel, showError]);
+  }, [enabled, hasModel, showError, t]);
 
   const select = (id: string) => {
     setSelectedId(id);
@@ -106,7 +109,7 @@ export function useClaudeCodeAccounts(
       const updated = await api.refreshClaudeCodeAccountQuota(account.id);
       setAccounts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
     } catch (error) {
-      if (!quiet) showError(String(error));
+      if (!quiet) showError(accountError(error, t));
     } finally {
       refreshingRef.current.delete(account.id);
       setRefreshing(new Set(refreshingRef.current));
@@ -132,7 +135,7 @@ export function useClaudeCodeAccounts(
     } catch (error) {
       if (generation === loginGeneration.current) {
         cancelLogin();
-        showError(String(error));
+        showError(accountError(error, t));
       }
     }
   };
@@ -151,10 +154,10 @@ export function useClaudeCodeAccounts(
       setBusy(false);
       addingRef.current = false;
       select(account.id);
-      await reload().catch((error) => showError(String(error)));
+      await reload().catch((error) => showError(accountError(error, t)));
       void refresh(account, true);
     } catch (error) {
-      if (loginRef.current?.loginId === pending.loginId) setLoginError(String(error));
+      if (loginRef.current?.loginId === pending.loginId) setLoginError(accountError(error, t));
     } finally {
       if (submittingRef.current === pending.loginId) {
         submittingRef.current = null;
@@ -178,7 +181,7 @@ export function useClaudeCodeAccounts(
       setSelectedId((id) => (id === account.id ? null : id));
       await reload();
     } catch (error) {
-      showError(String(error));
+      showError(accountError(error, t));
     }
   };
 

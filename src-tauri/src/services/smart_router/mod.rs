@@ -143,7 +143,6 @@ pub fn get_public_activity() -> PublicActivity {
 pub fn set_candidate_ids(candidate_ids: Vec<String>) -> Result<PublicConfig, String> {
     let valid_user_ids: HashSet<String> = model_manager::get_user_models()
         .into_iter()
-        .filter(model_is_routable)
         .map(|model| model.internal_id)
         .collect();
     let mut seen = HashSet::new();
@@ -174,7 +173,7 @@ pub fn get_candidate_models() -> Vec<ModelConfig> {
     let candidate_ids: HashSet<String> = candidate_ids().into_iter().collect();
     let mut models: Vec<ModelConfig> = model_manager::get_user_models()
         .into_iter()
-        .filter(|model| candidate_ids.contains(&model.internal_id) && model_is_routable(model))
+        .filter(|model| candidate_ids.contains(&model.internal_id))
         .collect();
     if candidate_ids.contains("local-server") {
         let local_server = crate::services::local_llm::get_server_info_sync();
@@ -206,7 +205,9 @@ fn model_is_routable(model: &ModelConfig) -> bool {
             .is_some_and(|model_id| !model_id.trim().is_empty())
         && !model.base_url.trim().is_empty()
         && !model.base_url.contains(":53683")
-        && !model_manager::decrypt_key_for_use(&model.api_key).is_empty()
+        && !model_manager::decrypt_key_for_use(&model.api_key)
+            .trim()
+            .is_empty()
 }
 
 fn local_server_is_routable(server: &crate::services::local_llm::LocalServerInfo) -> bool {
@@ -344,14 +345,19 @@ mod tests {
             scope: ModelScope::SmartRouter,
         };
         assert!(model_is_routable(&model));
+        model.name.clear();
+        assert!(model_is_routable(&model));
 
         model.model_id = Some(String::new());
         assert!(!model_is_routable(&model));
         model.model_id = Some("model-id".to_string());
         model.base_url.clear();
+        model.anthropic_url = Some("https://example.com/anthropic".to_string());
         assert!(!model_is_routable(&model));
         model.base_url = "https://example.com/v1".to_string();
         model.api_key.clear();
+        assert!(!model_is_routable(&model));
+        model.api_key = "   ".to_string();
         assert!(!model_is_routable(&model));
     }
 

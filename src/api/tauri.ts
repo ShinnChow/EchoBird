@@ -58,8 +58,12 @@ export async function captureCurrentCodexAccount(): Promise<CodexAccount> {
   return invoke('capture_current_codex_account');
 }
 
-export async function addCodexAccountViaOAuth(): Promise<CodexAccount> {
-  return invoke('add_codex_account_via_oauth');
+export async function addCodexAccountViaOAuth(callbackMessages: {
+  complete: string;
+  closeWindow: string;
+  failed: string;
+}): Promise<CodexAccount> {
+  return invoke('add_codex_account_via_oauth', { callbackMessages });
 }
 
 export async function switchCodexAccount(accountId: string): Promise<CodexAccount> {

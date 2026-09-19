@@ -3,6 +3,38 @@
 // where natural (API / GitHub / Claude / Codex / etc.)
 import { Translations } from './types';
 const ja: Partial<Translations> = {
+  'accountError.failed': 'アカウント操作に失敗しました。再試行してください。',
+  'accountError.home': 'ユーザーディレクトリが見つかりません。',
+  'accountError.loginRequired': '再度アカウントを追加してログインしてください。',
+  'accountError.noAccount': 'ログイン済みのアカウントがありません。先にログインしてください。',
+  'accountError.invalidAccount': '保存されたアカウントが無効です。再度追加してください。',
+  'accountError.read': 'アカウント設定を読み取れません。',
+  'accountError.write': 'アカウント設定を保存できません。ファイルの権限を確認してください。',
+  'accountError.format': 'アカウント設定または応答の形式が不正です。',
+  'accountError.keychain': 'システムの資格情報ストアにアクセスできません。',
+  'accountError.network':
+    'リクエストに失敗しました。ネットワークまたはプロキシ設定を確認してください。',
+  'accountError.quotaTimeout':
+    '使用量の更新がタイムアウトしました。ネットワークまたはプロキシ設定を確認してください。',
+  'accountError.denied': 'このアカウントは使用量サービスにアクセスできません。',
+  'accountError.rateLimited': 'リクエストが多すぎます。しばらくしてから再試行してください。',
+  'accountError.unavailable':
+    '使用量サービスを利用できません。しばらくしてから再試行してください。',
+  'accountError.quota': '使用量を取得できません。しばらくしてから再試行してください。',
+  'accountError.code': 'ブラウザに表示された認証コードをすべて貼り付けてください。',
+  'accountError.state': '認証が今回のログインと一致しません。再度ログインしてください。',
+  'accountError.cancelled': '認証がキャンセルされました。再度アカウントを追加してください。',
+  'accountError.expired': '認証がタイムアウトしました。再度アカウントを追加してください。',
+  'accountError.busy': '認証を処理しています。',
+  'accountError.auth': '認証に失敗しました。コードを確認するか、再度アカウントを追加してください。',
+  'accountError.authResponse': '認証応答が不完全または不正です。再度ログインしてください。',
+  'accountError.ports':
+    'ログインのコールバックポートが使用中です。他のログイン画面を閉じて再試行してください。',
+  'accountError.browser': '認証ページを開けません。',
+  'accountError.rollback': '切り替えに失敗し、元のアカウント設定も復元できませんでした。',
+  'accountError.complete': '認証を受け取りました',
+  'accountError.closeWindow': 'このウィンドウを閉じて EchoBird に戻れます。',
+  'accountError.callbackFailed': '認証に失敗しました。EchoBird に戻って再試行してください。',
   'agent.authorizationCode': '認証コード',
   'nav.modelNexus': 'モデルセンター',
   'nav.freeModels': 'スマートルーター',
@@ -42,8 +74,6 @@ const ja: Partial<Translations> = {
   'freeModels.saved.empty': 'モデルセンターにモデルがありません',
   'freeModels.saved.manage': 'モデルセンターへ',
   'freeModels.saved.added': 'ルーターに追加済み',
-  'freeModels.saved.incomplete':
-    '先にモデルセンターで OpenAI URL、モデル ID、API Key を設定してください',
   'freeModels.saved.addFailed': '追加できませんでした。モデルの設定を確認して再試行してください。',
   'freeModels.addToRouter': 'スマートルーターにモデルを追加',
   'freeModels.help': '使い方',
@@ -176,7 +206,6 @@ const ja: Partial<Translations> = {
   'model.modelIdPlaceholder': 'モデル ID を検索または入力…',
   'model.openaiUrl': 'OpenAI URL',
   'model.anthropicUrl': 'Anthropic URL',
-  'model.requiredFields': '名前、OpenAI URL、モデル ID、API キーを入力してください。',
   'model.invalidOpenaiUrl': '有効な OpenAI URL を入力してください。',
   'model.editConfig': 'モデル設定を編集',
   'model.deleteTitle': 'モデルを削除',

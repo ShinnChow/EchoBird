@@ -1,3 +1,4 @@
+import { accountError } from '../../utils/accountError';
 import { ClaudeCodeLoginDialog } from './ClaudeCodeLoginDialog';
 import { useClaudeCodeAccounts } from './useClaudeCodeAccounts';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -193,17 +194,21 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     setIsAddingCodexAccount(true);
     setIsLoadingCodexAccounts(true);
     try {
-      const captured = await api.addCodexAccountViaOAuth();
+      const captured = await api.addCodexAccountViaOAuth({
+        complete: t('accountError.complete'),
+        closeWindow: t('accountError.closeWindow'),
+        failed: t('accountError.callbackFailed'),
+      });
       await loadCodexAccounts();
       selectCodexAccount(captured.id);
     } catch (error) {
-      setApplyError(error instanceof Error ? error.message : String(error));
+      setApplyError(accountError(error, t));
     } finally {
       setIsAddingCodexAccount(false);
       setCodexOAuthRemainingSeconds(0);
       setIsLoadingCodexAccounts(false);
     }
-  }, [loadCodexAccounts, selectCodexAccount]);
+  }, [loadCodexAccounts, selectCodexAccount, t]);
 
   const deleteCodexAccount = useCallback(
     async (account: CodexAccount) => {
@@ -219,7 +224,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         setSelectedCodexAccountIdRaw((current) => (current === account.id ? null : current));
         await loadCodexAccounts();
       } catch (error) {
-        setApplyError(error instanceof Error ? error.message : String(error));
+        setApplyError(accountError(error, t));
       }
     },
     [confirm, loadCodexAccounts, t]
@@ -242,7 +247,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
           current.map((item) => (item.id === refreshed.id ? refreshed : item))
         );
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = accountError(error, t);
         setApplyError(
           t('agent.refreshAccountFailed')
             .replace('{email}', account.email)
@@ -592,7 +597,9 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     if (isCodexTool && selectedCodexAccountId) {
       const restoreResult = await applyRestore(selectedTool);
       if (restoreResult !== true) {
-        setApplyError(typeof restoreResult === 'string' ? restoreResult : t('key.destroyed'));
+        setApplyError(
+          typeof restoreResult === 'string' ? accountError(restoreResult, t) : t('key.destroyed')
+        );
         setIsLaunching(false);
         return;
       }
@@ -600,7 +607,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         await api.switchCodexAccount(selectedCodexAccountId);
         await loadCodexAccounts();
       } catch (error) {
-        setApplyError(error instanceof Error ? error.message : String(error));
+        setApplyError(accountError(error, t));
         setIsLaunching(false);
         return;
       }
@@ -613,7 +620,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         await claudeCodeAccounts.reload();
         setTimeout(() => setIsLaunching(false), 3000);
       } catch (error) {
-        setApplyError(error instanceof Error ? error.message : String(error));
+        setApplyError(accountError(error, t));
         setIsLaunching(false);
         return;
       }

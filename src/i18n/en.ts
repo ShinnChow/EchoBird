@@ -2,6 +2,37 @@
 import { Translations } from './types';
 
 const en: Translations = {
+  'accountError.failed': 'Account operation failed. Please try again.',
+  'accountError.home': 'Could not locate the user directory.',
+  'accountError.loginRequired': 'Sign in again by adding the account.',
+  'accountError.noAccount': 'No signed-in account was found. Please sign in first.',
+  'accountError.invalidAccount': 'The saved account is invalid. Please add it again.',
+  'accountError.read': 'Could not read the account configuration.',
+  'accountError.write': 'Could not save the account configuration. Check file permissions.',
+  'accountError.format': 'The account configuration or response has an invalid format.',
+  'accountError.keychain': 'Could not access the system credential store.',
+  'accountError.network': 'Request failed. Check your network or proxy settings.',
+  'accountError.quotaTimeout': 'Quota refresh timed out. Check your network or proxy settings.',
+  'accountError.denied': 'This account cannot access the quota service.',
+  'accountError.rateLimited': 'Too many requests. Please try again later.',
+  'accountError.unavailable': 'The quota service is temporarily unavailable. Try again later.',
+  'accountError.quota': 'Could not retrieve account quota. Please try again later.',
+  'accountError.code': 'Paste the complete authorization code returned by the browser.',
+  'accountError.state':
+    'This authorization does not match the current login. Please sign in again.',
+  'accountError.cancelled': 'Authorization was cancelled. Please add the account again.',
+  'accountError.expired': 'Authorization timed out. Please add the account again.',
+  'accountError.busy': 'Authorization is in progress.',
+  'accountError.auth': 'Authorization failed. Check the code or add the account again.',
+  'accountError.authResponse':
+    'The authorization response is incomplete or invalid. Please sign in again.',
+  'accountError.ports': 'Login callback ports are in use. Close other login windows and try again.',
+  'accountError.browser': 'Could not open the authorization page.',
+  'accountError.rollback':
+    'Switch failed, and the previous account configuration could not be restored.',
+  'accountError.complete': 'Authorization received',
+  'accountError.closeWindow': 'You can close this window and return to EchoBird.',
+  'accountError.callbackFailed': 'Authorization failed. Return to EchoBird and try again.',
   'agent.authorizationCode': 'Authorization code',
   // Navigation
   'nav.modelNexus': 'Model Nexus',
@@ -43,8 +74,6 @@ const en: Translations = {
   'freeModels.saved.empty': 'No models in Model Nexus yet',
   'freeModels.saved.manage': 'Go to Model Nexus',
   'freeModels.saved.added': 'Added to Router',
-  'freeModels.saved.incomplete':
-    'Complete the OpenAI URL, model ID, and API key in Model Nexus first',
   'freeModels.saved.addFailed': 'Could not add this model. Check its configuration and try again.',
   'freeModels.addToRouter': 'Add Model to Smart Router',
   'freeModels.help': 'How It Works',
@@ -165,7 +194,6 @@ const en: Translations = {
   'model.modelIdPlaceholder': 'Search or enter model ID…',
   'model.openaiUrl': 'OpenAI URL',
   'model.anthropicUrl': 'Anthropic URL',
-  'model.requiredFields': 'Enter a name, OpenAI URL, model ID, and API key.',
   'model.invalidOpenaiUrl': 'Enter a valid OpenAI URL.',
   'model.editConfig': 'EDIT MODEL CONFIG',
   'model.deleteTitle': 'DELETE MODEL',
