@@ -110,8 +110,10 @@ fn write_codex_canonical_fields(
     // Evict a stale `model_catalog_json` before conditionally re-adding the
     // catalog for the newly selected vendor.
     c = toml_delete_top(&c, "model_catalog_json");
-    // Top-level raw (bool, int).
-    c = toml_write_top_raw(&c, "disable_response_storage", "true");
+    // Remove the deprecated flag from configs written by older EchoBird
+    // versions. Codex no longer supports opting into response storage.
+    c = toml_delete_top(&c, "disable_response_storage");
+    // Top-level raw (int).
     c = toml_write_top_raw(&c, "model_context_window", &context_window.to_string());
     c = toml_write_top_raw(
         &c,
@@ -621,6 +623,21 @@ mod tests {
     fn codex_compact_limit_is_90_percent_of_window() {
         assert_eq!(codex_compact_limit_for(1_000_000), 900_000);
         assert_eq!(codex_compact_limit_for(204_800), 184_320);
+    }
+
+    #[test]
+    fn write_codex_canonical_fields_evicts_deprecated_response_storage_flag() {
+        let stale = "disable_response_storage = true\nmodel = \"gpt-5.5\"\n";
+        let out = write_codex_canonical_fields(
+            stale,
+            "https://provider.example/v1",
+            "provider-model",
+            DEFAULT_CODEX_CONTEXT_WINDOW,
+        );
+        assert!(
+            !out.contains("disable_response_storage"),
+            "deprecated flag survived: {out}"
+        );
     }
 
     #[test]
