@@ -115,7 +115,7 @@ const categoryRank = (cat?: string): number => {
 
 // Within-category tiebreaker: Desktop keeps its fixed display order (Coffee
 // CLI last); Science keeps OpenScience first (its model-config support is
-// solid while Claude Science is macOS/Linux-only with thinner support).
+// solid while Claude Science has thinner support and no model configuration).
 const withinCategoryRank = (tool: LocalTool): number => {
   if (tool.category === 'Desktop') return DESKTOP_ORDER[tool.id] ?? 50;
   if (tool.category === 'Science') return tool.id === 'openscience' ? 0 : 1;

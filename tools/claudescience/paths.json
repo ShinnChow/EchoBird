@@ -13,7 +13,9 @@
     "configFile": "~/.claude-science/preferences.json",
     "requireConfigFile": false,
     "paths": {
-        "win32": [],
+        "win32": [
+            "%LOCALAPPDATA%/Programs/ClaudeScience/claude-science.exe"
+        ],
         "darwin": [
             "/Applications/Claude Science.app/Contents/MacOS/Claude Science"
         ],
@@ -24,6 +26,8 @@
         ]
     },
     "installHints": {
+        "windowsDisplayNames": ["Claude Science"],
+        "windowsPublisher": "Anthropic",
         "macosAppName": "Claude Science"
     }
 }
