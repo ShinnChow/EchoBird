@@ -117,7 +117,7 @@ OpenCode Desktop · WorkBuddy(腾讯 CodeBuddy 办公版)
 这些工具由 EchoBird 检测、安装、管理,但模型切换由应用自身负责
 (厂商锁定或无模型配置):
 
-Hermes Desktop · Claude Science · Trae / Trae CN · Cursor · VS Code ·
+Hermes Desktop · Claude Science · Cursor · VS Code ·
 Gemini Desktop · Coffee CLI
 
 ## 界面截图

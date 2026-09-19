@@ -765,8 +765,8 @@ fn scan_windows_registry(hints: &InstallHints) -> Option<String> {
             }
             let dn_lower = display_name.to_lowercase();
             // EXACT case-insensitive match by default (windowsDisplayNames) —
-            // we don't blanket substring-match because "Trae" would then match
-            // "Trae CN" and the wrong card would claim a non-default install.
+            // we don't blanket substring-match because a base product would
+            // then match a regional edition and claim the wrong install.
             // Apps whose DisplayName embeds a version ("WorkBuddy 4.24.2") opt
             // into PREFIX matching via windowsDisplayNamePrefixes instead.
             if !registry_display_name_matches(&dn_lower, &names_lower, &prefixes_lower) {
@@ -2098,15 +2098,16 @@ mod tests {
 
     #[test]
     fn exact_name_matches() {
-        let names = v(&["trae cn"]);
-        assert!(registry_display_name_matches("trae cn", &names, &[]));
+        let names = v(&["editor cn"]);
+        assert!(registry_display_name_matches("editor cn", &names, &[]));
     }
 
     #[test]
     fn exact_name_does_not_substring_match() {
-        // The whole reason exact match exists: "trae" must NOT match "trae cn".
-        let names = v(&["trae"]);
-        assert!(!registry_display_name_matches("trae cn", &names, &[]));
+        // The whole reason exact match exists: a base name must not match a
+        // regional edition.
+        let names = v(&["editor"]);
+        assert!(!registry_display_name_matches("editor cn", &names, &[]));
     }
 
     #[test]
@@ -2188,8 +2189,8 @@ mod tests {
 
     #[test]
     fn exe_stem_matches_exact_name() {
-        let names = v(&["trae cn"]);
-        assert!(exe_stem_matches_hints("trae cn", &names, &[]));
+        let names = v(&["editor cn"]);
+        assert!(exe_stem_matches_hints("editor cn", &names, &[]));
     }
 
     #[test]

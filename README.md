@@ -122,7 +122,7 @@ OpenCode Desktop · WorkBuddy (Tencent CodeBuddy)
 These are detected, installed, and managed by EchoBird, but model switching
 is handled by the app itself (vendor-locked or no model config):
 
-Hermes Desktop · Claude Science · Trae / Trae CN · Cursor · VS Code ·
+Hermes Desktop · Claude Science · Cursor · VS Code ·
 Gemini Desktop · Coffee CLI
 
 ## Screenshots

@@ -152,8 +152,6 @@ pub const INSTALLABLE_TOOL_IDS: &[&str] = &[
     "vscode",
     "cursor",
     "clashverge",
-    "trae",
-    "traecn",
     "grok",
     "vibe-trading",
     "workbuddy",

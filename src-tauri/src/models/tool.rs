@@ -120,7 +120,7 @@ pub struct PathsConfig {
 pub struct InstallHints {
     /// Windows: match against `DisplayName` in
     /// HKLM/HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*.
-    /// Multiple entries are OR-matched (e.g. "Trae CN", "Trae-CN").
+    /// Multiple entries are OR-matched (e.g. "Editor CN", "Editor-CN").
     /// EXACT (case-insensitive) — see `windows_display_name_prefixes` for
     /// apps whose DisplayName embeds a version.
     #[serde(default)]
@@ -130,8 +130,8 @@ pub struct InstallHints {
     /// A DisplayName matches when it equals the prefix OR starts with
     /// `<prefix> ` (prefix + a space), so the trailing version is tolerated
     /// without enumerating every release. Opt-in per tool — exact
-    /// `windows_display_names` stays the safe default to avoid "Trae" →
-    /// "Trae CN" style false matches. Pair with `windows_publisher` for
+    /// `windows_display_names` stays the safe default to avoid a base product
+    /// matching a regional edition. Pair with `windows_publisher` for
     /// extra disambiguation.
     #[serde(default)]
     pub windows_display_name_prefixes: Vec<String>,
@@ -141,7 +141,7 @@ pub struct InstallHints {
     pub windows_publisher: Option<String>,
     /// macOS: `.app` bundle name to search for. Looked up under
     /// /Applications and ~/Applications, then via `mdfind kMDItemKind == Application`.
-    /// Either "Trae CN" or "Trae CN.app" works — we normalize.
+    /// Either "Editor CN" or "Editor CN.app" works — we normalize.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub macos_app_name: Option<String>,
     /// Linux: names to match against `Name=` in `.desktop` files
