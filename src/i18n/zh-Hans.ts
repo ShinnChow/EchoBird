@@ -1,6 +1,7 @@
 // Simplified Chinese translation
 import { Translations } from './types';
 const zhHans: Partial<Translations> = {
+  'agent.authorizationCode': '授权码',
   'nav.modelNexus': '模型中心',
   'nav.freeModels': '智能路由',
   'nav.appManager': '应用桌面',

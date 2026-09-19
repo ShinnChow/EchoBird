@@ -1,3 +1,5 @@
+import { ClaudeCodeLoginDialog } from './ClaudeCodeLoginDialog';
+import { useClaudeCodeAccounts } from './useClaudeCodeAccounts';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { EFFORT_PULSE_ONESHOT_MS } from '../../components';
@@ -357,8 +359,19 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     setSelectedTool(null);
     setApplyError(null);
   };
+  const clearClaudeCodeModel = useCallback(() => {
+    setToolModelConfig((prev) => ({ ...prev, claudecode: null }));
+  }, []);
+  const claudeCodeAccounts = useClaudeCodeAccounts(
+    selectedTool === 'claudecode',
+    !!toolModelConfig.claudecode,
+    clearClaudeCodeModel,
+    setApplyError
+  );
+
   // Set tool model (single selection) - UI state update
   const handleSelectModel = (toolId: string, modelId: string) => {
+    if (toolId === 'claudecode') claudeCodeAccounts.setSelectedId(null);
     if (toolId === 'codex' || toolId === 'chatgptdesktop') {
       setSelectedCodexAccountIdRaw(null);
     }
@@ -566,7 +579,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const handleLaunch = async () => {
     if (!selectedTool || isLaunching) return;
     setIsLaunching(true);
-    setTimeout(() => setIsLaunching(false), 3000); // 3 second cooldown
+    const switchingClaudeAccount = selectedTool === 'claudecode' && !!claudeCodeAccounts.selectedId;
+    if (!switchingClaudeAccount) setTimeout(() => setIsLaunching(false), 3000); // 3 second cooldown
 
     const toolData = detectedTools.find((t) => t.id === selectedTool);
     const isLaunchable = !!toolData?.launchFile;
@@ -585,6 +599,19 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
       try {
         await api.switchCodexAccount(selectedCodexAccountId);
         await loadCodexAccounts();
+      } catch (error) {
+        setApplyError(error instanceof Error ? error.message : String(error));
+        setIsLaunching(false);
+        return;
+      }
+    } else if (selectedTool === 'claudecode' && claudeCodeAccounts.selectedId) {
+      try {
+        const restored = await applyRestore(selectedTool);
+        if (restored !== true)
+          throw new Error(typeof restored === 'string' ? restored : t('key.destroyed'));
+        await api.switchClaudeCodeAccount(claudeCodeAccounts.selectedId);
+        await claudeCodeAccounts.reload();
+        setTimeout(() => setIsLaunching(false), 3000);
       } catch (error) {
         setApplyError(error instanceof Error ? error.message : String(error));
         setIsLaunching(false);
@@ -700,6 +727,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         toolModelConfig,
         handleSelectModel,
         handleRestoreModel,
+        claudeCodeAccounts,
         codexAccounts,
         selectedCodexAccountId,
         setSelectedCodexAccountId: selectCodexAccount,
@@ -733,6 +761,14 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
       }}
     >
       {children}
+      {claudeCodeAccounts.login && (
+        <ClaudeCodeLoginDialog
+          submitting={claudeCodeAccounts.submitting}
+          error={claudeCodeAccounts.loginError}
+          onClose={claudeCodeAccounts.cancelLogin}
+          onSubmit={claudeCodeAccounts.completeLogin}
+        />
+      )}
     </AppManagerContext.Provider>
   );
 };

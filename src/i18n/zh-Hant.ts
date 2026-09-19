@@ -3,6 +3,7 @@
 // (軟體/使用者/設定/預設/影片/伺服器/訊息/檔案/啟動/連線 etc.)
 import { Translations } from './types';
 const zhHant: Partial<Translations> = {
+  'agent.authorizationCode': '授權碼',
   'nav.modelNexus': '模型中心',
   'nav.freeModels': '智能路由',
   'nav.appManager': '應用桌面',

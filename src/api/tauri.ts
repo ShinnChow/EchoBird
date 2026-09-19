@@ -223,3 +223,42 @@ export async function launchUserProject(launcherPath: string): Promise<void> {
 // ─── Window APIs (Tauri built-in) ───
 
 export { getCurrentWindow } from '@tauri-apps/api/window';
+
+export interface ClaudeCodeAccount {
+  id: string;
+  email: string;
+  plan?: string | null;
+  fiveHour?: { remainingPercent: number; resetAt?: number | null } | null;
+  sevenDay?: { remainingPercent: number; resetAt?: number | null } | null;
+  active: boolean;
+}
+
+export async function listClaudeCodeAccounts(): Promise<ClaudeCodeAccount[]> {
+  return invoke('list_claude_code_accounts');
+}
+export interface ClaudeCodeLogin {
+  loginId: string;
+  authorizationUrl: string;
+  expiresAt: number;
+}
+export async function startClaudeCodeLogin(): Promise<ClaudeCodeLogin> {
+  return invoke('start_claude_code_login');
+}
+export async function completeClaudeCodeLogin(
+  loginId: string,
+  code: string
+): Promise<ClaudeCodeAccount> {
+  return invoke('complete_claude_code_login', { loginId, code });
+}
+export async function cancelClaudeCodeLogin(loginId: string): Promise<void> {
+  return invoke('cancel_claude_code_login', { loginId });
+}
+export async function switchClaudeCodeAccount(accountId: string): Promise<ClaudeCodeAccount> {
+  return invoke('switch_claude_code_account', { accountId });
+}
+export async function refreshClaudeCodeAccountQuota(accountId: string): Promise<ClaudeCodeAccount> {
+  return invoke('refresh_claude_code_account_quota', { accountId });
+}
+export async function deleteClaudeCodeAccount(accountId: string): Promise<void> {
+  return invoke('delete_claude_code_account', { accountId });
+}

@@ -3,6 +3,7 @@
 // where natural (API / GitHub / Claude / Codex / etc.)
 import { Translations } from './types';
 const ja: Partial<Translations> = {
+  'agent.authorizationCode': '認証コード',
   'nav.modelNexus': 'モデルセンター',
   'nav.freeModels': 'スマートルーター',
   'nav.appManager': 'アプリデスクトップ',

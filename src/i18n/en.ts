@@ -2,6 +2,7 @@
 import { Translations } from './types';
 
 const en: Translations = {
+  'agent.authorizationCode': 'Authorization code',
   // Navigation
   'nav.modelNexus': 'Model Nexus',
   'nav.freeModels': 'Smart Router',

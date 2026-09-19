@@ -1,3 +1,4 @@
+import type { useClaudeCodeAccounts } from './useClaudeCodeAccounts';
 import { createContext, useContext } from 'react';
 import type { ModelConfig, LocalTool } from '../../api/types';
 import type { CodexAccount } from '../../api/tauri';
@@ -17,6 +18,7 @@ export interface AppManagerContextType {
   handleSelectModel: (toolId: string, modelId: string) => void;
   /** Restore the tool's config back to its official vendor endpoint */
   handleRestoreModel: (toolId: string) => Promise<void>;
+  claudeCodeAccounts: ReturnType<typeof useClaudeCodeAccounts>;
   codexAccounts: CodexAccount[];
   selectedCodexAccountId: string | null;
   setSelectedCodexAccountId: (id: string | null) => void;

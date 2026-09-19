@@ -212,13 +212,16 @@ describe('AppManager views', () => {
 });
 
 describe('PageAwareHint', () => {
-  const renderHint = async (selectedTool: string | null) => {
+  const renderHint = async (selectedTool: string | null, selectedAccount: string | null = null) => {
     vi.stubGlobal('__APP_EDITION__', 'full');
     useNavigationStore.setState({ activePage: 'apps' });
     const { PageAwareHint } = await import('./AppManagerComponents');
     const context: Partial<AppManagerContextType> = {
       viewMode: 'desktop',
       selectedTool,
+      claudeCodeAccounts: {
+        selectedId: selectedAccount,
+      } as AppManagerContextType['claudeCodeAccounts'],
     };
     return renderToStaticMarkup(
       <AppManagerContext.Provider value={context as AppManagerContextType}>
@@ -244,6 +247,11 @@ describe('PageAwareHint', () => {
       expect(markup).not.toContain('hint.devInvite');
     }
   );
+
+  it('hides the proxy reminder when a Claude Code account is selected', async () => {
+    const markup = await renderHint('claudecode', 'saved-account');
+    expect(markup).not.toContain('hint.devInvite');
+  });
 
   it('shows neither tool-specific reminder for other tools', async () => {
     const markup = await renderHint('test-tool');

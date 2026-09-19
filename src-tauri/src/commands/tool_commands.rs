@@ -519,3 +519,46 @@ pub async fn open_tool_paths_config() -> Result<String, String> {
     #[cfg(not(target_os = "android"))]
     Ok(resolved)
 }
+
+#[tauri::command]
+pub async fn list_claude_code_accounts(
+) -> Result<Vec<crate::services::claude_code_accounts::ClaudeCodeAccount>, String> {
+    crate::services::claude_code_accounts::list().await
+}
+
+#[tauri::command]
+pub fn start_claude_code_login() -> Result<crate::services::claude_code_oauth::LoginStart, String> {
+    crate::services::claude_code_oauth::start()
+}
+
+#[tauri::command]
+pub async fn complete_claude_code_login(
+    login_id: String,
+    code: String,
+) -> Result<crate::services::claude_code_accounts::ClaudeCodeAccount, String> {
+    crate::services::claude_code_oauth::complete(&login_id, &code).await
+}
+
+#[tauri::command]
+pub fn cancel_claude_code_login(login_id: String) -> Result<(), String> {
+    crate::services::claude_code_oauth::cancel(&login_id)
+}
+
+#[tauri::command]
+pub async fn switch_claude_code_account(
+    account_id: String,
+) -> Result<crate::services::claude_code_accounts::ClaudeCodeAccount, String> {
+    crate::services::claude_code_accounts::switch(&account_id).await
+}
+
+#[tauri::command]
+pub async fn refresh_claude_code_account_quota(
+    account_id: String,
+) -> Result<crate::services::claude_code_accounts::ClaudeCodeAccount, String> {
+    crate::services::claude_code_accounts::refresh(&account_id).await
+}
+
+#[tauri::command]
+pub async fn delete_claude_code_account(account_id: String) -> Result<(), String> {
+    crate::services::claude_code_accounts::delete(&account_id).await
+}

@@ -1,3 +1,4 @@
+import { ClaudeCodeAccountSection } from './ClaudeCodeAccountSection';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
@@ -724,7 +725,8 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
   };
 
   // Official-endpoint card — first item, like cc-switch's "Claude Official"
-  const accountReplacesOfficial = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
+  const accountReplacesOfficial =
+    selectedTool === 'codex' || selectedTool === 'chatgptdesktop' || selectedTool === 'claudecode';
   const official =
     selectedTool && !accountReplacesOfficial ? getOfficialEndpoint(selectedTool) : undefined;
   const officialSentinel = selectedTool ? officialModelSentinel(selectedTool) : '';
@@ -1119,6 +1121,7 @@ export const AppManagerPanel: React.FC = () => {
     claudeDesktopRelayMode,
     setClaudeDesktopRelayMode,
     claudeCodeRelayMode,
+    claudeCodeAccounts,
     setClaudeCodeRelayMode,
     claude1mMode,
     setClaude1mMode,
@@ -1129,18 +1132,41 @@ export const AppManagerPanel: React.FC = () => {
   const isClaudeDesktopApp = selectedTool === 'claudedesktop';
   const isClaudeCodeApp = selectedTool === 'claudecode';
   // Relay is shown for Claude Desktop + Claude Code, each binding its own flag.
-  const showRelayToggle = isClaudeDesktopApp || isClaudeCodeApp;
+  const showRelayToggle = isClaudeDesktopApp || (isClaudeCodeApp && !claudeCodeAccounts.selectedId);
   const relayModeValue = isClaudeDesktopApp ? claudeDesktopRelayMode : claudeCodeRelayMode;
   const setRelayModeValue = isClaudeDesktopApp ? setClaudeDesktopRelayMode : setClaudeCodeRelayMode;
   // 1M-context toggle: Claude Code ONLY, and only once API Router is on. Hidden
   // in bridge mode (bridge writes no model id — CC's built-in claude-* ids
   // already budget the full window, so [1m] would be moot) and for Claude
   // Desktop (its 1M support comes from the backend profile in bridge mode).
-  const show1mToggle = isClaudeCodeApp && claudeCodeRelayMode;
+  const show1mToggle = isClaudeCodeApp && claudeCodeRelayMode && !claudeCodeAccounts.selectedId;
   const showCodexAccounts = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
   const selectedToolProtocols = selectedToolData?.apiProtocol || ['openai', 'anthropic'];
   const hasVisibleModels = userModels.some((model) =>
     isModelCompatibleWithTool(model, selectedToolProtocols, selectedTool)
+  );
+
+  const routingControls = (showRelayToggle || show1mToggle) && (
+    <div className="px-3 h-9 flex items-center gap-2">
+      {showRelayToggle && (
+        <RoutingToggle
+          key="relay"
+          label={t('agent.codexRelayLabel')}
+          hint={t('agent.codexRelayHint')}
+          checked={relayModeValue}
+          onChange={setRelayModeValue}
+        />
+      )}
+      {show1mToggle && (
+        <RoutingToggle
+          key="1m"
+          label="1M"
+          hint={t('agent.claude1mHint')}
+          checked={claude1mMode}
+          onChange={setClaude1mMode}
+        />
+      )}
+    </div>
   );
 
   return (
@@ -1159,36 +1185,7 @@ export const AppManagerPanel: React.FC = () => {
         )}
       </div>
 
-      {/* Toggle row: Claude Desktop and Claude Code show the API Router toggle,
-          and Claude Code additionally shows a 1M toggle when
-          API Router is on. Each toggle inside is INDIVIDUALLY gated and binds
-          to the flag for the selected app (relayModeValue / setRelayModeValue
-          resolve per-app), so no cross-wiring between Claude Desktop and
-          Claude Code. For apps with no toggles nothing renders and the model
-          list below claims the space — the user preferred no reserved gap when
-          toggles are absent. */}
-      {(showRelayToggle || show1mToggle) && (
-        <div className="px-3 h-9 flex items-center gap-2">
-          {showRelayToggle && (
-            <RoutingToggle
-              key="relay"
-              label={t('agent.codexRelayLabel')}
-              hint={t('agent.codexRelayHint')}
-              checked={relayModeValue}
-              onChange={setRelayModeValue}
-            />
-          )}
-          {show1mToggle && (
-            <RoutingToggle
-              key="1m"
-              label="1M"
-              hint={t('agent.claude1mHint')}
-              checked={claude1mMode}
-              onChange={setClaude1mMode}
-            />
-          )}
-        </div>
-      )}
+      {!isClaudeCodeApp && routingControls}
 
       <div className="flex-1 p-2 overflow-y-auto">
         {selectedToolData ? (
@@ -1234,6 +1231,14 @@ export const AppManagerPanel: React.FC = () => {
           ) : (
             <div className="space-y-2 h-full">
               {showCodexAccounts && <CodexAccountSection showDivider={hasVisibleModels} />}
+              {isClaudeCodeApp && (
+                <>
+                  <ClaudeCodeAccountSection
+                    showDivider={hasVisibleModels || showRelayToggle || show1mToggle}
+                  />
+                  {routingControls}
+                </>
+              )}
               <ModelListSection
                 selectedToolData={selectedToolData}
                 userModels={userModels}
@@ -1286,6 +1291,7 @@ export const AppManagerBottom: React.FC = () => {
     selectedToolData,
     toolModelConfig,
     selectedCodexAccountId,
+    claudeCodeAccounts,
     launchAfterApply,
     setLaunchAfterApply,
     isLaunching,
@@ -1305,7 +1311,8 @@ export const AppManagerBottom: React.FC = () => {
   const isBuiltInApp = selectedTool === 'reversi' || selectedTool === 'translator';
   const hasModelSelected = !!(selectedTool && toolModelConfig[selectedTool]);
   const hasAccountSelected =
-    (selectedTool === 'codex' || selectedTool === 'chatgptdesktop') && !!selectedCodexAccountId;
+    ((selectedTool === 'codex' || selectedTool === 'chatgptdesktop') && !!selectedCodexAccountId) ||
+    (selectedTool === 'claudecode' && !!claudeCodeAccounts.selectedId);
   // What will a click actually do?
   //  - "Apply" runs only when the user picked a model AND agreed to the config-write policy.
   //  - "Launch" runs whenever launchAfterApply is on, or unconditionally for desktop/no-config apps.
@@ -1471,18 +1478,20 @@ export const AppManagerBottom: React.FC = () => {
 // "应用桌面" and "我的AI项目" without duplicating the rest of the row.
 export const PageAwareHint: React.FC = () => {
   const { t } = useI18n();
-  const { viewMode, selectedTool } = useAppManager();
+  const { viewMode, selectedTool, claudeCodeAccounts } = useAppManager();
   const activePage = useNavigationStore((s) => s.activePage);
   const key =
     activePage === 'myProjects'
       ? 'hint.myProjects'
       : viewMode === 'install'
         ? 'aiDesktop.installHint'
-        : selectedTool === 'claudedesktop' || selectedTool === 'claudecode'
-          ? 'hint.devInvite'
-          : selectedTool === 'chatgptdesktop' || selectedTool === 'codex'
-            ? 'hint.responsesRequired'
-            : null;
+        : selectedTool === 'claudecode' && claudeCodeAccounts.selectedId
+          ? null
+          : selectedTool === 'claudedesktop' || selectedTool === 'claudecode'
+            ? 'hint.devInvite'
+            : selectedTool === 'chatgptdesktop' || selectedTool === 'codex'
+              ? 'hint.responsesRequired'
+              : null;
   return (
     <div className="flex-1 text-[15px] font-medium text-cyber-accent">{key ? t(key) : null}</div>
   );

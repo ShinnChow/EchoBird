@@ -2,6 +2,7 @@
 
 // Translation key definitions
 export type TKey =
+  | 'agent.authorizationCode'
   // Navigation
   | 'nav.modelNexus'
   | 'nav.freeModels'

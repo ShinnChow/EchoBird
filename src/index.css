@@ -466,6 +466,16 @@ html.is-macos .page-scroll::-webkit-scrollbar {
   color: #ffffff;
 }
 
+[data-theme='dark'] .claude-account-pill {
+  background-color: #151515;
+  color: #f0efec;
+}
+
+[data-theme='light'] .claude-account-pill {
+  background-color: #fcfcfb;
+  color: #0b0b0b;
+}
+
 .account-pill .text-cyber-text {
   color: currentColor;
 }

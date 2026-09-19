@@ -336,8 +336,17 @@ pub(super) fn restore_claudecode_to_official() -> ApplyResult {
         "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
     ];
 
-    if let Some(home) = dirs::home_dir() {
-        let settings_path = home.join(".claude").join("settings.json");
+    {
+        let config_dir = match crate::services::claude_code_accounts::config_dir() {
+            Ok(dir) => dir,
+            Err(message) => {
+                return ApplyResult {
+                    success: false,
+                    message,
+                }
+            }
+        };
+        let settings_path = config_dir.join("settings.json");
         if settings_path.exists() {
             match read_json_file(&settings_path) {
                 Some(mut config) => {
@@ -345,7 +354,12 @@ pub(super) fn restore_claudecode_to_official() -> ApplyResult {
                         for key in OUR_ENV_KEYS {
                             env.remove(key);
                         }
-                        let _ = write_json_file(&settings_path, &config);
+                        if let Err(message) = write_json_file(&settings_path, &config) {
+                            return ApplyResult {
+                                success: false,
+                                message,
+                            };
+                        }
                     }
                 }
                 None => {
