@@ -8,6 +8,7 @@ import type { CodexAccount } from '../../api/tauri';
 import { AppManagerContext } from './context';
 import { useToolsStore } from '../../stores/toolsStore';
 import { useNavigationStore } from '../../stores/navigationStore';
+import { useModelNexus } from '../ModelNexus/context';
 import { getOfficialEndpoint, isOfficialModelSentinel } from '../../data/officialEndpoints';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 
@@ -34,14 +35,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const confirm = useConfirm();
 
   // From stores (replaces drilled props)
-  const {
-    detectedTools,
-    setDetectedTools,
-    isScanning,
-    scanTools,
-    modelProtocolSelection,
-    setModelProtocolSelection,
-  } = useToolsStore();
+  const { detectedTools, setDetectedTools, isScanning, scanTools } = useToolsStore();
   const { activePage, goToMother } = useNavigationStore();
   const isActive = activePage === 'apps';
 
@@ -54,13 +48,23 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     [t, goToMother]
   );
 
+  const [toolModelConfig, setToolModelConfig] = useState<Record<string, string | null>>({
+    claudecode: null,
+    openclaw: null,
+    opencode: null,
+    codex: null,
+    hermes: null,
+    zcode: null,
+  });
+
   // Load models internally. userModels is consumed by BOTH the AppManager
   // right panel AND the 我的AI项目 right panel (same ModelListSection
   // component), so reload on either activation — otherwise a model added
   // in 模型中心 only surfaces in 我的AI项目 after the user incidentally
-  // bounces through 应用桌面 (which flips isActive). The extra trigger
-  // is free in practice (IPC + a couple of file reads on local Rust).
+  // bounces through 应用桌面 (which flips isActive). Also reload when Model
+  // Nexus changes, including edits/deletes from this panel.
   const [userModels, setUserModels] = useState<ModelConfig[]>([]);
+  const { userModels: modelNexusModels } = useModelNexus();
   const userModelsActive = isActive || activePage === 'myProjects';
   useEffect(() => {
     if (!api.getModels) return;
@@ -71,13 +75,26 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     api
       .getModels()
       .then((models) => {
-        if (!ignore) setUserModels(models);
+        if (ignore) return;
+        setUserModels(models);
+        setToolModelConfig((prev) => {
+          const removed = Object.keys(prev).filter(
+            (toolId) =>
+              prev[toolId] &&
+              !isOfficialModelSentinel(prev[toolId]!) &&
+              !models.some((model) => model.internalId === prev[toolId])
+          );
+          if (removed.length === 0) return prev;
+          const next = { ...prev };
+          removed.forEach((toolId) => (next[toolId] = null));
+          return next;
+        });
       })
       .catch((e) => console.error('Load models failed:', e));
     return () => {
       ignore = true;
     };
-  }, [userModelsActive]);
+  }, [userModelsActive, modelNexusModels]);
 
   // AI-installable IDs from bundled install/index.json (offline-first).
   const [aiInstallableIds, setAiInstallableIds] = useState<string[]>([]);
@@ -124,14 +141,6 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   }, [isAddingCodexAccount]);
 
   const isCodexTool = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
-  const [toolModelConfig, setToolModelConfig] = useState<Record<string, string | null>>({
-    claudecode: null,
-    openclaw: null,
-    opencode: null,
-    codex: null,
-    hermes: null,
-    zcode: null,
-  });
   const selectCodexAccount = useCallback(
     (accountId: string | null) => {
       setSelectedCodexAccountIdRaw(accountId);
@@ -383,13 +392,11 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     const toolData = detectedTools.find((t) => t.id === toolId);
     const toolProtocols = toolData?.apiProtocol || ['openai'];
 
-    const userSelectedProtocol = modelProtocolSelection[internalId];
     // Default to the protocol the model's URL actually speaks — NOT toolProtocols[0].
-    // For a single-URL model (no ⇄ switcher) defaulting to toolProtocols[0] would
+    // For a single-URL model, defaulting to toolProtocols[0] would
     // write an OpenAI-only model as @ai-sdk/anthropic against an OpenAI URL (or an
     // Anthropic-only model as openai-compatible), 404-ing every call at runtime.
-    // Only a both-URL model falls back to toolProtocols[0] — its switcher lets the
-    // user pick. (Improves zcode too: an anthropicUrl-only model now defaults correctly.)
+    // Only a both-URL model falls back to toolProtocols[0].
     const modelHasBoth = !!(model.baseUrl && model.anthropicUrl);
     const defaultProtocol = modelHasBoth
       ? toolProtocols[0] === 'anthropic'
@@ -398,7 +405,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
       : model.anthropicUrl
         ? 'anthropic'
         : 'openai';
-    const selectedProtocol = userSelectedProtocol || defaultProtocol;
+    const selectedProtocol = defaultProtocol;
 
     const useAnthropicUrl = selectedProtocol === 'anthropic' && model.anthropicUrl;
     const apiUrl = useAnthropicUrl ? model.anthropicUrl! : model.baseUrl;
@@ -618,7 +625,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
               apiKey: selectedModel.apiKey,
               model: selectedModel.modelId || selectedModel.name || 'unknown',
               name: selectedModel.name,
-              protocol: modelProtocolSelection[selectedModel.internalId] || 'openai',
+              protocol: selectedModel.baseUrl ? 'openai' : 'anthropic',
               locale,
             }
           : { locale };
@@ -711,8 +718,6 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         isScanning,
         scanTools,
         userModels,
-        modelProtocolSelection,
-        setModelProtocolSelection,
         claudeDesktopRelayMode,
         setClaudeDesktopRelayMode,
         claudeCodeRelayMode,

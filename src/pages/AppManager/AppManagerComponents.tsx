@@ -24,16 +24,19 @@ import {
   ExternalLink,
   LoaderCircle,
   RefreshCw,
+  SquarePen,
   Settings,
   Trash2,
 } from 'lucide-react';
 import { getModelIcon, EffortPulse } from '../../components';
+import { useConfirm } from '../../components/ConfirmDialog';
 import { useI18n } from '../../hooks/useI18n';
 import * as api from '../../api/tauri';
 import type { ModelConfig, LocalTool } from '../../api/types';
 import type { TKey } from '../../i18n';
 import { useAppManager } from './context';
 import { useNavigationStore } from '../../stores/navigationStore';
+import { useModelNexus } from '../ModelNexus/context';
 import {
   getOfficialEndpoint,
   officialModelSentinel,
@@ -468,13 +471,15 @@ interface ModelListSectionProps {
   toolModelConfig: Record<string, string | null>;
   selectedTool: string | null;
   handleSelectModel: (toolId: string, modelId: string) => void;
-  modelProtocolSelection: Record<string, 'openai' | 'anthropic'>;
-  setModelProtocolSelection: React.Dispatch<
-    React.SetStateAction<Record<string, 'openai' | 'anthropic'>>
-  >;
   /** When set, the card whose model id matches plays a one-shot apply pulse
    *  (keyed by nonce so re-applying replays it). Omitted where unused. */
   appliedPulse?: { id: string; nonce: number } | null;
+  modelUsageData?: Record<string, api.ModelUsageData>;
+  refreshingUsageIds?: Set<string>;
+  isRefreshingUsage?: boolean;
+  onRefreshUsage?: (modelId: string) => void;
+  onEditModel?: (model: ModelConfig) => void;
+  onDeleteModel?: (modelId: string) => void;
   t: (key: TKey) => string;
 }
 
@@ -528,9 +533,13 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
   toolModelConfig,
   selectedTool,
   handleSelectModel,
-  modelProtocolSelection,
-  setModelProtocolSelection,
   appliedPulse,
+  modelUsageData,
+  refreshingUsageIds,
+  isRefreshingUsage,
+  onRefreshUsage,
+  onEditModel,
+  onDeleteModel,
   t,
 }) => {
   const toolProtocols = useMemo(
@@ -554,30 +563,25 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
   const renderModelCard = (model: (typeof userModels)[0], badge?: 'smart' | 'local') => {
     const isSelected = selectedTool ? toolModelConfig[selectedTool] === model.internalId : false;
     const isLocalModel = model.internalId === 'local-server' || model.internalId === 'smart-router';
+    const canManage = !isLocalModel && model.modelType !== 'DEMO';
+    const quota = modelUsageData?.[model.internalId]?.quotas[0];
+    const usageSummary = quota
+      ? quota.balance != null
+        ? `${t('model.balance')}${quota.balance.toFixed(2)}`
+        : `${Number(quota.percentage.toFixed(1))}%`
+      : undefined;
+    const refreshing = isRefreshingUsage || refreshingUsageIds?.has(model.internalId) || false;
 
     const modelHasBoth = !!(model.baseUrl && model.anthropicUrl);
-    const toolSupportsBoth =
-      toolProtocols.includes('openai') && toolProtocols.includes('anthropic');
-    const showSwitcher = modelHasBoth && toolSupportsBoth;
-
-    let currentProtocol = 'openai';
-    if (toolSupportsBoth) {
-      // Default to the protocol the model's URL actually speaks (see
-      // applyModelConfig for the matching apply-side default). A single-URL model
-      // must not inherit toolProtocols[0] — that would display (and apply) an
-      // OpenAI-only model as Anthropic, 404-ing at call time. Only a both-URL
-      // model keeps the toolProtocols[0] default, since its ⇄ switcher can change it.
-      const defaultProtocol = modelHasBoth
-        ? toolProtocols[0] === 'anthropic'
-          ? 'anthropic'
-          : 'openai'
-        : model.anthropicUrl
-          ? 'anthropic'
-          : 'openai';
-      currentProtocol = modelProtocolSelection[model.internalId] || defaultProtocol;
-    } else {
-      currentProtocol = toolProtocols[0];
-    }
+    // Use the same default as applyModelConfig: a model with one URL uses that
+    // URL's protocol; a model with both URLs follows the tool's first protocol.
+    const currentProtocol = modelHasBoth
+      ? toolProtocols[0] === 'anthropic'
+        ? 'anthropic'
+        : 'openai'
+      : model.anthropicUrl
+        ? 'anthropic'
+        : 'openai';
 
     const displayUrl =
       currentProtocol === 'anthropic'
@@ -648,6 +652,11 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
             <div className="text-sm font-bold truncate leading-none flex-1 min-w-0">
               {model.name || 'Untitled Model'}
             </div>
+            {!isLocalModel && usageSummary && (
+              <span className="text-[10px] text-cyber-text-secondary flex-shrink-0 whitespace-nowrap">
+                {usageSummary}
+              </span>
+            )}
             {badge && (
               <span
                 className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none ${
@@ -659,25 +668,55 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
                 {t(badge === 'smart' ? 'agent.badge.smart' : 'agent.badge.local')}
               </span>
             )}
-            {showSwitcher && (
-              <span
-                className="text-[10px] font-mono cursor-pointer select-none flex-shrink-0 transition-colors text-cyber-text-muted/60 hover:text-cyber-text"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const newProtocol = currentProtocol === 'openai' ? 'anthropic' : 'openai';
-                  setModelProtocolSelection((prev) => ({
-                    ...prev,
-                    [model.internalId]: newProtocol,
-                  }));
-                }}
-              >
-                {currentProtocol === 'openai' ? 'OpenAI' : 'Anthropic'}{' '}
-                <span className="text-[8px]">⇄</span>
-              </span>
-            )}
           </div>
-          <div className="text-[10px] text-cyber-text-secondary truncate leading-tight mt-1 opacity-70">
-            {apiPath}
+          <div className="flex items-center gap-2 mt-1 text-[10px] leading-tight">
+            <span className="flex flex-1 min-w-0 truncate text-cyber-text-secondary/70">
+              {apiPath}
+            </span>
+            {!isLocalModel && (onRefreshUsage || (canManage && (onDeleteModel || onEditModel))) && (
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {onRefreshUsage && (
+                  <button
+                    type="button"
+                    className="p-0.5 text-cyber-text-muted/70 hover:text-cyber-text transition-colors"
+                    aria-label={t('btn.refreshUsage')}
+                    aria-busy={refreshing}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!refreshing) onRefreshUsage(model.internalId);
+                    }}
+                  >
+                    <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+                  </button>
+                )}
+                {canManage && onDeleteModel && (
+                  <button
+                    type="button"
+                    className="p-0.5 text-cyber-text-muted/70 hover:text-red-500 transition-colors"
+                    aria-label={t('btn.delete')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteModel(model.internalId);
+                    }}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+                {canManage && onEditModel && (
+                  <button
+                    type="button"
+                    className="p-0.5 text-cyber-text-muted/70 hover:text-cyber-text transition-colors"
+                    aria-label={t('btn.edit')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditModel(model);
+                    }}
+                  >
+                    <SquarePen size={12} />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1059,14 +1098,23 @@ function RoutingToggle({ label, hint, checked, onChange }: RoutingToggleProps) {
 
 export const AppManagerPanel: React.FC = () => {
   const { t, locale } = useI18n();
+  const confirm = useConfirm();
+  const {
+    modelUsageData,
+    refreshingUsageIds,
+    isRefreshingUsage,
+    refreshSingleUsage,
+    handleCardEdit,
+    handleCardDelete,
+    volcAkSkMissingIds,
+    openAkskModal,
+  } = useModelNexus();
   const {
     selectedToolData,
     selectedTool,
     userModels,
     toolModelConfig,
     handleSelectModel,
-    modelProtocolSelection,
-    setModelProtocolSelection,
     appliedPulse,
     claudeDesktopRelayMode,
     setClaudeDesktopRelayMode,
@@ -1192,9 +1240,26 @@ export const AppManagerPanel: React.FC = () => {
                 toolModelConfig={toolModelConfig}
                 selectedTool={selectedTool}
                 handleSelectModel={handleSelectModel}
-                modelProtocolSelection={modelProtocolSelection}
-                setModelProtocolSelection={setModelProtocolSelection}
                 appliedPulse={appliedPulse}
+                modelUsageData={modelUsageData}
+                refreshingUsageIds={refreshingUsageIds}
+                isRefreshingUsage={isRefreshingUsage}
+                onRefreshUsage={(modelId) =>
+                  volcAkSkMissingIds.has(modelId)
+                    ? openAkskModal(modelId)
+                    : refreshSingleUsage(modelId)
+                }
+                onEditModel={handleCardEdit}
+                onDeleteModel={async (modelId) => {
+                  const ok = await confirm({
+                    title: t('model.deleteTitle'),
+                    message: t('model.deleteConfirm'),
+                    confirmText: t('btn.delete'),
+                    cancelText: t('btn.cancel'),
+                    type: 'danger',
+                  });
+                  if (ok) await handleCardDelete(modelId);
+                }}
                 t={t}
               />
             </div>

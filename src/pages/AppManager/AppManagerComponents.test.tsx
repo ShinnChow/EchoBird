@@ -56,8 +56,6 @@ describe('ModelListSection', () => {
         toolModelConfig={{}}
         selectedTool={tool.id}
         handleSelectModel={() => undefined}
-        modelProtocolSelection={{}}
-        setModelProtocolSelection={() => undefined}
         t={(key) => labels[key] ?? key}
       />
     );
@@ -66,6 +64,40 @@ describe('ModelListSection', () => {
     expect(markup).toContain('本地');
     expect(markup.indexOf('Auto Router')).toBeLessThan(markup.indexOf('Local Model'));
     expect(markup.indexOf('Local Model')).toBeLessThan(markup.indexOf('Cloud Model'));
+  });
+
+  it('shows the API URL without switch controls or browser tooltips', async () => {
+    vi.stubGlobal('__APP_EDITION__', 'full');
+    const { ModelListSection } = await import('./AppManagerComponents');
+    const markup = renderToStaticMarkup(
+      <ModelListSection
+        selectedToolData={{ ...tool, apiProtocol: ['openai', 'anthropic'] }}
+        userModels={[{ ...models[0], anthropicUrl: 'https://cloud.example/anthropic' }]}
+        toolModelConfig={{}}
+        selectedTool={tool.id}
+        handleSelectModel={() => undefined}
+        modelUsageData={{
+          'cloud-model': {
+            quotas: [{ percentage: 80, resetAt: Date.now() + 60_000 }],
+          },
+        }}
+        refreshingUsageIds={new Set()}
+        onRefreshUsage={() => undefined}
+        onEditModel={() => undefined}
+        onDeleteModel={() => undefined}
+        t={(key) => labels[key] ?? key}
+      />
+    );
+
+    expect(markup).toContain('80%');
+    expect(markup).toContain('cloud.example/v1');
+    expect(markup).not.toContain('OAI');
+    expect(markup).not.toContain('ANT');
+    expect(markup).not.toContain('⇄');
+    expect(markup).not.toContain('OpenAI');
+    expect(markup).not.toContain('Anthropic');
+    expect(markup).not.toContain('title=');
+    expect(markup).not.toContain('disabled=');
   });
 
   it.each(['codex', 'chatgptdesktop'])(
@@ -80,8 +112,6 @@ describe('ModelListSection', () => {
           toolModelConfig={{}}
           selectedTool={toolId}
           handleSelectModel={() => undefined}
-          modelProtocolSelection={{}}
-          setModelProtocolSelection={() => undefined}
           t={(key) => labels[key] ?? key}
         />
       );

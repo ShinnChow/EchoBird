@@ -24,10 +24,8 @@ import { ModelListSection } from '../AppManager/AppManagerComponents';
 /// Build a synthetic LocalTool from a user project so the existing
 /// ModelListSection can render its model list without any
 /// user-project-specific code path. Declared single-protocol (`openai`)
-/// solely to suppress ModelListSection's OpenAI⇄Anthropic toggle —
 /// `apply_user_project_model` writes all 4 fields (modelId / baseUrl /
-/// anthropicUrl / apiKey) flat regardless, so the toggle would be a
-/// no-op cosmetic widget here. Cards still fall back to anthropicUrl
+/// anthropicUrl / apiKey) flat regardless. Cards still fall back to anthropicUrl
 /// when baseUrl is empty, so Anthropic-only models display correctly.
 const synthesiseToolFromProject = (id: string, name: string): LocalTool => ({
   id,
@@ -70,12 +68,6 @@ export const MyProjectsPanel: React.FC = () => {
   const userProjectModelChoice = useMyProjectsStore((s) => s.userProjectModelChoice);
   const setUserProjectModelChoice = useMyProjectsStore((s) => s.setUserProjectModelChoice);
   const { userModels } = useAppManager();
-
-  // Per-session protocol toggle state — same shape AppManager uses. Doesn't
-  // need to persist; the next session restart of EchoBird resets to default.
-  const [modelProtocolSelection, setModelProtocolSelection] = useState<
-    Record<string, 'openai' | 'anthropic'>
-  >({});
 
   // Resolve the project record. Built-ins are computed (id "builtin-<id>"),
   // user projects come from the store list. If id doesn't match either we
@@ -122,8 +114,6 @@ export const MyProjectsPanel: React.FC = () => {
               toolModelConfig={toolModelConfig}
               selectedTool={syntheticTool.id}
               handleSelectModel={handleSelectModel}
-              modelProtocolSelection={modelProtocolSelection}
-              setModelProtocolSelection={setModelProtocolSelection}
               t={t}
             />
           </div>

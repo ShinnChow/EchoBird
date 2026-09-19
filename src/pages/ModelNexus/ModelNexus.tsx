@@ -103,6 +103,64 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
     }, 200);
   }, []);
 
+  // Pre-fill values for the AK/SK modal (fetched when opening for a model).
+  const [volcAkSkInitial, setVolcAkSkInitial] = useState<{
+    access_key: string;
+    secret_key: string;
+  } | null>(null);
+
+  const openAkskModal = async (internalId: string) => {
+    try {
+      setVolcAkSkInitial(await api.getVolcAksk(internalId));
+    } catch {
+      setVolcAkSkInitial(null);
+    }
+    setVolcAkSkModelId(internalId);
+  };
+
+  const handleCardEdit = useCallback(
+    async (model: (typeof userModels)[0]) => {
+      // Reload fresh model data from disk to get latest apiKey state
+      let freshModel = model;
+      try {
+        const freshModels = await api.getModels();
+        const found = freshModels.find((m) => m.internalId === model.internalId);
+        if (found) {
+          freshModel = found;
+          // Also update the models list with fresh data
+          setUserModels(visibleModelNexusModels(freshModels));
+        }
+      } catch {
+        /* fallback to stale model */
+      }
+
+      setModelModalDestination('modelNexus');
+      setEditingModelId(freshModel.internalId);
+      if (freshModel.apiKey?.startsWith('enc:v1:') && api.isKeyDestroyed) {
+        api.isKeyDestroyed(freshModel.internalId).then((destroyed) => setKeyDestroyed(destroyed));
+      } else {
+        setKeyDestroyed(false);
+      }
+      setNewModelForm({
+        name: freshModel.name,
+        baseUrl: freshModel.baseUrl,
+        anthropicUrl: freshModel.anthropicUrl || '',
+        apiKey: freshModel.apiKey,
+        modelId: freshModel.modelId || '',
+      });
+      setShowAddModelModal(true);
+    },
+    [setEditingModelId, setKeyDestroyed, setNewModelForm, setShowAddModelModal, setUserModels]
+  );
+
+  const handleCardDelete = useCallback(
+    async (modelId: string) => {
+      await api.deleteModel(modelId);
+      setUserModels((prev) => prev.filter((m) => m.internalId !== modelId));
+    },
+    [setUserModels]
+  );
+
   // Test state
   const [testInput, setTestInput] = useState('');
   const [testOutput, setTestOutput] = useState<string[]>([]);
@@ -431,9 +489,20 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
         refreshAllUsage,
         refreshSingleUsage,
         handleTestModel,
+        handleCardEdit,
+        handleCardDelete,
+        openAkskModal,
       }}
     >
       {children}
+      {volcAkSkModelId && (
+        <VolcAkskModal
+          onClose={() => setVolcAkSkModelId(null)}
+          onSave={(ak, sk) => saveVolcAksk(volcAkSkModelId, ak, sk)}
+          initialAk={volcAkSkInitial?.access_key ?? ''}
+          initialSk={volcAkSkInitial?.secret_key ?? ''}
+        />
+      )}
     </ModelNexusContext.Provider>
   );
 }
@@ -696,71 +765,13 @@ export function ModelNexusMain() {
     setShowAddModelModal,
     setUserModels,
     keyDestroyed: _keyDestroyed,
-    setKeyDestroyed,
+    handleCardEdit,
+    handleCardDelete,
+    openAkskModal,
     refreshSingleUsage,
     refreshingUsageIds,
     volcAkSkMissingIds,
-    volcAkSkModelId,
-    setVolcAkSkModelId,
-    saveVolcAksk,
   } = useModelNexus();
-
-  // Pre-fill values for the AK/SK modal (fetched when opening for a model).
-  const [volcAkSkInitial, setVolcAkSkInitial] = useState<{
-    access_key: string;
-    secret_key: string;
-  } | null>(null);
-
-  const openAkskModal = async (internalId: string) => {
-    try {
-      setVolcAkSkInitial(await api.getVolcAksk(internalId));
-    } catch {
-      setVolcAkSkInitial(null);
-    }
-    setVolcAkSkModelId(internalId);
-  };
-
-  const handleCardEdit = useCallback(
-    async (model: (typeof userModels)[0]) => {
-      // Reload fresh model data from disk to get latest apiKey state
-      let freshModel = model;
-      try {
-        const freshModels = await api.getModels();
-        const found = freshModels.find((m) => m.internalId === model.internalId);
-        if (found) {
-          freshModel = found;
-          // Also update the models list with fresh data
-          setUserModels(visibleModelNexusModels(freshModels));
-        }
-      } catch {
-        /* fallback to stale model */
-      }
-
-      setEditingModelId(freshModel.internalId);
-      if (freshModel.apiKey?.startsWith('enc:v1:') && api.isKeyDestroyed) {
-        api.isKeyDestroyed(freshModel.internalId).then((destroyed) => setKeyDestroyed(destroyed));
-      } else {
-        setKeyDestroyed(false);
-      }
-      setNewModelForm({
-        name: freshModel.name,
-        baseUrl: freshModel.baseUrl,
-        anthropicUrl: freshModel.anthropicUrl || '',
-        apiKey: freshModel.apiKey,
-        modelId: freshModel.modelId || '',
-      });
-      setShowAddModelModal(true);
-    },
-    [setEditingModelId, setKeyDestroyed, setNewModelForm, setShowAddModelModal, setUserModels]
-  );
-
-  const handleCardDelete = useCallback(
-    async (modelId: string) => {
-      await api.deleteModel(modelId);
-      setUserModels((prev) => prev.filter((m) => m.internalId !== modelId));
-    },
-    [setUserModels]
-  );
 
   // Drag-reorder: pointer (5px activation so plain clicks pass through) +
   // keyboard (a11y). On drop, reorder in place and persist the full visible
@@ -923,14 +934,6 @@ export function ModelNexusMain() {
           </DragOverlay>
         </DndContext>
       </div>
-      {volcAkSkModelId && (
-        <VolcAkskModal
-          onClose={() => setVolcAkSkModelId(null)}
-          onSave={(ak, sk) => saveVolcAksk(volcAkSkModelId, ak, sk)}
-          initialAk={volcAkSkInitial?.access_key ?? ''}
-          initialSk={volcAkSkInitial?.secret_key ?? ''}
-        />
-      )}
     </>
   );
 }

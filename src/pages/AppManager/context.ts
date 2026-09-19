@@ -36,10 +36,6 @@ export interface AppManagerContextType {
   isScanning: boolean;
   scanTools: () => Promise<void>;
   userModels: ModelConfig[];
-  modelProtocolSelection: Record<string, 'openai' | 'anthropic'>;
-  setModelProtocolSelection: React.Dispatch<
-    React.SetStateAction<Record<string, 'openai' | 'anthropic'>>
-  >;
   /** Claude Desktop routing toggle. Kept separate from Codex because the
    *  two apps target different protocols / different relay-station compat. */
   claudeDesktopRelayMode: boolean;
