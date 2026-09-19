@@ -420,6 +420,21 @@ fn active_account_id(auth_path: &Path) -> Option<String> {
         .map(|metadata| metadata.id)
 }
 
+fn persist_active_snapshot(codex_dir: &Path, account_id: &str, raw: &[u8]) -> Result<(), String> {
+    let auth_path = codex_dir.join("auth.json");
+    if active_account_id(&auth_path).as_deref() != Some(account_id) {
+        return Ok(());
+    }
+
+    let keychain_is_current = read_keychain_raw(codex_dir).ok().flatten().is_some()
+        && read_oauth_snapshot(&auth_path).is_none();
+    if keychain_is_current {
+        write_keychain_raw(codex_dir, raw)
+    } else {
+        write_private_file(&auth_path, raw)
+    }
+}
+
 fn build_summary(
     mut metadata: AccountMetadata,
     active_id: Option<&str>,
@@ -879,15 +894,7 @@ pub async fn refresh_account_quota(account_id: &str) -> Result<CodexAccountSumma
         let refreshed_raw = serde_json::to_vec_pretty(&auth)
             .map_err(|error| format!("Failed to encode refreshed account: {error}"))?;
         write_private_file(&saved_path, &refreshed_raw)?;
-        if active_account_id(&codex_dir.join("auth.json")) == Some(account_id.to_string()) {
-            let auth_path = codex_dir.join("auth.json");
-            let keychain_is_current = read_keychain_raw(&codex_dir).ok().flatten().is_some()
-                && read_oauth_snapshot(&auth_path).is_none();
-            write_private_file(&auth_path, &refreshed_raw)?;
-            if keychain_is_current {
-                write_keychain_raw(&codex_dir, &refreshed_raw)?;
-            }
-        }
+        persist_active_snapshot(&codex_dir, account_id, &refreshed_raw)?;
     }
 
     let mut response = request_usage(&access_token, chatgpt_account_id.as_deref()).await?;
@@ -900,6 +907,7 @@ pub async fn refresh_account_quota(account_id: &str) -> Result<CodexAccountSumma
         let refreshed_raw = serde_json::to_vec_pretty(&auth)
             .map_err(|error| format!("Failed to encode refreshed account: {error}"))?;
         write_private_file(&saved_path, &refreshed_raw)?;
+        persist_active_snapshot(&codex_dir, account_id, &refreshed_raw)?;
         response = request_usage(&access_token, chatgpt_account_id.as_deref()).await?;
     }
     let status = response.status();
@@ -1037,6 +1045,24 @@ mod tests {
         let accounts = list_accounts_at(&auth_path, &store_dir).unwrap();
         assert_eq!(accounts.len(), 2);
         assert!(accounts.iter().all(|account| !account.active));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn refreshed_tokens_update_the_active_snapshot() {
+        let dir = temp_dir("refresh-active");
+        let codex_dir = dir.join("codex");
+        let auth_path = codex_dir.join("auth.json");
+        let store_dir = dir.join("state/codex-accounts");
+        let old = oauth("first@example.com", "acc-1", "refresh-1");
+        let new = oauth("first@example.com", "acc-1", "refresh-2");
+        write_private_file(&auth_path, &old).unwrap();
+        let auth: Value = serde_json::from_slice(&old).unwrap();
+        let metadata = save_snapshot(&old, &auth, &store_dir).unwrap();
+
+        persist_active_snapshot(&codex_dir, &metadata.id, &new).unwrap();
+
+        assert_eq!(fs::read(&auth_path).unwrap(), new);
         let _ = fs::remove_dir_all(dir);
     }
 
