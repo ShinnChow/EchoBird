@@ -279,20 +279,22 @@ When the user asks to set the **ChatGPT** display/UI language (triggers like "�
 
 When the user asks to make **Claude Desktop** Chinese (triggers like "设置 Claude 桌面端为简体中文" / "設定 Claude 桌面端為繁體中文"):
 
-Claude Desktop ships no Chinese UI. Use the community patch **`javaht/claude-desktop-zh-cn`** (1.4k★), which adds Chinese resources by patching Claude's local `app.asar`.
+Use the community patch **`javaht/claude-desktop-zh-cn`** for this Windows workflow. Pin downloads to commit `62ce5ea2a5002e1b72b4bc039164161c83bf461b`; do not silently substitute `main` or a newer release. Its script parameters were reviewed on 2026-09-19; installation, uninstall recovery, and Cowork compatibility have NOT been verified locally. For other operating systems, consult that pinned revision's platform instructions instead of running the Windows commands.
 
 1. **Ensure Claude Desktop is installed.** If not, install it (Desktop App Install above — `winget install --id Anthropic.Claude`), then continue **in the same turn**.
-2. **Surface the trade-offs and get ONE yes before patching**: patching `app.asar` rewrites `Claude.exe`'s integrity hash and **breaks its Authenticode signature**, so **Cowork sandbox / screenshot workspace may stop working**; a later Claude Desktop update can revert the patch (just re-run it). If the user needs Cowork, use `safe` mode in step 3.
-3. **Get the patch and run it elevated, non-interactively. Do NOT install Git for this — download the source ZIP:**
+2. **Choose the mode from the user's existing setup** (ask only if unknown): `safe` for third-party API use; `official` for online-page translation with an official account. Explain the selected mode's trade-offs before patching; use approval already given in the conversation rather than asking again. `official` modifies `app.asar` and the executable's integrity hash, invalidating its Authenticode signature. `safe` skips those modifications but translates resources and frontend bundles, not the official account's online DOM. Upstream README and installer menu disagree about Cowork compatibility: do NOT promise that either mode preserves Cowork or screenshot workspaces. Claude updates can overwrite the patch.
+3. **Get the pinned patch and run it elevated, non-interactively. Do NOT install Git for this — download the source ZIP:**
    ```powershell
-   $zip = "$env:TEMP\claude-zh.zip"
-   Invoke-WebRequest "https://github.com/javaht/claude-desktop-zh-cn/archive/refs/heads/main.zip" -OutFile $zip
-   Expand-Archive $zip "$env:TEMP\claude-zh" -Force
-   # then, as Administrator, from the extracted folder (claude-desktop-zh-cn-main):
-   .\scripts\install_windows.ps1 install <zh-CN|zh-TW> -PatchMode full
+   $patchRevision = '62ce5ea2a5002e1b72b4bc039164161c83bf461b'
+   $patchStage = Join-Path $env:TEMP ("echobird-claude-zh-" + [guid]::NewGuid().ToString('N'))
+   New-Item -ItemType Directory -Path $patchStage | Out-Null
+   $patchZip = Join-Path $patchStage 'source.zip'
+   Invoke-WebRequest "https://github.com/javaht/claude-desktop-zh-cn/archive/$patchRevision.zip" -OutFile $patchZip
+   Expand-Archive -LiteralPath $patchZip -DestinationPath $patchStage
+   $patchRoot = Join-Path $patchStage "claude-desktop-zh-cn-$patchRevision"
    ```
-   - Language: 简体中文→`zh-CN`, 繁體中文(台灣)→`zh-TW`, 香港→`zh-HK`.
-   - `-PatchMode full` = most complete Chinese (breaks signature). Use `-PatchMode safe` if the user needs Cowork (menu-only translation, keeps signature).
-   - Revert later with `.\scripts\install_windows.ps1 uninstall`.
-4. **Restart Claude Desktop**, verify the UI is Chinese, and report. Scope is the Chinese localization ONLY — never touch model routing / API config here.
+   - Before elevation, capture the original user's SID, `USERPROFILE`, `APPDATA`, and `LOCALAPPDATA`. Pass them to the script as `-OriginalUserSid`, `-OriginalUserProfile`, `-OriginalAppData`, and `-OriginalLocalAppData`, including during uninstall. This matches the upstream launcher and avoids patching the administrator's profile when UAC uses another account.
+   - From `$patchRoot`, use elevated Windows PowerShell with `-NoProfile -ExecutionPolicy Bypass -File .\scripts\install_windows.ps1 install <language> -PatchMode <mode>` plus those original-user arguments. Replace placeholders with the selected values: language 简体中文=`zh-CN`, 繁體中文(台灣)=`zh-TW`, 香港=`zh-HK`; mode=`safe` or `official`. The obsolete `full` value is invalid. Wait for completion and inspect the exit code and installer log.
+   - Keep the pinned installer path and upstream backups available. To revert, run the same pinned `scripts\install_windows.ps1` elevated with action `uninstall` and the original-user arguments; do not manually delete backups.
+4. **Restart Claude Desktop**, verify the requested language, and report the actual result. Do not claim installation, recovery, or Cowork validation based solely on a successful script exit. Scope is Chinese localization ONLY: do not enable Frida, change automatic-update settings, sync CC Switch skills, or change model routing / API configuration. If the pinned patch is incompatible with the installed Claude version, report the failure rather than automatically upgrading the patch or switching to experimental modes.
 5. Reply in the user's language.
