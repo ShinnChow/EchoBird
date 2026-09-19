@@ -1,5 +1,5 @@
 {
-  "version": "5.7.4",
+  "version": "5.7.5",
   "releaseDate": "2026-09-19",
   "releaseNotes": "Claude Code 账号登录与额度显示上线，模型配置更灵活。\n\n## 新增\n\n- Claude Code 支持通过浏览器 OAuth 添加账号，使用授权码弹窗完成登录，并可切换、刷新和删除账号。\n- 账号卡片显示套餐等级、5 小时与 7 天剩余额度及重置倒计时。\n- Claude Desktop 新增独立 1M 开关，控制默认使用 1M 上下文，不受 API Router 开关限制。",
   "releaseNotesI18n": {
