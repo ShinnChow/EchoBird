@@ -6,6 +6,8 @@
 
 <p align="center"><strong>AI 部署,不再是先有鸡还是先有蛋。</strong></p>
 
+<p align="center"><strong>ChatGPT、Codex CLI、Claude Code 多账号切换</strong> · 多模型智能路由与故障自动切换 · AI 工具一键安装</p>
+
 <p align="center">
   <a href="https://github.com/edison7009/EchoBird/releases">
     <img src="https://img.shields.io/github/v/release/edison7009/EchoBird?style=flat-square&color=D97757" alt="Release" />
@@ -89,6 +91,30 @@ EchoBird 提供 **4 大场景**,共享一个 **模型数据中枢** —— **一
 - **模型中心** —— 统一的模型数据中枢(OpenAI / Anthropic / 本地 LLM / API Router);一处配置好,4 大场景立即生效;附带一键测速,使用前看清真实延迟
 
 **跨平台** —— Windows、macOS、Linux(x64 + arm64)
+
+## 多账号切换 —— ChatGPT、Codex CLI、Claude Code
+
+在 EchoBird 的**应用管理**中保存多个账号、查看使用额度，并选择启动工具时使用的账号。
+
+- **ChatGPT 桌面版与 Codex CLI** —— 通过浏览器登录添加 OpenAI 账号，选中已保存账号后启动。这两个工具共享本地 Codex 账号配置，切换会影响共用的登录状态。
+- **Claude Code** —— 通过浏览器授权添加账号，选择账号后启动 Claude Code；可查看套餐、5 小时与 7 天剩余额度及重置倒计时（以服务商返回的数据为准）。
+- **额度一目了然** —— 在同一面板查看剩余额度和重置时间、刷新用量、删除已保存账号。
+
+**开始使用：**打开「应用管理」→ 选择 ChatGPT、Codex CLI 或 Claude Code → 添加并授权账号 → 选中账号 → 启动。账号选择在启动时生效；需要使用第三方 API 时，改选对应的模型即可。
+
+## 多模型智能路由 —— 按优先级调用，故障自动切换
+
+EchoBird 的**智能路由（Smart Router）**用一个本地 API 汇总多个模型服务。把模型中心已配置的免费、付费或私有模型加入路由，拖动卡片设置优先级。模型限流、额度耗尽或临时不可用时，路由自动尝试下一个；冷却结束后，重新按优先级尝试。
+
+- **最多接入 20 个模型** —— 复用已有模型配置，无需重复填写 API Key。
+- **兼容工具共用一个入口** —— 支持 OpenAI Chat Completions 和 Anthropic Messages，可供 Claude Code 等兼容客户端使用。
+- **优先级由你决定** —— 按你设定的顺序调用，不按任务内容或价格自动选模型。
+
+**开始使用：**打开「智能路由」→ 从「我的模型」或免费模型目录添加模型 → 拖动排序 → 在「应用管理」中为兼容工具选择 **Auto Router**。工具通过本地 API 调用期间，请保持 EchoBird 运行。
+
+智能路由切换的是已配置的模型 API，不会自动轮换已保存的登录账号。ChatGPT / Codex CLI 接入第三方模型需要 **Responses API**，当前智能路由尚未提供此接口；这两个工具请使用账号切换，或直接接入支持 Responses 的服务商。
+
+[在官网了解多账号切换与智能路由](https://echobird.ai/#accounts-and-routing)。
 
 ## 支持的工具 —— 一键安装、一键切换模型
 

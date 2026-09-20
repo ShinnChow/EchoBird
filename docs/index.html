@@ -4,14 +4,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EchoBird — 让 AI 的橄榄枝抵达千家万户</title>
+    <title>EchoBird — ChatGPT / Codex CLI / Claude Code 多账号切换与多模型智能路由</title>
     <meta name="description"
-        content="EchoBird — 在神话中，衔着橄榄枝的飞鸟，把幸福送入千家万户。而 EchoBird 把 AI 工具带到每一台电脑上。">
+        content="EchoBird 支持 ChatGPT、Codex CLI、Claude Code 多账号管理与切换、账号额度查看，以及多模型智能路由、优先级排序和故障自动切换。还可一键安装 AI 工具、部署本地大模型，支持 Windows、macOS、Linux。">
     <meta name="keywords"
-        content="EchoBird,AI Agent,Claude Code,OpenClaw,Codex,本地大模型,llama.cpp,vLLM,Qwen,DeepSeek,模型管理,一键安装">
-    <meta property="og:title" content="EchoBird — 让 AI 的橄榄枝抵达千家万户">
-    <meta property="og:description" content="一键安装 Agent · 模型中枢 · 一键部署本地大模型">
-    <meta property="og:image" content="./icon.png">
+        content="EchoBird,ChatGPT 多账号切换,Codex CLI 多账号管理,Claude Code 账号切换,多模型智能路由,自动故障切换,multi-account switching,smart routing,model failover,本地大模型,一键安装">
+    <link rel="canonical" href="https://echobird.ai/">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://echobird.ai/">
+    <meta property="og:title" content="EchoBird — ChatGPT / Codex CLI / Claude Code 多账号切换与多模型智能路由">
+    <meta property="og:description" content="ChatGPT、Codex CLI、Claude Code 多账号切换与额度查看；多模型智能路由、优先级排序、故障自动切换。">
+    <meta property="og:image" content="https://echobird.ai/icon.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="EchoBird — ChatGPT / Codex CLI / Claude Code 多账号切换与多模型智能路由">
+    <meta name="twitter:description" content="ChatGPT、Codex CLI、Claude Code 多账号切换与额度查看；多模型智能路由、优先级排序、故障自动切换。">
+    <meta name="twitter:image" content="https://echobird.ai/icon.png">
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            "name": "EchoBird",
+            "url": "https://echobird.ai/",
+            "image": "https://echobird.ai/icon.png",
+            "applicationCategory": "DeveloperApplication",
+            "operatingSystem": "Windows, macOS, Linux",
+            "description": "ChatGPT、Codex CLI、Claude Code 多账号切换与额度查看，以及多模型智能路由、优先级排序和故障自动切换。",
+            "featureList": [
+                "ChatGPT / Codex CLI / Claude Code multi-account switching",
+                "Account quota monitoring",
+                "Multi-model smart routing with priority and automatic failover",
+                "OpenAI Chat Completions and Anthropic Messages routing",
+                "One-click AI tool installation and local LLM deployment"
+            ]
+        }
+    </script>
     <link rel="icon" href="./icon.png" type="image/png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -717,6 +743,23 @@
             gap: 22px;
         }
 
+        .account-routing-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 22px;
+        }
+
+        #accounts-and-routing {
+            scroll-margin-top: 80px;
+        }
+
+        .routing-note {
+            margin-top: 24px;
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
         .feature-card {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -1203,7 +1246,8 @@
                 max-width: 720px;
             }
 
-            .features-grid {
+            .features-grid,
+            .account-routing-grid {
                 grid-template-columns: 1fr;
                 gap: 16px;
             }
@@ -1329,10 +1373,10 @@
         // i18n translations
         const I18N = {
             'zh-CN': {
-                'meta.title': 'EchoBird — 让 AI 的橄榄枝抵达千家万户',
-                'meta.desc': 'EchoBird — 在神话中，衔着橄榄枝的飞鸟，把幸福送入千家万户。而 EchoBird 把 AI 工具带到每一台电脑上。',
-                'meta.ogTitle': 'EchoBird — 让 AI 的橄榄枝抵达千家万户',
-                'meta.ogDesc': '一键安装 Agent · 模型中枢 · 一键部署本地大模型',
+                'meta.title': 'EchoBird — ChatGPT / Codex CLI / Claude Code 多账号切换与多模型智能路由',
+                'meta.desc': 'EchoBird 支持 ChatGPT、Codex CLI、Claude Code 多账号管理与切换、账号额度查看，以及多模型智能路由、优先级排序和故障自动切换。还可一键安装 AI 工具、部署本地大模型，支持 Windows、macOS、Linux。',
+                'meta.ogTitle': 'EchoBird — ChatGPT / Codex CLI / Claude Code 多账号切换与多模型智能路由',
+                'meta.ogDesc': 'ChatGPT、Codex CLI、Claude Code 多账号切换与额度查看；多模型智能路由、优先级排序、故障自动切换。',
                 'nav.brand': 'EchoBird',
                 'nav.showcase': '界面',
                 'nav.features': '功能',
@@ -1343,7 +1387,21 @@
                 'nav.download': '下载',
                 'hero.h1.line1': '让 AI 的橄榄枝',
                 'hero.h1.line2': '抵达千家万户',
-                'hero.lede.html': '在神话中，衔着橄榄枝的飞鸟，把幸福送入千家万户。而 EchoBird 帮你把 <strong>Claude Code</strong>、<strong>ChatGPT</strong>、<strong>本地大模型</strong> 和模型切换，都化成一次幸福的点击。',
+                'hero.lede.html': 'EchoBird 支持 <strong>ChatGPT、Codex CLI、Claude Code 多账号切换</strong>与额度查看，用<strong>多模型智能路由</strong>按优先级调用、故障自动切换。一键安装 AI 工具、部署本地大模型，把 AI 带到每一台电脑上。',
+                'workflow.eyebrow': '账号与模型调度',
+                'workflow.title': '多账号切换与多模型智能路由',
+                'workflow.sub': '管理 ChatGPT、Codex CLI、Claude Code 的多个账号，让兼容工具通过一个本地 API 调用多个模型。',
+                'accounts.title': 'ChatGPT / Codex CLI / Claude Code 多账号切换',
+                'accounts.desc': '在应用管理中添加账号，完成浏览器授权，选中已保存账号后启动工具；账号切换在启动时生效。',
+                'accounts.quota': '查看账号套餐、剩余额度和重置倒计时，支持手动刷新；Claude Code 展示 5 小时与 7 天额度。',
+                'accounts.shared': 'ChatGPT 桌面版与 Codex CLI 共用本地 Codex 登录配置；Claude Code 单独管理账号。',
+                'accounts.provider': '选择官方账号启动，或改选模型中心的第三方 API 模型。',
+                'routing.title': '多模型智能路由与故障自动切换',
+                'routing.desc': '从「我的模型」或免费模型目录添加模型，拖动卡片设置优先级，再为兼容工具选择 Auto Router。',
+                'routing.priority': '最多接入 20 个免费、付费或私有模型，按设定顺序调用，复用已有配置。',
+                'routing.failover': '限流、额度耗尽或临时不可用时自动尝试下一个模型，冷却后恢复按优先级尝试。',
+                'routing.protocols': '提供 OpenAI Chat Completions 与 Anthropic Messages 本地接口，可供 Claude Code 等兼容工具使用；调用期间保持 EchoBird 运行。',
+                'routing.note': '智能路由切换模型 API，不会自动轮换登录账号。ChatGPT / Codex CLI 接入第三方模型需要 Responses API；当前智能路由尚未提供此接口，请使用账号切换或直接接入支持 Responses 的服务商。',
                 'showcase.eyebrow': '界面预览',
                 'showcase.title': '看看 EchoBird 长啥样',
                 'showcase.sub': '浅色 / 深色双主题,中英文界面,所有 AI 工具集中在一个地方。',
@@ -1413,10 +1471,10 @@
                 'footer.tagline': 'Made with ❤ by EchoBird Team',
             },
             'en': {
-                'meta.title': 'EchoBird — Let the olive branch of AI reach every home',
-                'meta.desc': 'In myth, a bird carrying an olive branch brings happiness home. EchoBird turns Claude Code, ChatGPT, local LLMs, and model switching into one happy click.',
-                'meta.ogTitle': 'EchoBird — Let the olive branch of AI reach every home',
-                'meta.ogDesc': 'Claude Code · ChatGPT · Local LLMs · Model switching',
+                'meta.title': 'EchoBird — ChatGPT / Codex CLI / Claude Code Account Switching & Smart Routing',
+                'meta.desc': 'Switch ChatGPT, Codex CLI, and Claude Code accounts, monitor quota, and route across multiple models with priority and automatic failover. Windows, macOS, Linux.',
+                'meta.ogTitle': 'EchoBird — ChatGPT / Codex CLI / Claude Code Account Switching & Smart Routing',
+                'meta.ogDesc': 'Multi-account switching and quota monitoring for ChatGPT, Codex CLI, and Claude Code; multi-model smart routing with priority and automatic failover.',
                 'nav.brand': 'EchoBird',
                 'nav.showcase': 'Tour',
                 'nav.features': 'Features',
@@ -1427,7 +1485,21 @@
                 'nav.download': 'Download',
                 'hero.h1.line1': 'Let the olive branch',
                 'hero.h1.line2': 'of AI reach every home.',
-                'hero.lede.html': 'In myth, the bird carrying an olive branch brings happiness into every home. EchoBird helps you turn <strong>Claude Code</strong>, <strong>ChatGPT</strong>, <strong>local LLMs</strong>, and model switching into one happy click.',
+                'hero.lede.html': 'Manage <strong>ChatGPT, Codex CLI, and Claude Code accounts</strong> and track quota in one place. Use <strong>multi-model smart routing</strong> with priority and automatic failover. Install AI tools and deploy local LLMs in one click.',
+                'workflow.eyebrow': 'ACCOUNTS & MODEL ROUTING',
+                'workflow.title': 'Multi-account switching and multi-model smart routing',
+                'workflow.sub': 'Manage multiple ChatGPT, Codex CLI, and Claude Code accounts, and connect compatible tools to multiple models through one local API.',
+                'accounts.title': 'ChatGPT / Codex CLI / Claude Code account switching',
+                'accounts.desc': 'Add accounts in App Manager, authorize in your browser, then select a saved account and launch the tool. Account switching takes effect on launch.',
+                'accounts.quota': 'View plans, remaining quota, and reset countdowns, with manual refresh. Claude Code shows both 5-hour and 7-day quota.',
+                'accounts.shared': 'ChatGPT desktop and Codex CLI share the local Codex login configuration; Claude Code accounts are managed separately.',
+                'accounts.provider': 'Launch with an official account, or select a third-party API model from Model Nexus.',
+                'routing.title': 'Multi-model smart routing with automatic failover',
+                'routing.desc': 'Add models from My Models or the free-model directory, drag cards to set priority, then select Auto Router for a compatible tool.',
+                'routing.priority': 'Connect up to 20 free, paid, or private models, reuse existing settings, and try models in your chosen order.',
+                'routing.failover': 'Automatically try the next model on rate limits, exhausted quota, or temporary unavailability; retry in priority order after cooldown.',
+                'routing.protocols': 'Local OpenAI Chat Completions and Anthropic Messages endpoints work with compatible tools such as Claude Code. Keep EchoBird running while using the router.',
+                'routing.note': 'Smart Router switches model APIs, not saved login accounts. ChatGPT / Codex CLI third-party models need the Responses API, which Smart Router does not currently expose. Use account switching or a Responses-compatible provider directly for those tools.',
                 'showcase.eyebrow': 'PRODUCT TOUR',
                 'showcase.title': 'See EchoBird in action',
                 'showcase.sub': 'Light & dark themes, EN / CN UI — every AI tool in one place.',
@@ -1527,6 +1599,8 @@
             set('meta[name="description"]', 'content', 'meta.desc');
             set('meta[property="og:title"]', 'content', 'meta.ogTitle');
             set('meta[property="og:description"]', 'content', 'meta.ogDesc');
+            set('meta[name="twitter:title"]', 'content', 'meta.ogTitle');
+            set('meta[name="twitter:description"]', 'content', 'meta.ogDesc');
             // Toggle button label shows the OTHER language
             const btn = document.getElementById('lang-toggle');
             if (btn) btn.textContent = lang === 'zh-CN' ? 'EN' : '中';
@@ -1583,8 +1657,7 @@
             <span class="gradient" data-i18n="hero.h1.line2">抵达千家万户</span>
         </h1>
         <p class="lede" data-i18n-html="hero.lede.html">
-            在神话中，衔着橄榄枝的飞鸟，把幸福送入千家万户。而 EchoBird 帮你把 <strong>Claude Code</strong>、<strong>ChatGPT</strong>、<strong>本地大模型</strong>
-            和模型切换，都化成一次幸福的点击。
+            EchoBird 支持 <strong>ChatGPT、Codex CLI、Claude Code 多账号切换</strong>与额度查看，用<strong>多模型智能路由</strong>按优先级调用、故障自动切换。一键安装 AI 工具、部署本地大模型，把 AI 带到每一台电脑上。
         </p>
         <p class="platforms">
             <span data-i18n="hero.platforms">Windows · macOS · Linux · 免费</span><span class="macos-hint" id="macosHint" style="display:none"> · <span data-i18n="hero.macosHint">macOS 首次启动</span> <code>xattr -cr /Applications/EchoBird.app</code></span>
@@ -1759,6 +1832,37 @@
         </div>
     </section>
 
+    <section id="accounts-and-routing" class="section">
+        <div class="section-head">
+            <div class="section-eyebrow" data-i18n="workflow.eyebrow">账号与模型调度</div>
+            <h2 class="section-title" data-i18n="workflow.title">多账号切换与多模型智能路由</h2>
+            <p class="section-sub" data-i18n="workflow.sub">管理 ChatGPT、Codex CLI、Claude Code 的多个账号，让兼容工具通过一个本地 API 调用多个模型。</p>
+        </div>
+        <div class="account-routing-grid">
+            <article class="feature-card" id="multi-account-switching">
+                <div class="feature-icon"><i class="fa-solid fa-users" aria-hidden="true"></i></div>
+                <h3 data-i18n="accounts.title">ChatGPT / Codex CLI / Claude Code 多账号切换</h3>
+                <p data-i18n="accounts.desc">在应用管理中添加账号，完成浏览器授权，选中已保存账号后启动工具；账号切换在启动时生效。</p>
+                <ul>
+                    <li><i class="fa-solid fa-check" aria-hidden="true"></i> <span data-i18n="accounts.quota">查看账号套餐、剩余额度和重置倒计时，支持手动刷新；Claude Code 展示 5 小时与 7 天额度。</span></li>
+                    <li><i class="fa-solid fa-check" aria-hidden="true"></i> <span data-i18n="accounts.shared">ChatGPT 桌面版与 Codex CLI 共用本地 Codex 登录配置；Claude Code 单独管理账号。</span></li>
+                    <li><i class="fa-solid fa-check" aria-hidden="true"></i> <span data-i18n="accounts.provider">选择官方账号启动，或改选模型中心的第三方 API 模型。</span></li>
+                </ul>
+            </article>
+            <article class="feature-card" id="smart-routing">
+                <div class="feature-icon"><i class="fa-solid fa-route" aria-hidden="true"></i></div>
+                <h3 data-i18n="routing.title">多模型智能路由与故障自动切换</h3>
+                <p data-i18n="routing.desc">从「我的模型」或免费模型目录添加模型，拖动卡片设置优先级，再为兼容工具选择 Auto Router。</p>
+                <ul>
+                    <li><i class="fa-solid fa-check" aria-hidden="true"></i> <span data-i18n="routing.priority">最多接入 20 个免费、付费或私有模型，按设定顺序调用，复用已有配置。</span></li>
+                    <li><i class="fa-solid fa-check" aria-hidden="true"></i> <span data-i18n="routing.failover">限流、额度耗尽或临时不可用时自动尝试下一个模型，冷却后恢复按优先级尝试。</span></li>
+                    <li><i class="fa-solid fa-check" aria-hidden="true"></i> <span data-i18n="routing.protocols">提供 OpenAI Chat Completions 与 Anthropic Messages 本地接口，可供 Claude Code 等兼容工具使用；调用期间保持 EchoBird 运行。</span></li>
+                </ul>
+            </article>
+        </div>
+        <p class="routing-note" data-i18n="routing.note">智能路由切换模型 API，不会自动轮换登录账号。ChatGPT / Codex CLI 接入第三方模型需要 Responses API；当前智能路由尚未提供此接口，请使用账号切换或直接接入支持 Responses 的服务商。</p>
+    </section>
+
     <!-- Tools section -->
     <section id="tools" class="section tools-section">
         <div class="section-head reveal">
@@ -1771,7 +1875,7 @@
             <div class="tool-card"><div class="ico"><img src="./icons/tools/claudecode.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Claude Code</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/opencode.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">OpenCode</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/hermes.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Hermes Agent</div></div></div>
-            <div class="tool-card"><div class="ico"><img src="./icons/tools/codex.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Codex</div></div></div>
+            <div class="tool-card"><div class="ico"><img src="./icons/tools/codex.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Codex CLI</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/aider.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Aider</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/grok.svg" alt="" width="36" height="36" loading="lazy" class="mono"></div><div class="meta"><div class="name">Grok Build</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/kimicode.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Kimi Code</div></div></div>

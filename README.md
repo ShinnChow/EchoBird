@@ -7,6 +7,8 @@
 <p align="center"><strong>AI deployment, no more chicken-and-egg.</strong></p>
 <p align="center"><sub>AI 部署,不再是先有鸡还是先有蛋。</sub></p>
 
+<p align="center">Multi-account switching for <strong>ChatGPT, Codex CLI, and Claude Code</strong> · Multi-model smart routing with automatic failover · One-click AI tool setup</p>
+
 <p align="center">
   <a href="https://github.com/edison7009/EchoBird/releases">
     <img src="https://img.shields.io/github/v/release/edison7009/EchoBird?style=flat-square&color=D97757" alt="Release" />
@@ -91,6 +93,30 @@ EchoBird offers **4 scenarios** sharing a **unified model data hub** — **confi
 - **Model Nexus** — a unified data hub for OpenAI / Anthropic / local LLMs / API Routers; configure once and all 4 scenarios pick it up; one-click latency check before you commit
 
 **Cross-platform** — Windows, macOS, Linux (x64 + arm64)
+
+## Multi-account switching — ChatGPT, Codex CLI, and Claude Code
+
+Manage multiple saved accounts in EchoBird's **App Manager**, view their usage quota, and choose the account to use when launching a tool.
+
+- **ChatGPT desktop and Codex CLI** — add OpenAI accounts through browser sign-in, then select a saved account and launch. Both tools share the local Codex account configuration, so switching affects the shared login.
+- **Claude Code** — add accounts through browser authorization, select an account, and launch Claude Code with it. View the plan, remaining 5-hour and 7-day quota, and reset countdowns when available.
+- **Quota at a glance** — check remaining quota and reset times, refresh account usage, and remove saved accounts from the same panel.
+
+**Get started:** open App Manager → choose ChatGPT, Codex CLI, or Claude Code → add and authorize your accounts → select an account → launch. Account selection takes effect on launch; choose a third-party model instead when you want to use an API provider.
+
+## Multi-model smart routing — priority and automatic failover
+
+EchoBird's **Smart Router** puts multiple model providers behind one local API. Add free, paid, or private models from Model Nexus, then drag the cards into your preferred order. The router tries models in that order and automatically falls back when a model is rate-limited, out of quota, or temporarily unavailable. After cooldown, it retries models in priority order.
+
+- **Up to 20 models** — reuse your configured models without entering their API keys again.
+- **One endpoint for compatible tools** — supports OpenAI Chat Completions and Anthropic Messages, including clients such as Claude Code.
+- **Explicit priority** — you control the order; routing follows that order rather than selecting models by task or price.
+
+**Get started:** open Smart Router → add models from My Models or the free-model directory → drag to set priority → choose **Auto Router** for a compatible tool in App Manager. Keep EchoBird running while tools use its local API.
+
+Smart Router switches between configured model APIs; it does not automatically rotate saved login accounts. ChatGPT / Codex CLI third-party models require the **Responses API**, which Smart Router does not currently expose. For those tools, use account switching or a Responses-compatible provider directly.
+
+[Explore account switching and smart routing on the website](https://echobird.ai/#accounts-and-routing).
 
 ## Supported tools — install & switch models in one click
 
