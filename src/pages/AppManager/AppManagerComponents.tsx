@@ -1201,7 +1201,7 @@ export const AppManagerBottom: React.FC = () => {
                     )
                   )
                 }
-                className="absolute top-full left-1/2 -translate-x-1/2 mt-2 max-w-full whitespace-nowrap text-xs text-cyber-text-secondary hover:text-cyber-accent hover:underline transition-colors"
+                className="absolute top-full left-1/2 -translate-x-1/2 mt-2 max-w-full whitespace-nowrap text-xs text-cyber-text-secondary hover:text-cyber-accent transition-colors"
               >
                 {t('mother.hintUninstall').replace(
                   '{agent}',
