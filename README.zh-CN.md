@@ -4,8 +4,6 @@
 
 <h1 align="center">EchoBird</h1>
 
-<p align="center"><strong>AI 部署,不再是先有鸡还是先有蛋。</strong></p>
-
 <p align="center"><strong>ChatGPT、Codex CLI、Claude Code 多账号切换</strong> · 多模型智能路由与故障自动切换 · AI 工具一键安装</p>
 
 <p align="center">

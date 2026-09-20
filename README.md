@@ -4,9 +4,6 @@
 
 <h1 align="center">EchoBird</h1>
 
-<p align="center"><strong>AI deployment, no more chicken-and-egg.</strong></p>
-<p align="center"><sub>AI 部署,不再是先有鸡还是先有蛋。</sub></p>
-
 <p align="center">Multi-account switching for <strong>ChatGPT, Codex CLI, and Claude Code</strong> · Multi-model smart routing with automatic failover · One-click AI tool setup</p>
 
 <p align="center">
