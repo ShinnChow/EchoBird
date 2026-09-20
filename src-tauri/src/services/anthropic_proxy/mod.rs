@@ -29,10 +29,26 @@ mod messages_handler;
 mod server;
 
 pub const ANTHROPIC_PROXY_PORT: u16 = 53682;
+static PORT: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(ANTHROPIC_PROXY_PORT);
+
+pub fn port() -> u16 {
+    PORT.load(std::sync::atomic::Ordering::Relaxed)
+}
 
 pub fn spawn_proxy_task() {
+    let listener = match super::local_proxy::bind("anthropic-proxy", ANTHROPIC_PROXY_PORT) {
+        Ok(listener) => listener,
+        Err(error) => {
+            log::error!("[AnthropicProxy] {error}");
+            return;
+        }
+    };
+    PORT.store(
+        listener.local_addr().expect("bound listener").port(),
+        std::sync::atomic::Ordering::Relaxed,
+    );
     tauri::async_runtime::spawn(async move {
-        match server::run(ANTHROPIC_PROXY_PORT).await {
+        match server::run(listener).await {
             Ok(()) => log::info!("[AnthropicProxy] server task exited cleanly"),
             Err(e) => log::error!("[AnthropicProxy] server task failed: {e}"),
         }

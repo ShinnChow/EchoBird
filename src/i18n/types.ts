@@ -124,7 +124,6 @@ export type TKey =
   | 'btn.refreshUsage'
   // Status
   | 'status.running'
-  | 'status.online'
   | 'status.complete'
   | 'status.failed'
   | 'status.notInstalled'

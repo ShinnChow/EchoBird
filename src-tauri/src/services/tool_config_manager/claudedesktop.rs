@@ -1,7 +1,7 @@
 //! Model configuration for claudedesktop.
 
 use super::{echobird_dir, read_json_file, write_json_file, ApplyResult, ModelInfo};
-use crate::services::anthropic_proxy::ANTHROPIC_PROXY_PORT;
+use crate::services::anthropic_proxy;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -24,18 +24,18 @@ use std::path::{Path, PathBuf};
 // existing apiProtocol/anthropicUrl gate.
 // ════════════════════════════════════════════════════════════════
 
-const CLAUDE_DESKTOP_PROFILE_ID: &str = "7d8f4e2a-9c3b-4f1a-b0e5-1a2b3c4d5e6f";
+pub(super) const CLAUDE_DESKTOP_PROFILE_ID: &str = "7d8f4e2a-9c3b-4f1a-b0e5-1a2b3c4d5e6f";
 
 const CLAUDE_DESKTOP_PROFILE_NAME: &str = "EchoBird";
 
-struct ClaudeDesktopLayout {
+pub(super) struct ClaudeDesktopLayout {
     cfg_official: PathBuf,
     cfg_threep: PathBuf,
-    lib_dir: PathBuf,
+    pub(super) lib_dir: PathBuf,
 }
 
 #[cfg(any(target_os = "macos", windows))]
-fn resolve_claudedesktop_paths() -> Option<ClaudeDesktopLayout> {
+pub(super) fn resolve_claudedesktop_paths() -> Option<ClaudeDesktopLayout> {
     let home = dirs::home_dir()?;
 
     #[cfg(target_os = "macos")]
@@ -60,7 +60,7 @@ fn resolve_claudedesktop_paths() -> Option<ClaudeDesktopLayout> {
 }
 
 #[cfg(not(any(target_os = "macos", windows)))]
-fn resolve_claudedesktop_paths() -> Option<ClaudeDesktopLayout> {
+pub(super) fn resolve_claudedesktop_paths() -> Option<ClaudeDesktopLayout> {
     None
 }
 
@@ -182,7 +182,7 @@ pub(super) fn apply_claudedesktop(model_info: &ModelInfo) -> ApplyResult {
     //   model-id rewrite is lost, so the upstream sees whatever id
     //   Desktop chose (claude-sonnet-4-*, …) — fine for stations that
     //   accept those, broken for raw Chat-only providers.
-    let proxy_base = format!("http://127.0.0.1:{}", ANTHROPIC_PROXY_PORT);
+    let proxy_base = format!("http://127.0.0.1:{}", anthropic_proxy::port());
     let relay_mode = model_info.relay_mode.unwrap_or(false);
     let (gateway_base_url, gateway_api_key) = if relay_mode {
         (anthropic_url.clone(), api_key.clone())

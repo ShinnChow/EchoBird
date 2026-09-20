@@ -46,6 +46,7 @@ import {
 import * as api from '../../api/tauri';
 import type { FreeModelDirectory, FreeModelEntry } from '../../api/freeModels';
 import { getModelIcon } from '../../components';
+import { ModelListCard } from '../../components/ModelListCard';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { useToast } from '../../components/Toast';
 import { useI18n } from '../../hooks/useI18n';
@@ -73,7 +74,9 @@ interface FreeModelsContextValue {
   scanProvider: string;
   scanProgress: number;
   routerBaseUrl: string;
-  routerOnline: boolean;
+  routerEnabled: boolean;
+  routerTogglePending: boolean;
+  setRouterEnabled: (enabled: boolean) => Promise<void>;
   refresh: () => Promise<void>;
   addSelectedModel: (model: RouteModelInput) => Promise<void>;
   updateSelectedModel: (model: RouteModelInput) => void;
@@ -164,8 +167,9 @@ export function FreeModelsProvider({ children }: { children: ReactNode }) {
   const [scanProvider, setScanProvider] = useState('');
   const [scanProgress, setScanProgress] = useState(0);
   const [routerBaseUrl, setRouterBaseUrl] = useState('127.0.0.1:53683/v1');
-  const [routerRunning, setRouterRunning] = useState(false);
-  const [usableCandidateCount, setUsableCandidateCount] = useState(0);
+  const [routerEnabled, setRouterEnabledState] = useState(true);
+  const [routerTogglePending, setRouterTogglePending] = useState(false);
+  const [routerLoaded, setRouterLoaded] = useState(false);
   const refreshInFlightRef = useRef(false);
   const routerMutationRef = useRef<Promise<void>>(Promise.resolve());
   const selectedIdsRef = useRef<Set<string>>(new Set());
@@ -205,8 +209,8 @@ export function FreeModelsProvider({ children }: { children: ReactNode }) {
       return next;
     });
     setRouterBaseUrl(router.baseUrl.replace(/^https?:\/\//, ''));
-    setRouterRunning(router.running);
-    setUsableCandidateCount(router.usableCandidateCount);
+    setRouterEnabledState(router.enabled);
+    setRouterLoaded(true);
     routerLoadedRef.current = true;
   }, []);
 
@@ -218,6 +222,29 @@ export function FreeModelsProvider({ children }: { children: ReactNode }) {
     routerMutationRef.current = load;
     void load.catch((error) => console.error('Load smart router config failed:', error));
   }, [activePage, loadRouter]);
+
+  const setRouterEnabled = useCallback(
+    async (enabled: boolean) => {
+      setRouterTogglePending(true);
+      const change = routerMutationRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          const router = await api.setSmartRouterEnabled(enabled);
+          setRouterEnabledState(router.enabled);
+          setRouterBaseUrl(router.baseUrl.replace(/^https?:\/\//, ''));
+        });
+      routerMutationRef.current = change;
+      try {
+        await change;
+      } catch (error) {
+        console.error('Toggle smart router failed:', error);
+        showToast('error', t('error.requestFailed'));
+      } finally {
+        setRouterTogglePending(false);
+      }
+    },
+    [showToast, t]
+  );
 
   const refresh = useCallback(async () => {
     if (refreshInFlightRef.current) return;
@@ -283,8 +310,6 @@ export function FreeModelsProvider({ children }: { children: ReactNode }) {
             },
           ]);
           setRouterBaseUrl(router.baseUrl.replace(/^https?:\/\//, ''));
-          setRouterRunning(router.running);
-          setUsableCandidateCount(router.usableCandidateCount);
         });
       routerMutationRef.current = addition;
       await addition;
@@ -323,8 +348,6 @@ export function FreeModelsProvider({ children }: { children: ReactNode }) {
           setSelectedIds(nextIds);
           setCustomModels((current) => current.filter((model) => model.id !== id));
           setRouterBaseUrl(router.baseUrl.replace(/^https?:\/\//, ''));
-          setRouterRunning(router.running);
-          setUsableCandidateCount(router.usableCandidateCount);
         });
       routerMutationRef.current = removal;
       try {
@@ -382,7 +405,9 @@ export function FreeModelsProvider({ children }: { children: ReactNode }) {
         scanProvider,
         scanProgress,
         routerBaseUrl,
-        routerOnline: routerRunning && usableCandidateCount > 0,
+        routerEnabled,
+        routerTogglePending: routerTogglePending || !routerLoaded,
+        setRouterEnabled,
         refresh,
         addSelectedModel,
         updateSelectedModel,
@@ -608,7 +633,7 @@ export function FreeModelsMain() {
     customModels,
     selectedIds,
     routerBaseUrl,
-    routerOnline,
+    routerEnabled,
     removeSelectedModel,
     reorderSelectedModel,
   } = useFreeModels();
@@ -674,6 +699,7 @@ export function FreeModelsMain() {
 
   useEffect(() => {
     let cancelled = false;
+    if (!routerEnabled) return;
     let errorReported = false;
     const pollActivity = async () => {
       try {
@@ -695,7 +721,7 @@ export function FreeModelsMain() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [routerEnabled]);
 
   const setNodeRef = useCallback((id: string, node: HTMLDivElement | null) => {
     if (node) nodeRefs.current.set(id, node);
@@ -858,7 +884,7 @@ export function FreeModelsMain() {
     <div className="free-model-router h-full min-h-[620px] px-2 py-1">
       <div
         ref={stageRef}
-        className="relative h-full pt-6 overflow-hidden"
+        className={`relative h-full pt-6 overflow-hidden ${routerEnabled ? '' : 'is-disabled'}`}
         style={{ minHeight: stageMinHeight }}
       >
         <svg
@@ -870,7 +896,7 @@ export function FreeModelsMain() {
           {routePaths.map((path) => (
             <path key={path.id} d={path.d} className="free-model-route-path" />
           ))}
-          {activeRoutePath && (
+          {routerEnabled && activeRoutePath && (
             <path
               key={activeRoutePath.id}
               d={activeRoutePath.d}
@@ -888,9 +914,7 @@ export function FreeModelsMain() {
 
         <div
           ref={hubRef}
-          className={`free-model-router-hub relative z-10 mx-auto w-[min(270px,80%)] min-h-[118px] rounded-2xl flex flex-col items-center justify-center text-center px-4 py-3 cursor-default ${
-            routerOnline ? 'is-running' : selectedModels.length > 0 ? 'is-unavailable' : ''
-          }`}
+          className="free-model-router-hub relative z-10 mx-auto w-max min-w-[270px] min-h-[118px] rounded-2xl flex flex-col items-center justify-center text-center px-4 py-3 cursor-default"
         >
           <div className="whitespace-nowrap text-xl font-semibold text-cyber-text">
             {t('freeModels.router.title')}
@@ -1066,6 +1090,7 @@ function FreeModelProviderRow({
 export function FreeModelsPanel() {
   const { t } = useI18n();
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<'saved' | 'free'>('saved');
   const [addingId, setAddingId] = useState<string | null>(null);
   const setActivePage = useNavigationStore((state) => state.setActivePage);
@@ -1078,10 +1103,19 @@ export function FreeModelsPanel() {
     scanProgress,
     refresh,
     addSelectedModel,
+    removeSelectedModel,
   } = useFreeModels();
   const {
     userModels,
     isLoadingModels,
+    modelUsageData,
+    refreshingUsageIds,
+    isRefreshingUsage,
+    refreshSingleUsage,
+    volcAkSkMissingIds,
+    openAkskModal,
+    handleCardEdit,
+    handleCardDelete,
     setNewModelForm,
     setEditingModelId,
     setModelModalDestination,
@@ -1231,44 +1265,60 @@ export function FreeModelsPanel() {
                 {userModels.map((model) => {
                   const selected = selectedIds.has(model.internalId);
                   const adding = addingId === model.internalId;
-                  const iconSrc = getModelIcon('', model.modelId || '');
                   return (
-                    <button
+                    <ModelListCard
                       key={model.internalId}
-                      type="button"
-                      onClick={() => void addSavedModel(model)}
-                      disabled={selected || Boolean(addingId)}
-                      aria-label={`${t(selected ? 'freeModels.saved.added' : 'freeModels.addToRouter')}: ${model.name} — ${model.modelId ?? ''}`}
-                      className="w-full min-h-[64px] flex items-center gap-3 p-3 rounded bg-cyber-surface text-left transition-colors enabled:hover:bg-cyber-elevated disabled:cursor-default"
-                    >
-                      {adding ? (
-                        <RefreshCw
-                          size={22}
-                          className="shrink-0 animate-spin text-cyber-text-muted"
-                        />
-                      ) : selected ? (
-                        <Check size={22} strokeWidth={2.5} className="shrink-0 text-cyber-accent" />
-                      ) : (
-                        <Plus
-                          size={22}
-                          strokeWidth={2.5}
-                          className="shrink-0 text-cyber-text-muted"
-                        />
-                      )}
-                      {iconSrc ? (
-                        <img src={iconSrc} alt="" className="w-6 h-6 shrink-0" />
-                      ) : (
-                        <Box size={22} className="shrink-0 text-cyber-text-muted" />
-                      )}
-                      <span className="flex-1 min-w-0">
-                        <span className="block text-sm font-bold truncate leading-none">
-                          {model.name}
-                        </span>
-                        <span className="block text-[10px] text-cyber-text-secondary truncate leading-tight mt-1 opacity-70">
-                          {model.modelId}
-                        </span>
-                      </span>
-                    </button>
+                      model={model}
+                      onSelect={() => void addSavedModel(model)}
+                      selectionDisabled={selected || Boolean(addingId)}
+                      selectionLabel={`${t(selected ? 'freeModels.saved.added' : 'freeModels.addToRouter')}: ${model.name} — ${model.modelId ?? ''}`}
+                      selection={
+                        adding ? (
+                          <RefreshCw
+                            size={22}
+                            className="shrink-0 animate-spin text-cyber-text-muted"
+                          />
+                        ) : selected ? (
+                          <Check
+                            size={22}
+                            strokeWidth={2.5}
+                            className="shrink-0 text-cyber-accent"
+                          />
+                        ) : (
+                          <Plus
+                            size={22}
+                            strokeWidth={2.5}
+                            className="shrink-0 text-cyber-text-muted"
+                          />
+                        )
+                      }
+                      usage={modelUsageData[model.internalId]}
+                      refreshing={isRefreshingUsage || refreshingUsageIds.has(model.internalId)}
+                      onRefreshUsage={(modelId) =>
+                        volcAkSkMissingIds.has(modelId)
+                          ? openAkskModal(modelId)
+                          : refreshSingleUsage(modelId)
+                      }
+                      onEditModel={handleCardEdit}
+                      onDeleteModel={async (modelId) => {
+                        const ok = await confirm({
+                          title: t('model.deleteTitle'),
+                          message: t('model.deleteConfirm'),
+                          confirmText: t('btn.delete'),
+                          cancelText: t('btn.cancel'),
+                          type: 'danger',
+                        });
+                        if (!ok) return;
+                        try {
+                          await handleCardDelete(modelId);
+                          if (selectedIds.has(modelId)) await removeSelectedModel(modelId);
+                        } catch (error) {
+                          console.error('Delete saved router model failed:', error);
+                          showToast('error', t('error.requestFailed'));
+                        }
+                      }}
+                      t={t}
+                    />
                   );
                 })}
               </div>

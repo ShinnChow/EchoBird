@@ -645,10 +645,7 @@ pub fn run() {
         .manage(services::agent_loop::create_session_map())
         .manage(services::parasite::create_parasite_sessions())
         .setup(move |app| {
-            // Clean up orphaned llama-server from a previous EchoBird
-            // session. The codex launcher doesn't need this — the proxy
-            // shares a fixed port (53682) and any stale launcher gets
-            // shared by new launchers via the EADDRINUSE branch.
+            // Clean up orphaned llama-server from a previous EchoBird session.
             kill_stale_llama_server();
             log::info!("[Setup] Cleaned up any leftover llama-server processes");
 
@@ -665,14 +662,6 @@ pub fn run() {
                     }
                 }
             }
-
-            // Claude Desktop and Claude Code share one local Anthropic proxy
-            // for model-id rewriting. Codex CLI and ChatGPT connect directly
-            // to their configured Responses endpoint.
-            services::anthropic_proxy::spawn_proxy_task();
-
-            // Local OpenAI-compatible smart router on its own loopback port.
-            services::smart_router::spawn_proxy_task();
 
             // Initialize resource_dir for correct tools/ path resolution on all platforms
             // (especially Linux where exe is at /usr/bin but tools are at /usr/lib/com.echobird.ai/)
@@ -706,6 +695,11 @@ pub fn run() {
                     ])
                     .build(),
             )?;
+
+            // Bind and publish actual loopback ports before the UI can read
+            // them. Logging and tool paths must be ready for URL migration.
+            services::anthropic_proxy::spawn_proxy_task();
+            services::smart_router::spawn_proxy_task();
 
             // Register shell plugin (open external URLs, folders)
             app.handle().plugin(tauri_plugin_shell::init())?;
@@ -967,6 +961,7 @@ pub fn run() {
             model_commands::clear_volc_aksk,
             model_commands::get_volc_aksk,
             smart_router_commands::get_smart_router_config,
+            smart_router_commands::set_smart_router_enabled,
             smart_router_commands::get_smart_router_activity,
             smart_router_commands::get_smart_router_candidates,
             smart_router_commands::remove_smart_router_candidate,

@@ -392,7 +392,6 @@ const zhHans: Partial<Translations> = {
   'ssh.winNote':
     'Windows 部署 SSH 较为复杂。建议在服务器端下载安装 EchoBird，然后通过"一键安装"部署本机 SSH。',
   'status.running': '运行中',
-  'status.online': '在线',
   'status.notInstalled': '未安装',
   // 我的AI生涯
   'page.aiCareer': '我的AI生涯',

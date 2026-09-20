@@ -422,7 +422,6 @@ const ja: Partial<Translations> = {
   'ssh.winNote':
     'Windows での SSH 展開は Linux / macOS より複雑です。サーバー側に EchoBird を先にインストールし、「インストール & 修復」から SSH を設定するのを推奨します。',
   'status.running': '実行中',
-  'status.online': 'オンライン',
   'status.complete': '完了',
   'status.failed': '失敗',
   'status.notInstalled': '未インストール',

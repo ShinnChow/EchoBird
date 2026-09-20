@@ -67,7 +67,7 @@ export const MyProjectsPanel: React.FC = () => {
   const hiddenBuiltins = useMyProjectsStore((s) => s.hiddenBuiltins);
   const userProjectModelChoice = useMyProjectsStore((s) => s.userProjectModelChoice);
   const setUserProjectModelChoice = useMyProjectsStore((s) => s.setUserProjectModelChoice);
-  const { userModels } = useAppManager();
+  const { userModels, smartRouterEnabled } = useAppManager();
 
   // Resolve the project record. Built-ins are computed (id "builtin-<id>"),
   // user projects come from the store list. If id doesn't match either we
@@ -109,6 +109,7 @@ export const MyProjectsPanel: React.FC = () => {
         {syntheticTool ? (
           <div className="space-y-2 h-full">
             <ModelListSection
+              smartRouterEnabled={smartRouterEnabled}
               selectedToolData={syntheticTool}
               userModels={userModels}
               toolModelConfig={toolModelConfig}

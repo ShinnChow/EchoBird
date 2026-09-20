@@ -1,0 +1,151 @@
+import type { ReactNode } from 'react';
+import { Box, RefreshCw, Server, SquarePen, Trash2 } from 'lucide-react';
+import type { ModelConfig } from '../api/types';
+import type { ModelUsageData } from '../api/tauri';
+import type { TKey } from '../i18n';
+import { getModelIcon } from './cards';
+
+interface ModelListCardProps {
+  model: ModelConfig;
+  selection: ReactNode;
+  onSelect: () => void;
+  selectionLabel?: string;
+  selectionDisabled?: boolean;
+  selected?: boolean;
+  disabled?: boolean;
+  subtitle?: string;
+  badge?: ReactNode;
+  overlay?: ReactNode;
+  usage?: ModelUsageData;
+  refreshing?: boolean;
+  onRefreshUsage?: (modelId: string) => void;
+  onEditModel?: (model: ModelConfig) => void;
+  onDeleteModel?: (modelId: string) => void;
+  t: (key: TKey) => string;
+}
+
+export function ModelListCard({
+  model,
+  selection,
+  onSelect,
+  selectionLabel,
+  selectionDisabled = false,
+  selected = false,
+  disabled = false,
+  subtitle = model.modelId || '',
+  badge,
+  overlay,
+  usage,
+  refreshing = false,
+  onRefreshUsage,
+  onEditModel,
+  onDeleteModel,
+  t,
+}: ModelListCardProps) {
+  const isLocalModel = model.internalId === 'local-server' || model.internalId === 'smart-router';
+  const canManage = !isLocalModel && model.modelType !== 'DEMO';
+  const iconSrc = getModelIcon('', model.modelId || '');
+  const quota = usage?.quotas[0];
+  const usageSummary = quota
+    ? quota.balance != null
+      ? `${t('model.balance')}${quota.balance.toFixed(2)}`
+      : `${Number(quota.percentage.toFixed(1))}%`
+    : undefined;
+
+  return (
+    <div
+      aria-disabled={disabled || undefined}
+      className={`relative overflow-hidden p-3 rounded-card transition-colors flex items-center gap-3 border border-transparent ${
+        disabled ? 'opacity-50' : ''
+      } ${selected ? 'bg-cyber-elevated' : 'bg-cyber-surface hover:bg-cyber-elevated'}`}
+    >
+      <button
+        type="button"
+        aria-label={selectionLabel ?? `${model.name} — ${subtitle}`}
+        disabled={disabled || selectionDisabled}
+        onClick={onSelect}
+        className={`absolute inset-0 rounded-card focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyber-accent ${disabled ? 'cursor-not-allowed' : 'disabled:cursor-default'}`}
+      />
+      {overlay}
+      <div className="relative z-10 pointer-events-none flex items-center gap-3 shrink-0">
+        {selection}
+        {iconSrc ? (
+          <img
+            src={iconSrc}
+            alt=""
+            className="w-6 h-6"
+            onError={(event) => {
+              event.currentTarget.style.display = 'none';
+            }}
+          />
+        ) : (
+          <div
+            className={`w-6 h-6 flex items-center justify-center ${isLocalModel ? 'text-cyber-accent' : 'text-cyber-text'}`}
+          >
+            {isLocalModel ? <Server size={22} /> : <Box size={22} />}
+          </div>
+        )}
+      </div>
+      <div className="relative z-10 pointer-events-none flex-1 min-w-0 flex flex-col justify-center min-h-[2.5rem] py-0.5">
+        <div className="flex items-center gap-2">
+          <div className="text-sm font-bold truncate leading-none flex-1 min-w-0">
+            {model.name || 'Untitled Model'}
+          </div>
+          {!isLocalModel && usageSummary && (
+            <span className="text-[10px] text-cyber-text-secondary shrink-0 whitespace-nowrap">
+              {usageSummary}
+            </span>
+          )}
+          {badge}
+        </div>
+        <div className="flex items-center gap-2 mt-1 text-[10px] leading-tight">
+          <span className="flex-1 min-w-0 truncate text-cyber-text-secondary/70">{subtitle}</span>
+          {!isLocalModel && (onRefreshUsage || (canManage && (onDeleteModel || onEditModel))) && (
+            <div className="pointer-events-auto flex items-center gap-1 shrink-0">
+              {onRefreshUsage && (
+                <button
+                  type="button"
+                  className="p-0.5 text-cyber-text-muted/70 hover:text-cyber-text transition-colors"
+                  aria-label={t('btn.refreshUsage')}
+                  aria-busy={refreshing}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (!refreshing) onRefreshUsage(model.internalId);
+                  }}
+                >
+                  <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+                </button>
+              )}
+              {canManage && onDeleteModel && (
+                <button
+                  type="button"
+                  className="p-0.5 text-cyber-text-muted/70 hover:text-red-500 transition-colors"
+                  aria-label={t('btn.delete')}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDeleteModel(model.internalId);
+                  }}
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
+              {canManage && onEditModel && (
+                <button
+                  type="button"
+                  className="p-0.5 text-cyber-text-muted/70 hover:text-cyber-text transition-colors"
+                  aria-label={t('btn.edit')}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onEditModel(model);
+                  }}
+                >
+                  <SquarePen size={12} />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

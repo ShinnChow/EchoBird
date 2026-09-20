@@ -23,12 +23,14 @@ const models: ModelConfig[] = [
   {
     internalId: 'cloud-model',
     name: 'Cloud Model',
+    modelId: 'deepseek-flash',
     baseUrl: 'https://cloud.example/v1',
     apiKey: '',
   },
   {
     internalId: 'local-server',
     name: 'Local Model',
+    modelId: 'local-model-id',
     baseUrl: 'http://127.0.0.1:1234/v1',
     apiKey: '',
   },
@@ -46,6 +48,25 @@ const labels: Partial<Record<TKey, string>> = {
 };
 
 describe('ModelListSection', () => {
+  it('keeps the disabled router visible and unavailable for selection', async () => {
+    vi.stubGlobal('__APP_EDITION__', 'full');
+    const { ModelListSection } = await import('./AppManagerComponents');
+    const markup = renderToStaticMarkup(
+      <ModelListSection
+        smartRouterEnabled={false}
+        selectedToolData={tool}
+        userModels={models}
+        toolModelConfig={{ 'test-tool': 'smart-router' }}
+        selectedTool="test-tool"
+        handleSelectModel={vi.fn()}
+        t={(key) => key}
+      />
+    );
+    expect(markup).toContain('Auto Router');
+    expect(markup).toContain('aria-disabled="true"');
+    expect(markup).toContain('127.0.0.1:53683');
+    expect(markup).toContain('Cloud Model');
+  });
   it('renders smart, local, and cloud models as one ordered list with compact badges', async () => {
     vi.stubGlobal('__APP_EDITION__', 'full');
     const { ModelListSection } = await import('./AppManagerComponents');
@@ -66,7 +87,7 @@ describe('ModelListSection', () => {
     expect(markup.indexOf('Local Model')).toBeLessThan(markup.indexOf('Cloud Model'));
   });
 
-  it('shows the API URL without switch controls or browser tooltips', async () => {
+  it('shows the model ID and usage instead of the API URL without extra tooltips', async () => {
     vi.stubGlobal('__APP_EDITION__', 'full');
     const { ModelListSection } = await import('./AppManagerComponents');
     const markup = renderToStaticMarkup(
@@ -90,7 +111,8 @@ describe('ModelListSection', () => {
     );
 
     expect(markup).toContain('80%');
-    expect(markup).toContain('cloud.example/v1');
+    expect(markup).toContain('deepseek-flash');
+    expect(markup).not.toContain('cloud.example');
     expect(markup).not.toContain('OAI');
     expect(markup).not.toContain('ANT');
     expect(markup).not.toContain('⇄');
@@ -98,6 +120,27 @@ describe('ModelListSection', () => {
     expect(markup).not.toContain('Anthropic');
     expect(markup).not.toContain('title=');
     expect(markup).not.toContain('disabled=');
+  });
+
+  it('keeps router and official addresses while local and cloud models show IDs', async () => {
+    vi.stubGlobal('__APP_EDITION__', 'full');
+    const { ModelListSection } = await import('./AppManagerComponents');
+    const markup = renderToStaticMarkup(
+      <ModelListSection
+        selectedToolData={{ ...tool, id: 'claudedesktop' }}
+        userModels={models}
+        toolModelConfig={{}}
+        selectedTool="claudedesktop"
+        handleSelectModel={vi.fn()}
+        t={(key) => key}
+      />
+    );
+    expect(markup).toContain('127.0.0.1:53683/v1');
+    expect(markup).toContain('api.anthropic.com');
+    expect(markup).toContain('local-model-id');
+    expect(markup).toContain('deepseek-flash');
+    expect(markup).not.toContain('127.0.0.1:1234');
+    expect(markup).not.toContain('cloud.example');
   });
 
   it.each(['codex', 'chatgptdesktop'])(

@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Box, Server, FolderHeart, Trophy, Monitor, Download, RefreshCw } from 'lucide-react';
 import { NavItem } from './NavItem';
+import { RoutingToggle } from './RoutingToggle';
 import { useI18n } from '../hooks/useI18n';
 import * as api from '../api/tauri';
 import { useDocumentVisible } from '../hooks/useDocumentVisible';
@@ -23,7 +24,9 @@ interface SidebarProps {
   activePage: PageType;
   onPageChange: (page: PageType) => void;
   agentRunning?: boolean;
-  smartRouterOnline?: boolean;
+  smartRouterEnabled: boolean;
+  smartRouterTogglePending: boolean;
+  onSmartRouterChange: (enabled: boolean) => void;
   updateAvailable?: string | null;
   onSettingsClick?: () => void;
 }
@@ -32,7 +35,9 @@ export const Sidebar = ({
   activePage,
   onPageChange,
   agentRunning = false,
-  smartRouterOnline = false,
+  smartRouterEnabled,
+  smartRouterTogglePending,
+  onSmartRouterChange,
   updateAvailable = null,
   onSettingsClick,
 }: SidebarProps) => {
@@ -148,22 +153,24 @@ export const Sidebar = ({
         )}
       </div>
 
-      {(smartRouterOnline || (isFullEdition && serverRunning)) && (
-        <div className="pt-4 text-[14px] text-cyber-text-secondary">
-          {smartRouterOnline && (
-            <div>
-              {t('nav.smartRouter')}:{' '}
-              <span className="text-cyber-accent font-semibold">{t('status.online')}</span>
-            </div>
-          )}
-          {isFullEdition && serverRunning && (
-            <div className={smartRouterOnline ? 'mt-1' : ''}>
-              {t('nav.localServer')}:{' '}
-              <span className="text-cyber-accent font-semibold">{t('status.running')}</span>
-            </div>
-          )}
+      <div className="pt-4 text-[14px] text-cyber-text-secondary">
+        <div className="flex h-5 items-center gap-2">
+          <span className="whitespace-nowrap leading-5">{t('nav.smartRouter')}</span>
+          <RoutingToggle
+            label={t('nav.smartRouter')}
+            hideLabel
+            checked={smartRouterEnabled}
+            disabled={smartRouterTogglePending}
+            onChange={onSmartRouterChange}
+          />
         </div>
-      )}
+        {isFullEdition && serverRunning && (
+          <div className="mt-1">
+            {t('nav.localServer')}:{' '}
+            <span className="text-cyber-accent font-semibold">{t('status.running')}</span>
+          </div>
+        )}
+      </div>
     </nav>
   );
 };

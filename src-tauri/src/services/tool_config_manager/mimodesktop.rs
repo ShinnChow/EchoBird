@@ -6,9 +6,9 @@ use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
 const PROVIDER: &str = "echobird-desktop";
-const CONFIG_NAMES: [&str; 3] = ["mimocode.jsonc", "mimocode.json", "config.json"];
+pub(super) const CONFIG_NAMES: [&str; 3] = ["mimocode.jsonc", "mimocode.json", "config.json"];
 
-fn config_dir() -> Result<PathBuf, String> {
+pub(super) fn config_dir() -> Result<PathBuf, String> {
     if let Some(home) = std::env::var_os("MIMOCODE_HOME").filter(|v| !v.is_empty()) {
         let home = PathBuf::from(home);
         if !home.is_absolute() {

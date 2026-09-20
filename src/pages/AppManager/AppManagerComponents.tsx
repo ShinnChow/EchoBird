@@ -1,6 +1,7 @@
 import { ClaudeCodeAccountSection } from './ClaudeCodeAccountSection';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { RoutingToggle } from '../../components/RoutingToggle';
+import { ModelListCard } from '../../components/ModelListCard';
 import {
   DndContext,
   PointerSensor,
@@ -21,12 +22,10 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-  Server as ServerIcon,
   Box as BoxIcon,
   ExternalLink,
   LoaderCircle,
   RefreshCw,
-  SquarePen,
   Settings,
   Trash2,
 } from 'lucide-react';
@@ -468,6 +467,7 @@ export const AppManagerMain: React.FC = () => {
 // ===== Model List Section =====
 
 interface ModelListSectionProps {
+  smartRouterEnabled?: boolean;
   selectedToolData: LocalTool;
   userModels: ModelConfig[];
   toolModelConfig: Record<string, string | null>;
@@ -530,6 +530,7 @@ const ModelCardPulse: React.FC = () => {
 };
 
 export const ModelListSection: React.FC<ModelListSectionProps> = ({
+  smartRouterEnabled = true,
   selectedToolData,
   userModels,
   toolModelConfig,
@@ -563,17 +564,8 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
   }, [userModels, toolProtocols, selectedTool]);
 
   const renderModelCard = (model: (typeof userModels)[0], badge?: 'smart' | 'local') => {
+    const disabled = model.internalId === 'smart-router' && !smartRouterEnabled;
     const isSelected = selectedTool ? toolModelConfig[selectedTool] === model.internalId : false;
-    const isLocalModel = model.internalId === 'local-server' || model.internalId === 'smart-router';
-    const canManage = !isLocalModel && model.modelType !== 'DEMO';
-    const quota = modelUsageData?.[model.internalId]?.quotas[0];
-    const usageSummary = quota
-      ? quota.balance != null
-        ? `${t('model.balance')}${quota.balance.toFixed(2)}`
-        : `${Number(quota.percentage.toFixed(1))}%`
-      : undefined;
-    const refreshing = isRefreshingUsage || refreshingUsageIds?.has(model.internalId) || false;
-
     const modelHasBoth = !!(model.baseUrl && model.anthropicUrl);
     // Use the same default as applyModelConfig: a model with one URL uses that
     // URL's protocol; a model with both URLs follows the tool's first protocol.
@@ -599,28 +591,15 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
       }
     })();
 
-    // Resolve icon from the MODEL ID only — mirror the model-nexus 配置 tab
-    // (ModelCard.tsx). Passing the platform name (e.g.「千问AI平台」) here
-    // matched the platform rule and showed qianwen.png even when the model
-    // id was glm-5.2. The 官方端点 card below keeps name-based resolution
-    // because ep.name is the vendor's own endpoint name, not a platform card.
-    const iconSrc = getModelIcon('', model.modelId || '');
-
     return (
-      <div
+      <ModelListCard
         key={model.internalId}
-        className={`relative overflow-hidden p-3 rounded-card cursor-pointer transition-colors flex items-center gap-3 border ${
-          isSelected
-            ? 'bg-cyber-elevated border-transparent'
-            : 'bg-cyber-surface border-transparent hover:bg-cyber-elevated'
-        }`}
-        onClick={() => selectedTool && handleSelectModel(selectedTool, model.internalId)}
-      >
-        {appliedPulse && appliedPulse.id === model.internalId && (
-          <ModelCardPulse key={appliedPulse.nonce} />
-        )}
-        {/* Left: Radio + Icon */}
-        <div className="relative z-10 flex items-center gap-3 flex-shrink-0">
+        model={model}
+        selected={isSelected}
+        disabled={disabled}
+        subtitle={model.internalId === 'smart-router' ? apiPath : undefined}
+        onSelect={() => selectedTool && handleSelectModel(selectedTool, model.internalId)}
+        selection={
           <div
             className={`w-[16px] h-[16px] rounded-full border-2 flex items-center justify-center ${
               isSelected ? 'border-cyber-accent' : 'border-cyber-border'
@@ -628,100 +607,32 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
           >
             {isSelected && <div className="w-[8px] h-[8px] rounded-full bg-cyber-accent" />}
           </div>
-          {iconSrc ? (
-            <img
-              src={iconSrc}
-              alt=""
-              className="w-6 h-6"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          ) : isLocalModel ? (
-            <div className="w-6 h-6 flex items-center justify-center text-cyber-accent">
-              <ServerIcon size={22} />
-            </div>
-          ) : (
-            <div className="w-6 h-6 flex items-center justify-center text-cyber-text">
-              <BoxIcon size={22} />
-            </div>
-          )}
-        </div>
-
-        {/* Right: Two-row layout */}
-        <div className="relative z-10 flex-1 min-w-0 flex flex-col justify-center min-h-[2.5rem] py-0.5">
-          <div className="flex items-center gap-2">
-            <div className="text-sm font-bold truncate leading-none flex-1 min-w-0">
-              {model.name || 'Untitled Model'}
-            </div>
-            {!isLocalModel && usageSummary && (
-              <span className="text-[10px] text-cyber-text-secondary flex-shrink-0 whitespace-nowrap">
-                {usageSummary}
-              </span>
-            )}
-            {badge && (
-              <span
-                className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none ${
-                  badge === 'smart'
-                    ? 'bg-cyber-accent/10 text-cyber-accent'
-                    : 'bg-cyber-text/10 text-cyber-text-secondary'
-                }`}
-              >
-                {t(badge === 'smart' ? 'agent.badge.smart' : 'agent.badge.local')}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 mt-1 text-[10px] leading-tight">
-            <span className="flex flex-1 min-w-0 truncate text-cyber-text-secondary/70">
-              {apiPath}
+        }
+        overlay={
+          appliedPulse && appliedPulse.id === model.internalId ? (
+            <ModelCardPulse key={appliedPulse.nonce} />
+          ) : undefined
+        }
+        badge={
+          badge && (
+            <span
+              className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none ${
+                badge === 'smart'
+                  ? 'bg-cyber-accent/10 text-cyber-accent'
+                  : 'bg-cyber-text/10 text-cyber-text-secondary'
+              }`}
+            >
+              {t(badge === 'smart' ? 'agent.badge.smart' : 'agent.badge.local')}
             </span>
-            {!isLocalModel && (onRefreshUsage || (canManage && (onDeleteModel || onEditModel))) && (
-              <div className="flex items-center gap-1 flex-shrink-0">
-                {onRefreshUsage && (
-                  <button
-                    type="button"
-                    className="p-0.5 text-cyber-text-muted/70 hover:text-cyber-text transition-colors"
-                    aria-label={t('btn.refreshUsage')}
-                    aria-busy={refreshing}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!refreshing) onRefreshUsage(model.internalId);
-                    }}
-                  >
-                    <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
-                  </button>
-                )}
-                {canManage && onDeleteModel && (
-                  <button
-                    type="button"
-                    className="p-0.5 text-cyber-text-muted/70 hover:text-red-500 transition-colors"
-                    aria-label={t('btn.delete')}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteModel(model.internalId);
-                    }}
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                )}
-                {canManage && onEditModel && (
-                  <button
-                    type="button"
-                    className="p-0.5 text-cyber-text-muted/70 hover:text-cyber-text transition-colors"
-                    aria-label={t('btn.edit')}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEditModel(model);
-                    }}
-                  >
-                    <SquarePen size={12} />
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+          )
+        }
+        usage={modelUsageData?.[model.internalId]}
+        refreshing={isRefreshingUsage || refreshingUsageIds?.has(model.internalId)}
+        onRefreshUsage={onRefreshUsage}
+        onEditModel={onEditModel}
+        onDeleteModel={onDeleteModel}
+        t={t}
+      />
     );
   };
 
@@ -1013,147 +924,11 @@ const AccountIconButton: React.FC<AccountIconButtonProps> = ({
   );
 };
 
-// A single routing toggle: label + switch + themed help glyph with an
-// interactive tooltip. The tooltip stays open while the pointer is over the
-// glyph OR the tooltip itself.
-interface RoutingToggleProps {
-  label: string;
-  hint?: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}
-
-function RoutingToggle({ label, hint, checked, onChange }: RoutingToggleProps) {
-  const [open, setOpen] = useState(false);
-  const anchorRef = useRef<HTMLSpanElement>(null);
-  const tooltipRef = useRef<HTMLSpanElement>(null);
-  const [position, setPosition] = useState<{
-    left: number;
-    top: number;
-    caret: number;
-    above: boolean;
-  } | null>(null);
-  useEffect(() => {
-    if (!open) return;
-    const place = () => {
-      const anchor = anchorRef.current?.getBoundingClientRect();
-      const tooltip = tooltipRef.current?.getBoundingClientRect();
-      if (!anchor || !tooltip) return;
-      const left = Math.max(
-        8,
-        Math.min(anchor.right - tooltip.width, window.innerWidth - tooltip.width - 8)
-      );
-      const above = anchor.bottom + 6 + tooltip.height > window.innerHeight - 8;
-      const top = Math.max(8, above ? anchor.top - tooltip.height - 6 : anchor.bottom + 6);
-      setPosition({
-        left,
-        top,
-        above,
-        caret: Math.max(8, Math.min(anchor.left + anchor.width / 2 - left - 4, tooltip.width - 16)),
-      });
-    };
-    place();
-    window.addEventListener('resize', place);
-    window.addEventListener('scroll', place, true);
-    return () => {
-      window.removeEventListener('resize', place);
-      window.removeEventListener('scroll', place, true);
-    };
-  }, [open, hint]);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Clear any pending close timer on unmount so it can't fire after teardown.
-  useEffect(
-    () => () => {
-      if (closeTimer.current) clearTimeout(closeTimer.current);
-    },
-    []
-  );
-
-  const showTip = () => {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-    if (!open) setPosition(null);
-    setOpen(true);
-  };
-  // Small grace delay so moving the pointer from "?" across the gap into the
-  // tooltip doesn't dismiss it.
-  const scheduleHide = () => {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-    closeTimer.current = setTimeout(() => setOpen(false), 160);
-  };
-
-  return (
-    <div className="flex items-center">
-      <span className="text-xs text-cyber-text-secondary mr-2 whitespace-nowrap">{label}</span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-cyber-accent mr-2 ${
-          checked ? 'bg-cyber-accent' : 'bg-cyber-border'
-        }`}
-      >
-        <span
-          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-all duration-200 ${
-            checked ? 'translate-x-[18px] shadow-[0_1px_2px_rgba(0,0,0,0.35)]' : 'translate-x-1'
-          }`}
-        />
-      </button>
-      {/* Help glyph — themed, interactive tooltip (not the native browser one).
-          onMouseEnter/Leave on this wrapper covers both the glyph and the
-          tooltip (a descendant), so the tooltip stays open while hovered. */}
-      {hint && (
-        <span
-          ref={anchorRef}
-          className="relative inline-flex items-center"
-          onMouseEnter={showTip}
-          onMouseLeave={scheduleHide}
-        >
-          <span
-            aria-label={hint}
-            className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-cyber-elevated font-sans text-xs font-medium leading-none text-cyber-text-secondary cursor-help select-none hover:bg-cyber-accent/15 hover:text-cyber-accent transition-colors"
-          >
-            ?
-          </span>
-          {open &&
-            createPortal(
-              <span
-                ref={tooltipRef}
-                role="tooltip"
-                onMouseEnter={showTip}
-                onMouseLeave={scheduleHide}
-                style={{
-                  left: position?.left ?? 0,
-                  top: position?.top ?? 0,
-                  visibility: position ? 'visible' : 'hidden',
-                  width: 'min(288px, calc(100vw - 16px))',
-                  maxHeight: 'calc(100vh - 16px)',
-                }}
-                className="fixed z-[10000] rounded border border-cyber-accent/40 bg-cyber-elevated px-3 py-2 text-[11px] leading-relaxed text-cyber-text shadow-cyber-card backdrop-blur-sm"
-              >
-                <span
-                  aria-hidden="true"
-                  style={{ left: position?.caret ?? 0 }}
-                  className={`absolute h-2 w-2 rotate-45 border-cyber-accent/40 bg-cyber-elevated ${position?.above ? '-bottom-1 border-r border-b' : '-top-1 border-l border-t'}`}
-                />
-                <span className="block overflow-y-auto" style={{ maxHeight: 'calc(100vh - 34px)' }}>
-                  {hint}
-                </span>
-              </span>,
-              document.body
-            )}
-        </span>
-      )}
-    </div>
-  );
-}
-
 // ===== Right Panel (config panel with tabs) =====
 
 export const AppManagerPanel: React.FC = () => {
   const { t, locale } = useI18n();
+  const { smartRouterEnabled } = useAppManager();
   const confirm = useConfirm();
   const {
     modelUsageData,
@@ -1294,6 +1069,7 @@ export const AppManagerPanel: React.FC = () => {
                 </>
               )}
               <ModelListSection
+                smartRouterEnabled={smartRouterEnabled}
                 selectedToolData={selectedToolData}
                 userModels={userModels}
                 toolModelConfig={toolModelConfig}

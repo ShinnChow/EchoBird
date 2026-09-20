@@ -4,6 +4,7 @@ import type { ModelConfig } from './types';
 export const SMART_ROUTER_CANDIDATE_LIMIT = 20;
 
 export interface SmartRouterConfig {
+  enabled: boolean;
   candidateIds: string[];
   usableCandidateCount: number;
   baseUrl: string;
@@ -21,6 +22,10 @@ export interface SmartRouterActivity {
 
 export async function getSmartRouterConfig(): Promise<SmartRouterConfig> {
   return invoke('get_smart_router_config');
+}
+
+export async function setSmartRouterEnabled(enabled: boolean): Promise<SmartRouterConfig> {
+  return invoke('set_smart_router_enabled', { enabled });
 }
 
 export async function getSmartRouterActivity(): Promise<SmartRouterActivity> {

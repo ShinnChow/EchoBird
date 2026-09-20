@@ -1576,6 +1576,19 @@ pub fn merge_override_seed(
     }
 }
 
+pub(crate) fn model_config_paths() -> Vec<PathBuf> {
+    get_definitions()
+        .into_iter()
+        .flat_map(|def| {
+            [
+                expand_path(&def.config_mapping.config_file),
+                platform::echobird_dir().join(format!("{}.json", def.id)),
+            ]
+        })
+        .filter(|path| !path.as_os_str().is_empty())
+        .collect()
+}
+
 /// Get the config mapping for a specific tool
 pub fn get_tool_config_mapping(tool_id: &str) -> Option<(ToolDefinition, PathBuf)> {
     let defs = get_definitions();

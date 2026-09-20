@@ -451,7 +451,6 @@ const en: Translations = {
   'ssh.winNote':
     'Windows SSH deployment is more complex than Linux/macOS. Recommended: install EchoBird on the Windows machine first, then use One-Click Install to set up local SSH access for you.',
   'status.running': 'Running',
-  'status.online': 'Online',
   'status.complete': 'Complete',
   'status.failed': 'Failed',
   'status.notInstalled': 'Not installed',

@@ -6,6 +6,7 @@ import type { CodexAccount } from '../../api/tauri';
 // ===== Context =====
 
 export interface AppManagerContextType {
+  smartRouterEnabled: boolean;
   // Internalized state
   selectedTool: string | null;
   setSelectedTool: (id: string | null) => void;

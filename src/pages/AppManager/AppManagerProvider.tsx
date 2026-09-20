@@ -12,6 +12,7 @@ import { AppManagerContext } from './context';
 import { useToolsStore } from '../../stores/toolsStore';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { useModelNexus } from '../ModelNexus/context';
+import { useFreeModels } from '../FreeModels';
 import { getOfficialEndpoint, isOfficialModelSentinel } from '../../data/officialEndpoints';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 
@@ -68,6 +69,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   // Nexus changes, including edits/deletes from this panel.
   const [userModels, setUserModels] = useState<ModelConfig[]>([]);
   const { userModels: modelNexusModels } = useModelNexus();
+  const { routerEnabled, routerBaseUrl } = useFreeModels();
   const userModelsActive = isActive || activePage === 'myProjects';
   useEffect(() => {
     if (!api.getModels) return;
@@ -97,7 +99,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     return () => {
       ignore = true;
     };
-  }, [userModelsActive, modelNexusModels]);
+  }, [userModelsActive, modelNexusModels, routerEnabled, routerBaseUrl]);
 
   // AI-installable IDs from bundled install/index.json (offline-first).
   const [aiInstallableIds, setAiInstallableIds] = useState<string[]>([]);
@@ -743,6 +745,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   return (
     <AppManagerContext.Provider
       value={{
+        smartRouterEnabled: routerEnabled,
         selectedTool,
         setSelectedTool,
         launchAfterApply,

@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
-use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -19,8 +18,7 @@ use sha2::{Digest, Sha256};
 use tokio_stream::wrappers::ReceiverStream;
 
 use super::{
-    api_key_for_use, candidate_ids, mark_running, PublicActivity, SMART_ROUTER_INTERNAL_ID,
-    SMART_ROUTER_MODEL_ID,
+    api_key_for_use, candidate_ids, PublicActivity, SMART_ROUTER_INTERNAL_ID, SMART_ROUTER_MODEL_ID,
 };
 use crate::services::model_manager;
 use crate::utils::platform::echobird_dir;
@@ -336,7 +334,9 @@ fn candidate_fingerprint(model_id: &str, base_url: &str, api_key: &str) -> Strin
     hex::encode(hasher.finalize())
 }
 
-pub async fn run(port: u16) -> Result<(), String> {
+pub(super) fn start(
+    listener: std::net::TcpListener,
+) -> Result<super::runtime::ServerControl, String> {
     let state = AppState::new()?;
     let app = Router::new()
         .route("/health", get(handle_health))
@@ -348,16 +348,11 @@ pub async fn run(port: u16) -> Result<(), String> {
         .route("/messages", post(handle_messages))
         .layer(DefaultBodyLimit::max(MAX_REQUEST_BODY_BYTES))
         .with_state(state);
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .map_err(|e| format!("bind 127.0.0.1:{port} failed: {e}"))?;
+    let listener = tokio::net::TcpListener::from_std(listener).map_err(|e| e.to_string())?;
+    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
 
-    mark_running();
     log::info!("[SmartRouter] listening on 127.0.0.1:{port}");
-    axum::serve(listener, app)
-        .await
-        .map_err(|e| format!("serve failed: {e}"))
+    Ok(super::runtime::ServerControl::start(listener, app))
 }
 
 async fn handle_health() -> Json<Value> {
@@ -501,7 +496,7 @@ fn resolve_candidates() -> Vec<Candidate> {
                 api_key,
             })
         })
-        .filter(|candidate| !candidate.base_url.contains(":53683"))
+        .filter(|candidate| !super::is_router_url(&candidate.base_url))
         .collect()
 }
 
@@ -1448,6 +1443,7 @@ fn json_error(status: StatusCode, message: &str, attempts: Option<Value>) -> Res
 #[cfg(test)]
 mod tests {
     use std::convert::Infallible;
+    use std::net::SocketAddr;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use axum::routing::post;

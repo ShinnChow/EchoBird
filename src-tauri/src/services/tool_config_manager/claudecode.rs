@@ -1,7 +1,7 @@
 //! Model configuration for claudecode.
 
 use super::{echobird_dir, read_json_file, write_json_file, ApplyResult, ModelInfo};
-use crate::services::anthropic_proxy::ANTHROPIC_PROXY_PORT;
+use crate::services::anthropic_proxy;
 use std::fs;
 
 pub(super) fn normalize_model_info_for_tool(tool_id: &str, mut model_info: ModelInfo) -> ModelInfo {
@@ -151,7 +151,7 @@ pub(super) fn apply_claudecode(model_info: &ModelInfo) -> ApplyResult {
         .to_string();
 
     let relay_mode = model_info.relay_mode.unwrap_or(false);
-    let proxy_base = format!("http://127.0.0.1:{}/claudecode", ANTHROPIC_PROXY_PORT);
+    let proxy_base = format!("http://127.0.0.1:{}/claudecode", anthropic_proxy::port());
 
     // ── settings.json env block (preserve every other key the user has) ──
     // Only start from a fresh object when the file genuinely does NOT exist. If
