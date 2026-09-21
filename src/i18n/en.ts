@@ -147,9 +147,11 @@ const en: Translations = {
     "If GitHub isn't reachable, email us directly — we'll reply within a few business days.",
   // Settings
   'settings.title': 'SETTINGS',
+  'settings.general': 'GENERAL',
   'settings.version': 'VERSION',
   'settings.language': 'LANGUAGE',
   'settings.appearance': 'APPEARANCE',
+  'settings.colorTheme': 'Color theme',
   'settings.themeLight': 'Light',
   'settings.themeDark': 'Dark',
   'settings.themeSystem': 'System',

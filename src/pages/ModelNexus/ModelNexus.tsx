@@ -625,7 +625,7 @@ function VolcAkskModal({
         if (e.key === 'Escape') onClose();
       }}
     >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div
         className="relative w-[450px] max-w-[90vw] border border-cyber-border/30 bg-cyber-surface shadow-2xl rounded-xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -1201,7 +1201,7 @@ export function AddModelModal() {
       }}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeModelModal} />
+      <div className="absolute inset-0 bg-black/60" onClick={closeModelModal} />
 
       <div
         role="dialog"

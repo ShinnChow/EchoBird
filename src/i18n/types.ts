@@ -66,6 +66,7 @@ export type TKey =
   | 'feedback.networkNote'
   // Settings
   | 'settings.title'
+  | 'settings.general'
   | 'settings.version'
   | 'settings.language'
   | 'settings.updates'
@@ -74,6 +75,7 @@ export type TKey =
   | 'settings.updateDownloading'
   | 'settings.updateLaunching'
   | 'settings.appearance'
+  | 'settings.colorTheme'
   | 'settings.themeLight'
   | 'settings.themeDark'
   | 'settings.themeSystem'

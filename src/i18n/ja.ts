@@ -163,9 +163,11 @@ const ja: Partial<Translations> = {
   'feedback.networkNote':
     'GitHub に接続できない場合は、メールでお問い合わせください。数営業日以内に返信いたします。',
   'settings.title': '設定',
+  'settings.general': '一般',
   'settings.version': 'バージョン',
   'settings.language': '言語',
   'settings.appearance': '外観',
+  'settings.colorTheme': 'カラーテーマ',
   'settings.themeLight': 'ライト',
   'settings.themeDark': 'ダーク',
   'settings.themeSystem': 'システムに従う',

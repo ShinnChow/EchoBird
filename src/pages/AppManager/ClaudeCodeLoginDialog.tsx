@@ -26,7 +26,7 @@ export function ClaudeCodeLoginDialog({
 
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <form
         role="dialog"
         aria-modal="true"

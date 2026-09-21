@@ -1339,10 +1339,7 @@ export const AppManagerErrorModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={() => setApplyError(null)}
-      />
+      <div className="absolute inset-0 bg-black/60" onClick={() => setApplyError(null)} />
       <div className="relative w-[360px] max-w-[90vw] border border-red-500/40 bg-cyber-surface shadow-2xl rounded-xl overflow-hidden">
         <div className="h-[2px] w-full bg-red-500/60" />
         <div className="px-5 pt-4 pb-2 flex items-center gap-2">

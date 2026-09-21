@@ -5,9 +5,9 @@ import {
   Globe,
   Download,
   ExternalLink,
-  Sun,
-  Moon,
-  Monitor,
+  Check,
+  Palette,
+  Settings2,
   Sparkles,
   Power,
 } from 'lucide-react';
@@ -18,6 +18,7 @@ import { useI18n } from '../hooks/useI18n';
 import * as api from '../api/tauri';
 import { isNewerVersion } from '../utils/version';
 import { useThemeStore, type ThemeMode } from '../stores/themeStore';
+import { COLOR_THEMES, type ColorThemeId } from '../data/colorThemes';
 
 // All supported locales
 const LOCALE_OPTIONS = [
@@ -31,6 +32,7 @@ const LOCALE_OPTIONS = [
 // AppManagerProvider reads. Default ON — users can switch it off here to keep
 // things quiet.
 const EASTER_EGG_KEY = 'echobird_easter_egg';
+type SettingsTab = 'general' | 'appearance';
 
 interface SettingsDialogProps {
   isOpen: boolean;
@@ -47,6 +49,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 }) => {
   const { t } = useI18n();
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [updateStatus, setUpdateStatus] = useState<'latest' | 'available'>('latest');
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [appVersion, setAppVersion] = useState<string>('');
@@ -72,6 +75,8 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const [launchAtStartup, setLaunchAtStartup] = useState(false);
   const themeMode = useThemeStore((s) => s.mode);
   const setThemeMode = useThemeStore((s) => s.setMode);
+  const colorTheme = useThemeStore((s) => s.colorTheme);
+  const setColorTheme = useThemeStore((s) => s.setColorTheme);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   // Read the installed binary version from Tauri at runtime — single source of truth (tauri.conf.json).
@@ -226,208 +231,217 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       }`}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
+      <div className="absolute inset-0 bg-black/55" onClick={handleClose} />
 
       {/* Dialog */}
       <div
         ref={dialogRef}
-        className={`relative w-[440px] max-w-[92vw] border border-cyber-border/30 bg-cyber-surface shadow-2xl rounded-xl overflow-hidden transition-all duration-200 ${
+        className={`relative flex h-[560px] max-h-[88vh] w-[720px] max-w-[92vw] overflow-hidden rounded-xl border border-cyber-border/30 bg-cyber-surface shadow-2xl transition-all duration-200 ${
           isAnimatingOut ? 'scale-95 opacity-0' : 'scale-100 opacity-100'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Top accent line */}
-        <div className="h-px w-full bg-cyber-border" />
+        <aside className="flex w-[168px] flex-shrink-0 flex-col border-r border-cyber-border/50 bg-cyber-bg/35 p-3">
+          <div className="px-3 pt-2 pb-4 text-[12px] font-semibold tracking-wide text-cyber-text-muted">
+            {t('settings.title')}
+          </div>
+          <nav className="space-y-1">
+            {(
+              [
+                ['general', Settings2, t('settings.general')],
+                ['appearance', Palette, t('settings.appearance')],
+              ] as const
+            ).map(([id, Icon, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveTab(id)}
+                className={`flex h-10 w-full items-center gap-2.5 rounded-md px-3 text-[14px] transition-colors ${
+                  activeTab === id
+                    ? 'bg-cyber-accent/10 font-semibold text-cyber-text'
+                    : 'text-cyber-text-secondary hover:bg-cyber-elevated/60 hover:text-cyber-text'
+                }`}
+              >
+                <Icon size={16} />
+                {label}
+              </button>
+            ))}
+          </nav>
 
-        {/* Header */}
-        <div className="px-6 pt-5 pb-4 flex items-center justify-between">
-          <span className="text-lg font-bold text-cyber-text">{t('settings.title')}</span>
-          <button
-            onClick={handleClose}
-            className="text-cyber-text-secondary hover:text-cyber-text transition-colors"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="px-6 pb-6 space-y-5">
-          {/* Version */}
-          <div className="flex items-center justify-between">
-            <span className="text-[14px] text-cyber-text-secondary">{t('settings.version')}</span>
-            <span className="text-[14px] font-mono font-medium text-cyber-text">
+          <div className="mt-auto border-t border-cyber-border/50 px-3 pt-3">
+            <div className="mb-2 text-[12px] font-mono text-cyber-text-muted">
               {appVersion ? `v${appVersion}` : '—'}
-            </span>
-          </div>
-
-          {/* Divider */}
-          <div className="h-px bg-cyber-border/50" />
-
-          {/* Appearance — Light / Dark / System */}
-          <div className="space-y-2.5">
-            <div className="flex items-center gap-2">
-              <Sun size={14} className="text-cyber-text-secondary" />
-              <span className="text-[14px] font-medium text-cyber-text-secondary">
-                {t('settings.appearance')}
-              </span>
             </div>
-            <ThemeSegmented
-              value={themeMode}
-              onChange={setThemeMode}
-              labels={{
-                light: t('settings.themeLight'),
-                dark: t('settings.themeDark'),
-                system: t('settings.themeSystem'),
-              }}
-            />
-          </div>
-
-          {/* Divider */}
-          <div className="h-px bg-cyber-border/50" />
-
-          {/* Close Window Behavior */}
-          <div className="space-y-2.5">
-            <div className="flex items-center gap-2">
-              <X size={14} className="text-cyber-text-secondary" />
-              <span className="text-[14px] font-medium text-cyber-text-secondary">
-                {t('settings.closeWindowBehavior')}
-              </span>
-            </div>
-            <div className="flex gap-1 p-1 bg-cyber-input border border-cyber-border rounded-button">
-              <button
-                onClick={() => handleCloseToTrayChange(false)}
-                className={`flex-1 h-9 flex items-center justify-center text-[13px] transition-colors rounded ${
-                  closeToTray === false
-                    ? 'bg-cyber-elevated text-cyber-text font-semibold'
-                    : 'text-cyber-text-secondary hover:text-cyber-text hover:bg-cyber-elevated'
-                }`}
-              >
-                {t('settings.closeDirectly')}
-              </button>
-              <button
-                onClick={() => handleCloseToTrayChange(true)}
-                className={`flex-1 h-9 flex items-center justify-center text-[13px] transition-colors rounded ${
-                  closeToTray === true
-                    ? 'bg-cyber-elevated text-cyber-text font-semibold'
-                    : 'text-cyber-text-secondary hover:text-cyber-text hover:bg-cyber-elevated'
-                }`}
-              >
-                {t('settings.closeToTray')}
-              </button>
-              <button
-                onClick={() => handleCloseToTrayChange(null)}
-                className={`flex-1 h-9 flex items-center justify-center text-[13px] transition-colors rounded ${
-                  closeToTray === null
-                    ? 'bg-cyber-elevated text-cyber-text font-semibold'
-                    : 'text-cyber-text-secondary hover:text-cyber-text hover:bg-cyber-elevated'
-                }`}
-              >
-                {t('settings.alwaysAsk')}
-              </button>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div className="h-px bg-cyber-border/50" />
-
-          {/* Language */}
-          <div className="space-y-2.5">
-            <div className="flex items-center gap-2">
-              <Globe size={14} className="text-cyber-text-secondary" />
-              <span className="text-[14px] font-medium text-cyber-text-secondary">
-                {t('settings.language')}
-              </span>
-            </div>
-            <MiniSelect value={locale} onChange={onLocaleChange} options={LOCALE_OPTIONS} />
-          </div>
-
-          {/* Divider */}
-          <div className="h-px bg-cyber-border/50" />
-
-          {/* Easter Egg — opt-in playful apply effect + sound (default off). No
-              hint on purpose: an easter egg explained is no fun. */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Launch at startup - boots hidden in the tray (default off) */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Power size={14} className="text-cyber-text-secondary" />
-                <span className="text-[14px] font-medium text-cyber-text-secondary">
-                  {t('settings.launchAtStartup')}
-                </span>
-              </div>
-              <ToggleSwitch checked={launchAtStartup} onChange={handleLaunchAtStartupChange} />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles size={14} className="text-cyber-text-secondary" />
-                <span className="text-[14px] font-medium text-cyber-text-secondary">
-                  {t('settings.easterEgg')}
-                </span>
-              </div>
-              <ToggleSwitch checked={easterEgg} onChange={handleEasterEggChange} />
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div className="h-px bg-cyber-border/50" />
-
-          {/* Update check */}
-          <div className="space-y-2.5">
-            <div className="flex items-center gap-2">
-              <Download size={14} className="text-cyber-text-secondary" />
-              <span className="text-[14px] font-medium text-cyber-text-secondary">
-                {t('settings.updates')}
-              </span>
-            </div>
-
-            <div className="h-10 flex items-center">
-              {installing ? (
-                <div className="relative w-full h-10 overflow-hidden border border-cyber-accent/40 bg-cyber-input/30 rounded-button">
-                  <div
-                    className="absolute inset-y-0 left-0 bg-cyber-accent/20 transition-[width] duration-200"
-                    style={{
-                      width: `${
-                        installPhase === 'launching'
-                          ? 100
-                          : installPhase === 'speed_test'
-                            ? 8
-                            : installPct
-                      }%`,
-                    }}
-                  />
-                  <div className="relative flex items-center justify-center h-full text-[13px] font-medium text-cyber-text">
-                    {installPhase === 'launching'
-                      ? t('settings.updateLaunching')
-                      : installPhase === 'speed_test'
-                        ? `${t('settings.updateDownloading')}…`
-                        : `${t('settings.updateDownloading')} ${installPct}%`}
-                  </div>
-                </div>
-              ) : updateStatus === 'available' ? (
-                <button
-                  onClick={handleUpdate}
-                  className="flex items-center justify-center gap-1.5 w-full h-10 text-[14px] font-semibold border border-cyber-accent/50 bg-cyber-accent/10 text-cyber-accent hover:bg-cyber-accent/20 hover:border-cyber-accent transition-colors rounded-button"
-                >
-                  {t('settings.updateTo')} v{latestVersion} <Download size={13} />
-                </button>
-              ) : (
-                <div className="w-full h-10 flex items-center justify-center gap-1.5 text-[14px] text-cyber-text border border-cyber-border/30 bg-cyber-input/30 rounded-button">
-                  <span className="text-cyber-accent">✓</span> {t('settings.latestVersion')}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Website link */}
-          <div className="pt-2 flex justify-center">
             <button
+              type="button"
               onClick={() => api.openExternal('https://echobird.ai')}
-              className="text-[14px] font-mono font-medium text-cyber-text-secondary hover:text-cyber-text transition-colors flex items-center gap-1.5"
+              className="flex items-center gap-1.5 text-[13px] font-medium text-cyber-text-secondary transition-colors hover:text-cyber-text"
             >
-              EchoBird <ExternalLink size={13} />
+              EchoBird <ExternalLink size={12} />
             </button>
           </div>
-        </div>
+        </aside>
+
+        <section className="flex min-w-0 flex-1 flex-col">
+          <header className="flex h-[58px] flex-shrink-0 items-center justify-between border-b border-cyber-border/50 px-5">
+            <span className="text-[16px] font-semibold text-cyber-text">
+              {activeTab === 'general' ? t('settings.general') : t('settings.appearance')}
+            </span>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="text-cyber-text-secondary transition-colors hover:text-cyber-text"
+            >
+              <X size={18} />
+            </button>
+          </header>
+
+          {/* Content */}
+          <div className="page-scroll flex-1 overflow-y-auto px-5 py-5">
+            {activeTab === 'general' ? (
+              <div className="space-y-5">
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <X size={14} className="text-cyber-text-secondary" />
+                    <span className="text-[14px] font-medium text-cyber-text-secondary">
+                      {t('settings.closeWindowBehavior')}
+                    </span>
+                  </div>
+                  <div className="flex gap-1 p-1 bg-cyber-input border border-cyber-border rounded-button">
+                    {(
+                      [
+                        [false, t('settings.closeDirectly')],
+                        [true, t('settings.closeToTray')],
+                        [null, t('settings.alwaysAsk')],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <button
+                        key={String(value)}
+                        onClick={() => handleCloseToTrayChange(value)}
+                        className={`flex-1 h-9 flex items-center justify-center text-[13px] transition-colors rounded ${
+                          closeToTray === value
+                            ? 'bg-cyber-elevated text-cyber-text font-semibold'
+                            : 'text-cyber-text-secondary hover:text-cyber-text hover:bg-cyber-elevated'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="h-px bg-cyber-border/50" />
+
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <Globe size={14} className="text-cyber-text-secondary" />
+                    <span className="text-[14px] font-medium text-cyber-text-secondary">
+                      {t('settings.language')}
+                    </span>
+                  </div>
+                  <MiniSelect value={locale} onChange={onLocaleChange} options={LOCALE_OPTIONS} />
+                </div>
+
+                <div className="h-px bg-cyber-border/50" />
+
+                <div className="grid grid-cols-2 gap-8">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Power size={14} className="text-cyber-text-secondary" />
+                      <span className="text-[14px] font-medium text-cyber-text-secondary">
+                        {t('settings.launchAtStartup')}
+                      </span>
+                    </div>
+                    <ToggleSwitch
+                      checked={launchAtStartup}
+                      onChange={handleLaunchAtStartupChange}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={14} className="text-cyber-text-secondary" />
+                      <span className="text-[14px] font-medium text-cyber-text-secondary">
+                        {t('settings.easterEgg')}
+                      </span>
+                    </div>
+                    <ToggleSwitch checked={easterEgg} onChange={handleEasterEggChange} />
+                  </div>
+                </div>
+
+                <div className="h-px bg-cyber-border/50" />
+
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <Download size={14} className="text-cyber-text-secondary" />
+                    <span className="text-[14px] font-medium text-cyber-text-secondary">
+                      {t('settings.updates')}
+                    </span>
+                  </div>
+                  <div className="h-10 flex items-center">
+                    {installing ? (
+                      <div className="relative w-full h-10 overflow-hidden border border-cyber-accent/40 bg-cyber-input/30 rounded-button">
+                        <div
+                          className="absolute inset-y-0 left-0 bg-cyber-accent/20 transition-[width] duration-200"
+                          style={{
+                            width: `${
+                              installPhase === 'launching'
+                                ? 100
+                                : installPhase === 'speed_test'
+                                  ? 8
+                                  : installPct
+                            }%`,
+                          }}
+                        />
+                        <div className="relative flex items-center justify-center h-full text-[13px] font-medium text-cyber-text">
+                          {installPhase === 'launching'
+                            ? t('settings.updateLaunching')
+                            : installPhase === 'speed_test'
+                              ? `${t('settings.updateDownloading')}…`
+                              : `${t('settings.updateDownloading')} ${installPct}%`}
+                        </div>
+                      </div>
+                    ) : updateStatus === 'available' ? (
+                      <button
+                        onClick={handleUpdate}
+                        className="flex items-center justify-center gap-1.5 w-full h-10 text-[14px] font-semibold border border-cyber-accent/50 bg-cyber-accent/10 text-cyber-accent hover:bg-cyber-accent/20 hover:border-cyber-accent transition-colors rounded-button"
+                      >
+                        {t('settings.updateTo')} v{latestVersion} <Download size={13} />
+                      </button>
+                    ) : (
+                      <div className="w-full h-10 flex items-center justify-center gap-1.5 text-[14px] text-cyber-text border border-cyber-border/30 bg-cyber-input/30 rounded-button">
+                        <span className="text-cyber-accent">✓</span> {t('settings.latestVersion')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[12px] font-semibold text-cyber-text-secondary">
+                    {t('settings.colorTheme')}
+                  </span>
+                  <ThemeSegmented
+                    value={themeMode}
+                    onChange={setThemeMode}
+                    labels={{
+                      light: t('settings.themeLight'),
+                      dark: t('settings.themeDark'),
+                      system: t('settings.themeSystem'),
+                    }}
+                  />
+                </div>
+
+                <ColorThemePicker
+                  value={colorTheme}
+                  mode={themeMode}
+                  locale={locale}
+                  onChange={setColorTheme}
+                />
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -455,32 +469,29 @@ const ToggleSwitch: React.FC<{ checked: boolean; onChange: (v: boolean) => void 
   </button>
 );
 
-// 3-button segmented control for the theme: Light / Dark / System.
+// Compact text tabs for the theme mode: Light / Dark / System.
 const ThemeSegmented: React.FC<{
   value: ThemeMode;
   onChange: (mode: ThemeMode) => void;
   labels: { light: string; dark: string; system: string };
 }> = ({ value, onChange, labels }) => {
-  const opts: Array<{ id: ThemeMode; icon: React.ReactNode; label: string }> = [
-    { id: 'light', icon: <Sun size={14} />, label: labels.light },
-    { id: 'dark', icon: <Moon size={14} />, label: labels.dark },
-    { id: 'system', icon: <Monitor size={14} />, label: labels.system },
+  const opts: Array<{ id: ThemeMode; label: string }> = [
+    { id: 'light', label: labels.light },
+    { id: 'dark', label: labels.dark },
+    { id: 'system', label: labels.system },
   ];
   return (
-    <div className="flex gap-1 p-1 bg-cyber-input border border-cyber-border rounded-button">
+    <div className="flex items-center">
       {opts.map((o) => {
         const active = value === o.id;
         return (
           <button
             key={o.id}
             onClick={() => onChange(o.id)}
-            className={`flex-1 h-9 flex items-center justify-center gap-1.5 text-[14px] transition-colors rounded ${
-              active
-                ? 'bg-cyber-elevated text-cyber-text font-semibold'
-                : 'text-cyber-text-secondary hover:text-cyber-text hover:bg-cyber-elevated'
+            className={`px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+              active ? 'text-cyber-text' : 'text-cyber-text-muted hover:text-cyber-text-secondary'
             }`}
           >
-            {o.icon}
             {o.label}
           </button>
         );
@@ -488,3 +499,67 @@ const ThemeSegmented: React.FC<{
     </div>
   );
 };
+
+const ColorThemePicker: React.FC<{
+  value: ColorThemeId;
+  mode: ThemeMode;
+  locale: string;
+  onChange: (theme: ColorThemeId) => void;
+}> = ({ value, mode, locale, onChange }) => (
+  <div className="grid grid-cols-6 gap-x-3 gap-y-3.5">
+    {COLOR_THEMES.map((theme) => {
+      const active = value === theme.id;
+      const label = locale.startsWith('zh')
+        ? theme.labelZh
+        : locale === 'ja'
+          ? theme.labelJa
+          : theme.labelEn;
+      return (
+        <button
+          key={theme.id}
+          type="button"
+          aria-pressed={active}
+          aria-label={label}
+          onClick={() => onChange(theme.id)}
+          className="group flex min-w-0 flex-col gap-1.5 bg-transparent"
+        >
+          <span
+            className={`relative flex h-[46px] w-full overflow-hidden rounded-lg border-2 transition-[border-color,transform] duration-150 group-hover:-translate-y-px ${
+              active ? 'border-cyber-accent' : 'border-transparent'
+            }`}
+          >
+            <span
+              className="block h-full flex-1"
+              style={{
+                backgroundColor: mode === 'dark' ? theme.dark.canvas : theme.light.canvas,
+              }}
+            />
+            <span
+              className="block h-full flex-1"
+              style={{
+                backgroundColor:
+                  mode === 'system'
+                    ? theme.dark.canvas
+                    : mode === 'dark'
+                      ? theme.dark.tertiary
+                      : theme.light.tertiary,
+              }}
+            />
+            {active && (
+              <span className="absolute top-1 right-1 flex h-[15px] w-[15px] items-center justify-center rounded-full bg-cyber-accent text-white">
+                <Check size={9} strokeWidth={3.5} />
+              </span>
+            )}
+          </span>
+          <span
+            className={`truncate text-center text-[11px] transition-colors ${
+              active ? 'text-cyber-text' : 'text-cyber-text-secondary'
+            }`}
+          >
+            {label}
+          </span>
+        </button>
+      );
+    })}
+  </div>
+);

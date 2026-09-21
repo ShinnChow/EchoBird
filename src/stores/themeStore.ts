@@ -2,6 +2,12 @@
 // undefined themeMode === follow system.
 import { create } from 'zustand';
 import * as api from '../api/tauri';
+import {
+  getColorTheme,
+  isColorThemeId,
+  type ColorThemeId,
+  type ColorThemeVariant,
+} from '../data/colorThemes';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 type Resolved = 'light' | 'dark';
@@ -13,6 +19,28 @@ const resolve = (mode: ThemeMode): Resolved => {
   return mode;
 };
 
+const hexToRgbChannels = (hex: string): string => {
+  const value = Number.parseInt(hex.slice(1), 16);
+  return `${(value >> 16) & 255} ${(value >> 8) & 255} ${value & 255}`;
+};
+
+const applyColorTheme = (id: ColorThemeId, resolved: Resolved) => {
+  const theme = getColorTheme(id);
+  const variant: ColorThemeVariant = resolved === 'dark' ? theme.dark : theme.light;
+  const root = document.documentElement;
+  root.style.setProperty('--bg-base-rgb', hexToRgbChannels(variant.canvas));
+  root.style.setProperty('--bg-terminal-rgb', hexToRgbChannels(variant.shell));
+  root.style.setProperty('--bg-surface-rgb', hexToRgbChannels(variant.secondary));
+  root.style.setProperty('--bg-elevated-rgb', hexToRgbChannels(variant.tertiary));
+  root.style.setProperty('--bg-deep-rgb', hexToRgbChannels(variant.shell));
+  root.style.setProperty('--bg-input-rgb', hexToRgbChannels(variant.input));
+  try {
+    localStorage.setItem('color-theme', id);
+  } catch {
+    /* private mode */
+  }
+};
+
 // Apply the resolved theme to <html data-theme> and persist a sync-readable
 // copy to localStorage so index.html's inline pre-script can pick it up on
 // next launch (avoids a wrong-theme flash before getSettings() resolves).
@@ -21,13 +49,14 @@ const resolve = (mode: ThemeMode): Resolved => {
 // transitions — every element changes in the same frame, so theme switching
 // looks like a clean swap rather than a janky stagger of `transition-colors`
 // elements interpolating at different speeds.
-const apply = (resolved: Resolved, instant: boolean) => {
+const apply = (resolved: Resolved, colorTheme: ColorThemeId, instant: boolean) => {
   if (instant) {
     const kill = document.createElement('style');
     kill.textContent =
       '*, *::before, *::after { transition: none !important; animation: none !important; }';
     document.head.appendChild(kill);
     document.documentElement.dataset.theme = resolved;
+    applyColorTheme(colorTheme, resolved);
     // Force a reflow so the no-transition rule is in effect for this frame.
     void document.body?.offsetHeight;
     // Re-enable transitions on the next frame so future hover/state
@@ -35,6 +64,7 @@ const apply = (resolved: Resolved, instant: boolean) => {
     requestAnimationFrame(() => requestAnimationFrame(() => kill.remove()));
   } else {
     document.documentElement.dataset.theme = resolved;
+    applyColorTheme(colorTheme, resolved);
   }
   try {
     localStorage.setItem('theme', resolved);
@@ -46,38 +76,65 @@ const apply = (resolved: Resolved, instant: boolean) => {
 interface ThemeStore {
   mode: ThemeMode;
   resolved: Resolved;
+  colorTheme: ColorThemeId;
   setMode: (mode: ThemeMode) => void;
+  setColorTheme: (colorTheme: ColorThemeId) => void;
   init: () => Promise<void>;
 }
 
 export const useThemeStore = create<ThemeStore>((set, get) => ({
   mode: 'system',
   resolved: resolve('system'),
+  colorTheme: 'echobird',
   setMode: (mode) => {
     const resolved = resolve(mode);
-    apply(resolved, true);
+    apply(resolved, get().colorTheme, true);
     set({ mode, resolved });
     api
       .getSettings()
-      .then((s) => api.saveSettings({ ...s, themeMode: mode === 'system' ? undefined : mode }))
+      .then((s) => {
+        const current = get();
+        return api.saveSettings({
+          ...s,
+          themeMode: current.mode === 'system' ? undefined : current.mode,
+          colorTheme: current.colorTheme,
+        });
+      })
+      .catch(() => {});
+  },
+  setColorTheme: (colorTheme) => {
+    apply(get().resolved, colorTheme, true);
+    set({ colorTheme });
+    api
+      .getSettings()
+      .then((s) => {
+        const current = get();
+        return api.saveSettings({
+          ...s,
+          themeMode: current.mode === 'system' ? undefined : current.mode,
+          colorTheme: current.colorTheme,
+        });
+      })
       .catch(() => {});
   },
   init: async () => {
     let mode: ThemeMode = 'system';
+    let colorTheme: ColorThemeId = 'echobird';
     try {
       const s = await api.getSettings();
       if (s.themeMode === 'light' || s.themeMode === 'dark') mode = s.themeMode;
+      if (isColorThemeId(s.colorTheme)) colorTheme = s.colorTheme;
     } catch {
       /* default to system */
     }
     const resolved = resolve(mode);
     // No `instant: true` — initial paint has nothing to transition from.
-    apply(resolved, false);
-    set({ mode, resolved });
+    apply(resolved, colorTheme, false);
+    set({ mode, resolved, colorTheme });
     mql.addEventListener('change', () => {
       if (get().mode !== 'system') return;
       const r: Resolved = mql.matches ? 'dark' : 'light';
-      apply(r, true);
+      apply(r, get().colorTheme, true);
       set({ resolved: r });
     });
   },

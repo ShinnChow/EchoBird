@@ -42,10 +42,7 @@ export const CloseWindowDialog: React.FC<CloseWindowDialogProps> = ({ isOpen, on
       }`}
     >
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={() => handleClose(null)}
-      />
+      <div className="absolute inset-0 bg-black/60" onClick={() => handleClose(null)} />
 
       {/* Dialog box */}
       <div
