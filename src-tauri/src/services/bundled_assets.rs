@@ -141,6 +141,7 @@ pub const INSTALLABLE_TOOL_IDS: &[&str] = &[
     "mimocode",
     "kilo",
     "kimicode",
+    "kimidesktop",
     "claudedesktop",
     "chatgptdesktop",
     "geminidesktop",

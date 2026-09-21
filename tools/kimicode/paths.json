@@ -1,10 +1,12 @@
 {
-    "name": "Kimi Code",
+    "name": "Kimi CLI",
     "category": "CLI Code",
     "apiProtocol": [
-        "openai"
+        "openai",
+        "anthropic"
     ],
-    "docs": "https://moonshotai.github.io/kimi-code/",
+    "docs": "https://www.kimi.com/code/docs/",
+    "website": "https://www.kimi.com/code/",
     "command": "kimi",
     "startCommand": "kimi",
     "envVar": "KIMI_CODE_PATH",
@@ -13,8 +15,8 @@
     "requireConfigFile": false,
     "paths": {
         "win32": [
-            "%APPDATA%\\npm\\kimi.cmd",
             "%USERPROFILE%\\.kimi-code\\bin\\kimi.exe",
+            "%APPDATA%\\npm\\kimi.cmd",
             "%USERPROFILE%\\.bun\\bin\\kimi.exe",
             "%LOCALAPPDATA%\\pnpm\\kimi.exe",
             "%USERPROFILE%\\.npm-global\\kimi.cmd"

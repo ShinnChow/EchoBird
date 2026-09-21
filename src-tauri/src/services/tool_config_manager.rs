@@ -38,7 +38,10 @@ use generic::{apply_generic_json, read_generic_json};
 use grok::{apply_grok, read_grok, restore_grok_to_official};
 pub use kilo::kilo_echobird_model;
 use kilo::{apply_kilo, read_kilo, restore_kilo_to_official};
-use kimicode::{apply_kimicode, read_kimicode, restore_kimicode_to_official};
+use kimicode::{
+    apply_kimicode, apply_kimidesktop, read_kimicode, read_kimidesktop,
+    restore_kimicode_to_official, restore_kimidesktop_to_official,
+};
 pub use mimocode::mimocode_echobird_model;
 use mimocode::{apply_mimocode, read_mimocode, restore_mimocode_to_official};
 use openclaw::{apply_openclaw, read_openclaw};
@@ -281,6 +284,7 @@ pub async fn apply_model_to_tool(tool_id: &str, model_info: ModelInfo) -> ApplyR
         // own config at ~/.config/mimocode/mimocode.json(c).
         "mimocode" => return apply_mimocode(&model_info),
         "mimodesktop" => return mimodesktop::apply(&model_info),
+        "kimidesktop" => return apply_kimidesktop(&model_info),
 
         // Kilo Code (Kilo fork of OpenCode): same provider schema,
         // own config at ~/.config/kilo/kilo.json.
@@ -320,7 +324,7 @@ pub async fn apply_model_to_tool(tool_id: &str, model_info: ModelInfo) -> ApplyR
         "pi" => return apply_pi(&model_info),
         "omp" => return omp::apply(&model_info),
 
-        // Kimi Code (Moonshot AI): TOML at ~/.kimi-code/config.toml
+        // Kimi CLI (Moonshot AI): TOML shared with Desktop at ~/.kimi-code/config.toml
         "kimicode" => return apply_kimicode(&model_info),
 
         // Vibe-Trading (HKUDS): dotenv at ~/.vibe-trading/.env. Every endpoint
@@ -382,6 +386,9 @@ pub async fn restore_tool_to_official(tool_id: &str) -> ApplyResult {
     }
     if tool_id == "mimodesktop" {
         return mimodesktop::restore();
+    }
+    if tool_id == "kimidesktop" {
+        return restore_kimidesktop_to_official();
     }
     if tool_id == "kilo" {
         return restore_kilo_to_official();
@@ -454,6 +461,7 @@ pub async fn get_tool_model_info(tool_id: &str) -> Option<ModelInfo> {
         "opencode" | "opencodedesktop" => return read_opencode(),
         "mimocode" => return read_mimocode(),
         "mimodesktop" => return mimodesktop::read(),
+        "kimidesktop" => return read_kimidesktop(),
         "kilo" => return read_kilo(),
         "openscience" => return read_openscience(),
         "dsh" => return read_dsh(),

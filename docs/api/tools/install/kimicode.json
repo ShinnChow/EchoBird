@@ -1,14 +1,14 @@
 {
     "id": "kimicode",
-    "displayName": "Kimi Code (CLI)",
-    "homepage": "https://code.kimi.com/",
-    "docs": "https://moonshotai.github.io/kimi-code/",
+    "displayName": "Kimi CLI",
+    "homepage": "https://www.kimi.com/code/",
+    "docs": "https://www.kimi.com/code/docs/",
     "github": "https://github.com/MoonshotAI/kimi-code",
     "install": {
         "curl (macOS / Linux — recommended)": "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash",
         "npm (all platforms)": "npm install -g @moonshot-ai/kimi-code",
         "PowerShell (Windows)": "irm https://code.kimi.com/kimi-code/install.ps1 | iex",
-        "note": "CLI coding agent by Moonshot AI (Kimi). The binary is `kimi` (curl installs to ~/.kimi-code/bin and prepends it to PATH; restart the shell or source the rc file before verifying). Built on Pi's pi-tui TUI library but a SEPARATE product — do NOT install `pi` or `@earendil-works/pi-coding-agent`. On Windows, Git for Windows is required (Kimi Code uses bundled Git Bash); set KIMI_SHELL_PATH if bash.exe is in a custom location. Native installers do not require Node.js; the npm alternative requires Node.js 22.19.0+. Verify with `kimi --version`."
+        "note": "Kimi CLI by Moonshot AI. The binary is `kimi` (curl installs to ~/.kimi-code/bin and prepends it to PATH; restart the shell or source the rc file before verifying). This is the command-line client, not Kimi Desktop. Built on Pi's pi-tui TUI library but a SEPARATE product — do NOT install `pi` or `@earendil-works/pi-coding-agent`. On Windows, Git for Windows is required (Kimi CLI uses bundled Git Bash); set KIMI_SHELL_PATH if bash.exe is in a custom location. Native installers do not require Node.js; the npm alternative requires Node.js 22.19.0+. Verify with `kimi --version`."
     },
     "network_requirements": {
         "test_urls": [
@@ -21,9 +21,12 @@
         "mirrors": {}
     },
     "first_run": {
-        "description": "On first launch run `/login` inside Kimi Code and choose Kimi Code OAuth or a Moonshot AI Open Platform API key. Any OpenAI/Anthropic-compatible provider can also be added via the [providers.<name>] table in config.toml.",
+        "description": "On first launch run `/login` inside Kimi CLI and choose Kimi Code OAuth or a Moonshot AI Open Platform API key. Any OpenAI/Anthropic-compatible provider can also be added via the [providers.<name>] table in config.toml. Kimi CLI and Desktop share this global configuration.",
         "config_global": "~/.kimi-code/config.toml",
         "config_project": ".kimi-code/local.toml",
         "verify": "kimi --version"
+    },
+    "identity_guard": {
+        "description": "Kimi CLI is Moonshot AI's terminal client (command `kimi`, npm package `@moonshot-ai/kimi-code`). It is separate from Kimi Desktop, although both clients share ~/.kimi-code/config.toml. Do not download the desktop installer when the user requests Kimi CLI."
     }
 }

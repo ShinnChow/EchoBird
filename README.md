@@ -129,14 +129,14 @@ The tools below support **both** — install _and_ model switching — which is
 the core of what EchoBird is for:
 
 **Coding CLIs** — Claude Code · Codex CLI (OpenAI) · Grok Build (xAI) ·
-Kimi Code (Moonshot) · Qwen Code · Aider · OpenCode · MiMo Code (Xiaomi) · Kilo Code ·
+Kimi CLI (Moonshot) · Qwen Code · Aider · OpenCode · MiMo Code (Xiaomi) · Kilo Code ·
 ZCode (Z.AI) · OpenClaw · Pi · Vibe-Trading
 
 **Desktop apps** — Claude Desktop (3P profile) · ChatGPT desktop ·
-OpenCode Desktop · OpenScience · WorkBuddy (Tencent CodeBuddy)
+Kimi Desktop · OpenCode Desktop · OpenScience · WorkBuddy (Tencent CodeBuddy)
 
 > Searching GitHub for "switch model for Grok Build" or "switch model for
-> Kimi Code"? Those are first-class here — pick the model in Model Nexus,
+> Kimi CLI or Kimi Desktop"? Those are first-class here — pick the model in Model Nexus,
 > hit switch, and EchoBird rewrites `~/.grok/config.toml` or
 > `~/.kimi-code/config.toml` for you.
 

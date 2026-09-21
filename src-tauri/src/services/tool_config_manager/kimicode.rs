@@ -20,10 +20,11 @@ use std::path::PathBuf;
 //   cannot inject via env). Surgical string-level edits (toml_write_top /
 //   toml_write_table_value[_raw]) preserve the user's comments, thinking,
 //   loop_control, permission, hooks, and any unrelated providers/models.
-//   KIMI_CODE_HOME env overrides the whole data dir (detection blind spot —
-//   same shape as MiMo's MIMOCODE_HOME). max_context_size is required (≥1);
-//   we default to 262144 when ModelInfo has no context size.
+//   KIMI_CODE_HOME env overrides the whole data dir. CLI and Desktop share
+//   this file, so changing the selected model in either surface affects both.
 // ════════════════════════════════════════════════════════════════
+
+const DEFAULT_CONTEXT_SIZE: &str = "1000000";
 
 fn kimicode_dir() -> PathBuf {
     // KIMI_CODE_HOME overrides the whole data dir; the file is always
@@ -41,6 +42,22 @@ fn kimicode_config_path() -> PathBuf {
 }
 
 pub(super) fn apply_kimicode(model_info: &ModelInfo) -> ApplyResult {
+    apply_kimi(model_info, "Kimi CLI")
+}
+
+pub(super) fn apply_kimidesktop(model_info: &ModelInfo) -> ApplyResult {
+    apply_kimi(model_info, "Kimi Desktop")
+}
+
+fn apply_kimi(model_info: &ModelInfo, surface: &str) -> ApplyResult {
+    apply_kimi_at(&kimicode_config_path(), model_info, surface)
+}
+
+fn apply_kimi_at(
+    config_path: &std::path::Path,
+    model_info: &ModelInfo,
+    surface: &str,
+) -> ApplyResult {
     let model_id = model_info
         .model
         .as_deref()
@@ -49,24 +66,40 @@ pub(super) fn apply_kimicode(model_info: &ModelInfo) -> ApplyResult {
     if model_id.is_empty() {
         return ApplyResult {
             success: false,
-            message: "Model ID is empty, cannot apply Kimi Code config".to_string(),
+            message: format!("Model ID is empty, cannot apply {surface} config"),
         };
     }
 
-    // Kimi Code is exposed as OpenAI-only (apiProtocol in paths.json is
-    // ["openai"]). The anthropic provider type uses the Anthropic SDK, which
-    // appends /v1/messages to base_url itself — so a base_url carrying /v1
-    // double-joins (404), and third-party Anthropic-compatible relays have
-    // inconsistent path structures that we can't write correctly in general.
-    // We don't expose Anthropic for kimi; the user can still configure an
-    // anthropic provider manually in config.toml if they need it.
-    let base_url = model_info
-        .base_url
-        .as_deref()
-        .unwrap_or("https://api.openai.com/v1")
+    let provider_type = if model_info.protocol.as_deref() == Some("anthropic") {
+        "anthropic"
+    } else {
+        "openai"
+    };
+    let endpoint = if provider_type == "anthropic" {
+        model_info
+            .anthropic_url
+            .as_deref()
+            .or(model_info.base_url.as_deref())
+    } else {
+        model_info.base_url.as_deref()
+    };
+    let mut base_url = endpoint
+        .unwrap_or(if provider_type == "anthropic" {
+            "https://api.anthropic.com"
+        } else {
+            "https://api.openai.com/v1"
+        })
         .trim_end_matches('/')
         .to_string();
-    let provider_type = "openai";
+    // Kimi's Anthropic provider appends /v1/messages. Accept either the base
+    // URL or a complete endpoint from Model Nexus without producing /v1/v1.
+    if provider_type == "anthropic" {
+        if let Some(base) = base_url.strip_suffix("/v1/messages") {
+            base_url = base.trim_end_matches('/').to_string();
+        } else if let Some(base) = base_url.strip_suffix("/v1") {
+            base_url = base.trim_end_matches('/').to_string();
+        }
+    }
 
     let api_key = model_info.api_key.as_deref().unwrap_or("");
     let provider = "echobird";
@@ -74,9 +107,8 @@ pub(super) fn apply_kimicode(model_info: &ModelInfo) -> ApplyResult {
     let providers_table = format!("providers.{}", provider);
     let models_table = format!("models.{}", alias);
 
-    let config_path = kimicode_config_path();
-    ensure_parent(&config_path);
-    let mut content = fs::read_to_string(&config_path).unwrap_or_default();
+    ensure_parent(config_path);
+    let mut content = fs::read_to_string(config_path).unwrap_or_default();
 
     // Top-level default_model → our alias.
     content = toml_write_top(&content, "default_model", alias);
@@ -86,20 +118,33 @@ pub(super) fn apply_kimicode(model_info: &ModelInfo) -> ApplyResult {
     content = toml_write_table_value(&content, &providers_table, "base_url", &base_url);
     content = toml_write_table_value(&content, &providers_table, "api_key", api_key);
 
-    // [models.echobird] — max_context_size is required (≥1); default 262144.
+    // Match Kimi Desktop's provider form defaults. Both supplied protocol
+    // samples use a 1M context with tool use + thinking enabled.
     content = toml_write_table_value(&content, &models_table, "provider", provider);
     content = toml_write_table_value(&content, &models_table, "model", model_id);
-    content = toml_write_table_value_raw(&content, &models_table, "max_context_size", "262144");
+    content = toml_write_table_value_raw(
+        &content,
+        &models_table,
+        "max_context_size",
+        DEFAULT_CONTEXT_SIZE,
+    );
+    content = toml_write_table_value_raw(
+        &content,
+        &models_table,
+        "capabilities",
+        "[\"tool_use\", \"thinking\"]",
+    );
+    content = toml_write_table_value_raw(&content, &models_table, "adaptive_thinking", "true");
 
-    if let Err(e) = fs::write(&config_path, &content) {
+    if let Err(e) = fs::write(config_path, &content) {
         return ApplyResult {
             success: false,
-            message: format!("Kimi Code config error: {}", e),
+            message: format!("{surface} config error: {e}"),
         };
     }
 
     log::info!(
-        "[ToolConfigManager] Kimi Code configured: provider={}, alias={}, model={}, type={}",
+        "[ToolConfigManager] {surface} configured: provider={}, alias={}, model={}, type={}",
         provider,
         alias,
         model_id,
@@ -108,15 +153,22 @@ pub(super) fn apply_kimicode(model_info: &ModelInfo) -> ApplyResult {
     ApplyResult {
         success: true,
         message: format!(
-            "Model \"{}\" configured for Kimi Code. Restart `kimi` or use /model to select {}.",
+            "Model \"{}\" configured for {surface}. Kimi CLI and Desktop share this selection; restart the active client to load it.",
             model_info.name.as_deref().unwrap_or(model_id),
-            alias
         ),
     }
 }
 
 pub(super) fn read_kimicode() -> Option<ModelInfo> {
-    let content = fs::read_to_string(kimicode_config_path()).ok()?;
+    read_kimi_at(&kimicode_config_path())
+}
+
+pub(super) fn read_kimidesktop() -> Option<ModelInfo> {
+    read_kimicode()
+}
+
+fn read_kimi_at(config_path: &std::path::Path) -> Option<ModelInfo> {
+    let content = fs::read_to_string(config_path).ok()?;
     if content.trim().is_empty() {
         return None;
     }
@@ -222,12 +274,23 @@ pub(super) fn read_kimicode() -> Option<ModelInfo> {
 }
 
 pub(super) fn restore_kimicode_to_official() -> ApplyResult {
-    let config_path = kimicode_config_path();
-    let content = fs::read_to_string(&config_path).unwrap_or_default();
+    restore_kimi("Kimi CLI")
+}
+
+pub(super) fn restore_kimidesktop_to_official() -> ApplyResult {
+    restore_kimi("Kimi Desktop")
+}
+
+fn restore_kimi(surface: &str) -> ApplyResult {
+    restore_kimi_at(&kimicode_config_path(), surface)
+}
+
+fn restore_kimi_at(config_path: &std::path::Path, surface: &str) -> ApplyResult {
+    let content = fs::read_to_string(config_path).unwrap_or_default();
     if content.trim().is_empty() {
         return ApplyResult {
             success: true,
-            message: "Kimi Code config not found — already at official.".to_string(),
+            message: format!("{surface} config not found — already at official."),
         };
     }
 
@@ -237,20 +300,20 @@ pub(super) fn restore_kimicode_to_official() -> ApplyResult {
     // launch Kimi Code falls back to /login (OAuth or Moonshot platform key).
     let new_content = remove_toml_table(&content, "providers.echobird");
     let new_content = remove_toml_table(&new_content, "models.echobird");
-    let new_content = remove_toml_top_key(&new_content, "default_model");
+    let new_content = remove_toml_top_key_if_value(&new_content, "default_model", "echobird");
 
     if new_content != content {
-        if let Err(e) = fs::write(&config_path, &new_content) {
+        if let Err(e) = fs::write(config_path, &new_content) {
             return ApplyResult {
                 success: false,
-                message: format!("Kimi Code restore error: {}", e),
+                message: format!("{surface} restore error: {e}"),
             };
         }
     }
 
     ApplyResult {
         success: true,
-        message: "Kimi Code restored — echobird provider/model removed, default_model cleared. Kimi Code will fall back to /login on next launch.".to_string(),
+        message: format!("{surface} restored — EchoBird's shared provider/model was removed without changing a model selected later in Kimi."),
     }
 }
 
@@ -285,7 +348,7 @@ fn remove_toml_table(content: &str, table: &str) -> String {
 }
 
 /// Remove a top-level `key = ...` line (before any section header).
-fn remove_toml_top_key(content: &str, key: &str) -> String {
+fn remove_toml_top_key_if_value(content: &str, key: &str, expected: &str) -> String {
     let mut first_section: Option<usize> = None;
     let mut lines: Vec<String> = content.lines().map(String::from).collect();
     let mut remove: Option<usize> = None;
@@ -300,8 +363,8 @@ fn remove_toml_top_key(content: &str, key: &str) -> String {
         if t.starts_with('#') || t.is_empty() {
             continue;
         }
-        if let Some((k, _)) = t.split_once('=') {
-            if k.trim() == key {
+        if let Some((k, value)) = t.split_once('=') {
+            if k.trim() == key && value.trim().trim_matches('"') == expected {
                 remove = Some(i);
                 break;
             }
@@ -311,4 +374,111 @@ fn remove_toml_top_key(content: &str, key: &str) -> String {
         lines.remove(i);
     }
     lines.join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct Fixture(PathBuf);
+
+    impl Fixture {
+        fn new() -> Self {
+            let path =
+                std::env::temp_dir().join(format!("echobird-kimi-config-{}", uuid::Uuid::new_v4()));
+            std::fs::create_dir_all(&path).unwrap();
+            Self(path.join("config.toml"))
+        }
+    }
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            if let Some(parent) = self.0.parent() {
+                let _ = std::fs::remove_dir_all(parent);
+            }
+        }
+    }
+
+    fn model(protocol: &str, base_url: &str) -> ModelInfo {
+        let mut value = serde_json::json!({
+            "name": "Test model",
+            "model": "vendor/model",
+            "apiKey": "test-only",
+            "protocol": protocol
+        });
+        value[if protocol == "anthropic" {
+            "anthropicUrl"
+        } else {
+            "baseUrl"
+        }] = serde_json::Value::String(base_url.to_string());
+        serde_json::from_value(value).unwrap()
+    }
+
+    #[test]
+    fn writes_openai_shape_used_by_cli_and_desktop() {
+        let f = Fixture::new();
+        assert!(
+            apply_kimi_at(
+                &f.0,
+                &model("openai", "https://example.com/v1/"),
+                "Kimi CLI"
+            )
+            .success
+        );
+        let content = fs::read_to_string(&f.0).unwrap();
+        assert!(content.contains("type = \"openai\""));
+        assert!(content.contains("base_url = \"https://example.com/v1\""));
+        assert!(content.contains("max_context_size = 1000000"));
+        assert!(content.contains("capabilities = [\"tool_use\", \"thinking\"]"));
+        assert!(content.contains("adaptive_thinking = true"));
+        assert_eq!(
+            read_kimi_at(&f.0).unwrap().protocol.as_deref(),
+            Some("openai")
+        );
+    }
+
+    #[test]
+    fn writes_anthropic_and_normalizes_complete_endpoint() {
+        let f = Fixture::new();
+        assert!(
+            apply_kimi_at(
+                &f.0,
+                &model("anthropic", "https://example.com/anthropic/v1/messages/"),
+                "Kimi Desktop"
+            )
+            .success
+        );
+        let content = fs::read_to_string(&f.0).unwrap();
+        assert!(content.contains("type = \"anthropic\""));
+        assert!(content.contains("base_url = \"https://example.com/anthropic\""));
+        let selected = read_kimi_at(&f.0).unwrap();
+        assert_eq!(selected.protocol.as_deref(), Some("anthropic"));
+        assert_eq!(
+            selected.anthropic_url.as_deref(),
+            Some("https://example.com/anthropic")
+        );
+    }
+
+    #[test]
+    fn restore_only_clears_the_echobird_default() {
+        for (default_model, should_remain) in [("echobird", false), ("kimi-code/k3", true)] {
+            let f = Fixture::new();
+            fs::write(
+                &f.0,
+                format!(
+                    "default_model = \"{default_model}\"\n\n[providers.echobird]\ntype = \"openai\"\n\n[models.echobird]\nprovider = \"echobird\"\n\n[providers.official]\ntype = \"kimi\"\n"
+                ),
+            )
+            .unwrap();
+            assert!(restore_kimi_at(&f.0, "Kimi CLI").success);
+            let content = fs::read_to_string(&f.0).unwrap();
+            assert!(!content.contains("[providers.echobird]"));
+            assert!(!content.contains("[models.echobird]"));
+            assert_eq!(
+                content.contains(&format!("default_model = \"{default_model}\"")),
+                should_remain
+            );
+            assert!(content.contains("[providers.official]"));
+        }
+    }
 }

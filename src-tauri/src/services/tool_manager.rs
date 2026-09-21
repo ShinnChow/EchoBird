@@ -2316,6 +2316,19 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
+    #[ignore = "machine-specific: requires Kimi Desktop to be installed"]
+    fn real_registry_finds_kimidesktop() {
+        let definition: crate::models::tool::PathsConfig =
+            serde_json::from_str(include_str!("../../../tools/kimidesktop/paths.json")).unwrap();
+        let path = super::scan_windows_registry(&definition.install_hints.unwrap())
+            .expect("Kimi Desktop registry entry should resolve to an executable");
+        assert!(super::is_windows_exe(&path));
+        assert!(path.to_lowercase().ends_with(r"\kimi code.exe"), "{path}");
+        println!("Detected Kimi Desktop: {path}");
+    }
+
+    #[cfg(windows)]
+    #[test]
     #[ignore = "machine-specific: requires OpenScience Desktop to be installed"]
     fn real_registry_finds_openscience_desktop() {
         let definition: crate::models::tool::PathsConfig =

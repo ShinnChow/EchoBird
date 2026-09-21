@@ -1,0 +1,42 @@
+{
+    "id": "kimidesktop",
+    "displayName": "Kimi Desktop",
+    "homepage": "https://www.kimi.com/code/",
+    "docs": "https://www.kimi.com/code/docs/",
+    "github": "https://github.com/MoonshotAI/kimi-code",
+    "kind": "desktop_app",
+    "platforms": ["windows", "macos"],
+    "install": {
+        "windows_x64_download": "https://code.kimi.com/kimi-code/desktop/download/KimiCode-win-x64.exe",
+        "macos_arm64_download": "https://code.kimi.com/kimi-code/desktop/download/KimiCode-mac-arm64.dmg",
+        "macos_x64_download": "https://code.kimi.com/kimi-code/desktop/download/KimiCode-mac-x64.dmg",
+        "note": "Official Kimi Code Desktop application. Windows currently provides an x64 installer; macOS provides separate Apple Silicon and Intel installers. Linux is not listed as a supported desktop platform. This is the desktop client, not the `kimi` CLI package."
+    },
+    "install_flow": {
+        "summary": "Detect OS and architecture -> download the matching official installer -> install -> verify the desktop executable",
+        "agent_steps": [
+            "Detect OS, CPU architecture and an existing installation first. On Windows, match registry Uninstall DisplayName prefix 'Kimi Code' and resolve DisplayIcon or the uninstaller's sibling Kimi Code.exe so custom install locations work. Do not reinstall a working copy.",
+            "Use only the matching official download URL. Windows ARM64 and Linux are not currently listed; report the unsupported platform instead of substituting Kimi CLI or a third-party build.",
+            "Download the installer to the user's Downloads directory and report its full path.",
+            "Windows x64: launch the official installer and wait for it to finish. If it requires interactive confirmation, open it and explain the remaining step. Verify Kimi Code.exe through the uninstall registry before reporting completion.",
+            "macOS: select the ARM64 DMG for Apple Silicon or x64 DMG for Intel, mount it read-only, copy Kimi Code.app into /Applications or ~/Applications, detach the image, then verify and launch the copied app.",
+            "Refresh EchoBird's tool detection. First launch may require Kimi sign-in. Kimi CLI and Desktop share ~/.kimi-code/config.toml, so applying a model from either EchoBird entry changes the shared default model."
+        ],
+        "tell_user": [
+            "The exact installer and installed application paths",
+            "Whether installation was verified, or the precise remaining step",
+            "EchoBird's Apply & Launch restarts Kimi Desktop to load the shared model; Modify Only requires a manual restart."
+        ]
+    },
+    "identity_guard": {
+        "description": "Kimi Desktop is Moonshot AI's Windows/macOS desktop application, installed as Kimi Code.exe / Kimi Code.app. It is separate from Kimi CLI (npm package @moonshot-ai/kimi-code, command kimi), although both clients share ~/.kimi-code/config.toml. Do not install the CLI when the user requests the desktop app."
+    },
+    "network_requirements": {
+        "test_urls": ["https://www.kimi.com/code/", "https://code.kimi.com"],
+        "mirrors": {}
+    },
+    "first_run": {
+        "description": "Launch Kimi Desktop and sign in. EchoBird can then configure an OpenAI- or Anthropic-compatible provider in the shared ~/.kimi-code/config.toml.",
+        "config_global": "~/.kimi-code/config.toml"
+    }
+}

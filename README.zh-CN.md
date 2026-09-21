@@ -126,13 +126,13 @@ provider,任意支持的工具都能指向它;不用手改 TOML / JSON,不用每
 以下工具**同时**支持安装与切换模型 —— 这是 EchoBird 的核心:
 
 **编程 CLI** —— Claude Code · Codex CLI(OpenAI) · Grok Build(xAI) ·
-Kimi Code(月之暗面) · Qwen Code · Aider · OpenCode · MiMo Code(小米) · Kilo Code ·
+Kimi CLI(月之暗面) · Qwen Code · Aider · OpenCode · MiMo Code(小米) · Kilo Code ·
 ZCode(Z.AI) · OpenClaw · Pi · Vibe-Trading
 
 **桌面应用** —— Claude Desktop(第三方 profile) · ChatGPT 桌面版 ·
-OpenCode Desktop · OpenScience · WorkBuddy(腾讯 CodeBuddy 办公版)
+Kimi 桌面端 · OpenCode Desktop · OpenScience · WorkBuddy(腾讯 CodeBuddy 办公版)
 
-> 在 GitHub 上搜「给 Grok Build 切换模型」「给 Kimi Code 切换模型」?
+> 在 GitHub 上搜「给 Grok Build 切换模型」「给 Kimi CLI / 桌面端切换模型」?
 > 这两个在这里都是一等公民 —— 在模型中心选好模型,按下切换,EchoBird
 > 就帮你重写 `~/.grok/config.toml` 或 `~/.kimi-code/config.toml`。
 
