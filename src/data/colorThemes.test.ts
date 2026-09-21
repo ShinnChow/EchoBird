@@ -11,7 +11,7 @@ describe('color themes', () => {
     }
   });
 
-  it('validates ids and falls back to EchoBird', () => {
+  it('validates ids and falls back to the default palette', () => {
     expect(isColorThemeId('nord')).toBe(true);
     expect(isColorThemeId('unknown')).toBe(false);
     expect(getColorTheme('echobird').id).toBe('echobird');

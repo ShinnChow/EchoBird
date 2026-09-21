@@ -120,6 +120,19 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
   init: async () => {
     let mode: ThemeMode = 'system';
     let colorTheme: ColorThemeId = 'echobird';
+    // Restore the cached palette before the first await. index.html already
+    // resolves the light/dark half synchronously, so this prevents the first
+    // painted frame from briefly using EchoBird's default background colors
+    // while the Rust settings file is still loading.
+    try {
+      const cachedColorTheme = localStorage.getItem('color-theme');
+      if (isColorThemeId(cachedColorTheme)) colorTheme = cachedColorTheme;
+    } catch {
+      /* private mode */
+    }
+    const cachedResolved: Resolved =
+      document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+    applyColorTheme(colorTheme, cachedResolved);
     try {
       const s = await api.getSettings();
       if (s.themeMode === 'light' || s.themeMode === 'dark') mode = s.themeMode;
