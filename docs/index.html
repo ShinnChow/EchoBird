@@ -895,6 +895,10 @@
             filter: brightness(0) invert(1);
         }
 
+        .tool-card .ico img.adaptive-mono {
+            filter: invert(1) brightness(0.92);
+        }
+
         .tool-card .meta {
             min-width: 0;
         }
@@ -1435,8 +1439,9 @@
                 'pillar3.li2': '双协议代理:OpenAI + Anthropic 双端点同时可用',
                 'pillar3.li3': 'GGUF / HuggingFace 任意模型即拉即跑',
                 'tools.title': '原生支持你已经在用的工具',
-                'tools.sub': '28 款主流 AI 工具,大部分一键安装 + 切换模型。',
+                'tools.sub': '29 款主流 AI 工具,大部分一键安装 + 切换模型。',
                 'tools.mimodesktop': 'MiMo 桌面端',
+                'tools.kimidesktop': 'Kimi 桌面端',
                 'relays.title': '优质中转站推荐',
                 'relays.sub': '模型中心已收录，获取 API Key 后即可接入你的 AI 工具。',
                 'relays.ccvibe.desc': 'Claude、GPT 等编程模型 API',
@@ -1533,8 +1538,9 @@
                 'pillar3.li2': 'Dual-protocol proxy: OpenAI + Anthropic endpoints both available',
                 'pillar3.li3': 'Any GGUF / HuggingFace model — pull and run',
                 'tools.title': 'Native support for tools you already use',
-                'tools.sub': '28 mainstream AI tools — most install + switch models in one click.',
+                'tools.sub': '29 mainstream AI tools — most install + switch models in one click.',
                 'tools.mimodesktop': 'MiMo Desktop',
+                'tools.kimidesktop': 'Kimi Desktop',
                 'relays.title': 'Recommended API relays',
                 'relays.sub': 'Available in Model Nexus. Get an API key to connect your AI tools.',
                 'relays.ccvibe.desc': 'API access for Claude, GPT and more',
@@ -1868,7 +1874,7 @@
         <div class="section-head reveal">
             <div class="section-eyebrow">SUPPORTED AGENTS</div>
             <h2 class="section-title" data-i18n="tools.title">原生支持你已经在用的工具</h2>
-            <p class="section-sub" data-i18n="tools.sub">28 款主流 AI 工具,大部分一键安装 + 切换模型。</p>
+            <p class="section-sub" data-i18n="tools.sub">29 款主流 AI 工具,大部分一键安装 + 切换模型。</p>
         </div>
         <div class="tools-grid reveal">
             <div class="tool-card"><div class="ico"><img src="./icons/tools/openclaw.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">OpenClaw</div></div></div>
@@ -1878,7 +1884,7 @@
             <div class="tool-card"><div class="ico"><img src="./icons/tools/codex.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Codex CLI</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/aider.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Aider</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/grok.svg" alt="" width="36" height="36" loading="lazy" class="mono"></div><div class="meta"><div class="name">Grok Build</div></div></div>
-            <div class="tool-card"><div class="ico"><img src="./icons/tools/kimicode.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Kimi Code</div></div></div>
+            <div class="tool-card"><div class="ico"><img src="./icons/tools/kimicode.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Kimi CLI</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/mimocode.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">MiMo Code</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/kilo.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Kilo Code</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/pi.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Pi</div></div></div>
@@ -1888,6 +1894,7 @@
             <div class="tool-card"><div class="ico"><img src="./icons/tools/claudedesktop.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Claude Desktop</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/geminidesktop.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Gemini Desktop</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/opencodedesktop.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">OpenCode Desktop</div></div></div>
+            <div class="tool-card"><div class="ico"><img src="./icons/tools/kimidesktop.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name" data-i18n="tools.kimidesktop">Kimi 桌面端</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/mimodesktop.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name" data-i18n="tools.mimodesktop">MiMo 桌面端</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/coffeecli.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Coffee CLI</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/workbuddy.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">WorkBuddy</div></div></div>
@@ -1895,7 +1902,7 @@
             <div class="tool-card"><div class="ico"><img src="./icons/tools/cursor.svg" alt="" width="36" height="36" loading="lazy" class="mono"></div><div class="meta"><div class="name">Cursor</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/vscode.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Visual Studio Code</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/claudescience.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Claude Science</div></div></div>
-            <div class="tool-card"><div class="ico"><img src="./icons/tools/openscience.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">OpenScience</div></div></div>
+            <div class="tool-card"><div class="ico"><img src="./icons/tools/openscience.svg" alt="" width="36" height="36" loading="lazy" class="adaptive-mono"></div><div class="meta"><div class="name">OpenScience</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/vibe-trading.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Vibe-Trading</div></div></div>
         </div>
     </section>
