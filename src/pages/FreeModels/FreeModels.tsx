@@ -178,12 +178,12 @@ export function FreeModelsProvider({ children }: { children: ReactNode }) {
 
   const loadRouter = useCallback(async () => {
     routerLoadedRef.current = false;
-    const [router, configuredModels] = await Promise.all([
+    const [loadedRouter, configuredModels] = await Promise.all([
       api.getSmartRouterConfig(),
       api.getSmartRouterCandidates(),
     ]);
     const modelsById = new Map(configuredModels.map((model) => [model.internalId, model]));
-    const routeModels = router.candidateIds.flatMap((internalId) => {
+    const routeModels = loadedRouter.candidateIds.flatMap((internalId) => {
       const model = modelsById.get(internalId);
       if (!model) return [];
       return [
@@ -196,6 +196,10 @@ export function FreeModelsProvider({ children }: { children: ReactNode }) {
         },
       ];
     });
+    const router =
+      loadedRouter.enabled && routeModels.length === 0
+        ? await api.setSmartRouterEnabled(false)
+        : loadedRouter;
     setCustomModels(routeModels);
     const next = new Set(router.candidateIds);
     selectedIdsRef.current = next;
@@ -342,12 +346,16 @@ export function FreeModelsProvider({ children }: { children: ReactNode }) {
         .catch(() => undefined)
         .then(async () => {
           if (!routerLoadedRef.current) await loadRouter();
-          const router = await api.removeSmartRouterCandidate(id);
+          let router = await api.removeSmartRouterCandidate(id);
+          if (router.enabled && router.candidateIds.length === 0) {
+            router = await api.setSmartRouterEnabled(false);
+          }
           const nextIds = new Set(router.candidateIds);
           selectedIdsRef.current = nextIds;
           setSelectedIds(nextIds);
           setCustomModels((current) => current.filter((model) => model.id !== id));
           setRouterBaseUrl(router.baseUrl.replace(/^https?:\/\//, ''));
+          setRouterEnabledState(router.enabled);
         });
       routerMutationRef.current = removal;
       try {

@@ -551,8 +551,10 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
   );
 
   const { smartRouterModels, localModels, cloudModels } = useMemo(() => {
-    const compatible = userModels.filter((model) =>
-      isModelCompatibleWithTool(model, toolProtocols, selectedTool)
+    const compatible = userModels.filter(
+      (model) =>
+        isModelCompatibleWithTool(model, toolProtocols, selectedTool) &&
+        (model.internalId !== 'smart-router' || smartRouterEnabled)
     );
     return {
       smartRouterModels: compatible.filter((m) => m.internalId === 'smart-router'),
@@ -561,10 +563,9 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
         (m) => m.internalId !== 'local-server' && m.internalId !== 'smart-router'
       ),
     };
-  }, [userModels, toolProtocols, selectedTool]);
+  }, [userModels, toolProtocols, selectedTool, smartRouterEnabled]);
 
   const renderModelCard = (model: (typeof userModels)[0], badge?: 'smart' | 'local') => {
-    const disabled = model.internalId === 'smart-router' && !smartRouterEnabled;
     const isSelected = selectedTool ? toolModelConfig[selectedTool] === model.internalId : false;
     const modelHasBoth = !!(model.baseUrl && model.anthropicUrl);
     // Use the same default as applyModelConfig: a model with one URL uses that
@@ -596,7 +597,6 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
         key={model.internalId}
         model={model}
         selected={isSelected}
-        disabled={disabled}
         subtitle={model.internalId === 'smart-router' ? apiPath : undefined}
         onSelect={() => selectedTool && handleSelectModel(selectedTool, model.internalId)}
         selection={
@@ -971,8 +971,10 @@ export const AppManagerPanel: React.FC = () => {
     (isClaudeCodeApp && claudeCodeRelayMode && !claudeCodeAccounts.selectedId);
   const showCodexAccounts = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
   const selectedToolProtocols = selectedToolData?.apiProtocol || ['openai', 'anthropic'];
-  const hasVisibleModels = userModels.some((model) =>
-    isModelCompatibleWithTool(model, selectedToolProtocols, selectedTool)
+  const hasVisibleModels = userModels.some(
+    (model) =>
+      isModelCompatibleWithTool(model, selectedToolProtocols, selectedTool) &&
+      (model.internalId !== 'smart-router' || smartRouterEnabled)
   );
 
   const routingControls = (showRelayToggle || show1mToggle) && (

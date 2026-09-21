@@ -11,5 +11,6 @@ describe('RoutingToggle', () => {
     expect(markup).toContain('role="switch"');
     expect(markup).toContain('aria-checked="false"');
     expect(markup).toContain('disabled=""');
+    expect(markup).not.toContain('cursor-wait');
   });
 });

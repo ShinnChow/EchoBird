@@ -24,6 +24,7 @@ interface SidebarProps {
   activePage: PageType;
   onPageChange: (page: PageType) => void;
   agentRunning?: boolean;
+  hasSmartRouterModels: boolean;
   smartRouterEnabled: boolean;
   smartRouterTogglePending: boolean;
   onSmartRouterChange: (enabled: boolean) => void;
@@ -35,6 +36,7 @@ export const Sidebar = ({
   activePage,
   onPageChange,
   agentRunning = false,
+  hasSmartRouterModels,
   smartRouterEnabled,
   smartRouterTogglePending,
   onSmartRouterChange,
@@ -154,16 +156,18 @@ export const Sidebar = ({
       </div>
 
       <div className="pt-4 text-[14px] text-cyber-text-secondary">
-        <div className="flex h-5 items-center gap-2">
-          <span className="whitespace-nowrap leading-5">{t('nav.smartRouter')}</span>
-          <RoutingToggle
-            label={t('nav.smartRouter')}
-            hideLabel
-            checked={smartRouterEnabled}
-            disabled={smartRouterTogglePending}
-            onChange={onSmartRouterChange}
-          />
-        </div>
+        {hasSmartRouterModels && (
+          <div className="flex h-5 items-center gap-2">
+            <span className="whitespace-nowrap leading-5">{t('nav.smartRouter')}</span>
+            <RoutingToggle
+              label={t('nav.smartRouter')}
+              hideLabel
+              checked={smartRouterEnabled}
+              disabled={smartRouterTogglePending}
+              onChange={onSmartRouterChange}
+            />
+          </div>
+        )}
         {isFullEdition && serverRunning && (
           <div className="mt-1">
             {t('nav.localServer')}:{' '}

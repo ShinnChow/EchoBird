@@ -68,12 +68,13 @@ function SidebarConnected({ onSettingsClick }: { onSettingsClick: () => void }) 
   const setActivePage = useNavigationStore((s) => s.setActivePage);
   const agentRunning = useNavigationStore((s) => s.agentRunning);
   const updateAvailable = useNavigationStore((s) => s.updateAvailable);
-  const { routerEnabled, routerTogglePending, setRouterEnabled } = useFreeModels();
+  const { customModels, routerEnabled, routerTogglePending, setRouterEnabled } = useFreeModels();
   return (
     <Sidebar
       activePage={activePage}
       onPageChange={setActivePage}
       agentRunning={agentRunning}
+      hasSmartRouterModels={customModels.length > 0}
       smartRouterEnabled={routerEnabled}
       smartRouterTogglePending={routerTogglePending}
       onSmartRouterChange={(enabled) => void setRouterEnabled(enabled)}

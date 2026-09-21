@@ -48,7 +48,7 @@ const labels: Partial<Record<TKey, string>> = {
 };
 
 describe('ModelListSection', () => {
-  it('keeps the disabled router visible and unavailable for selection', async () => {
+  it('hides the router when smart routing is turned off', async () => {
     vi.stubGlobal('__APP_EDITION__', 'full');
     const { ModelListSection } = await import('./AppManagerComponents');
     const markup = renderToStaticMarkup(
@@ -62,9 +62,8 @@ describe('ModelListSection', () => {
         t={(key) => key}
       />
     );
-    expect(markup).toContain('Auto Router');
-    expect(markup).toContain('aria-disabled="true"');
-    expect(markup).toContain('127.0.0.1:53683');
+    expect(markup).not.toContain('Auto Router');
+    expect(markup).not.toContain('127.0.0.1:53683');
     expect(markup).toContain('Cloud Model');
   });
   it('renders smart, local, and cloud models as one ordered list with compact badges', async () => {
