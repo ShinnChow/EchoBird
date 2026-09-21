@@ -1675,7 +1675,7 @@ dependencies = [
 
 [[package]]
 name = "echobird"
-version = "5.7.6"
+version = "5.7.7"
 dependencies = [
  "aes-gcm 0.10.3",
  "async-ssh2-tokio",
