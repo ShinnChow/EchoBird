@@ -521,10 +521,10 @@ const ColorThemePicker: React.FC<{
           aria-pressed={active}
           aria-label={label}
           onClick={() => onChange(theme.id)}
-          className="group flex min-w-0 flex-col gap-1.5 bg-transparent"
+          className="flex min-w-0 flex-col gap-1.5 bg-transparent"
         >
           <span
-            className={`relative flex h-[46px] w-full overflow-hidden rounded-lg border-2 transition-[border-color,transform] duration-150 group-hover:-translate-y-px ${
+            className={`relative flex h-[46px] w-full overflow-hidden rounded-lg border-2 ${
               active ? 'border-cyber-accent' : 'border-transparent'
             }`}
           >
@@ -552,7 +552,7 @@ const ColorThemePicker: React.FC<{
             )}
           </span>
           <span
-            className={`truncate text-center text-[11px] transition-colors ${
+            className={`truncate text-center text-[11px] ${
               active ? 'text-cyber-text' : 'text-cyber-text-secondary'
             }`}
           >
