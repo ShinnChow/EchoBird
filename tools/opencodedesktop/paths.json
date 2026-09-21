@@ -24,6 +24,8 @@
             "/Applications/OpenCode Beta.app/Contents/MacOS/OpenCode Beta"
         ],
         "linux": [
+            "/usr/bin/ai.opencode.desktop",
+            "/opt/OpenCode/ai.opencode.desktop",
             "/opt/OpenCode/opencode",
             "~/.local/bin/opencode-desktop"
         ]

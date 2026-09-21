@@ -10,8 +10,8 @@
         "macos_brew_cask": "brew install --cask opencode-desktop",
         "macos_download": "Open https://opencode.ai/download in the browser, click the macOS download (.dmg, Apple Silicon or Intel). Saves to ~/Downloads by default.",
         "windows_download": "Open https://opencode.ai/download in the browser, click the Windows (x64) download — a one-click NSIS .exe installer. Saves to %USERPROFILE%\\Downloads by default.",
-        "linux_download": "Open https://opencode.ai/download in the browser, download the .deb / .rpm and install it.",
-        "note": "GUI desktop application (Electron). It shares config under ~/.config/opencode with the OpenCode CLI, so a model configured for one applies to both. Always tell the user the download location and ask them to run the installer themselves."
+        "linux_download": "Open https://opencode.ai/download in the browser, download the x64 .deb / .rpm and install it.",
+        "note": "Official v2 GUI desktop application (Electron) with a bundled OpenCode CLI. It shares the OpenCode global config directory with the standalone CLI: OPENCODE_CONFIG_DIR when set, otherwise $XDG_CONFIG_HOME/opencode, otherwise ~/.config/opencode. A model configured for one therefore applies to both. Always tell the user the download location and ask them to run the installer themselves."
     },
     "install_flow": {
         "summary": "Download installer -> user double-clicks -> installer finishes (Windows is a one-click NSIS installer; macOS/Linux follow the wizard or drag-to-Applications)",
@@ -31,7 +31,7 @@
         ]
     },
     "identity_guard": {
-        "description": "OpenCode Desktop is the GUI app for OpenCode (the open-source AI coding agent by Anomaly). It is DIFFERENT from the OpenCode CLI (npm `opencode-ai`). Both can coexist and share config under ~/.config/opencode, so a model set for one applies to both."
+        "description": "OpenCode Desktop is the official GUI app for OpenCode v2 (the open-source AI coding agent by Anomaly). It is DIFFERENT from the standalone OpenCode CLI (npm `@opencode/cli`), though the desktop package bundles a CLI internally. Both can coexist and share the same global OpenCode config directory, so a model set for one applies to both."
     },
     "network_requirements": {
         "test_urls": ["https://opencode.ai", "https://github.com"],

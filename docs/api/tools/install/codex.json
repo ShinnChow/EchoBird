@@ -19,10 +19,10 @@
         }
     },
     "identity_guard": {
-        "description": "Codex CLI is made by OpenAI. It is NOT Claude Code (Anthropic), NOT OpenCode (Charm/Anomaly), and NOT GitHub Copilot. These are four completely different products.",
+        "description": "Codex CLI is made by OpenAI. It is NOT Claude Code (Anthropic), NOT OpenCode (Anomaly), and NOT GitHub Copilot. These are four completely different products.",
         "common_confusions": {
             "claude_code": "Claude Code is by Anthropic (@anthropic-ai/claude-code). Codex is by OpenAI (@openai/codex). They are DIFFERENT tools.",
-            "opencode": "OpenCode is by Charm/Anomaly (opencode-ai). Codex is by OpenAI (@openai/codex). They are DIFFERENT tools.",
+            "opencode": "OpenCode v2 is by Anomaly (@opencode/cli). Codex is by OpenAI (@openai/codex). They are DIFFERENT tools.",
             "github_copilot": "GitHub Copilot is a VS Code extension. Codex CLI is a terminal-based agent. They are DIFFERENT tools."
         }
     }

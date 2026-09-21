@@ -5,7 +5,7 @@ use super::{
 };
 use crate::services::tool_manager;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 // ════════════════════════════════════════════════════════════════
 //  Type 3b: OpenCode
@@ -79,11 +79,7 @@ fn write_opencode_native_config(
     base_url: &str,
     provider_name: &str,
 ) -> Result<(), String> {
-    let config_path = dirs::home_dir()
-        .unwrap_or_default()
-        .join(".config")
-        .join("opencode")
-        .join("opencode.jsonc");
+    let config_path = opencode_config_dir().join("opencode.jsonc");
 
     let mut config = read_jsonc_file(&config_path)
         .or_else(|| read_json_file(&config_path.with_extension("json")))
@@ -121,10 +117,7 @@ fn write_opencode_native_config(
 }
 
 pub(super) fn read_opencode() -> Option<ModelInfo> {
-    let native_path = dirs::home_dir()?
-        .join(".config")
-        .join("opencode")
-        .join("opencode.jsonc");
+    let native_path = opencode_config_dir().join("opencode.jsonc");
     if let Some(info) = read_opencode_native_config(&native_path)
         .or_else(|| read_opencode_native_config(&native_path.with_extension("json")))
     {
@@ -199,11 +192,7 @@ pub(super) fn restore_opencode_to_official() -> ApplyResult {
         let _ = fs::remove_file(&relay_path);
     }
 
-    let native_path = dirs::home_dir()
-        .unwrap_or_default()
-        .join(".config")
-        .join("opencode")
-        .join("opencode.jsonc");
+    let native_path = opencode_config_dir().join("opencode.jsonc");
 
     if !native_path.exists() {
         return ApplyResult {
@@ -267,5 +256,50 @@ pub(super) fn restore_opencode_to_official() -> ApplyResult {
             success: true,
             message: "OpenCode already at defaults - no config file to update.".to_string(),
         }
+    }
+}
+
+fn opencode_config_dir() -> PathBuf {
+    opencode_config_dir_from(
+        dirs::home_dir(),
+        std::env::var_os("OPENCODE_CONFIG_DIR").map(PathBuf::from),
+        std::env::var_os("XDG_CONFIG_HOME")
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from),
+    )
+}
+
+fn opencode_config_dir_from(
+    home: Option<PathBuf>,
+    opencode_config_dir: Option<PathBuf>,
+    xdg_config_home: Option<PathBuf>,
+) -> PathBuf {
+    opencode_config_dir
+        .or_else(|| xdg_config_home.map(|path| path.join("opencode")))
+        .unwrap_or_else(|| home.unwrap_or_default().join(".config").join("opencode"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::opencode_config_dir_from;
+    use std::path::PathBuf;
+
+    #[test]
+    fn config_dir_follows_opencode_v2_precedence() {
+        let home = Some(PathBuf::from("home"));
+        let xdg = Some(PathBuf::from("xdg"));
+
+        assert_eq!(
+            opencode_config_dir_from(home.clone(), Some(PathBuf::from("custom")), xdg.clone()),
+            PathBuf::from("custom")
+        );
+        assert_eq!(
+            opencode_config_dir_from(home.clone(), None, xdg),
+            PathBuf::from("xdg").join("opencode")
+        );
+        assert_eq!(
+            opencode_config_dir_from(home, None, None),
+            PathBuf::from("home").join(".config").join("opencode")
+        );
     }
 }

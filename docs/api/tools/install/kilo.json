@@ -7,7 +7,7 @@
     "install": {
         "curl (macOS / Linux — recommended)": "curl -fsSL https://kilo.ai/cli/install | bash",
         "npm (all platforms)": "npm install -g @kilocode/cli",
-        "note": "CLI coding agent by Kilo, forked from OpenCode. The binary is `kilo` (curl installs to ~/.kilo/bin and updates PATH; restart the shell or source the rc file before verifying). Windows: use npm or the GitHub Releases binary. Do NOT install `opencode-ai` — Kilo Code is a separate product with its own npm package `@kilocode/cli`."
+        "note": "CLI coding agent by Kilo, forked from OpenCode. The binary is `kilo` (curl installs to ~/.kilo/bin and updates PATH; restart the shell or source the rc file before verifying). Windows: use npm or the GitHub Releases binary. Do NOT install OpenCode's `@opencode/cli` — Kilo Code is a separate product with its own npm package `@kilocode/cli`."
     },
     "network_requirements": {
         "test_urls": [
