@@ -1,40 +1,46 @@
 {
     "id": "openscience",
     "displayName": "OpenScience",
-    "homepage": "https://www.openscience.sh/",
+    "homepage": "https://www.openscience.sh/download",
     "docs": "https://www.openscience.sh/docs",
-    "kind": "cli",
+    "kind": "desktop_app",
     "platforms": ["macos", "linux", "windows"],
     "install": {
-        "npm_global": "npm install -g @synsci/openscience",
-        "npx": "npx synsci",
-        "curl_bash": "curl -fsSL https://openscience.sh/install | bash",
-        "macos_download_arm": "https://github.com/synthetic-sciences/OpenScience/releases/latest/download/openscience-darwin-arm64.zip",
-        "macos_download_x64": "https://github.com/synthetic-sciences/OpenScience/releases/latest/download/openscience-darwin-x64.zip",
-        "linux_download_x64": "https://github.com/synthetic-sciences/OpenScience/releases/latest/download/openscience-linux-x64.tar.gz",
-        "linux_download_arm64": "https://github.com/synthetic-sciences/OpenScience/releases/latest/download/openscience-linux-arm64.tar.gz",
-        "windows_download_x64": "https://github.com/synthetic-sciences/OpenScience/releases/latest/download/openscience-windows-x64.zip",
-        "note": "OpenScience is an open-source, model-agnostic AI research workbench (open-source Claude Science alternative). It runs a local server and opens a workspace UI in the browser. Install via npm (preferred, cross-platform), the curl install script (macOS/Linux), or a platform binary from GitHub Releases. EchoBird configures the model by writing `~/.config/openscience/openscience.json` — a `provider.echobird` block (apiKey + baseURL; npm = @ai-sdk/anthropic for the Anthropic protocol, @ai-sdk/openai-compatible otherwise) plus `model`/`small_model` selectors pointing at `echobird/<model_id>`. OpenScience reads config per request, so a switch takes effect with no restart. Login, onboarding, and the Credentials panel stay OpenScience's own — its first-run onboarding auto-skips when launched without a TTY."
+        "download_page": "https://www.openscience.sh/download",
+        "windows_download_x64": "https://github.com/synthetic-sciences/OpenScience/releases/latest/download/OpenScience-windows-x64.exe",
+        "macos_download_arm64": "https://github.com/synthetic-sciences/OpenScience/releases/latest/download/OpenScience-mac-arm64.dmg",
+        "macos_download_x64": "https://github.com/synthetic-sciences/OpenScience/releases/latest/download/OpenScience-mac-x64.dmg",
+        "linux_download_x64": "https://github.com/synthetic-sciences/OpenScience/releases/latest/download/OpenScience-linux-x64.AppImage",
+        "linux_download_arm64": "https://github.com/synthetic-sciences/OpenScience/releases/latest/download/OpenScience-linux-arm64.AppImage",
+        "note": "OpenScience is an open-source, model-agnostic AI research desktop workbench. The desktop app bundles the OpenScience runtime. Its current in-app updater is macOS-only; Windows and Linux users should install newer releases from the official download page. Windows supports x64; macOS supports Apple Silicon and Intel; Linux ships x64 and arm64 AppImages. Stable macOS DMGs are signed and notarized. The Windows installer and Linux AppImages are currently unsigned, so explain the expected operating-system warning before opening them. EchoBird configures the model through OpenScience's resolved config directory (`OPENSCIENCE_CONFIG_DIR`, then `XDG_CONFIG_HOME/openscience`, then `~/.config/openscience`) and marks the local desktop onboarding complete in `settings.json`, so an EchoBird-configured third-party model does not require a Synthetic Sciences account. The desktop app must be fully restarted after an external model change. The CLI remains a separate upstream option, but desktop-app requests must use these desktop installers rather than npm, `npx synsci`, the shell installer, or CLI archives."
     },
     "install_flow": {
-        "summary": "Install the `openscience` binary onto PATH (npm global, curl script, or GitHub release archive), then launch with `openscience serve` to start the local backend.",
+        "summary": "Detect OS and architecture, download the matching official desktop installer, open it for the user, then let EchoBird configure a third-party model and complete local onboarding.",
         "agent_steps": [
-            "Detect OS and architecture. OpenScience ships native binaries for macOS (arm64/x64), Linux (x64/arm64), and Windows (x64).",
-            "Preferred path (all platforms): if npm is available, run `npm install -g @synsci/openscience` — this puts `openscience` on PATH and is the simplest cross-platform install. Verify with `openscience --version`.",
-            "macOS / Linux without npm: run `curl -fsSL https://openscience.sh/install | bash`. The script detects OS/arch, downloads the platform archive, extracts to ~/.openscience/bin, and modifies shell rc files (.zshrc / .bashrc) to add that dir to PATH. Tell the user to open a NEW terminal afterwards so PATH reloads.",
-            "Windows without npm: download https://github.com/synthetic-sciences/OpenScience/releases/latest/download/openscience-windows-x64.zip, extract openscience.exe to %USERPROFILE%\\.openscience\\bin, and add that directory to the user PATH. Verify with `openscience --version` in a new terminal.",
-            "After install, tell the user to launch with `openscience serve` in a terminal — it starts the local backend and prints the workspace URL (e.g. `openscience server listening on http://localhost:xxxxx`). The user opens that URL in their browser themselves. `serve` is headless and does NOT auto-open a browser; bare `openscience` (the `web` command) WOULD auto-open one, so use `serve` when launched from EchoBird.",
-            "OpenScience reads `~/.config/openscience/openscience.json` per request (a model switch takes effect with no restart). When the user picks a model in EchoBird, EchoBird writes an `echobird` provider block + active-model selectors to that file, so the chosen model becomes active in the workspace. The user can alternatively power models with a provider key env var (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, etc.), `openscience keys add`, or the free demo / Atlas managed models — those routes are independent of the EchoBird-written block."
+            "Install only on the local machine with a graphical desktop. Detect OS and CPU architecture first. Windows supports x64 only; macOS supports arm64 and x64; Linux supports arm64 and x64. If the platform or architecture is unsupported, point the user to https://www.openscience.sh/download and do not substitute a CLI build.",
+            "Download the matching URL from install to the user's Downloads folder using a resolved full path: OpenScienceSetup.exe on Windows, OpenScience.dmg on macOS, or OpenScience.AppImage on Linux. If a latest-download URL fails, read https://www.openscience.sh/download or the official GitHub Releases page for the current desktop asset; do not use a lowercase `openscience-*` CLI archive as a desktop installer.",
+            "Before opening Windows or Linux builds, tell the user that the official build is currently unsigned and the OS may show a security warning. Do not disable SmartScreen, Gatekeeper, antivirus, or other operating-system protections.",
+            "Windows: open the downloaded NSIS installer with `Start-Process -FilePath <resolved-path>` without `-Wait`. Tell the user to choose the install directory and finish the wizard; do not invent or use silent flags. Stop the turn after handing off the installer.",
+            "macOS: open the downloaded DMG with `open <resolved-path>`, tell the user to drag OpenScience.app to Applications, then stop the turn. The stable DMG is signed and notarized; do not use the ZIP updater payload as the installer.",
+            "Linux: create `~/.local/bin` if needed, move the downloaded file to `~/.local/bin/OpenScience.AppImage`, mark it executable, and launch it detached. Tell the user exactly where it was saved and that desktop-menu integration may depend on their desktop environment; then stop the turn.",
+            "When the user returns after the installer or first launch is complete, verify OpenScience through the installed application path or OS application registration. Do not verify the desktop install with `openscience --version`, because that tests the separate CLI.",
+            "Have the user select and apply a third-party model for OpenScience in EchoBird. That operation writes the `echobird` provider and active-model selectors to `openscience.json` in OpenScience's resolved config directory, preserves unrelated settings, and sets `desktop_onboarding_version` to the supported local completion revision with `desktop_onboarding_step` set to `done` in the sibling `settings.json`. This skips only the local setup gate; it does not fabricate a Synthetic Sciences session or unlock account-only managed services.",
+            "Use Apply & Launch after model configuration. EchoBird fully restarts the desktop app so it reloads the new local configuration. Provider sign-in and credentials not managed by EchoBird remain the user's actions inside OpenScience."
         ],
         "tell_user": [
-            "Which install method was used (npm global, curl script, or manual binary)",
-            "That `openscience` is now on PATH (may need a NEW terminal to take effect)",
-            "How to launch: `openscience serve` in a terminal (headless — prints the workspace URL, does not auto-open a browser)",
-            "To power models: pick a model in EchoBird (it writes the config to openscience.json), or set a provider key env var / run `openscience keys add` directly in OpenScience"
+            "Detected OS and architecture and the matching desktop asset",
+            "The exact saved installer or AppImage path",
+            "That Windows and Linux desktop builds are currently unsigned and may trigger an OS warning",
+            "Whether the installer or app was opened and which user steps remain",
+            "That applying an EchoBird model completes local onboarding without creating a Synthetic Sciences login",
+            "After the user finishes, whether the installed desktop app was verified and launched"
         ]
     },
     "network_requirements": {
-        "test_urls": ["https://openscience.sh", "https://github.com/synthetic-sciences/OpenScience"],
+        "test_urls": [
+            "https://www.openscience.sh/download",
+            "https://github.com/synthetic-sciences/OpenScience/releases/latest"
+        ],
         "mirrors": {}
     }
 }

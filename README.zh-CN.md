@@ -127,10 +127,10 @@ provider,任意支持的工具都能指向它;不用手改 TOML / JSON,不用每
 
 **编程 CLI** —— Claude Code · Codex CLI(OpenAI) · Grok Build(xAI) ·
 Kimi Code(月之暗面) · Qwen Code · Aider · OpenCode · MiMo Code(小米) · Kilo Code ·
-ZCode(Z.AI) · OpenClaw · Pi · OpenScience · Vibe-Trading
+ZCode(Z.AI) · OpenClaw · Pi · Vibe-Trading
 
 **桌面应用** —— Claude Desktop(第三方 profile) · ChatGPT 桌面版 ·
-OpenCode Desktop · WorkBuddy(腾讯 CodeBuddy 办公版)
+OpenCode Desktop · OpenScience · WorkBuddy(腾讯 CodeBuddy 办公版)
 
 > 在 GitHub 上搜「给 Grok Build 切换模型」「给 Kimi Code 切换模型」?
 > 这两个在这里都是一等公民 —— 在模型中心选好模型,按下切换,EchoBird

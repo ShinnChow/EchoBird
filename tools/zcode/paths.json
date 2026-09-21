@@ -9,7 +9,8 @@
     "website": "https://zcode.z.ai/cn#all-downloads",
     "command": "",
     "configDir": "~/.zcode/v2",
-    "configFile": "~/.zcode/v2/config.json",
+    "configFile": "~/.zcode/v2/provider_config.json",
+    "configFileAlt": "~/.zcode/v2/config.json",
     "requireConfigFile": false,
     "paths": {
         "win32": [

@@ -109,6 +109,7 @@ const DESKTOP_ORDER: Record<string, number> = {
   claudedesktop: 0,
   chatgptdesktop: 1,
   geminidesktop: 2,
+  openscience: 3,
   coffeecli: 99,
 };
 
@@ -118,11 +119,9 @@ const categoryRank = (cat?: string): number => {
 };
 
 // Within-category tiebreaker: Desktop keeps its fixed display order (Coffee
-// CLI last); Science keeps OpenScience first (its model-config support is
-// solid while Claude Science has thinner support and no model configuration).
+// CLI last).
 const withinCategoryRank = (tool: LocalTool): number => {
   if (tool.category === 'Desktop') return DESKTOP_ORDER[tool.id] ?? 50;
-  if (tool.category === 'Science') return tool.id === 'openscience' ? 0 : 1;
   return 0;
 };
 

@@ -64,6 +64,11 @@ pub struct PathsConfig {
     pub detect_by_config_dir: bool,
     #[serde(default)]
     pub paths: PlatformPaths,
+    /// Optional platform-specific process image names used for desktop
+    /// kill-and-restart when the installed filename differs from the running
+    /// image (for example, an AppImage launching an internal executable).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub process_names: Option<PlatformPaths>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub skills_path: Option<SkillsPathConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]

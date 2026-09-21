@@ -1716,17 +1716,21 @@ pub fn is_managed_desktop_tool(tool_id: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Candidate process image names for a desktop tool on the current OS — the
-/// filenames of its declared exe paths (e.g. "Claude.exe" / "Codex.exe" on
-/// Windows, "Codex" on macOS). Used to terminate instances the *user* launched
-/// (which we have no tracked PID for) before relaunching with fresh config.
-/// Derived from paths.json so it needs no hardcoding, and matches MSIX/Store
-/// installs too — their running image name equals the declared exe filename.
+/// Candidate process image names for a desktop tool on the current OS. Most
+/// tools derive these from the filenames of their declared executable paths;
+/// `processNames` supplies an explicit override for wrappers such as AppImages
+/// whose installed filename differs from the running image.
 pub fn get_tool_process_names(tool_id: &str) -> Vec<String> {
     let defs = get_definitions();
     let Some(def) = defs.iter().find(|d| d.id == tool_id) else {
         return Vec::new();
     };
+    if let Some(names) = def.paths_config.process_names.as_ref() {
+        let configured = get_platform_paths(names);
+        if !configured.is_empty() {
+            return configured;
+        }
+    }
     filenames_of(&get_platform_paths(&def.paths_config.paths))
 }
 
@@ -2056,6 +2060,21 @@ mod tests {
         assert!(super::filenames_of(&[]).is_empty());
     }
 
+    #[test]
+    fn paths_config_accepts_explicit_process_names() {
+        let config = paths_config_from(serde_json::json!({
+            "name": "Wrapped Desktop",
+            "category": "Desktop",
+            "paths": { "linux": ["~/.local/bin/Wrapped.AppImage"] },
+            "processNames": { "linux": ["wrapped-runtime"] }
+        }));
+
+        assert_eq!(
+            config.process_names.unwrap().linux.unwrap(),
+            v(&["wrapped-runtime"])
+        );
+    }
+
     // ── config-dir detection: a lingering config dir must not count as
     //    "installed" when a stronger detector exists and already failed.
     //    Regression: WorkBuddy showed installed after uninstall because
@@ -2293,6 +2312,19 @@ mod tests {
         assert!(super::is_windows_exe(&path));
         assert!(path.to_lowercase().ends_with(r"\xiaomi mimo.exe"), "{path}");
         println!("Detected Xiaomi MiMo Desktop: {path}");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "machine-specific: requires OpenScience Desktop to be installed"]
+    fn real_registry_finds_openscience_desktop() {
+        let definition: crate::models::tool::PathsConfig =
+            serde_json::from_str(include_str!("../../../tools/openscience/paths.json")).unwrap();
+        let path = super::scan_windows_registry(&definition.install_hints.unwrap())
+            .expect("OpenScience registry entry should resolve to an executable");
+        assert!(super::is_windows_exe(&path));
+        assert!(path.to_lowercase().ends_with(r"\openscience.exe"), "{path}");
+        println!("Detected OpenScience Desktop: {path}");
     }
 
     // ── tool-paths.json self-heal: a file seeded before a tool shipped (e.g.

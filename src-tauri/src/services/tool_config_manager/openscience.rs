@@ -1,29 +1,47 @@
 //! Model configuration for openscience.
 
-use super::{read_jsonc_file, write_json_file, ApplyResult, ModelInfo};
+use super::{read_json_file, read_jsonc_file, write_json_file, ApplyResult, ModelInfo};
 use crate::services::tool_manager;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 // ════════════════════════════════════════════════════════════════
 //  Type 3d: OpenScience - open-source Claude Science alternative.
 //  ~/.config/openscience/openscience.json(c)  {provider: {X: {npm, options, models}}}
 //  Same models.dev provider schema as OpenCode; model-agnostic (Anthropic +
-//  OpenAI both native). Single binary (npm/curl install) - no launcher
-//  patch, no relay file; the native config write is the whole mechanism.
+//  OpenAI both native). The desktop app bundles the same runtime and reads the
+//  same config. EchoBird also completes its local onboarding preference so a
+//  third-party provider does not require a Synthetic Sciences account.
 //  `openscience_config_path()` picks the highest-precedence file the install
 //  already owns (`.jsonc` wins by merge order), so a user who has touched any
 //  global setting gets edits applied to the file that actually shadows the
 //  rest — never a silent no-op against an out-ranked file.
 // ════════════════════════════════════════════════════════════════
 
-// OpenScience's GLOBAL config dir is ~/.config/openscience on every platform:
-// it resolves `xdgConfig` from `xdg-basedir`, which has NO Windows APPDATA
-// fallback (it joins os.homedir()/.config everywhere), so this path is correct
-// on Windows / macOS / Linux alike.
+// Match OpenScience's own resolution order: its explicit override wins, then
+// xdg-basedir's XDG_CONFIG_HOME, then ~/.config. This matters on Linux and for
+// portable/test installs that intentionally relocate the config directory.
 fn openscience_config_dir() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_default()
-        .join(".config")
+    openscience_config_dir_from(
+        &dirs::home_dir().unwrap_or_default(),
+        std::env::var_os("OPENSCIENCE_CONFIG_DIR"),
+        std::env::var_os("XDG_CONFIG_HOME"),
+    )
+}
+
+fn openscience_config_dir_from(
+    home: &Path,
+    explicit: Option<std::ffi::OsString>,
+    xdg_config_home: Option<std::ffi::OsString>,
+) -> PathBuf {
+    let non_empty = |value: Option<std::ffi::OsString>| {
+        value.filter(|value| !value.to_string_lossy().trim().is_empty())
+    };
+    if let Some(path) = non_empty(explicit) {
+        return PathBuf::from(path);
+    }
+    non_empty(xdg_config_home)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home.join(".config"))
         .join("openscience")
 }
 
@@ -43,6 +61,38 @@ fn openscience_config_path() -> PathBuf {
     } else {
         openscience_config_dir().join("openscience.json")
     }
+}
+
+// Mirrors OpenScience v2's public ONBOARDING_VERSION. A positive version is
+// the application's own completion signal; it skips the local setup screen
+// without fabricating an account session or enabling managed services.
+const DESKTOP_ONBOARDING_VERSION: u64 = 2;
+
+fn complete_desktop_onboarding_at(settings_path: &Path) -> Result<(), String> {
+    let mut settings = if settings_path.exists() {
+        read_json_file(settings_path).ok_or_else(|| {
+            format!(
+                "{} is not valid JSON; fix it before applying OpenScience so EchoBird does not overwrite unrelated settings.",
+                settings_path.display()
+            )
+        })?
+    } else {
+        serde_json::json!({})
+    };
+    if !settings.is_object() {
+        return Err(format!(
+            "{} must contain a JSON object; EchoBird left it unchanged.",
+            settings_path.display()
+        ));
+    }
+    settings["desktop_onboarding_version"] =
+        serde_json::Value::Number(DESKTOP_ONBOARDING_VERSION.into());
+    settings["desktop_onboarding_step"] = serde_json::Value::String("done".to_string());
+    write_json_file(settings_path, &settings)
+}
+
+fn complete_desktop_onboarding() -> Result<(), String> {
+    complete_desktop_onboarding_at(&openscience_config_dir().join("settings.json"))
 }
 
 pub(super) fn apply_openscience(model_info: &ModelInfo) -> ApplyResult {
@@ -146,7 +196,7 @@ pub(super) fn apply_openscience(model_info: &ModelInfo) -> ApplyResult {
         }
     });
     // OpenScience-standard active-model selectors (model + small_model for
-    // title generation etc.). NB a running `openscience serve` memoizes config
+    // title generation etc.). NB a running OpenScience app memoizes config
     // in State.create keyed by Instance.directory and only re-reads on restart
     // / dispose, so the new model takes effect the next time the server starts
     // — not on an already-running one.
@@ -155,6 +205,14 @@ pub(super) fn apply_openscience(model_info: &ModelInfo) -> ApplyResult {
 
     match write_json_file(&config_path, &config) {
         Ok(_) => {
+            if let Err(error) = complete_desktop_onboarding() {
+                return ApplyResult {
+                    success: false,
+                    message: format!(
+                        "OpenScience model config was written, but local onboarding could not be completed: {error}"
+                    ),
+                };
+            }
             log::info!(
                 "[ToolConfigManager] OpenScience config written to {:?}",
                 config_path
@@ -162,7 +220,7 @@ pub(super) fn apply_openscience(model_info: &ModelInfo) -> ApplyResult {
             ApplyResult {
                 success: true,
                 message: format!(
-                    "Model \"{}\" configured for OpenScience (echobird/{}) — start or restart `openscience serve` for the workspace to pick it up.",
+                    "Model \"{}\" configured for OpenScience (echobird/{}) — local onboarding completed; start or restart the desktop app to pick it up.",
                     display_name, model_id
                 ),
             }
@@ -298,5 +356,71 @@ pub(super) fn restore_openscience_to_official() -> ApplyResult {
             success: true,
             message: "OpenScience already at defaults - no config file to update.".to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn config_dir_matches_openscience_environment_precedence() {
+        let home = Path::new("/home/researcher");
+        assert_eq!(
+            openscience_config_dir_from(home, Some("/portable/config".into()), Some("/xdg".into())),
+            PathBuf::from("/portable/config")
+        );
+        assert_eq!(
+            openscience_config_dir_from(home, None, Some("/xdg".into())),
+            PathBuf::from("/xdg/openscience")
+        );
+        assert_eq!(
+            openscience_config_dir_from(home, Some("".into()), None),
+            PathBuf::from("/home/researcher/.config/openscience")
+        );
+    }
+
+    #[test]
+    fn desktop_onboarding_completion_preserves_existing_settings() {
+        let dir = std::env::temp_dir().join(format!(
+            "echobird-openscience-onboarding-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let path = dir.join("settings.json");
+        write_json_file(
+            &path,
+            &serde_json::json!({
+                "reasoning_effort": "high",
+                "desktop_onboarding_step": "account"
+            }),
+        )
+        .unwrap();
+
+        complete_desktop_onboarding_at(&path).unwrap();
+
+        let settings = read_json_file(&path).unwrap();
+        assert_eq!(settings["reasoning_effort"], "high");
+        assert_eq!(settings["desktop_onboarding_version"], 2);
+        assert_eq!(settings["desktop_onboarding_step"], "done");
+        std::fs::remove_file(&path).unwrap();
+        std::fs::remove_dir(&dir).unwrap();
+    }
+
+    #[test]
+    fn desktop_onboarding_completion_rejects_invalid_json() {
+        let dir = std::env::temp_dir().join(format!(
+            "echobird-openscience-onboarding-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("settings.json");
+        std::fs::write(&path, "not json").unwrap();
+
+        let error = complete_desktop_onboarding_at(&path).unwrap_err();
+
+        assert!(error.contains("not valid JSON"));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "not json");
+        std::fs::remove_file(&path).unwrap();
+        std::fs::remove_dir(&dir).unwrap();
     }
 }

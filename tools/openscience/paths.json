@@ -1,32 +1,38 @@
 {
     "name": "OpenScience",
-    "category": "Science",
+    "category": "Desktop",
     "apiProtocol": [
         "anthropic",
         "openai"
     ],
     "docs": "https://www.openscience.sh/docs",
-    "website": "https://www.openscience.sh/",
-    "command": "openscience",
-    "startCommand": "openscience serve",
+    "website": "https://www.openscience.sh/download",
+    "command": "",
     "configDir": "~/.config/openscience",
     "configFile": "~/.config/openscience/openscience.json",
     "requireConfigFile": false,
     "paths": {
         "win32": [
-            "%APPDATA%\\npm\\openscience.cmd",
-            "~\\.openscience\\bin\\openscience.exe"
+            "%LOCALAPPDATA%\\Programs\\OpenScience\\openscience.exe",
+            "%LOCALAPPDATA%\\Programs\\openscience\\openscience.exe"
         ],
         "darwin": [
-            "~/.openscience/bin/openscience",
-            "/usr/local/bin/openscience"
+            "/Applications/OpenScience.app/Contents/MacOS/OpenScience",
+            "~/Applications/OpenScience.app/Contents/MacOS/OpenScience"
         ],
         "linux": [
-            "~/.openscience/bin/openscience",
-            "~/.local/bin/openscience",
-            "/usr/local/bin/openscience",
-            "/usr/bin/openscience"
+            "~/.local/bin/OpenScience.AppImage",
+            "~/Applications/OpenScience.AppImage"
         ]
     },
-    "installHints": {}
+    "processNames": {
+        "win32": ["openscience.exe"],
+        "darwin": ["OpenScience"],
+        "linux": ["openscience"]
+    },
+    "installHints": {
+        "windowsDisplayNamePrefixes": ["OpenScience"],
+        "macosAppName": "OpenScience",
+        "linuxDesktopNames": ["OpenScience"]
+    }
 }

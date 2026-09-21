@@ -97,14 +97,10 @@ impl ProcessManager {
             tokio::time::sleep(std::time::Duration::from_millis(800)).await;
         }
 
-        // OpenScience runs a local web server (`openscience serve`) that caches
-        // config in memory — like desktop apps, a running instance won't pick up
-        // a model switch until it restarts (no file watcher on openscience.json;
-        // config.dispose only fires via OpenScience's own API, not external file
-        // writes). Kill OUR tracked instance by PID — NOT by image name — so a
-        // user's own `openscience serve` in another terminal is left untouched.
-        // Freeing port 4096 also makes the post-spawn browser-open reliable.
-        if matches!(tool_id, "openscience" | "dsh") && self.kill_tracked_instance(tool_id) {
+        // DSH runs a local web server that caches config in memory. Kill only
+        // EchoBird's tracked instance so a separately launched server is left
+        // untouched and the configured port is free for the replacement.
+        if tool_id == "dsh" && self.kill_tracked_instance(tool_id) {
             tokio::time::sleep(std::time::Duration::from_millis(800)).await;
         }
 
@@ -588,12 +584,7 @@ impl ProcessManager {
                     );
                     self.processes
                         .insert(tool_id.to_string(), ProcessInfo::new(pid));
-                    // OpenScience: the spawned `openscience serve` takes ~1-3s
-                    // to bind port 4096; poll + auto-open the workspace in the
-                    // user's browser so they don't copy the URL from the terminal.
-                    if tool_id == "openscience" {
-                        tokio::spawn(Self::wait_and_open_workspace("http://localhost:4096"));
-                    } else if tool_id == "dsh" {
+                    if tool_id == "dsh" {
                         tokio::spawn(Self::wait_and_open_workspace("http://localhost:3080"));
                     }
                     Ok(())
@@ -628,9 +619,7 @@ impl ProcessManager {
             );
             self.processes
                 .insert(tool_id.to_string(), ProcessInfo::new(pid));
-            if tool_id == "openscience" {
-                tokio::spawn(Self::wait_and_open_workspace("http://localhost:4096"));
-            } else if tool_id == "dsh" {
+            if tool_id == "dsh" {
                 tokio::spawn(Self::wait_and_open_workspace("http://localhost:3080"));
             }
             Ok(())
@@ -933,9 +922,29 @@ impl ProcessManager {
                 ),
             };
 
-            let output = Command::new("powershell")
+            let mut command = Command::new("powershell");
+            command
                 .args(["-Command", &ps_cmd])
-                .creation_flags(CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW)
+                .creation_flags(CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW);
+
+            // OpenScience currently builds runtime-run filenames long enough
+            // to exceed Win32's legacy path limit under its default managed
+            // data-root link. A short, per-user direct root keeps prompt
+            // publishing below that limit without sharing state across Windows
+            // accounts; the Electron sidecar inherits this variable.
+            if tool_id == "openscience" {
+                let data_dir = openscience_windows_data_dir();
+                std::fs::create_dir_all(&data_dir).map_err(|e| {
+                    format!(
+                        "Failed to create OpenScience data directory {}: {}",
+                        data_dir.display(),
+                        e
+                    )
+                })?;
+                command.env("OPENSCIENCE_DATA_DIR", &data_dir);
+            }
+
+            let output = command
                 .output()
                 .map_err(|e| format!("PowerShell error: {}", e))?;
 
@@ -1129,8 +1138,8 @@ impl ProcessManager {
 
     /// Kill only the PID EchoBird spawned for `tool_id` (if any), leaving any
     /// user-started instance of the same binary running. Used by serve-style
-    /// tools (OpenScience) where kill+restart is needed for a config/model
-    /// switch to take effect, but a blanket image-name kill (like
+    /// tools (DSH) where kill+restart is needed for a config/model switch to
+    /// take effect, but a blanket image-name kill (like
     /// `kill_desktop_instances`) would nuke a user's own manually-started
     /// instance. Mirrors `stop_all`'s per-PID kill, scoped to one tool.
     ///
@@ -1364,6 +1373,25 @@ fn is_third_party_codex_base_url(base_url: &str) -> bool {
         && !crate::services::codex_catalog::url_matches_domain(base_url, "api.openai.com")
 }
 
+#[cfg(windows)]
+fn openscience_windows_data_dir() -> std::path::PathBuf {
+    let home = dirs::home_dir().unwrap_or_default();
+    openscience_windows_data_dir_for(&home)
+}
+
+#[cfg(windows)]
+fn openscience_windows_data_dir_for(home: &std::path::Path) -> std::path::PathBuf {
+    use sha2::{Digest, Sha256};
+
+    let digest = Sha256::digest(home.to_string_lossy().to_lowercase().as_bytes());
+    let user_key = hex::encode(&digest[..5]);
+    home.ancestors()
+        .last()
+        .unwrap_or(home)
+        .join("OS")
+        .join(user_key)
+}
+
 // ─── Platform helpers ───
 
 // Resolve cmd.exe via %COMSPEC% / %SystemRoot%\System32 instead of trusting
@@ -1486,6 +1514,9 @@ pub async fn start_tool(
 mod tests {
     use super::is_third_party_codex_base_url;
 
+    #[cfg(windows)]
+    use super::openscience_windows_data_dir_for;
+
     #[test]
     fn codex_provider_classification_uses_domain_boundaries() {
         assert!(!is_third_party_codex_base_url(""));
@@ -1494,5 +1525,17 @@ mod tests {
             "https://api.openai.com.example/v1"
         ));
         assert!(is_third_party_codex_base_url("https://api.deepseek.com/v1"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn openscience_uses_short_per_user_drive_root_on_windows() {
+        let alice = openscience_windows_data_dir_for(std::path::Path::new(r"C:\Users\Alice"));
+        let bob = openscience_windows_data_dir_for(std::path::Path::new(r"C:\Users\Bob"));
+
+        assert!(alice.starts_with(r"C:\OS"));
+        assert!(bob.starts_with(r"C:\OS"));
+        assert_ne!(alice, bob);
+        assert_eq!(alice.file_name().unwrap().to_string_lossy().len(), 10);
     }
 }

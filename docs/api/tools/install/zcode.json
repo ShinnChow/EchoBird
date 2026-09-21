@@ -9,7 +9,7 @@
         "windows_download": "Open https://zcode.z.ai/cn#all-downloads in the browser, click the Windows download. Saves to %USERPROFILE%\\Downloads by default; installs to %LOCALAPPDATA%\\Programs\\ZCode.",
         "macos_download": "Open https://zcode.z.ai/cn#all-downloads in the browser, click the macOS download (.dmg). Saves to ~/Downloads by default.",
         "linux_download": "Open https://zcode.z.ai/cn#all-downloads in the browser, download the Linux build (.deb / .rpm / AppImage) and install it.",
-        "note": "GUI desktop application (Electron) — an OpenCode-based coding agent by Z.AI (Zhipu). Always tell the user the download location and ask them to run the installer themselves."
+        "note": "GUI desktop application (Electron) — an open-source coding workbench by Z.AI (Zhipu). Current source uses ~/.zcode/v2/provider_config.json for personal providers and imports the legacy ~/.zcode/v2/config.json only when the new file is first created; EchoBird supports both generations. Always tell the user the download location and ask them to run the installer themselves."
     },
     "install_flow": {
         "summary": "Download installer from zcode.z.ai -> user double-clicks -> follow the install wizard",
@@ -28,7 +28,7 @@
         ]
     },
     "identity_guard": {
-        "description": "ZCode is Z.AI's (Zhipu) GUI desktop coding agent, based on OpenCode. It is DIFFERENT from OpenCode Desktop and from the OpenCode CLI. Its config lives under ~/.zcode/v2/config.json."
+        "description": "ZCode is Z.AI's (Zhipu) GUI desktop coding workbench. It is DIFFERENT from OpenCode Desktop and from the OpenCode CLI. Current personal-provider config lives at ~/.zcode/v2/provider_config.json; older releases use ~/.zcode/v2/config.json."
     },
     "network_requirements": {
         "test_urls": ["https://zcode.z.ai"],
