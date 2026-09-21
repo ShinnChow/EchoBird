@@ -196,7 +196,11 @@ const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick, drag
       {...dragProps}
       onClick={onClick}
       aria-label={displayName}
-      className="flex flex-col items-center gap-1.5 px-1.5 py-3 w-full rounded-xl outline-none transition-colors select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-cyber-accent"
+      className={`flex w-full flex-col items-center gap-1.5 rounded-xl border-2 px-1.5 py-3 outline-none transition-colors select-none focus-visible:ring-2 focus-visible:ring-cyber-accent ${
+        selected
+          ? 'border-cyber-accent/70 bg-cyber-accent/10'
+          : 'border-transparent hover:bg-cyber-elevated/60'
+      }`}
     >
       {/* The icon alone is the graphic — no tile background behind it; the
           icon itself renders at the tile size. */}
@@ -213,14 +217,10 @@ const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick, drag
           <BoxIcon size={44} className="text-cyber-text-secondary" />
         )}
       </span>
-      {/* Name wraps gracefully across up to two lines; the selected tile
-          tints its label rather than drawing a highlight box. */}
-      <span
-        className={`text-xs leading-snug text-center w-full line-clamp-2 break-words ${
-          selected ? 'text-cyber-accent' : 'text-cyber-text'
-        }`}
-      >
-        {displayName}
+      {/* Reserve exactly two lines for every name. Single-line labels center
+          vertically in the same area occupied by wrapped two-line labels. */}
+      <span className="flex h-8 w-full items-center justify-center text-center text-xs leading-snug text-cyber-text">
+        <span className="line-clamp-2 break-words">{displayName}</span>
       </span>
     </button>
   );
