@@ -332,7 +332,7 @@ pub async fn apply_model_to_tool(tool_id: &str, model_info: ModelInfo) -> ApplyR
         "vibe-trading" => return apply_vibe_trading(&model_info),
 
         // WorkBuddy (Tencent CodeBuddy 办公版): ~/.workbuddy/models.json.
-        "workbuddy" => return apply_workbuddy(&model_info),
+        "workbuddy" | "workbuddyai" => return apply_workbuddy(tool_id, &model_info),
 
         // Plug-and-play: check config.json custom flag
         _ => {
@@ -476,7 +476,7 @@ pub async fn get_tool_model_info(tool_id: &str) -> Option<ModelInfo> {
         "omp" => return omp::read(),
         "kimicode" => return read_kimicode(),
         "vibe-trading" => return read_vibe_trading(),
-        "workbuddy" => return read_workbuddy(),
+        "workbuddy" | "workbuddyai" => return read_workbuddy(tool_id),
         // Plug-and-play: check config.json custom flag
         _ => {
             if let Some((def, _)) = tool_manager::get_tool_config_mapping(tool_id) {

@@ -19,10 +19,14 @@ use super::{extract_domain_name, read_json_file, write_json_file, ApplyResult, M
 //     other apply_* (one entry, never accumulates).
 // ════════════════════════════════════════════════════════════════
 
-pub(super) fn apply_workbuddy(model_info: &ModelInfo) -> ApplyResult {
+pub(super) fn apply_workbuddy(tool_id: &str, model_info: &ModelInfo) -> ApplyResult {
     let config_path = dirs::home_dir()
         .unwrap_or_default()
-        .join(".workbuddy")
+        .join(if tool_id == "workbuddyai" {
+            ".workbuddy-ai"
+        } else {
+            ".workbuddy"
+        })
         .join("models.json");
 
     let model_id = model_info
@@ -86,8 +90,14 @@ pub(super) fn apply_workbuddy(model_info: &ModelInfo) -> ApplyResult {
     }
 }
 
-pub(super) fn read_workbuddy() -> Option<ModelInfo> {
-    let path = dirs::home_dir()?.join(".workbuddy").join("models.json");
+pub(super) fn read_workbuddy(tool_id: &str) -> Option<ModelInfo> {
+    let path = dirs::home_dir()?
+        .join(if tool_id == "workbuddyai" {
+            ".workbuddy-ai"
+        } else {
+            ".workbuddy"
+        })
+        .join("models.json");
     let config = read_json_file(&path)?;
     let models = config.get("models")?.as_array()?;
     let m = models.first()?;

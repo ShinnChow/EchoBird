@@ -1,3 +1,5 @@
+import { QuotaCountdown } from './QuotaCountdown';
+import { WorkBuddyAccountSection } from './WorkBuddyAccountSection';
 import { ClaudeCodeAccountSection } from './ClaudeCodeAccountSection';
 import React, { useEffect, useMemo, useState } from 'react';
 import { RoutingToggle } from '../../components/RoutingToggle';
@@ -638,7 +640,11 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
 
   // Official-endpoint card — first item, like cc-switch's "Claude Official"
   const accountReplacesOfficial =
-    selectedTool === 'codex' || selectedTool === 'chatgptdesktop' || selectedTool === 'claudecode';
+    selectedTool === 'codex' ||
+    selectedTool === 'chatgptdesktop' ||
+    selectedTool === 'claudecode' ||
+    selectedTool === 'workbuddy' ||
+    selectedTool === 'workbuddyai';
   const official =
     selectedTool && !accountReplacesOfficial ? getOfficialEndpoint(selectedTool) : undefined;
   const officialSentinel = selectedTool ? officialModelSentinel(selectedTool) : '';
@@ -740,37 +746,6 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
       {official && renderOfficialCard(official)}
       {cloudModels.map((model) => renderModelCard(model))}
     </div>
-  );
-};
-
-function formatQuotaCountdown(resetAt: number, now: number): string {
-  const minutes = Math.max(0, Math.ceil((resetAt * 1000 - now) / 60_000));
-  if (minutes >= 24 * 60) {
-    const days = Math.floor(minutes / (24 * 60));
-    const hours = Math.floor((minutes % (24 * 60)) / 60);
-    return `${days}d${hours}h`;
-  }
-  if (minutes >= 60) {
-    return `${Math.floor(minutes / 60)}h${minutes % 60}m`;
-  }
-  return `${minutes}m`;
-}
-
-const QuotaCountdown: React.FC<{ resetAt?: number | null }> = ({ resetAt }) => {
-  const [now, setNow] = useState<number | null>(null);
-  useEffect(() => {
-    if (!resetAt) return;
-    const initial = setTimeout(() => setNow(Date.now()), 0);
-    const timer = setInterval(() => setNow(Date.now()), 60_000);
-    return () => {
-      clearTimeout(initial);
-      clearInterval(timer);
-    };
-  }, [resetAt]);
-  return (
-    <span className="w-[64px] flex-shrink-0 text-center text-[12px] font-semibold leading-[16px] text-cyber-text">
-      {resetAt && now ? formatQuotaCountdown(resetAt, now) : ''}
-    </span>
   );
 };
 
@@ -1062,6 +1037,9 @@ export const AppManagerPanel: React.FC = () => {
           ) : (
             <div className="space-y-2 h-full">
               {showCodexAccounts && <CodexAccountSection showDivider={hasVisibleModels} />}
+              {(selectedTool === 'workbuddy' || selectedTool === 'workbuddyai') && (
+                <WorkBuddyAccountSection showDivider={hasVisibleModels} />
+              )}
               {isClaudeCodeApp && (
                 <>
                   <ClaudeCodeAccountSection
@@ -1124,6 +1102,7 @@ export const AppManagerBottom: React.FC = () => {
     toolModelConfig,
     selectedCodexAccountId,
     claudeCodeAccounts,
+    workBuddyAccounts,
     launchAfterApply,
     setLaunchAfterApply,
     isLaunching,
@@ -1144,7 +1123,9 @@ export const AppManagerBottom: React.FC = () => {
   const hasModelSelected = !!(selectedTool && toolModelConfig[selectedTool]);
   const hasAccountSelected =
     ((selectedTool === 'codex' || selectedTool === 'chatgptdesktop') && !!selectedCodexAccountId) ||
-    (selectedTool === 'claudecode' && !!claudeCodeAccounts.selectedId);
+    (selectedTool === 'claudecode' && !!claudeCodeAccounts.selectedId) ||
+    ((selectedTool === 'workbuddy' || selectedTool === 'workbuddyai') &&
+      !!workBuddyAccounts.selectedId);
   // What will a click actually do?
   //  - "Apply" runs only when the user picked a model AND agreed to the config-write policy.
   //  - "Launch" runs whenever launchAfterApply is on, or unconditionally for desktop/no-config apps.

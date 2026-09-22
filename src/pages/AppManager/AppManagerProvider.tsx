@@ -1,5 +1,6 @@
 import { accountError } from '../../utils/accountError';
 import { ClaudeCodeLoginDialog } from './ClaudeCodeLoginDialog';
+import { useWorkBuddyAccounts } from './useWorkBuddyAccounts';
 import { useClaudeCodeAccounts } from './useClaudeCodeAccounts';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useConfirm } from '../../components/ConfirmDialog';
@@ -379,9 +380,22 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     setApplyError
   );
 
+  const workBuddyEdition =
+    selectedTool === 'workbuddy' || selectedTool === 'workbuddyai' ? selectedTool : null;
+  const clearWorkBuddyModel = useCallback((edition: api.WorkBuddyEdition) => {
+    setToolModelConfig((prev) => ({ ...prev, [edition]: null }));
+  }, []);
+  const workBuddyAccounts = useWorkBuddyAccounts(
+    workBuddyEdition,
+    !!(workBuddyEdition && toolModelConfig[workBuddyEdition]),
+    clearWorkBuddyModel,
+    setApplyError
+  );
+
   // Set tool model (single selection) - UI state update
   const handleSelectModel = (toolId: string, modelId: string) => {
     if (toolId === 'claudecode') claudeCodeAccounts.setSelectedId(null);
+    if (toolId === 'workbuddy' || toolId === 'workbuddyai') workBuddyAccounts.select(null);
     if (toolId === 'codex' || toolId === 'chatgptdesktop') {
       setSelectedCodexAccountIdRaw(null);
     }
@@ -606,7 +620,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     if (!selectedTool || isLaunching) return;
     setIsLaunching(true);
     const switchingClaudeAccount = selectedTool === 'claudecode' && !!claudeCodeAccounts.selectedId;
-    if (!switchingClaudeAccount) setTimeout(() => setIsLaunching(false), 3000); // 3 second cooldown
+    if (!switchingClaudeAccount && !(workBuddyEdition && workBuddyAccounts.selectedId))
+      setTimeout(() => setIsLaunching(false), 3000); // 3 second cooldown
 
     const toolData = detectedTools.find((t) => t.id === selectedTool);
     const isLaunchable = !!toolData?.launchFile;
@@ -632,6 +647,20 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         setIsLaunching(false);
         return;
       }
+    } else if (workBuddyEdition && workBuddyAccounts.selectedId) {
+      try {
+        await api.switchWorkBuddyAccount(workBuddyEdition, workBuddyAccounts.selectedId);
+        const restored = await applyRestore(workBuddyEdition);
+        if (restored !== true)
+          throw new Error(typeof restored === 'string' ? restored : t('key.destroyed'));
+        await workBuddyAccounts.reload();
+        if (launchAfterApply) await api.startTool(workBuddyEdition, toolData?.startCommand);
+      } catch (error) {
+        setApplyError(accountError(error, t));
+      } finally {
+        setIsLaunching(false);
+      }
+      return;
     } else if (selectedTool === 'claudecode' && claudeCodeAccounts.selectedId) {
       try {
         const restored = await applyRestore(selectedTool);
@@ -757,6 +786,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         handleSelectModel,
         handleRestoreModel,
         claudeCodeAccounts,
+        workBuddyAccounts,
         codexAccounts,
         selectedCodexAccountId,
         setSelectedCodexAccountId: selectCodexAccount,

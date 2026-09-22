@@ -1,0 +1,6 @@
+{
+    "docs": "https://www.workbuddy.ai/",
+    "configFile": "~/.workbuddy-ai/models.json",
+    "format": "json",
+    "custom": true
+}

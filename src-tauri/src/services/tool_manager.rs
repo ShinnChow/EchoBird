@@ -580,9 +580,13 @@ fn registry_display_name_matches(
     if names_lower.iter().any(|n| n == dn_lower) {
         return true;
     }
-    prefixes_lower
-        .iter()
-        .any(|p| dn_lower == p || dn_lower.starts_with(&format!("{p} ")))
+    prefixes_lower.iter().any(|p| {
+        if p == "workbuddy" && (dn_lower == "workbuddy ai" || dn_lower.starts_with("workbuddy ai "))
+        {
+            return false;
+        }
+        dn_lower == p || dn_lower.starts_with(&format!("{p} "))
+    })
 }
 
 /// Returns true when `path` has a Windows executable extension (`.exe`).
@@ -2150,6 +2154,30 @@ mod tests {
             "workbuddy 4.24.2",
             &[],
             &prefixes
+        ));
+    }
+
+    #[test]
+    fn workbuddy_editions_do_not_match_each_other() {
+        assert!(!registry_display_name_matches(
+            "workbuddy ai 5.5.2",
+            &[],
+            &v(&["workbuddy"])
+        ));
+        assert!(!registry_display_name_matches(
+            "workbuddy ai",
+            &[],
+            &v(&["workbuddy"])
+        ));
+        assert!(registry_display_name_matches(
+            "workbuddy ai 5.5.2",
+            &[],
+            &v(&["workbuddy ai"])
+        ));
+        assert!(!registry_display_name_matches(
+            "workbuddy 5.5.2",
+            &[],
+            &v(&["workbuddy ai"])
         ));
     }
 

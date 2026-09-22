@@ -1,0 +1,19 @@
+{
+    "id": "workbuddyai",
+    "displayName": "WorkBuddy AI",
+    "docs": "https://www.workbuddy.ai/",
+    "install": {
+        "windows": "Download the Windows installer from https://www.workbuddy.ai/ and follow the install wizard.",
+        "macos": "Download the macOS installer from https://www.workbuddy.ai/ and move WorkBuddy AI.app to Applications.",
+        "note": "International edition, separate from WorkBuddy (China). Do not install Tencent.WorkBuddy as a substitute."
+    },
+    "homepage": "https://www.workbuddy.ai/",
+    "kind": "desktop_app",
+    "platforms": [
+        "windows",
+        "macos"
+    ],
+    "identity_guard": {
+        "description": "WorkBuddy AI is the international desktop app. Windows executable: WorkBuddyAI.exe. Config directory: ~/.workbuddy-ai. Keep independent from the domestic WorkBuddy app."
+    }
+}

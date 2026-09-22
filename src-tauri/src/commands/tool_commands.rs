@@ -563,3 +563,53 @@ pub async fn refresh_claude_code_account_quota(
 pub async fn delete_claude_code_account(account_id: String) -> Result<(), String> {
     crate::services::claude_code_accounts::delete(&account_id).await
 }
+
+use crate::services::workbuddy_accounts::{
+    self, Account as WorkBuddyAccount, Edition as WorkBuddyEdition, LoginStart as WorkBuddyLogin,
+};
+
+#[tauri::command]
+pub async fn list_workbuddy_accounts(
+    edition: WorkBuddyEdition,
+) -> Result<Vec<WorkBuddyAccount>, String> {
+    workbuddy_accounts::list(edition).await
+}
+
+#[tauri::command]
+pub async fn start_workbuddy_login(edition: WorkBuddyEdition) -> Result<WorkBuddyLogin, String> {
+    workbuddy_accounts::start_login(edition).await
+}
+
+#[tauri::command]
+pub async fn poll_workbuddy_login(login_id: String) -> Result<Option<WorkBuddyAccount>, String> {
+    workbuddy_accounts::poll_login(&login_id).await
+}
+
+#[tauri::command]
+pub async fn cancel_workbuddy_login(login_id: String) -> Result<(), String> {
+    workbuddy_accounts::cancel_login(&login_id)
+}
+
+#[tauri::command]
+pub async fn switch_workbuddy_account(
+    edition: WorkBuddyEdition,
+    account_id: String,
+) -> Result<WorkBuddyAccount, String> {
+    workbuddy_accounts::switch(edition, &account_id).await
+}
+
+#[tauri::command]
+pub async fn refresh_workbuddy_account_quota(
+    edition: WorkBuddyEdition,
+    account_id: String,
+) -> Result<WorkBuddyAccount, String> {
+    workbuddy_accounts::refresh(edition, &account_id).await
+}
+
+#[tauri::command]
+pub async fn delete_workbuddy_account(
+    edition: WorkBuddyEdition,
+    account_id: String,
+) -> Result<(), String> {
+    workbuddy_accounts::delete(edition, &account_id).await
+}

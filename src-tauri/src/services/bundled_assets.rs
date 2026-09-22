@@ -156,6 +156,7 @@ pub const INSTALLABLE_TOOL_IDS: &[&str] = &[
     "grok",
     "vibe-trading",
     "workbuddy",
+    "workbuddyai",
     "zcode",
     "dsh",
 ];

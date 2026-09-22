@@ -1,3 +1,4 @@
+import type { useWorkBuddyAccounts } from './useWorkBuddyAccounts';
 import type { useClaudeCodeAccounts } from './useClaudeCodeAccounts';
 import { createContext, useContext } from 'react';
 import type { ModelConfig, LocalTool } from '../../api/types';
@@ -20,6 +21,7 @@ export interface AppManagerContextType {
   /** Restore the tool's config back to its official vendor endpoint */
   handleRestoreModel: (toolId: string) => Promise<void>;
   claudeCodeAccounts: ReturnType<typeof useClaudeCodeAccounts>;
+  workBuddyAccounts: ReturnType<typeof useWorkBuddyAccounts>;
   codexAccounts: CodexAccount[];
   selectedCodexAccountId: string | null;
   setSelectedCodexAccountId: (id: string | null) => void;

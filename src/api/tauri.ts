@@ -266,3 +266,50 @@ export async function refreshClaudeCodeAccountQuota(accountId: string): Promise<
 export async function deleteClaudeCodeAccount(accountId: string): Promise<void> {
   return invoke('delete_claude_code_account', { accountId });
 }
+
+export type WorkBuddyEdition = 'workbuddy' | 'workbuddyai';
+export interface WorkBuddyAccount {
+  id: string;
+  name: string;
+  edition: WorkBuddyEdition;
+  plan: string | null;
+  remaining: number | null;
+  total: number | null;
+  expiresAt: number | null;
+  active: boolean;
+}
+export interface WorkBuddyLogin {
+  loginId: string;
+  verificationUri: string;
+  expiresAt: number;
+}
+export function listWorkBuddyAccounts(edition: WorkBuddyEdition): Promise<WorkBuddyAccount[]> {
+  return invoke('list_workbuddy_accounts', { edition });
+}
+export function startWorkBuddyLogin(edition: WorkBuddyEdition): Promise<WorkBuddyLogin> {
+  return invoke('start_workbuddy_login', { edition });
+}
+export function pollWorkBuddyLogin(loginId: string): Promise<WorkBuddyAccount | null> {
+  return invoke('poll_workbuddy_login', { loginId });
+}
+export function cancelWorkBuddyLogin(loginId: string): Promise<void> {
+  return invoke('cancel_workbuddy_login', { loginId });
+}
+export function switchWorkBuddyAccount(
+  edition: WorkBuddyEdition,
+  accountId: string
+): Promise<WorkBuddyAccount> {
+  return invoke('switch_workbuddy_account', { edition, accountId });
+}
+export function refreshWorkBuddyAccountQuota(
+  edition: WorkBuddyEdition,
+  accountId: string
+): Promise<WorkBuddyAccount> {
+  return invoke('refresh_workbuddy_account_quota', { edition, accountId });
+}
+export function deleteWorkBuddyAccount(
+  edition: WorkBuddyEdition,
+  accountId: string
+): Promise<void> {
+  return invoke('delete_workbuddy_account', { edition, accountId });
+}

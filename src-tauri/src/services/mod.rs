@@ -29,3 +29,5 @@ pub mod tool_patcher;
 pub mod usage_providers;
 #[cfg(windows)]
 pub mod windows_path;
+
+pub mod workbuddy_accounts;
