@@ -65,7 +65,8 @@ pub fn url_matches_domain(base_url: &str, domain: &str) -> bool {
 pub fn template_for_url(base_url: &str) -> Option<&'static str> {
     if url_matches_domain(base_url, "deepseek.com") {
         Some(DEEPSEEK_TEMPLATE)
-    } else if url_matches_domain(base_url, "minimaxi.com")
+    } else if url_matches_domain(base_url, "minimax.cn")
+        || url_matches_domain(base_url, "minimaxi.com")
         || url_matches_domain(base_url, "minimax.io")
     {
         Some(MINIMAX_TEMPLATE)
@@ -154,6 +155,10 @@ mod tests {
 
     #[test]
     fn template_for_url_matches_minimax_domains() {
+        assert_eq!(
+            template_for_url("https://api.minimax.cn/v1"),
+            Some(MINIMAX_TEMPLATE)
+        );
         assert_eq!(
             template_for_url("https://api.minimaxi.com/v1"),
             Some(MINIMAX_TEMPLATE)
