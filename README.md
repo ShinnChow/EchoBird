@@ -58,6 +58,15 @@
       Thanks to <strong>GrooRoute</strong> for sponsoring this project! Official Claude and GPT models are now available. We invite everyone with a curious mind to explore advanced AI, including Fable 5 and GPT-5.6. Connect directly from mainland China and get started with a single line of configuration — <a href="https://grooroute.com/register?aff=FWGVPMYENJQ8">sign up here</a>.
     </td>
   </tr>
+  <tr>
+    <td width="150" align="center">
+      <a href="https://fluxionai.space/register?source=github&amp;campaign=github-echobird&amp;promo=ECHOBIRD"><img src="docs/sponsors/fluxion.png" width="92" alt="Fluxion AI" /></a>
+    </td>
+    <td>
+      <a href="https://fluxionai.space/register?source=github&amp;campaign=github-echobird&amp;promo=ECHOBIRD"><strong>Fluxion AI</strong></a><br/>
+      Fluxion AI helps individual developers and businesses access and manage leading AI models worldwide through a unified API. Dynamic routing across multiple upstream connections improves availability, with transparent model performance, response times, and costs. When using Fable 5.1, Fluxion AI can save up to approximately 90% compared with Claude's official API pricing.
+    </td>
+  </tr>
 </table>
 
 Sponsorship contact: [hi@echobird.ai](mailto:hi@echobird.ai)
