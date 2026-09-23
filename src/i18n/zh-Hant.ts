@@ -273,6 +273,7 @@ const zhHant: Partial<Translations> = {
   'toolCat.utility': '工具',
   'toolCat.science': '科研',
   'agent.modelsTab': '模型',
+  'agent.currentSelection': '目前選擇',
   'agent.modelSwitch': '模型切換',
   'agent.addCurrentAccount': '新增帳號',
   'agent.waitingForBrowser': '等待瀏覽器操作({seconds})',

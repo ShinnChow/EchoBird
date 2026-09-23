@@ -983,7 +983,7 @@ export const AppManagerPanel: React.FC = () => {
       <div className="h-10 px-2 flex items-center justify-between bg-transparent">
         <div className="flex gap-1">
           <span className="px-3 py-1.5 text-xs font-bold text-cyber-text">
-            {t('agent.modelsTab')}
+            {t('agent.currentSelection')}
           </span>
         </div>
         {selectedToolData && (
