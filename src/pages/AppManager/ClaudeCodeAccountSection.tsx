@@ -1,3 +1,4 @@
+import { ModelSwitchDivider } from './ModelSwitchDivider';
 import React, { useEffect, useState } from 'react';
 import { LoaderCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { useI18n } from '../../hooks/useI18n';
@@ -43,7 +44,7 @@ export const ClaudeCodeAccountSection: React.FC<{ showDivider?: boolean }> = ({
     state;
 
   return (
-    <section className={showDivider ? 'mb-3 border-b border-cyber-border pb-3' : undefined}>
+    <section className={showDivider ? 'mb-3' : undefined}>
       <button
         type="button"
         onClick={() => void add()}
@@ -135,6 +136,7 @@ export const ClaudeCodeAccountSection: React.FC<{ showDivider?: boolean }> = ({
           })}
         </div>
       )}
+      {showDivider && <ModelSwitchDivider />}
     </section>
   );
 };

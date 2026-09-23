@@ -1,3 +1,4 @@
+import { ModelSwitchDivider } from './ModelSwitchDivider';
 import { QuotaCountdown } from './QuotaCountdown';
 import { WorkBuddyAccountSection } from './WorkBuddyAccountSection';
 import { ClaudeCodeAccountSection } from './ClaudeCodeAccountSection';
@@ -767,7 +768,7 @@ export const CodexAccountSection: React.FC<{ showDivider?: boolean }> = ({
   } = useAppManager();
 
   return (
-    <section className={showDivider ? 'mb-3 border-b border-cyber-border pb-3' : undefined}>
+    <section className={showDivider ? 'mb-3' : undefined}>
       <button
         type="button"
         onClick={() => void addCodexAccount()}
@@ -869,6 +870,7 @@ export const CodexAccountSection: React.FC<{ showDivider?: boolean }> = ({
           })}
         </div>
       )}
+      {showDivider && <ModelSwitchDivider />}
     </section>
   );
 };

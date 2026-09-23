@@ -286,6 +286,7 @@ const en: Translations = {
   'toolCat.science': 'Science',
   // Agent Worker tabs
   'agent.modelsTab': 'MODELS',
+  'agent.modelSwitch': 'Model switching',
   'agent.addCurrentAccount': 'Add Account',
   'agent.waitingForBrowser': 'Waiting for browser ({seconds})',
   'agent.refreshAccount': 'Refresh account quota',

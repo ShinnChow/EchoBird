@@ -1,3 +1,4 @@
+import { ModelSwitchDivider } from './ModelSwitchDivider';
 import React from 'react';
 import { LoaderCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { useI18n } from '../../hooks/useI18n';
@@ -13,7 +14,7 @@ export const WorkBuddyAccountSection: React.FC<{ showDivider?: boolean }> = ({
     workBuddyAccounts;
 
   return (
-    <section className={showDivider ? 'mb-3 border-b border-cyber-border pb-3' : undefined}>
+    <section className={showDivider ? 'mb-3' : undefined}>
       <button
         type="button"
         onClick={() => void add()}
@@ -111,6 +112,7 @@ export const WorkBuddyAccountSection: React.FC<{ showDivider?: boolean }> = ({
           })}
         </div>
       )}
+      {showDivider && <ModelSwitchDivider />}
     </section>
   );
 };

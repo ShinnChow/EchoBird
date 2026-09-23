@@ -253,6 +253,7 @@ const zhHans: Partial<Translations> = {
   'toolCat.utility': '工具',
   'toolCat.science': '科研',
   'agent.modelsTab': '模型',
+  'agent.modelSwitch': '模型切换',
   'agent.addCurrentAccount': '添加账号',
   'agent.waitingForBrowser': '等待浏览器操作({seconds})',
   'agent.refreshAccount': '刷新账号额度',

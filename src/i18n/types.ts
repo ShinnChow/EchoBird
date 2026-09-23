@@ -234,6 +234,7 @@ export type TKey =
   | 'agent.appliedVia'
   | 'agent.noModelConfig'
   | 'agent.modelsTab'
+  | 'agent.modelSwitch'
   | 'agent.addCurrentAccount'
   | 'agent.waitingForBrowser'
   | 'agent.refreshAccount'
