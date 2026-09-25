@@ -144,6 +144,7 @@
       "modelId": "claude-opus-5",
       "modelIds": [
         "claude-opus-5",
+        "claude-opus-5-5",
         "claude-sonnet-5",
         "claude-haiku-4-5",
         "gpt-5.5",
@@ -205,7 +206,8 @@
       "url": "https://www.anthropic.com",
       "baseUrl": "",
       "anthropicUrl": "https://api.anthropic.com",
-      "modelId": "claude-opus-5",
+      "modelId": "claude-opus-5-5",
+      "modelIds": ["claude-opus-5-5", "claude-opus-5"],
       "region": "global"
     },
     {
@@ -355,6 +357,7 @@
       "modelId": "claude-opus-5",
       "modelIds": [
         "claude-opus-5",
+        "claude-opus-5-5",
         "claude-sonnet-5",
         "claude-fable-5",
         "claude-fable-5-1",
@@ -377,6 +380,7 @@
       "modelId": "claude-opus-5",
       "modelIds": [
         "claude-opus-5",
+        "claude-opus-5-5",
         "claude-fable-5-1",
         "grok-4.6",
         "qwen3.8-max",
@@ -404,6 +408,7 @@
         "gpt-6-astra",
         "deepseek-v4.1-flash",
         "claude-opus-5",
+        "claude-opus-5-5",
         "claude-sonnet-5",
         "claude-fable-5",
         "claude-fable-5-1",
