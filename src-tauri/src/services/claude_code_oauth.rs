@@ -10,6 +10,7 @@ const CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const REDIRECT: &str = "https://platform.claude.com/oauth/code/callback";
 const SCOPES: &str =
     "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload";
+const LOGIN_TIMEOUT_SECONDS: i64 = 60;
 static PENDING: Mutex<Option<PendingLogin>> = Mutex::new(None);
 
 #[derive(Clone)]
@@ -41,7 +42,7 @@ pub fn start() -> Result<LoginStart, String> {
         id: random_token(),
         state: random_token(),
         verifier: random_token(),
-        expires_at: chrono::Utc::now().timestamp() + 600,
+        expires_at: chrono::Utc::now().timestamp() + LOGIN_TIMEOUT_SECONDS,
         busy: false,
         snapshots: None,
     };

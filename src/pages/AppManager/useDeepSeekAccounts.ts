@@ -4,82 +4,52 @@ import { accountError } from '../../utils/accountError';
 import { useI18n } from '../../hooks/useI18n';
 import { useConfirm } from '../../components/ConfirmDialog';
 
-export function useWorkBuddyAccounts(
-  edition: api.WorkBuddyEdition | null,
+const LOGIN_TIMEOUT_SECONDS = 60;
+
+export function useDeepSeekAccounts(
+  enabled: boolean,
   hasModel: boolean,
-  clearModel: (edition: api.WorkBuddyEdition) => void,
+  clearModel: () => void,
   showError: (error: string) => void
 ) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const confirm = useConfirm();
-  const [accountsByEdition, setAccountsByEdition] = useState<
-    Partial<Record<api.WorkBuddyEdition, api.WorkBuddyAccount[]>>
-  >({});
-  const [selected, setSelected] = useState<Partial<Record<api.WorkBuddyEdition, string | null>>>(
-    {}
-  );
+  const [accounts, setAccounts] = useState<api.DeepSeekAccount[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
-  const refreshingRef = useRef(new Set<string>());
   const generation = useRef(0);
   const adding = useRef(false);
-  const pending = useRef<api.WorkBuddyLogin | null>(null);
+  const selectionRevision = useRef(0);
+  const pending = useRef<api.DeepSeekLogin | null>(null);
+  const refreshIds = useRef(new Set<string>());
   const hasModelRef = useRef(hasModel);
   useEffect(() => {
     hasModelRef.current = hasModel;
   }, [hasModel]);
-  const selectedId = edition && !hasModel ? (selected[edition] ?? null) : null;
 
   const reload = useCallback(async () => {
-    if (!edition) return;
     const current = generation.current;
-    const result = await api.listWorkBuddyAccounts(edition);
-    if (current === generation.current)
-      setAccountsByEdition((prev) => ({ ...prev, [edition]: result }));
-  }, [edition]);
-
-  const refresh = useCallback(
-    async (account: api.WorkBuddyAccount, quiet = false) => {
-      if (refreshingRef.current.has(account.id)) return;
-      const current = generation.current;
-      refreshingRef.current.add(account.id);
-      setRefreshing(new Set(refreshingRef.current));
-      try {
-        const updated = await api.refreshWorkBuddyAccountQuota(account.edition, account.id);
-        setAccountsByEdition((prev) => ({
-          ...prev,
-          [updated.edition]: (prev[updated.edition] ?? []).map((a) =>
-            a.id === updated.id ? updated : a
-          ),
-        }));
-      } catch (error) {
-        if (!quiet && current === generation.current) showError(accountError(error, t));
-      } finally {
-        refreshingRef.current.delete(account.id);
-        setRefreshing(new Set(refreshingRef.current));
-      }
-    },
-    [showError, t]
-  );
+    const result = await api.listDeepSeekAccounts();
+    if (current === generation.current) setAccounts(result);
+  }, []);
 
   useEffect(() => {
     const current = ++generation.current;
     const timer = setTimeout(() => {
       setBusy(false);
-      if (!edition) return;
+      setRefreshing(new Set());
+      if (!enabled) return;
       void api
-        .listWorkBuddyAccounts(edition)
+        .listDeepSeekAccounts()
         .then((result) => {
           if (current !== generation.current) return;
-          setAccountsByEdition((prev) => ({ ...prev, [edition]: result }));
+          setAccounts(result);
           if (!hasModelRef.current)
-            setSelected((prev) => ({
-              ...prev,
-              [edition]: result.some((a) => a.id === prev[edition])
-                ? prev[edition]
-                : (result.find((a) => a.active)?.id ?? null),
-            }));
+            setSelected((prev) =>
+              result.some((a) => a.id === prev) ? prev : (result.find((a) => a.active)?.id ?? null)
+            );
         })
         .catch((error) => {
           if (current === generation.current) showError(accountError(error, t));
@@ -89,27 +59,48 @@ export function useWorkBuddyAccounts(
       clearTimeout(timer);
       generation.current += 1;
       adding.current = false;
+      refreshIds.current = new Set();
       const login = pending.current;
       pending.current = null;
-      if (login) void api.cancelWorkBuddyLogin(login.loginId).catch(() => {});
+      if (login) void api.cancelDeepSeekLogin(login.loginId).catch(() => {});
     };
-  }, [edition, showError, t]);
+  }, [enabled, showError, t]);
 
   const select = (id: string | null) => {
-    if (!edition) return;
-    setSelected((prev) => ({ ...prev, [edition]: id }));
-    if (id) clearModel(edition);
+    selectionRevision.current += 1;
+    setSelected(id);
+    if (id) clearModel();
   };
+
+  const refresh = async (account: api.DeepSeekAccount, quiet = false) => {
+    const ids = refreshIds.current;
+    if (ids.has(account.id)) return;
+    const current = generation.current;
+    ids.add(account.id);
+    setRefreshing(new Set(ids));
+    try {
+      const updated = await api.refreshDeepSeekAccountQuota(account.id, locale);
+      if (current === generation.current)
+        setAccounts((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+    } catch (error) {
+      if (!quiet && current === generation.current) showError(accountError(error, t));
+    } finally {
+      ids.delete(account.id);
+      if (current === generation.current) setRefreshing(new Set(ids));
+    }
+  };
+
   const add = async () => {
-    if (!edition || adding.current) return;
+    if (!enabled || adding.current) return;
     const current = generation.current;
     adding.current = true;
+    const selectionAtStart = selectionRevision.current;
     setBusy(true);
-    setRemainingSeconds(60);
-    let login: api.WorkBuddyLogin | null = null;
+    setRemainingSeconds(LOGIN_TIMEOUT_SECONDS);
+    let login: api.DeepSeekLogin | null = null;
     let ticker: ReturnType<typeof setInterval> | undefined;
     try {
-      login = await api.startWorkBuddyLogin(edition);
+      login = await api.startDeepSeekLogin(locale);
       if (current !== generation.current) return;
       pending.current = login;
       const expires = login.expiresAt;
@@ -120,13 +111,14 @@ export function useWorkBuddyAccounts(
       }, 250);
       await api.openExternal(login.verificationUri);
       while (current === generation.current && Date.now() / 1000 < expires) {
-        const account = await api.pollWorkBuddyLogin(login.loginId);
+        const account = await api.pollDeepSeekLogin(login.loginId);
         if (current !== generation.current) return;
         if (account) {
           pending.current = null;
           await reload();
           if (current !== generation.current) return;
-          select(account.id);
+          // Do not replace a model explicitly selected while the browser was open.
+          if (selectionRevision.current === selectionAtStart) select(account.id);
           void refresh(account, true);
           return;
         }
@@ -137,7 +129,7 @@ export function useWorkBuddyAccounts(
       if (current === generation.current) showError(accountError(error, t));
     } finally {
       clearInterval(ticker);
-      if (login) void api.cancelWorkBuddyLogin(login.loginId).catch(() => {});
+      if (login) void api.cancelDeepSeekLogin(login.loginId).catch(() => {});
       if (current === generation.current) {
         pending.current = null;
         adding.current = false;
@@ -145,7 +137,9 @@ export function useWorkBuddyAccounts(
       }
     }
   };
-  const remove = async (account: api.WorkBuddyAccount) => {
+
+  const remove = async (account: api.DeepSeekAccount) => {
+    const current = generation.current;
     if (
       !(await confirm({
         title: t('agent.deleteAccountTitle'),
@@ -155,25 +149,19 @@ export function useWorkBuddyAccounts(
       }))
     )
       return;
-    const current = generation.current;
     try {
-      await api.deleteWorkBuddyAccount(account.edition, account.id);
-      setAccountsByEdition((prev) => ({
-        ...prev,
-        [account.edition]: (prev[account.edition] ?? []).filter((a) => a.id !== account.id),
-      }));
-      setSelected((prev) => ({
-        ...prev,
-        [account.edition]: prev[account.edition] === account.id ? null : prev[account.edition],
-      }));
-      if (current === generation.current) await reload();
+      await api.deleteDeepSeekAccount(account.id);
+      if (current !== generation.current) return;
+      setAccounts((prev) => prev.filter((a) => a.id !== account.id));
+      setSelected((prev) => (prev === account.id ? null : prev));
     } catch (error) {
       if (current === generation.current) showError(accountError(error, t));
     }
   };
+
   return {
-    accounts: edition ? (accountsByEdition[edition] ?? []) : [],
-    selectedId,
+    accounts,
+    selectedId: enabled && !hasModel ? selected : null,
     select,
     busy,
     remainingSeconds,

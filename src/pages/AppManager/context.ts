@@ -1,3 +1,4 @@
+import type { useDeepSeekAccounts } from './useDeepSeekAccounts';
 import type { useWorkBuddyAccounts } from './useWorkBuddyAccounts';
 import type { useClaudeCodeAccounts } from './useClaudeCodeAccounts';
 import { createContext, useContext } from 'react';
@@ -22,6 +23,7 @@ export interface AppManagerContextType {
   handleRestoreModel: (toolId: string) => Promise<void>;
   claudeCodeAccounts: ReturnType<typeof useClaudeCodeAccounts>;
   workBuddyAccounts: ReturnType<typeof useWorkBuddyAccounts>;
+  deepSeekAccounts: ReturnType<typeof useDeepSeekAccounts>;
   codexAccounts: CodexAccount[];
   selectedCodexAccountId: string | null;
   setSelectedCodexAccountId: (id: string | null) => void;

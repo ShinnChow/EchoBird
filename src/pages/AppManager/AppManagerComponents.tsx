@@ -1,3 +1,4 @@
+import { DeepSeekAccountSection } from './DeepSeekAccountSection';
 import { ModelSwitchDivider } from './ModelSwitchDivider';
 import { QuotaCountdown } from './QuotaCountdown';
 import { WorkBuddyAccountSection } from './WorkBuddyAccountSection';
@@ -183,7 +184,9 @@ interface DesktopIconProps {
 // uniformly — which section an app sits in (已安装 / 未安装) tells the state.
 const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick, dragProps }) => {
   const { locale } = useI18n();
-  const [iconSrc, setIconSrc] = useState<string>(`./icons/tools/${tool.id}.svg`);
+  const [iconSrc, setIconSrc] = useState<string>(
+    `./icons/tools/${tool.id}.${tool.id === 'dsh' ? 'png' : 'svg'}`
+  );
   const displayName = toolDisplayName(tool, locale);
 
   const handleIconError = () => {
@@ -1039,6 +1042,7 @@ export const AppManagerPanel: React.FC = () => {
           ) : (
             <div className="space-y-2 h-full">
               {showCodexAccounts && <CodexAccountSection showDivider={hasVisibleModels} />}
+              {selectedTool === 'dsh' && <DeepSeekAccountSection showDivider={hasVisibleModels} />}
               {(selectedTool === 'workbuddy' || selectedTool === 'workbuddyai') && (
                 <WorkBuddyAccountSection showDivider={hasVisibleModels} />
               )}
@@ -1105,6 +1109,7 @@ export const AppManagerBottom: React.FC = () => {
     selectedCodexAccountId,
     claudeCodeAccounts,
     workBuddyAccounts,
+    deepSeekAccounts,
     launchAfterApply,
     setLaunchAfterApply,
     isLaunching,
@@ -1126,6 +1131,7 @@ export const AppManagerBottom: React.FC = () => {
   const hasAccountSelected =
     ((selectedTool === 'codex' || selectedTool === 'chatgptdesktop') && !!selectedCodexAccountId) ||
     (selectedTool === 'claudecode' && !!claudeCodeAccounts.selectedId) ||
+    (selectedTool === 'dsh' && !!deepSeekAccounts.selectedId) ||
     ((selectedTool === 'workbuddy' || selectedTool === 'workbuddyai') &&
       !!workBuddyAccounts.selectedId);
   // What will a click actually do?

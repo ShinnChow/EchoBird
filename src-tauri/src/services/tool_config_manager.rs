@@ -5,7 +5,7 @@ mod aider;
 mod claudecode;
 mod claudedesktop;
 mod codex;
-mod dsh;
+pub(crate) mod dsh;
 mod generic;
 mod grok;
 mod kilo;
@@ -236,12 +236,6 @@ fn yaml_child_map<'a>(
 /// Read a child value from a mapping by string key (None if absent/non-mapping).
 fn yaml_get<'a>(value: &'a serde_yaml_ng::Value, key: &str) -> Option<&'a serde_yaml_ng::Value> {
     value.as_mapping()?.get(yaml_str(key))
-}
-
-/// Read a YAML file into a `serde_yaml_ng::Value` (None if missing/unparseable).
-fn read_yaml_file(path: &Path) -> Option<serde_yaml_ng::Value> {
-    let content = fs::read_to_string(path).ok()?;
-    serde_yaml_ng::from_str(&content).ok()
 }
 
 /// Write a `serde_yaml_ng::Value` back to a YAML file (block style), creating

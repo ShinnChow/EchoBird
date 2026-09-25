@@ -18,7 +18,7 @@ function renderAccount(quotaPercent: number | null, busy = false) {
       ],
       selectedId: 'test',
       busy,
-      remainingSeconds: 600,
+      remainingSeconds: 60,
       refreshing: new Set(),
       select: () => {},
       add: async () => {},

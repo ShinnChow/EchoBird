@@ -38,7 +38,7 @@ Tools that are installed as separate executables:
 - **pi**: Pi assistant
 - **vibe-trading**: AI quant-research / market-analysis agent (Quant Analysis category)
 - **claudescience**: Claude Science (Science category, noModelConfig showcase, Windows/macOS/Linux)
-- **dsh**: DeepSeek Harness (CLI Code category, DeepSeek's open-source agent harness, developer preview, web UI served locally via `dsh web` at http://127.0.0.1:3080)
+- **dsh**: DeepSeek Harness (Desktop category, official Windows x64 / macOS Apple Silicon app with bundled runtimes; shares model settings and sessions under ~/.dsh with the CLI)
 
 ### 2. Desktop Apps
 

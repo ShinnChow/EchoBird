@@ -138,6 +138,7 @@ describe('WorkBuddy account interactions', () => {
     act(() => {
       adding = state.add();
     });
+    expect(state.remainingSeconds).toBe(60);
     act(() => {
       renderer.update(<Harness edition="workbuddyai" />);
     });
@@ -145,7 +146,7 @@ describe('WorkBuddy account interactions', () => {
       login.resolve({
         loginId: 'pending',
         verificationUri: 'https://www.codebuddy.cn/login',
-        expiresAt: Date.now() / 1000 + 120,
+        expiresAt: Date.now() / 1000 + 60,
       });
       await adding;
       await vi.runOnlyPendingTimersAsync();

@@ -2,32 +2,42 @@
     "id": "dsh",
     "displayName": "DeepSeek Harness",
     "homepage": "https://www.deepseek.com/harness/",
-    "docs": "https://deepseek-harness.github.io/deepseek-harness/",
+    "docs": "https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/desktop/README.md",
     "kind": "desktop_app",
-    "platforms": ["macos", "linux", "windows"],
+    "platforms": [
+        "windows",
+        "macos"
+    ],
     "install": {
-        "npm_global": "npm install -g @deepseek-ai/dsh",
-        "npx": "npx @deepseek-ai/dsh web",
-        "note": "DeepSeek Harness (`dsh`) is DeepSeek's open-source agent harness, currently in developer preview (breaking changes expected). It runs a local web server (`dsh web`) served at http://127.0.0.1:3080 and you open that URL in a browser. Its source requires Node.js ^22.19.0 || >=24.0.0 (22.19.0+ within 22.x, or 24+; Node 23 is excluded). EchoBird configures models by writing ~/.dsh/settings.yaml (an `echobird` provider route under `llm-pi-ai.providers` plus an `agent-default-model` selector) and ~/.dsh/.credentials.yaml (the `ECHOBIRD_API_KEY` credential) — both YAML. `dsh` hot-reloads settings.yaml, but EchoBird still restarts the tracked instance on model switch so the change is deterministic."
+        "windows_update_manifest": "https://download.deepseek.com/dsh-desk/feeds/win-x64/nightly.yml",
+        "macos_update_manifest": "https://download.deepseek.com/dsh-desk/feeds/mac-arm64/nightly-mac.yml",
+        "note": "Official desktop app with bundled runtimes: no separate Node.js, terminal or browser is required to launch. Windows x64 and macOS Apple Silicon only; no Linux desktop package is configured. Resolve the current package from the official update manifest instead of pinning a release. Subsequent updates are handled by the desktop app."
     },
     "install_flow": {
-        "summary": "Install the `dsh` binary onto PATH via npm (global or npx), then launch with `dsh web` to start the local backend, and open http://127.0.0.1:3080 in a browser.",
+        "summary": "Detect existing desktop app -> resolve official update manifest for the supported OS and architecture -> install -> verify desktop executable.",
         "agent_steps": [
-            "Check `node --version` against the official engine range ^22.19.0 || >=24.0.0: accept 22.x from 22.19.0, or 24.0.0 and later; do not accept Node 23. Upgrade an incompatible Node before continuing.",
-            "Preferred path (all platforms): if npm is available, run `npm install -g @deepseek-ai/dsh`. This puts `dsh` on PATH. Verify with `dsh --version`.",
-            "Fallback: run via `npx @deepseek-ai/dsh web` (downloads on demand, no global install). This is fine for one-off launches but re-resolves each run.",
-            "After install, launch with `dsh web` in a terminal. A local launch opens the browser automatically; `--no-open` suppresses it. An SSH launch prints the URL for the SSH client or editor to forward. The default URL is http://127.0.0.1:3080.",
-            "Model config lives in `~/.dsh/settings.yaml` (provider routes under `llm-pi-ai.providers` + `agent-default-model`) and `~/.dsh/.credentials.yaml` (API keys). When the user picks a model in EchoBird, EchoBird writes an `echobird` provider route (displayName EchoBird, `apiKeyEnv: ECHOBIRD_API_KEY`, `api: anthropic-messages` or `openai-completions`, `baseURL` + `models`) and sets `agent-default-model` to `echobird/<model>`, and stores the key under `ECHOBIRD_API_KEY` in `.credentials.yaml`. The chosen model becomes the default for new sessions."
+            "Detect OS, architecture and existing installation first. Windows: match registry Uninstall DisplayName prefix DeepSeek Harness and resolve DisplayIcon or sibling DeepSeek Harness.exe, including custom install locations. Default: %LOCALAPPDATA%\\Programs\\DeepSeek Harness\\DeepSeek Harness.exe. macOS: check /Applications/DeepSeek Harness.app and ~/Applications/DeepSeek Harness.app. Do not reinstall an existing working desktop app. An npm dsh command does not count as the desktop app.",
+            "Only Windows x64 and macOS arm64 are supported by these feeds. On other platforms or architectures, report that no matching official desktop package is configured; do not substitute the CLI.",
+            "Fetch the matching YAML update manifest. Select the Windows .exe or macOS .zip in files, resolve relative URLs against the manifest URL, and require HTTPS on download.deepseek.com. Download to the user's Downloads directory and verify SHA-512 against the manifest's base64 sha512 before installation. If the feed or package is unavailable, report the failure instead of guessing a versioned URL.",
+            "Windows x64: run the official installer using Start-Process -FilePath <installer> -ArgumentList '/S' -WindowStyle Hidden -Wait -PassThru. Check its exit code and verify DeepSeek Harness.exe through the registry. If the app is running, ask the user to quit it from the tray before retrying installation. If interactive setup is required, explain the remaining step without claiming completion.",
+            "macOS arm64: extract the official ZIP using ditto -x -k into a temporary directory, copy DeepSeek Harness.app to ~/Applications using ditto, and verify Contents/MacOS/DeepSeek Harness. Launch using open; handle first-launch approval through normal macOS UI.",
+            "Refresh EchoBird detection and launch the desktop executable directly. Desktop model settings live in ~/.dsh/profiles/desktop/cordis.patch.yml (llm-pi-ai and agent-default-model entries). Credentials use ~/.dsh/.credentials.yaml version 1: API keys under refs, account grants under records. EchoBird supports browser account login, saved-account switching and balance refresh. Apply & Launch restarts the desktop app; existing sessions may retain their model. Do not write new model settings to the legacy settings.yaml file."
         ],
         "tell_user": [
-            "Which install method was used (npm global vs npx) and the Node.js version requirement (>= 22.19)",
-            "That `dsh` is now on PATH (a NEW terminal may be needed to pick it up)",
-            "How to launch: `dsh web` (headless server at http://127.0.0.1:3080 — open that URL in a browser)",
-            "To switch models: pick one in EchoBird (it writes settings.yaml + .credentials.yaml), or configure providers directly in the DeepSeek Harness Settings → Models page"
+            "The installed desktop version and full application path, or the exact remaining installation step.",
+            "Launch DeepSeek Harness from EchoBird or the desktop shortcut; no npm, terminal or browser is needed to start the app.",
+            "Choose a model in EchoBird and use Apply & Launch to restart with that model for new sessions. The desktop app manages its own updates."
         ]
     },
+    "identity_guard": {
+        "description": "This entry launches the official DeepSeek Harness desktop app (DeepSeek Harness.exe / DeepSeek Harness.app). The npm package @deepseek-ai/dsh and dsh web are the separate CLI/web launch path and must not satisfy this desktop installation request."
+    },
     "network_requirements": {
-        "test_urls": ["https://www.deepseek.com", "https://github.com/deepseek-ai/deepseek-harness", "https://registry.npmjs.org"],
+        "test_urls": [
+            "https://download.deepseek.com/dsh-desk/feeds/win-x64/nightly.yml",
+            "https://download.deepseek.com/dsh-desk/feeds/mac-arm64/nightly-mac.yml",
+            "https://github.com/deepseek-ai/deepseek-harness"
+        ],
         "mirrors": {}
     }
 }

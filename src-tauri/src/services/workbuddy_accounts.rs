@@ -15,6 +15,7 @@ use std::{
 mod credits;
 static ACCOUNT_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 static LOGINS: OnceLock<Mutex<HashMap<String, Login>>> = OnceLock::new();
+const LOGIN_TIMEOUT_SECONDS: i64 = 60;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Edition {
@@ -321,7 +322,7 @@ pub async fn start_login(edition: Edition) -> Result<LoginStart, String> {
     {
         return Err("accountError.authResponse".into());
     }
-    let expires = chrono::Utc::now().timestamp() + 120;
+    let expires = chrono::Utc::now().timestamp() + LOGIN_TIMEOUT_SECONDS;
     let login_id = uuid::Uuid::new_v4().to_string();
     let mut pending = LOGINS
         .get_or_init(Mutex::default)

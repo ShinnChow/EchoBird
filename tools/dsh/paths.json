@@ -8,27 +8,23 @@
     ],
     "docs": "https://deepseek-harness.github.io/deepseek-harness/",
     "website": "https://www.deepseek.com/harness/",
-    "command": "dsh",
-    "startCommand": "dsh web",
+    "description": "Official DeepSeek Harness desktop app. Apply & Launch restarts the app to load the selected model for new sessions.",
+    "command": "",
     "configDir": "~/.dsh",
-    "configFile": "~/.dsh/settings.yaml",
+    "configFile": "~/.dsh/profiles/desktop/cordis.patch.yml",
     "requireConfigFile": false,
     "paths": {
         "win32": [
-            "%APPDATA%\\npm\\dsh.cmd",
-            "%APPDATA%\\npm\\dsh"
+            "%LOCALAPPDATA%\\Programs\\DeepSeek Harness\\DeepSeek Harness.exe"
         ],
         "darwin": [
-            "/usr/local/bin/dsh",
-            "/opt/homebrew/bin/dsh",
-            "~/.npm-global/bin/dsh"
+            "/Applications/DeepSeek Harness.app/Contents/MacOS/DeepSeek Harness",
+            "~/Applications/DeepSeek Harness.app/Contents/MacOS/DeepSeek Harness"
         ],
-        "linux": [
-            "/usr/local/bin/dsh",
-            "/usr/bin/dsh",
-            "~/.npm-global/bin/dsh",
-            "~/.local/bin/dsh"
-        ]
+        "linux": []
     },
-    "installHints": {}
+    "installHints": {
+        "windowsDisplayNamePrefixes": ["DeepSeek Harness"],
+        "macosAppName": "DeepSeek Harness"
+    }
 }
