@@ -274,6 +274,7 @@ html {
    rules outrank Tailwind's base/utility layers, so this applies app-wide. */
 button,
 [role='button'],
+[role='radio'],
 a,
 label,
 summary,
