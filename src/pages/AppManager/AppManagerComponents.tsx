@@ -1,4 +1,6 @@
+import { AccountSectionButton, AccountSectionRow } from './AccountSectionPrimitives';
 import { DeepSeekAccountSection } from './DeepSeekAccountSection';
+import { GrokAccountSection } from './GrokAccountSection';
 import { ModelSwitchDivider } from './ModelSwitchDivider';
 import { QuotaCountdown } from './QuotaCountdown';
 import { WorkBuddyAccountSection } from './WorkBuddyAccountSection';
@@ -25,14 +27,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import {
-  Box as BoxIcon,
-  ExternalLink,
-  LoaderCircle,
-  RefreshCw,
-  Settings,
-  Trash2,
-} from 'lucide-react';
+import { Box as BoxIcon, ExternalLink, RefreshCw, Settings } from 'lucide-react';
 import { getModelIcon, EffortPulse } from '../../components';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { useI18n } from '../../hooks/useI18n';
@@ -756,7 +751,6 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
 export const CodexAccountSection: React.FC<{ showDivider?: boolean }> = ({
   showDivider = true,
 }) => {
-  const { t } = useI18n();
   const {
     codexAccounts,
     selectedCodexAccountId,
@@ -772,60 +766,33 @@ export const CodexAccountSection: React.FC<{ showDivider?: boolean }> = ({
 
   return (
     <section className={showDivider ? 'mb-3' : undefined}>
-      <button
-        type="button"
+      <AccountSectionButton
+        iconSrc="/icons/tools/codex.svg"
+        busy={isAddingCodexAccount}
+        disabled={isLoadingCodexAccounts}
+        remainingSeconds={codexOAuthRemainingSeconds}
         onClick={() => void addCodexAccount()}
-        disabled={isLoadingCodexAccounts || isAddingCodexAccount}
-        className="account-pill mb-2 flex h-12 w-full items-center justify-center rounded-full px-3 text-[17px] font-bold leading-6 transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-50"
-      >
-        <span className="flex translate-y-px items-center gap-2.5">
-          <img src="/icons/tools/codex.svg" alt="" className="codex-account-button-icon h-6 w-6" />
-          <span>
-            {isAddingCodexAccount
-              ? t('agent.waitingForBrowser').replace(
-                  '{seconds}',
-                  String(codexOAuthRemainingSeconds)
-                )
-              : t('agent.addCurrentAccount')}
-          </span>
-        </span>
-      </button>
+      />
       {codexAccounts.length > 0 && (
         <div className="space-y-2">
           {codexAccounts.map((account) => {
-            const selected = selectedCodexAccountId === account.id;
-            const isRefreshing = refreshingCodexAccountIds.has(account.id);
             const normalizedPlan = account.plan?.trim().toLowerCase().replace(/[-_]/g, ' ') ?? '';
             const planLabel = ['pro', 'prolite', 'pro lite'].includes(normalizedPlan)
               ? 'Pro 5X'
               : normalizedPlan.replace(/\b\w/g, (letter) => letter.toUpperCase());
             return (
-              <div
+              <AccountSectionRow
                 key={account.id}
-                role="radio"
-                aria-checked={selected}
-                tabIndex={0}
-                onClick={() => setSelectedCodexAccountId(account.id)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    setSelectedCodexAccountId(account.id);
-                  }
-                }}
-                className="account-pill grid h-12 cursor-pointer grid-cols-[16px_minmax(0,1fr)_44px] items-center gap-2 rounded-full border border-transparent px-3 transition-opacity hover:opacity-90"
-              >
-                <span
-                  className="flex h-[16px] w-[16px] flex-shrink-0 items-center justify-center rounded-full border-2 border-cyber-bg"
-                  aria-hidden="true"
-                >
-                  {selected && <span className="h-[8px] w-[8px] rounded-full bg-cyber-bg" />}
-                </span>
-                <span className="grid min-w-0 auto-rows-[16px] items-center">
-                  <span className="block truncate text-[13px] font-semibold leading-[16px] text-cyber-text">
-                    {account.email}
-                  </span>
+                selected={selectedCodexAccountId === account.id}
+                email={account.email}
+                plan={planLabel}
+                refreshing={refreshingCodexAccountIds.has(account.id)}
+                onSelect={() => setSelectedCodexAccountId(account.id)}
+                onRefresh={() => void refreshCodexAccountQuota(account)}
+                onDelete={() => void deleteCodexAccount(account)}
+                secondary={
                   <span className="flex h-[16px] items-center justify-between">
-                    <span className="h-1.5 min-w-0 max-w-[80px] flex-1 overflow-hidden rounded-full bg-cyber-border">
+                    <span className="h-1.5 min-w-[56px] max-w-[80px] flex-1 overflow-hidden rounded-full bg-cyber-border">
                       <span
                         className="block h-full rounded-full bg-cyber-bg"
                         style={{ width: `${account.quotaPercent ?? 0}%` }}
@@ -836,71 +803,14 @@ export const CodexAccountSection: React.FC<{ showDivider?: boolean }> = ({
                     </span>
                     <QuotaCountdown resetAt={account.quotaResetAt} />
                   </span>
-                </span>
-                <span className="grid auto-rows-[16px] items-center justify-items-center">
-                  {planLabel && (
-                    <span className="whitespace-nowrap text-[12px] font-semibold leading-[16px] text-cyber-text">
-                      {planLabel}
-                    </span>
-                  )}
-                  <span className="flex items-center gap-1.5">
-                    <AccountIconButton
-                      ariaLabel={`${t('agent.refreshAccount')} ${account.email}`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void refreshCodexAccountQuota(account);
-                      }}
-                    >
-                      {isRefreshing ? (
-                        <LoaderCircle size={12} className="animate-spin" aria-hidden="true" />
-                      ) : (
-                        <RefreshCw size={12} aria-hidden="true" />
-                      )}
-                    </AccountIconButton>
-                    <AccountIconButton
-                      ariaLabel={`${t('btn.delete')} ${account.email}`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void deleteCodexAccount(account);
-                      }}
-                    >
-                      <Trash2 size={11} aria-hidden="true" />
-                    </AccountIconButton>
-                  </span>
-                </span>
-              </div>
+                }
+              />
             );
           })}
         </div>
       )}
       {showDivider && <ModelSwitchDivider />}
     </section>
-  );
-};
-
-interface AccountIconButtonProps {
-  ariaLabel: string;
-  disabled?: boolean;
-  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
-  children: React.ReactNode;
-}
-
-const AccountIconButton: React.FC<AccountIconButtonProps> = ({
-  ariaLabel,
-  disabled,
-  onClick,
-  children,
-}) => {
-  return (
-    <button
-      type="button"
-      aria-label={ariaLabel}
-      disabled={disabled}
-      onClick={onClick}
-      className="account-icon-button flex h-5 w-5 items-center justify-center rounded-full transition-colors disabled:cursor-wait disabled:opacity-40"
-    >
-      {children}
-    </button>
   );
 };
 
@@ -1043,6 +953,7 @@ export const AppManagerPanel: React.FC = () => {
             <div className="space-y-2 h-full">
               {showCodexAccounts && <CodexAccountSection showDivider={hasVisibleModels} />}
               {selectedTool === 'dsh' && <DeepSeekAccountSection showDivider={hasVisibleModels} />}
+              {selectedTool === 'grok' && <GrokAccountSection showDivider={hasVisibleModels} />}
               {(selectedTool === 'workbuddy' || selectedTool === 'workbuddyai') && (
                 <WorkBuddyAccountSection showDivider={hasVisibleModels} />
               )}
@@ -1110,6 +1021,7 @@ export const AppManagerBottom: React.FC = () => {
     claudeCodeAccounts,
     workBuddyAccounts,
     deepSeekAccounts,
+    grokAccounts,
     launchAfterApply,
     setLaunchAfterApply,
     isLaunching,
@@ -1132,6 +1044,7 @@ export const AppManagerBottom: React.FC = () => {
     ((selectedTool === 'codex' || selectedTool === 'chatgptdesktop') && !!selectedCodexAccountId) ||
     (selectedTool === 'claudecode' && !!claudeCodeAccounts.selectedId) ||
     (selectedTool === 'dsh' && !!deepSeekAccounts.selectedId) ||
+    (selectedTool === 'grok' && !!grokAccounts.selectedId) ||
     ((selectedTool === 'workbuddy' || selectedTool === 'workbuddyai') &&
       !!workBuddyAccounts.selectedId);
   // What will a click actually do?

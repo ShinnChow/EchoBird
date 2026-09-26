@@ -12,6 +12,14 @@ import { MotherAgentContext } from './context';
 import { useToolsStore } from '../../stores/toolsStore';
 import { useNavigationStore } from '../../stores/navigationStore';
 
+export function selectAgentProtocol(baseUrl: string, anthropicUrl?: string) {
+  const useAnthropic = !baseUrl && !!anthropicUrl;
+  return {
+    provider: useAnthropic ? 'anthropic' : 'openai',
+    anthropicUrl: useAnthropic ? anthropicUrl : undefined,
+  } as const;
+}
+
 // ===== Provider =====
 
 export function MotherAgentProvider({ children }: { children: React.ReactNode }) {
@@ -518,11 +526,10 @@ export function MotherAgentProvider({ children }: { children: React.ReactNode })
       }
 
       try {
-        // Protocol is decided by config, never guessed. Use the Anthropic
-        // Messages API only when the model carries an explicit anthropicUrl
-        // (the model directory sets it solely for vendors that natively serve
-        // /v1/messages; users can set it too). Otherwise use the
-        // OpenAI-compatible base_url.
+        // Protocol is decided by the available endpoints. When both endpoint
+        // fields exist, OpenAI is the default because baseUrl is the primary
+        // endpoint for providers such as Grok. Anthropic is used only when the
+        // model has no OpenAI-compatible baseUrl.
         //
         // The backend runs one protocol per session and never switches
         // mid-flight (auto-downgrade was removed in v5.2.0). So fabricating an
@@ -530,14 +537,15 @@ export function MotherAgentProvider({ children }: { children: React.ReactNode })
         // OpenAI-only provider (OpenRouter, OpenAI, Grok, Groq, Together, …)
         // to a non-existent "/anthropic/v1/messages" endpoint and fails hard
         // with "Not Found" instead of just using the OpenAI path that works.
-        const anthropicUrl = modelData.anthropicUrl || undefined;
+        const protocol = selectAgentProtocol(modelData.baseUrl, modelData.anthropicUrl);
+        const anthropicUrl = protocol.anthropicUrl;
         await api.sendAgentMessage({
           message: message.trim(),
           model_id: modelData.internalId,
           base_url: modelData.baseUrl || '',
           api_key: modelData.apiKey,
           model_name: modelData.modelId || modelData.name,
-          provider: anthropicUrl ? 'anthropic' : 'openai',
+          provider: protocol.provider,
           anthropic_url: anthropicUrl,
           server_ids: selectedServerId === 'local' ? [] : [selectedServerId],
           skills: [],

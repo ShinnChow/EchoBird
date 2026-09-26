@@ -1,4 +1,5 @@
 import { useDeepSeekAccounts } from './useDeepSeekAccounts';
+import { useGrokAccounts } from './useGrokAccounts';
 import { accountError } from '../../utils/accountError';
 import { ClaudeCodeLoginDialog } from './ClaudeCodeLoginDialog';
 import { useWorkBuddyAccounts } from './useWorkBuddyAccounts';
@@ -402,10 +403,21 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     clearDeepSeekModel,
     setApplyError
   );
+  const clearGrokModel = useCallback(
+    () => setToolModelConfig((prev) => ({ ...prev, grok: null })),
+    []
+  );
+  const grokAccounts = useGrokAccounts(
+    selectedTool === 'grok',
+    !!toolModelConfig.grok,
+    clearGrokModel,
+    setApplyError
+  );
 
   // Set tool model (single selection) - UI state update
   const handleSelectModel = (toolId: string, modelId: string) => {
     if (toolId === 'dsh') deepSeekAccounts.select(null);
+    if (toolId === 'grok') grokAccounts.select(null);
     if (toolId === 'claudecode') claudeCodeAccounts.setSelectedId(null);
     if (toolId === 'workbuddy' || toolId === 'workbuddyai') workBuddyAccounts.select(null);
     if (toolId === 'codex' || toolId === 'chatgptdesktop') {
@@ -677,6 +689,16 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         setIsLaunching(false);
       }
       return;
+    } else if (selectedTool === 'grok' && grokAccounts.selectedId) {
+      try {
+        await grokAccounts.switchAccount();
+        if (launchAfterApply) await api.startTool('grok');
+      } catch (error) {
+        setApplyError(accountError(error, t));
+      } finally {
+        setIsLaunching(false);
+      }
+      return;
     } else if (workBuddyEdition && workBuddyAccounts.selectedId) {
       try {
         await api.switchWorkBuddyAccount(workBuddyEdition, workBuddyAccounts.selectedId);
@@ -818,6 +840,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         claudeCodeAccounts,
         workBuddyAccounts,
         deepSeekAccounts,
+        grokAccounts,
         codexAccounts,
         selectedCodexAccountId,
         setSelectedCodexAccountId: selectCodexAccount,

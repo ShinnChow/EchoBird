@@ -85,7 +85,7 @@ interface ThemeStore {
 export const useThemeStore = create<ThemeStore>((set, get) => ({
   mode: 'system',
   resolved: resolve('system'),
-  colorTheme: 'echobird',
+  colorTheme: 'oatgray',
   setMode: (mode) => {
     const resolved = resolve(mode);
     apply(resolved, get().colorTheme, true);
@@ -119,7 +119,7 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
   },
   init: async () => {
     let mode: ThemeMode = 'system';
-    let colorTheme: ColorThemeId = 'echobird';
+    let colorTheme: ColorThemeId = 'oatgray';
     // Restore the cached palette before the first await. index.html already
     // resolves the light/dark half synchronously, so this prevents the first
     // painted frame from briefly using EchoBird's default background colors

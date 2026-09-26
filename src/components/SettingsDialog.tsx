@@ -506,7 +506,7 @@ const ColorThemePicker: React.FC<{
   locale: string;
   onChange: (theme: ColorThemeId) => void;
 }> = ({ value, mode, locale, onChange }) => (
-  <div className="grid grid-cols-6 gap-x-3 gap-y-3.5">
+  <div className="grid max-h-[360px] grid-cols-6 gap-x-3 gap-y-3.5 overflow-y-auto pr-1">
     {COLOR_THEMES.map((theme) => {
       const active = value === theme.id;
       const label = locale.startsWith('zh')
@@ -531,18 +531,13 @@ const ColorThemePicker: React.FC<{
             <span
               className="block h-full flex-1"
               style={{
-                backgroundColor: mode === 'dark' ? theme.dark.canvas : theme.light.canvas,
+                backgroundImage: `linear-gradient(135deg, ${mode === 'dark' ? theme.dark.canvas : theme.light.canvas}, ${mode === 'dark' ? theme.dark.tertiary : theme.light.tertiary})`,
               }}
             />
             <span
               className="block h-full flex-1"
               style={{
-                backgroundColor:
-                  mode === 'system'
-                    ? theme.dark.canvas
-                    : mode === 'dark'
-                      ? theme.dark.tertiary
-                      : theme.light.tertiary,
+                backgroundImage: `linear-gradient(135deg, ${mode === 'system' ? theme.dark.canvas : mode === 'dark' ? theme.dark.tertiary : theme.light.tertiary}, ${mode === 'system' ? theme.dark.tertiary : mode === 'dark' ? theme.dark.canvas : theme.light.canvas})`,
               }}
             />
             {active && (

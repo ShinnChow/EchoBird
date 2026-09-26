@@ -1,11 +1,11 @@
 {
-  "version": "5.7.8",
-  "releaseDate": "2026-09-22",
-  "releaseNotes": "- 新增 WorkBuddy 国内版与 WorkBuddy AI 国际版多账号登录与切换（Windows/macOS）。\n- 支持查看账号等级、剩余积分与到期倒计时。",
+  "version": "5.7.9",
+  "releaseDate": "2026-09-26",
+  "releaseNotes": "- 新增 DeepSeek 与 Grok Build 多账号登录切换、统一账号管理及主题与协议兼容优化。",
   "releaseNotesI18n": {
-    "zh-cn": "- 新增 WorkBuddy 国内版与 WorkBuddy AI 国际版多账号登录与切换（Windows/macOS）。\n- 支持查看账号等级、剩余积分与到期倒计时。",
-    "en": "- Add multi-account login and switching for WorkBuddy (China) and WorkBuddy AI (international) on Windows/macOS.\n- View account tiers, remaining credits, and expiry countdowns.",
-    "zh-tw": "- 新增 WorkBuddy 國內版與 WorkBuddy AI 國際版多帳號登入與切換（Windows/macOS）。\n- 支援查看帳號等級、剩餘積分與到期倒數。",
-    "ja": "- WorkBuddy 中国版と WorkBuddy AI 国際版の複数アカウントでのログイン・切り替えに対応（Windows/macOS）。\n- アカウントのプラン、残りクレジット、有効期限までの時間を表示。"
+    "zh-cn": "- 新增 DeepSeek 与 Grok Build 多账号登录切换、统一账号管理及主题与协议兼容优化。",
+    "en": "- Add DeepSeek and Grok Build multi-account login, switching, unified account management, and theme and protocol compatibility improvements.",
+    "zh-tw": "- 新增 DeepSeek 與 Grok Build 多帳號登入切換、統一帳號管理，以及主題與協議相容性優化。",
+    "ja": "- DeepSeek と Grok Build の複数アカウントログイン・切り替え、統合アカウント管理、テーマとプロトコル互換性を改善。"
   }
 }

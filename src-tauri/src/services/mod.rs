@@ -15,6 +15,7 @@ pub mod datalog;
 pub mod deepseek_accounts;
 pub mod deepseek_oauth;
 pub mod free_model_directory;
+pub mod grok_accounts;
 pub mod json_repair;
 pub mod llm_client;
 pub mod local_llm;

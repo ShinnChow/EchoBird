@@ -651,3 +651,39 @@ pub async fn refresh_deepseek_account_quota(
 pub async fn delete_deepseek_account(account_id: String) -> Result<(), String> {
     deepseek_accounts::delete(&account_id).await
 }
+
+#[tauri::command]
+pub async fn start_grok_login() -> Result<serde_json::Value, String> {
+    let (id, expires) = crate::services::grok_accounts::start_login().await?;
+    Ok(serde_json::json!({"loginId":id,"expiresAt":expires}))
+}
+#[tauri::command]
+pub async fn poll_grok_login(
+    login_id: String,
+) -> Result<Option<crate::services::grok_accounts::Account>, String> {
+    crate::services::grok_accounts::poll_login(&login_id).await
+}
+#[tauri::command]
+pub fn cancel_grok_login(login_id: String) -> Result<(), String> {
+    crate::services::grok_accounts::cancel_login(&login_id)
+}
+#[tauri::command]
+pub fn list_grok_accounts() -> Result<Vec<crate::services::grok_accounts::Account>, String> {
+    crate::services::grok_accounts::list()
+}
+#[tauri::command]
+pub async fn switch_grok_account(
+    account_id: String,
+) -> Result<crate::services::grok_accounts::Account, String> {
+    crate::services::grok_accounts::switch(&account_id).await
+}
+#[tauri::command]
+pub async fn delete_grok_account(account_id: String) -> Result<(), String> {
+    crate::services::grok_accounts::delete(&account_id).await
+}
+#[tauri::command]
+pub async fn refresh_grok_account(
+    account_id: String,
+) -> Result<crate::services::grok_accounts::Account, String> {
+    crate::services::grok_accounts::refresh(&account_id).await
+}

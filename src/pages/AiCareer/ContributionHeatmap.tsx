@@ -265,7 +265,7 @@ export function ContributionHeatmap({ buckets }: { buckets: DayBuckets }) {
               // it per frame and settles back here. Constant across renders, so
               // React never re-applies it (and never fights the rAF writes).
               background: cell.future ? 'transparent' : LEVEL_BG[cell.level],
-              cursor: cell.future ? 'default' : 'pointer',
+              cursor: 'default',
             }}
           />
         ))}

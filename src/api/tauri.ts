@@ -349,3 +349,35 @@ export function refreshDeepSeekAccountQuota(
 export function deleteDeepSeekAccount(accountId: string): Promise<void> {
   return invoke('delete_deepseek_account', { accountId });
 }
+
+export interface GrokAccount {
+  id: string;
+  email: string;
+  plan: string | null;
+  active: boolean;
+}
+export interface GrokLogin {
+  loginId: string;
+  expiresAt: number;
+}
+export function startGrokLogin(): Promise<GrokLogin> {
+  return invoke('start_grok_login');
+}
+export function pollGrokLogin(loginId: string): Promise<GrokAccount | null> {
+  return invoke('poll_grok_login', { loginId });
+}
+export function cancelGrokLogin(loginId: string): Promise<void> {
+  return invoke('cancel_grok_login', { loginId });
+}
+export function listGrokAccounts(): Promise<GrokAccount[]> {
+  return invoke('list_grok_accounts');
+}
+export function switchGrokAccount(accountId: string): Promise<GrokAccount> {
+  return invoke('switch_grok_account', { accountId });
+}
+export function deleteGrokAccount(accountId: string): Promise<void> {
+  return invoke('delete_grok_account', { accountId });
+}
+export function refreshGrokAccount(accountId: string): Promise<GrokAccount> {
+  return invoke('refresh_grok_account', { accountId });
+}

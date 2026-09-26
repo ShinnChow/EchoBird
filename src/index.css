@@ -270,7 +270,7 @@ html {
 /* Desktop app — no hand/pointer cursor. Tailwind's preflight sets buttons to
    cursor:pointer (web-like); this unlayered rule replaces that and the
    cursor-pointer/grab/move utilities with the native default arrow. Text
-   fields keep the I-beam and disabled controls keep not-allowed. Unlayered
+   fields keep the I-beam. Unlayered
    rules outrank Tailwind's base/utility layers, so this applies app-wide. */
 button,
 [role='button'],
@@ -280,12 +280,17 @@ summary,
 select,
 .cursor-pointer,
 .cursor-grab,
-.cursor-move {
+.cursor-move,
+.cursor-not-allowed,
+.cursor-wait,
+.cursor-help,
+.cursor-progress,
+.cursor-crosshair {
   cursor: default;
 }
 :disabled,
 [aria-disabled='true'] {
-  cursor: not-allowed;
+  cursor: default;
 }
 input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not(
     [type='button']

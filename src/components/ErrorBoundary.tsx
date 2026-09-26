@@ -16,7 +16,7 @@ const btnStyle: CSSProperties = {
   border: '1px solid #444',
   background: '#2a2a2a',
   color: '#e8e8e8',
-  cursor: 'pointer',
+  cursor: 'default',
   fontSize: 13,
 };
 
