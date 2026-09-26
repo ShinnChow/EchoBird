@@ -69,7 +69,7 @@ export const OFFICIAL_ENDPOINTS: Record<string, OfficialEndpoint> = {
     name: 'Xiaomi MiMo Official',
     baseUrl: 'https://api.xiaomimimo.com/v1',
     protocol: 'openai',
-    modelId: 'mimo-v2.5-pro',
+    modelId: 'mimo-v2.6-pro',
   },
   // Kimi Code: NO official-endpoint card. Unlike Xiaomi's single MiMo
   // platform, Moonshot runs TWO separate platforms with independent
