@@ -1,11 +1,11 @@
 {
   "version": "5.7.9",
   "releaseDate": "2026-09-26",
-  "releaseNotes": "- 新增 DeepSeek 与 Grok Build 多账号登录切换、统一账号管理及主题与协议兼容优化。",
+  "releaseNotes": "- DeepSeek Harness 从 Web 端升级为官方桌面端，支持一键安装、账号登录、账号切换与模型切换；新增 Grok Build 多账号管理，并焕新主题配色。",
   "releaseNotesI18n": {
-    "zh-cn": "- 新增 DeepSeek 与 Grok Build 多账号登录切换、统一账号管理及主题与协议兼容优化。",
-    "en": "- Add DeepSeek and Grok Build multi-account login, switching, unified account management, and theme and protocol compatibility improvements.",
-    "zh-tw": "- 新增 DeepSeek 與 Grok Build 多帳號登入切換、統一帳號管理，以及主題與協議相容性優化。",
-    "ja": "- DeepSeek と Grok Build の複数アカウントログイン・切り替え、統合アカウント管理、テーマとプロトコル互換性を改善。"
+    "zh-cn": "- DeepSeek Harness 从 Web 端升级为官方桌面端，支持一键安装、账号登录、账号切换与模型切换；新增 Grok Build 多账号管理，并焕新主题配色。",
+    "en": "- Upgrade DeepSeek Harness from the web interface to the official desktop app with one-click installation, account login, account switching, and model switching; add Grok Build multi-account management and refreshed color themes.",
+    "zh-tw": "- DeepSeek Harness 從 Web 端升級為官方桌面端，支援一鍵安裝、帳號登入、帳號切換與模型切換；新增 Grok Build 多帳號管理，並煥新主題配色。",
+    "ja": "- DeepSeek Harness を Web 版から公式デスクトップ版へ移行。ワンクリックインストール、アカウントログイン・切り替え、モデル切り替えに対応し、Grok Build の複数アカウント管理と新しいカラーテーマを追加。"
   }
 }
