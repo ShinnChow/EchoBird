@@ -13,6 +13,41 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.paths.outputs.rust }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check for changes beyond README and screenshots
+        id: paths
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          IS_PULL_REQUEST: ${{ github.event_name == 'pull_request' }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import subprocess
+
+          base, head = os.environ['BASE_SHA'], os.environ['HEAD_SHA']
+          rust = True
+          if base and base != '0' * 40:
+              if os.environ['IS_PULL_REQUEST'] == 'true':
+                  base = subprocess.check_output(['git', 'merge-base', base, head], text=True).strip()
+              paths = subprocess.check_output(['git', 'diff', '--no-renames', '--name-only', '-z', base, head]).split(b'\0')
+              paths = [path for path in paths if path]
+              rust = not paths or any(
+                  path not in (b'README.md', b'README.zh-CN.md') and not path.startswith(b'docs/screenshots/')
+                  for path in paths
+              )
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'rust={str(rust).lower()}\n')
+          PY
+
   frontend:
     runs-on: ubuntu-latest
     steps:
@@ -43,11 +78,12 @@ jobs:
         continue-on-error: true
 
   rust:
+    needs: changes
     # Skip on Dependabot PRs: Dependabot only opens PRs for GitHub
     # Actions / dependency version bumps (config-only, no rust diff),
     # so the frontend job still runs and the rust job re-runs on the
     # merge commit to main.
-    if: github.actor != 'dependabot[bot]'
+    if: always() && github.actor != 'dependabot[bot]' && needs.changes.outputs.rust != 'false'
     strategy:
       fail-fast: false
       matrix:

@@ -50,6 +50,18 @@ const CLAUDECODE_MODEL_VARS_1M: &[&str] = &[
     "ANTHROPIC_DEFAULT_FABLE_MODEL",
 ];
 
+const AUTO_MODE_SERVER: &str = "CLAUDE_CODE_AUTO_MODE_SERVER";
+
+fn owns_auto_mode_server(settings_path: &std::path::Path, relay_path: &std::path::Path) -> bool {
+    read_json_file(relay_path)
+        .and_then(|relay| {
+            relay["autoModeServerSettingsPath"]
+                .as_str()
+                .map(|path| std::path::Path::new(path) == settings_path)
+        })
+        .unwrap_or(false)
+}
+
 /// Value written to a `CLAUDECODE_MODEL_VARS` entry in relay mode. Appends
 /// `[1m]` only when the user opted in (`one_m`) AND `var` is in the 1M-capable
 /// tier; `ANTHROPIC_DEFAULT_HAIKU_MODEL` / `CLAUDE_CODE_SUBAGENT_MODEL` always
@@ -205,6 +217,16 @@ fn apply_claudecode_at(
         serde_json::Value::String("1".to_string()),
     );
 
+    // Gateways may not return server classifier verdicts. Preserve explicit
+    // user values and track our default separately so official restore can
+    // remove it, including after repeated applies or relay/bridge switches.
+    let auto_mode_inserted = !env.contains_key(AUTO_MODE_SERVER);
+    let auto_mode_managed = auto_mode_inserted
+        || (env.get(AUTO_MODE_SERVER).and_then(|v| v.as_str()) == Some("0")
+            && owns_auto_mode_server(settings_path, relay_path));
+    env.entry(AUTO_MODE_SERVER.to_string())
+        .or_insert_with(|| serde_json::json!("0"));
+
     // Both modes authenticate via ANTHROPIC_AUTH_TOKEN (Bearer), so always drop
     // any ANTHROPIC_API_KEY (x-api-key) the user may have left in settings.json —
     // a stale real key would otherwise conflict. We *remove* the key rather than
@@ -257,8 +279,23 @@ fn apply_claudecode_at(
         "actualModel": real_model_id,
         "modelName": model_info.name.as_deref().unwrap_or(real_model_id.as_str()),
         "relayMode": relay_mode,
+        "autoModeServerSettingsPath": auto_mode_managed.then(|| settings_path.to_string_lossy()),
     });
     if let Err(e) = write_json_file(relay_path, &relay) {
+        // Without the ownership record, a newly inserted default could no
+        // longer be distinguished from a user's value during official restore.
+        if auto_mode_inserted {
+            config["env"]
+                .as_object_mut()
+                .unwrap()
+                .remove(AUTO_MODE_SERVER);
+            if let Err(rollback) = write_json_file(settings_path, &config) {
+                return ApplyResult {
+                    success: false,
+                    message: format!("Failed to write Claude Code relay file: {}. Failed to remove auto-mode default: {}", e, rollback),
+                };
+            }
+        }
         return ApplyResult {
             success: false,
             message: format!("Failed to write Claude Code relay file: {}", e),
@@ -371,6 +408,11 @@ fn restore_claudecode_at(
             match read_json_file(settings_path) {
                 Some(mut config) => {
                     if let Some(env) = config.get_mut("env").and_then(|v| v.as_object_mut()) {
+                        if env.get(AUTO_MODE_SERVER).and_then(|v| v.as_str()) == Some("0")
+                            && owns_auto_mode_server(settings_path, relay_path)
+                        {
+                            env.remove(AUTO_MODE_SERVER);
+                        }
                         for key in OUR_ENV_KEYS {
                             env.remove(key);
                         }
@@ -428,10 +470,110 @@ mod tests {
                     apply_claudecode_at(&claudecode_model_info(Some(mode)), &path, &relay).success
                 );
                 assert!(read_json_file(&path).unwrap()["env"]["ANTHROPIC_BASE_URL"].is_string());
+                assert_eq!(
+                    read_json_file(&path).unwrap()["env"]["CLAUDE_CODE_AUTO_MODE_SERVER"],
+                    "0"
+                );
                 assert!(restore_claudecode_at(&path, &relay).success);
                 assert_eq!(read_json_file(&path).unwrap(), original);
                 assert_eq!(read_json_file(&unchanged).unwrap(), original);
             }
+        }
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn auto_mode_default_survives_repeated_model_switches_until_official_restore() {
+        let dir = std::env::temp_dir().join(format!("claude-auto-mode-{}", uuid::Uuid::new_v4()));
+        let path = dir.join("settings.json");
+        let relay = dir.join("relay.json");
+        let original = serde_json::json!({"env":{"KEEP":"yes"}});
+        write_json_file(&path, &original).unwrap();
+        for mode in [false, true, false] {
+            assert!(apply_claudecode_at(&claudecode_model_info(Some(mode)), &path, &relay).success);
+            assert_eq!(
+                read_json_file(&path).unwrap()["env"]["CLAUDE_CODE_AUTO_MODE_SERVER"],
+                "0"
+            );
+        }
+        assert!(restore_claudecode_at(&path, &relay).success);
+        assert_eq!(read_json_file(&path).unwrap(), original);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn auto_mode_preserves_user_values_and_manual_edits() {
+        let dir = std::env::temp_dir().join(format!("claude-auto-mode-{}", uuid::Uuid::new_v4()));
+        let path = dir.join("settings.json");
+        let relay = dir.join("relay.json");
+        for mode in [false, true] {
+            for value in ["0", "1"] {
+                let original =
+                    serde_json::json!({"env":{"CLAUDE_CODE_AUTO_MODE_SERVER":value,"KEEP":"yes"}});
+                write_json_file(&path, &original).unwrap();
+                assert!(
+                    apply_claudecode_at(&claudecode_model_info(Some(mode)), &path, &relay).success
+                );
+                assert_eq!(
+                    read_json_file(&path).unwrap()["env"]["CLAUDE_CODE_AUTO_MODE_SERVER"],
+                    value
+                );
+                assert!(restore_claudecode_at(&path, &relay).success);
+                assert_eq!(read_json_file(&path).unwrap(), original);
+            }
+            for reapply in [false, true] {
+                write_json_file(&path, &serde_json::json!({"env":{"KEEP":"yes"}})).unwrap();
+                assert!(
+                    apply_claudecode_at(&claudecode_model_info(Some(mode)), &path, &relay).success
+                );
+                let mut edited = read_json_file(&path).unwrap();
+                edited["env"]["CLAUDE_CODE_AUTO_MODE_SERVER"] = serde_json::json!("1");
+                write_json_file(&path, &edited).unwrap();
+                if reapply {
+                    assert!(
+                        apply_claudecode_at(&claudecode_model_info(Some(!mode)), &path, &relay)
+                            .success
+                    );
+                }
+                assert!(restore_claudecode_at(&path, &relay).success);
+                assert_eq!(
+                    read_json_file(&path).unwrap(),
+                    serde_json::json!({"env":{"KEEP":"yes","CLAUDE_CODE_AUTO_MODE_SERVER":"1"}})
+                );
+            }
+        }
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn auto_mode_ownership_does_not_cross_config_directories() {
+        let dir = std::env::temp_dir().join(format!("claude-auto-mode-{}", uuid::Uuid::new_v4()));
+        let first = dir.join("first/settings.json");
+        let second = dir.join("second/settings.json");
+        let relay = dir.join("relay.json");
+        let original = serde_json::json!({"env":{"CLAUDE_CODE_AUTO_MODE_SERVER":"0"}});
+        write_json_file(&second, &original).unwrap();
+        assert!(apply_claudecode_at(&claudecode_model_info(Some(false)), &first, &relay).success);
+        assert!(apply_claudecode_at(&claudecode_model_info(Some(true)), &second, &relay).success);
+        assert!(restore_claudecode_at(&second, &relay).success);
+        assert_eq!(read_json_file(&second).unwrap(), original);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn failed_relay_write_does_not_leave_an_untracked_auto_mode_default() {
+        let dir = std::env::temp_dir().join(format!("claude-auto-mode-{}", uuid::Uuid::new_v4()));
+        let path = dir.join("settings.json");
+        let relay = dir.join("relay.json");
+        fs::create_dir_all(&relay).unwrap();
+        for mode in [false, true] {
+            write_json_file(&path, &serde_json::json!({"env":{"KEEP":"yes"}})).unwrap();
+            assert!(
+                !apply_claudecode_at(&claudecode_model_info(Some(mode)), &path, &relay).success
+            );
+            let config = read_json_file(&path).unwrap();
+            assert!(config["env"].get(AUTO_MODE_SERVER).is_none());
+            assert_eq!(config["env"]["KEEP"], "yes");
         }
         fs::remove_dir_all(dir).unwrap();
     }
