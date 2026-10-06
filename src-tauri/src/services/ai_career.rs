@@ -608,9 +608,68 @@ fn mimo_db_path(home: &Path) -> PathBuf {
     home.join(".config").join("mimocode").join("mimocode.db")
 }
 
-/// One page of a Drizzle/SQLite tool's sessions, newest first. OpenCode and its
-/// MiMo Code fork share the schema (session + message tables, `time_updated` ms,
-/// `time_archived`) — only the db path differs. `tool`/`label` set the
+/// Normalize V1, V2, and partially migrated OpenCode stores. A V2 session owns
+/// its id even when empty or archived, so stale V1 rows must not reappear.
+fn drizzle_sessions_sql(conn: &rusqlite::Connection) -> String {
+    let table_exists = |table: &str| {
+        conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
+            [table],
+            |row| row.get::<_, bool>(0),
+        )
+        .unwrap_or(false)
+    };
+    let has_v2_sessions = table_exists("session_v2");
+    let has_v2_messages = table_exists("session_message");
+    let v2_count = if has_v2_messages {
+        "(SELECT COUNT(*) FROM session_message WHERE session_id = s.id AND type IN ('user', 'assistant'))"
+    } else {
+        "0"
+    };
+    let v1_count = if table_exists("message") {
+        "(SELECT COUNT(*) FROM message WHERE session_id = s.id)"
+    } else {
+        "0"
+    };
+    let mut sources = Vec::new();
+    for table in ["session_v2", "session"] {
+        if !table_exists(table) {
+            continue;
+        }
+        let count = if table == "session_v2" {
+            v2_count.to_string()
+        } else if has_v2_messages {
+            format!(
+                "CASE WHEN EXISTS(SELECT 1 FROM session_message WHERE session_id = s.id) \
+                 THEN {v2_count} ELSE {v1_count} END"
+            )
+        } else {
+            v1_count.to_string()
+        };
+        let filter = if table == "session" && has_v2_sessions {
+            "WHERE NOT EXISTS(SELECT 1 FROM session_v2 WHERE id = s.id)"
+        } else {
+            ""
+        };
+        let subpath = if conn
+            .prepare(&format!("SELECT path FROM {table} LIMIT 0"))
+            .is_ok()
+        {
+            "s.path"
+        } else {
+            "NULL"
+        };
+        sources.push(format!(
+            "SELECT s.id, s.title, s.directory, s.time_updated, s.time_archived, \
+             s.parent_id, {count} AS msg_count, {subpath} AS subpath FROM {table} s {filter}"
+        ));
+    }
+    sources.join(" UNION ALL ")
+}
+
+/// One page of a Drizzle/SQLite tool's sessions, newest first. OpenCode V1/V2
+/// and its MiMo Code fork use `time_updated` ms and `time_archived`.
+/// `tool`/`label` set the
 /// SavedSession id-prefix + `tool` tag and the fallback title.
 ///
 /// `parent_id IS NULL` excludes sub-agent sessions: OpenCode writes one row
@@ -632,15 +691,14 @@ fn drizzle_history_page(
     ) else {
         return Vec::new();
     };
-    let query = "SELECT s.id, s.title, s.directory, s.time_updated, COUNT(m.id) as msg_count \
-                 FROM session s \
-                 LEFT JOIN message m ON m.session_id = s.id \
-                 WHERE s.time_archived IS NULL \
-                   AND s.parent_id IS NULL \
-                 GROUP BY s.id \
-                 ORDER BY s.time_updated DESC \
-                 LIMIT ?1 OFFSET ?2";
-    let Ok(mut stmt) = conn.prepare(query) else {
+    let query = format!(
+        "WITH sessions AS ({}) \
+         SELECT s.id, s.title, s.directory, s.time_updated, s.msg_count, s.subpath \
+         FROM sessions s WHERE s.time_archived IS NULL AND s.parent_id IS NULL \
+         ORDER BY s.time_updated DESC, s.id ASC LIMIT ?1 OFFSET ?2",
+        drizzle_sessions_sql(&conn)
+    );
+    let Ok(mut stmt) = conn.prepare(&query) else {
         return Vec::new();
     };
     let db_str = db_path.to_string_lossy().into_owned();
@@ -657,11 +715,19 @@ fn drizzle_history_page(
             .unwrap_or_default();
         let time_updated: i64 = row.get(3).unwrap_or(0);
         let msg_count: i64 = row.get(4).unwrap_or(0);
+        let subpath: Option<String> = row.get(5).unwrap_or(None);
+        let cwd = match subpath.filter(|path| !path.is_empty() && path != ".") {
+            Some(path) => Path::new(&directory)
+                .join(path)
+                .to_string_lossy()
+                .into_owned(),
+            None => directory,
+        };
         Ok(SavedSession {
             id: format!("{}_native_{}", tool, id),
             name: title,
             tool: tool.to_string(),
-            cwd: directory,
+            cwd,
             session_token: Some(id),
             saved_at: time_updated.to_string(),
             file_path: Some(db_str.clone()),
@@ -685,12 +751,13 @@ fn collect_drizzle_heatmap_entries(db_path: &Path, cutoff_secs: i64, out: &mut V
         return;
     };
     let cutoff_ms = cutoff_secs.saturating_mul(1000);
-    let query = "SELECT s.time_updated, COUNT(m.id) AS msg_count \
-                 FROM session s \
-                 LEFT JOIN message m ON m.session_id = s.id \
-                 WHERE s.time_archived IS NULL AND s.time_updated >= ?1 \
-                 GROUP BY s.id";
-    let Ok(mut stmt) = conn.prepare(query) else {
+    let query = format!(
+        "WITH sessions AS ({}) \
+         SELECT s.time_updated, s.msg_count FROM sessions s \
+         WHERE s.time_archived IS NULL AND s.time_updated >= ?1",
+        drizzle_sessions_sql(&conn)
+    );
+    let Ok(mut stmt) = conn.prepare(&query) else {
         return;
     };
     let rows = stmt.query_map([cutoff_ms], |row| {
@@ -1599,6 +1666,197 @@ mod tests {
 
         let _ = std::fs::remove_file(&db);
         let _ = std::fs::remove_dir(&dir);
+    }
+
+    fn opencode_v2_fixture() -> PathBuf {
+        let path =
+            std::env::temp_dir().join(format!("echobird-opencode-v2-{}.db", uuid::Uuid::new_v4()));
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE session_v2 (
+                id TEXT PRIMARY KEY, title TEXT, directory TEXT, path TEXT,
+                time_updated INTEGER, time_archived INTEGER, parent_id TEXT
+             );
+             CREATE TABLE session_message (id TEXT PRIMARY KEY, session_id TEXT, type TEXT);
+             INSERT INTO session_v2 VALUES
+                ('main', 'V2 task', '/proj', 'packages/app', 5000, NULL, NULL),
+                ('empty', '', '/empty', '.', 4000, NULL, NULL),
+                ('child', 'Child', '/proj', NULL, 6000, NULL, 'main'),
+                ('archived', 'Archived', '/proj', NULL, 7000, 7000, NULL);
+             INSERT INTO session_message VALUES
+                ('u1', 'main', 'user'), ('a1', 'main', 'assistant'),
+                ('u2', 'main', 'user'), ('a2', 'main', 'assistant'),
+                ('switch', 'main', 'model-switched'), ('compact', 'main', 'compaction'),
+                ('child-u', 'child', 'user'), ('archived-u', 'archived', 'user');",
+        )
+        .unwrap();
+        path
+    }
+
+    fn add_opencode_v1_fixture(path: &Path) {
+        let conn = rusqlite::Connection::open(path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE session AS SELECT id, title, directory, time_updated, time_archived, parent_id FROM session_v2;
+             UPDATE session SET title = 'Stale title', time_updated = 9000, time_archived = NULL;
+             INSERT INTO session VALUES ('legacy', 'V1 task', '/old', 5500, NULL, NULL);
+             CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT);
+             INSERT INTO message VALUES
+                ('v1-u1', 'main'), ('v1-a1', 'main'),
+                ('v1-u2', 'main'), ('v1-a2', 'main'),
+                ('v1-u3', 'main'), ('v1-a3', 'main'),
+                ('v1-empty-u1', 'empty'), ('v1-empty-a1', 'empty'),
+                ('v1-empty-u2', 'empty'), ('v1-empty-a2', 'empty'),
+                ('legacy-u', 'legacy'), ('legacy-a', 'legacy');",
+        ).unwrap();
+    }
+
+    #[test]
+    fn opencode_v2_history_reads_roots_metadata_and_chat_counts_without_writes() {
+        let db = opencode_v2_fixture();
+        let before = std::fs::read(&db).unwrap();
+        let rows = drizzle_history_page(&db, "opencode", "OpenCode", 0, 30);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].id, "opencode_native_main");
+        assert_eq!(rows[0].name, "V2 task");
+        assert_eq!(
+            PathBuf::from(&rows[0].cwd),
+            Path::new("/proj").join("packages/app")
+        );
+        assert_eq!(rows[0].session_token.as_deref(), Some("main"));
+        assert_eq!(rows[0].saved_at, "5000");
+        assert_eq!(rows[0].turn_count, Some(2));
+        assert_eq!(rows[0].file_path.as_deref(), db.to_str());
+        assert_eq!(rows[1].name, "OpenCode Session");
+        assert_eq!(rows[1].cwd, "/empty");
+        assert_eq!(std::fs::read(&db).unwrap(), before);
+        std::fs::remove_file(db).unwrap();
+    }
+
+    #[test]
+    fn opencode_v2_migration_wins_over_stale_archived_and_empty_v1_rows() {
+        let db = opencode_v2_fixture();
+        add_opencode_v1_fixture(&db);
+        let rows = drizzle_history_page(&db, "opencode", "OpenCode", 0, 30);
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.session_token.as_deref().unwrap())
+                .collect::<Vec<_>>(),
+            vec!["legacy", "main", "empty"]
+        );
+        assert_eq!(rows[1].name, "V2 task");
+        assert_eq!(rows[1].saved_at, "5000");
+        assert_eq!(rows[1].turn_count, Some(2));
+        assert_eq!(
+            rows[2].turn_count,
+            Some(1),
+            "empty V2 must not count retained V1 messages"
+        );
+        std::fs::remove_file(db).unwrap();
+    }
+
+    #[test]
+    fn opencode_v2_history_paginates_the_merged_sessions_with_stable_ties() {
+        let db = opencode_v2_fixture();
+        add_opencode_v1_fixture(&db);
+        let conn = rusqlite::Connection::open(&db).unwrap();
+        conn.execute_batch(
+            "INSERT INTO session_v2 VALUES ('a', 'A', '/proj', NULL, 5500, NULL, NULL);
+                            INSERT INTO session VALUES ('b', 'B', '/proj', 5500, NULL, NULL);",
+        )
+        .unwrap();
+        drop(conn);
+        let all = drizzle_history_page(&db, "opencode", "OpenCode", 0, 30);
+        let paged: Vec<_> = (0..all.len())
+            .step_by(2)
+            .flat_map(|offset| drizzle_history_page(&db, "opencode", "OpenCode", offset, 2))
+            .collect();
+        assert_eq!(
+            all.iter()
+                .map(|row| row.session_token.as_deref().unwrap())
+                .collect::<Vec<_>>(),
+            vec!["a", "b", "legacy", "main", "empty"]
+        );
+        assert_eq!(
+            paged.iter().map(|row| &row.id).collect::<Vec<_>>(),
+            all.iter().map(|row| &row.id).collect::<Vec<_>>()
+        );
+        assert!(drizzle_history_page(&db, "opencode", "OpenCode", all.len(), 2).is_empty());
+        assert!(drizzle_history_page(&db, "opencode", "OpenCode", 0, 0).is_empty());
+        std::fs::remove_file(db).unwrap();
+    }
+
+    #[test]
+    fn opencode_v2_transitional_schema_keeps_legacy_sessions_and_control_only_counts() {
+        let db = opencode_v2_fixture();
+        add_opencode_v1_fixture(&db);
+        let conn = rusqlite::Connection::open(&db).unwrap();
+        conn.execute_batch("DROP TABLE session_v2;
+                            INSERT INTO session_message VALUES ('empty-switch', 'empty', 'model-switched');").unwrap();
+        drop(conn);
+        let rows = drizzle_history_page(&db, "opencode", "OpenCode", 0, 30);
+        assert_eq!(
+            rows.iter()
+                .find(|row| row.session_token.as_deref() == Some("main"))
+                .unwrap()
+                .turn_count,
+            Some(2)
+        );
+        assert_eq!(
+            rows.iter()
+                .find(|row| row.session_token.as_deref() == Some("empty"))
+                .unwrap()
+                .turn_count,
+            Some(1)
+        );
+        assert!(rows
+            .iter()
+            .any(|row| row.session_token.as_deref() == Some("legacy")));
+        let conn = rusqlite::Connection::open(&db).unwrap();
+        conn.execute_batch("DROP TABLE message").unwrap();
+        drop(conn);
+        assert_eq!(
+            drizzle_history_page(&db, "opencode", "OpenCode", 0, 30).len(),
+            rows.len()
+        );
+        std::fs::remove_file(db).unwrap();
+    }
+
+    #[test]
+    fn opencode_v2_heatmap_uses_the_same_migration_and_message_count_rules() {
+        let db = opencode_v2_fixture();
+        add_opencode_v1_fixture(&db);
+        let mut entries = Vec::new();
+        collect_drizzle_heatmap_entries(&db, 5, &mut entries);
+        let mut counts: Vec<_> = entries
+            .iter()
+            .map(|entry| (entry.ts, entry.count))
+            .collect();
+        counts.sort_unstable();
+        assert_eq!(counts, vec![(5, 2), (5, 4), (6, 1)]);
+        let mut newer = Vec::new();
+        collect_drizzle_heatmap_entries(&db, 6, &mut newer);
+        assert_eq!(newer.len(), 1, "heatmap still includes child sessions");
+        assert_eq!((newer[0].ts, newer[0].count), (6, 1));
+        std::fs::remove_file(db).unwrap();
+    }
+
+    #[test]
+    fn opencode_missing_or_invalid_database_is_not_created_or_changed() {
+        let db = std::env::temp_dir().join(format!(
+            "echobird-opencode-missing-{}.db",
+            uuid::Uuid::new_v4()
+        ));
+        assert!(drizzle_history_page(&db, "opencode", "OpenCode", 0, 30).is_empty());
+        let mut entries = Vec::new();
+        collect_drizzle_heatmap_entries(&db, 0, &mut entries);
+        assert!(entries.is_empty());
+        assert!(!db.exists());
+        std::fs::write(&db, b"invalid sqlite fixture").unwrap();
+        assert!(drizzle_history_page(&db, "opencode", "OpenCode", 0, 30).is_empty());
+        collect_drizzle_heatmap_entries(&db, 0, &mut entries);
+        assert!(entries.is_empty());
+        assert_eq!(std::fs::read(&db).unwrap(), b"invalid sqlite fixture");
+        std::fs::remove_file(db).unwrap();
     }
 
     // ── Bug A: sub-agent filtering ───────────────────────────────────────
