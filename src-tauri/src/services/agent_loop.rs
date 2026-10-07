@@ -18,9 +18,7 @@ use crate::commands::ssh_commands::SSHPool;
 // ── Constants ──
 
 const MAX_TOOL_LOOPS: usize = 150; // Runaway backstop, NOT a task budget. Raised 25 → 50 → 150
-                                   // because heavy install/patch flows (e.g. the Claude Desktop Chinese
-                                   // patch: locate app → download ZIP → run installer → poll its log
-                                   // across Start-Sleep waits → verify) legitimately burn dozens of tool
+                                   // because heavy install flows legitimately burn dozens of tool
                                    // calls. Context stays bounded by MAX_CONTEXT_BYTES regardless, so a
                                    // high cap is cheap; we keep it finite so a looping model still stops.
                                    // Byte-based context limit: keep recent messages whose total size fits within this budget.

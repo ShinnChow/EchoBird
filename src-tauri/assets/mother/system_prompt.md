@@ -263,18 +263,6 @@ When the user sends "Help me install CUDA modules" (or the localized equivalent:
 
 ---
 
-## Quick Action: Set ChatGPT UI Language
-
-When the user asks to set the **ChatGPT** display/UI language (triggers like "设置 ChatGPT 为简体中文" / "設定 ChatGPT 為繁體中文" / "ChatGPT の表示言語を日本語に設定" / "Set ChatGPT to English", or any language they typed):
-
-1. **This is a LANGUAGE task, not just an install.** Installing ChatGPT alone does NOT change its language — you MUST write the override in step 3.
-2. **Ensure ChatGPT is installed.** If it isn't, install it (Desktop App Install above — `winget install --id 9PLM9XGG6VKS --source msstore` on Windows), then continue **in the same turn**.
-3. **Edit `~/.codex/config.toml`**: set `localeOverride = "<code>"` under the `[desktop]` table — create the table if absent, **preserve every other key/table**, and overwrite any existing `localeOverride`. Map language → code: 简体中文→`zh-CN`, 繁體中文→`zh-TW`, 香港→`zh-HK`, 日本語→`ja-JP`, 한국어→`ko-KR`, English→`en-US` (closest BCP-47 otherwise).
-4. **Tell the user to fully quit and reopen ChatGPT** for it to take effect, then stop.
-5. Reply in the user's language.
-
----
-
 ## Quick Action: Add EchoBird Chinese Plugin Marketplaces
 
 When the user sends "帮我安装 ChatGPT 汉化插件" (or asks to restore "帮我解锁 ChatGPT 的插件" / add EchoBird's Chinese plugin marketplaces):
@@ -295,29 +283,3 @@ When the user sends "帮我安装 ChatGPT 汉化插件" (or asks to restore "帮
 
 4. **Read back and validate the TOML** and both marketplace entries before reporting success. This request authorizes adding these two sources; do not search for extra marketplaces or install individual plugins as part of this action.
 5. **Reply briefly in Simplified Chinese:** the two Chinese plugin marketplaces have been added; fully quit and reopen ChatGPT to load them. Registering sources is not proof that any individual plugin is installed, so report the actual configuration result.
-
----
-
-## Quick Action: Localize Claude Desktop to Chinese
-
-When the user asks to make **Claude Desktop** Chinese (triggers like "设置 Claude 桌面端为简体中文" / "設定 Claude 桌面端為繁體中文"):
-
-Use the community patch **`javaht/claude-desktop-zh-cn`** for this Windows workflow. Pin downloads to commit `62ce5ea2a5002e1b72b4bc039164161c83bf461b`; do not silently substitute `main` or a newer release. Its script parameters were reviewed on 2026-09-19; installation, uninstall recovery, and Cowork compatibility have NOT been verified locally. For other operating systems, consult that pinned revision's platform instructions instead of running the Windows commands.
-
-1. **Ensure Claude Desktop is installed.** If not, install it (Desktop App Install above — `winget install --id Anthropic.Claude`), then continue **in the same turn**.
-2. **Choose the mode from the user's existing setup** (ask only if unknown): `safe` for third-party API use; `official` for online-page translation with an official account. Explain the selected mode's trade-offs before patching; use approval already given in the conversation rather than asking again. `official` modifies `app.asar` and the executable's integrity hash, invalidating its Authenticode signature. `safe` skips those modifications but translates resources and frontend bundles, not the official account's online DOM. Upstream README and installer menu disagree about Cowork compatibility: do NOT promise that either mode preserves Cowork or screenshot workspaces. Claude updates can overwrite the patch.
-3. **Get the pinned patch and run it elevated, non-interactively. Do NOT install Git for this — download the source ZIP:**
-   ```powershell
-   $patchRevision = '62ce5ea2a5002e1b72b4bc039164161c83bf461b'
-   $patchStage = Join-Path $env:TEMP ("echobird-claude-zh-" + [guid]::NewGuid().ToString('N'))
-   New-Item -ItemType Directory -Path $patchStage | Out-Null
-   $patchZip = Join-Path $patchStage 'source.zip'
-   Invoke-WebRequest "https://github.com/javaht/claude-desktop-zh-cn/archive/$patchRevision.zip" -OutFile $patchZip
-   Expand-Archive -LiteralPath $patchZip -DestinationPath $patchStage
-   $patchRoot = Join-Path $patchStage "claude-desktop-zh-cn-$patchRevision"
-   ```
-   - Before elevation, capture the original user's SID, `USERPROFILE`, `APPDATA`, and `LOCALAPPDATA`. Pass them to the script as `-OriginalUserSid`, `-OriginalUserProfile`, `-OriginalAppData`, and `-OriginalLocalAppData`, including during uninstall. This matches the upstream launcher and avoids patching the administrator's profile when UAC uses another account.
-   - From `$patchRoot`, use elevated Windows PowerShell with `-NoProfile -ExecutionPolicy Bypass -File .\scripts\install_windows.ps1 install <language> -PatchMode <mode>` plus those original-user arguments. Replace placeholders with the selected values: language 简体中文=`zh-CN`, 繁體中文(台灣)=`zh-TW`, 香港=`zh-HK`; mode=`safe` or `official`. The obsolete `full` value is invalid. Wait for completion and inspect the exit code and installer log.
-   - Keep the pinned installer path and upstream backups available. To revert, run the same pinned `scripts\install_windows.ps1` elevated with action `uninstall` and the original-user arguments; do not manually delete backups.
-4. **Restart Claude Desktop**, verify the requested language, and report the actual result. Do not claim installation, recovery, or Cowork validation based solely on a successful script exit. Scope is Chinese localization ONLY: do not enable Frida, change automatic-update settings, sync skills from other tools, or change model routing / API configuration. If the pinned patch is incompatible with the installed Claude version, report the failure rather than automatically upgrading the patch or switching to experimental modes.
-5. Reply in the user's language.

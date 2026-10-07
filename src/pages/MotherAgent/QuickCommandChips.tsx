@@ -12,8 +12,7 @@ import { pickToolName } from '../../stores/myProjectsStore';
 // self-contained prompt into the chat input (the user edits, then sends).
 // Hints come from the bundled registry (getMotherHints) with EchoBird's own
 // FRONTEND_HINTS prepended; a hint with no localized label renders nothing,
-// which is how locale-specific chips (e.g. the Claude Chinese patch) hide
-// themselves outside zh-Hans / zh-Hant.
+// which is how locale-specific chips hide themselves in other UI languages.
 export function QuickCommandChips() {
   const { t, locale } = useI18n();
   const { setChatInput, selectedServerId } = useMotherAgent();

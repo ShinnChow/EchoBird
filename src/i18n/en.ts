@@ -482,12 +482,7 @@ const en: Translations = {
   'mother.hintDetectCuda': 'Detect CUDA module status',
   'mother.hintInstallCuda': 'Help me install CUDA modules',
   'mother.hintInstallGit': 'Help me install Git',
-  'mother.hintSetCodexLocale': 'Set ChatGPT to English',
   'mother.hintUnlockCodexPlugins': '',
-  // Intentionally empty: the Claude Chinese-patch chip is shown only for
-  // zh-Hans / zh-Hant. An empty label makes translate() fall through to the
-  // raw key, which the hint renderer treats as "no translation → hide".
-  'mother.hintSetClaudeLocale': '',
   'mother.parasiteTipInstalled':
     "I'm an AI assistant — short memory, sharp install skills, here to launch you into AI. Once your Claude Code is configured with a model, pick it on the right to keep talking here.",
   'mother.parasiteTipNotInstalled':

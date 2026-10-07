@@ -7,12 +7,6 @@ import type { MotherHint } from './types';
 // (which is also the prompt sent to the agent) lives in i18n under
 // `mother.hint<Action>`, so it follows EchoBird's own UI language.
 export const FRONTEND_HINTS: MotherHint[] = [
-  // Localize Claude Desktop to Chinese — text: `mother.hintSetClaudeLocale`.
-  // Shown only for zh-Hans / zh-Hant (hidden elsewhere via an empty en label,
-  // since the upstream patch only ships Simplified/Traditional Chinese).
-  { action: 'setClaudeLocale' },
-  // Set ChatGPT UI language — text: `mother.hintSetCodexLocale`.
-  { action: 'setCodexLocale' },
   // EchoBird's Chinese plugin marketplaces — zh-Hans only (empty en label).
   { action: 'unlockCodexPlugins' },
 ];
