@@ -53,6 +53,11 @@ import { MyProjectsMain, MyProjectsPanel, MyProjectsBottom } from './pages/MyPro
 import { AiCareerMain, AiCareerPanel, AiCareerTitleActions } from './pages/AiCareer';
 import { useMyProjectsStore } from './stores/myProjectsStore';
 import {
+  AccountCenterMain,
+  AccountCenterPanel,
+  AccountCenterTitleActions,
+} from './pages/AccountCenter/AccountCenter';
+import {
   FreeModelsProvider,
   FreeModelsTitleActions,
   FreeModelsMain,
@@ -270,6 +275,7 @@ function App() {
                                   <div className="flex items-baseline gap-3 flex-1 min-w-0">
                                     <h2 className="cjk-title flex-shrink-0">
                                       {is('models') && t('page.modelNexus')}
+                                      {is('accounts') && t('nav.accountCenter')}
                                       {is('freeModels') && t('page.freeModels')}
 
                                       {is('apps') && t('page.appManager')}
@@ -281,6 +287,7 @@ function App() {
                                     </h2>
                                     <div className="page-kicker truncate" aria-hidden="true">
                                       {is('models') && 'ROSTER'}
+                                      {is('accounts') && 'ACCOUNTS'}
                                       {is('freeModels') && 'SMART ROUTER'}
                                       {is('apps') && 'DESKTOP'}
                                       {is('myProjects') && 'VIBE CODING'}
@@ -293,6 +300,9 @@ function App() {
                                   {/* Title actions — always mounted but hidden */}
                                   <span className={page(is('models'))}>
                                     <ModelNexusTitleActions />
+                                  </span>
+                                  <span className={page(is('accounts'))}>
+                                    <AccountCenterTitleActions />
                                   </span>
                                   <span className={page(is('freeModels'))}>
                                     <FreeModelsTitleActions />
@@ -322,6 +332,9 @@ function App() {
                                 {/* Page content — always mounted, CSS hidden */}
                                 <div className={pageScroll(is('models'))}>
                                   <ModelNexusMain />
+                                </div>
+                                <div className={pageScroll(is('accounts'))}>
+                                  <AccountCenterMain />
                                 </div>
                                 <div
                                   className={is('freeModels') ? 'flex-1 overflow-y-auto' : 'hidden'}
@@ -356,6 +369,9 @@ function App() {
                             <aside className="w-80 flex flex-col">
                               <div className={page(is('models'))}>
                                 <ModelNexusPanel />
+                              </div>
+                              <div className={page(is('accounts'))}>
+                                <AccountCenterPanel />
                               </div>
                               <div className={page(is('freeModels'))}>
                                 <FreeModelsPanel />

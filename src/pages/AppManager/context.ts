@@ -25,8 +25,14 @@ export interface AppManagerContextType {
   handleSelectModel: (toolId: string, modelId: string) => void;
   /** Restore the tool's config back to its official vendor endpoint */
   handleRestoreModel: (toolId: string) => Promise<void>;
+  accountCardOrder: string[];
+  setAccountCardOrder: (order: string[]) => void;
   claudeCodeAccounts: ReturnType<typeof useClaudeCodeAccounts>;
   workBuddyAccounts: ReturnType<typeof useWorkBuddyAccounts>;
+  workBuddyAccountGroups: Record<
+    'workbuddy' | 'workbuddyai',
+    ReturnType<typeof useWorkBuddyAccounts>
+  >;
   zcodeAccounts: ReturnType<typeof useZCodeAccounts>;
   deepSeekAccounts: ReturnType<typeof useDeepSeekAccounts>;
   grokAccounts: ReturnType<typeof useGrokAccounts>;

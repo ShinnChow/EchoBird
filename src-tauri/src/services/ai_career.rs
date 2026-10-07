@@ -200,6 +200,7 @@ const SYSTEM_INJECTION_TAGS: &[&str] = &[
     "<image name=",
     "</image>",
     "<in-app-browser-context",
+    "<external_codex_apps_open_page>",
     "# AGENTS.md",
     "Below is a conversation log from a Claude Code coding session",
 ];
@@ -547,6 +548,44 @@ fn parse_codex_session_jsonl(file_path: &Path) -> Option<SavedSession> {
         file_path: Some(file_path.to_string_lossy().into_owned()),
         turn_count: Some(turns_from_messages(total_messages)),
     })
+}
+
+/// Codex appends a row to this index whenever a thread is named or renamed.
+/// The last valid name for each id wins, including user-edited titles.
+fn parse_codex_thread_names(index: &str) -> HashMap<String, String> {
+    let mut names = HashMap::new();
+    for line in index.lines() {
+        let Ok(row) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
+        let field = |key: &str| {
+            row.get(key)
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+        };
+        if let (Some(id), Some(name)) = (field("id"), field("thread_name")) {
+            names.insert(id.to_string(), name.to_string());
+        }
+    }
+    names
+}
+
+/// Read native titles beside the scanned sessions directory on every page
+/// load: a rename can update the index without changing the rollout file.
+fn apply_codex_thread_names(history_dir: &Path, sessions: &mut [SavedSession]) {
+    let Some(profile_dir) = history_dir.parent() else {
+        return;
+    };
+    let Ok(index) = std::fs::read_to_string(profile_dir.join("session_index.jsonl")) else {
+        return;
+    };
+    let names = parse_codex_thread_names(&index);
+    for session in sessions.iter_mut().filter(|s| s.tool == "codex") {
+        if let Some(name) = session.session_token.as_ref().and_then(|id| names.get(id)) {
+            session.name = name.clone();
+        }
+    }
 }
 
 // ─── Directory walking ───────────────────────────────────────────────────
@@ -1285,7 +1324,7 @@ pub fn family_history(family: Family, offset: usize, limit: usize) -> Vec<SavedS
     }
 
     candidates.sort_by(|a, b| b.0.cmp(&a.0));
-    candidates
+    let mut sessions: Vec<_> = candidates
         .into_iter()
         .skip(offset)
         .take(limit)
@@ -1294,7 +1333,11 @@ pub fn family_history(family: Family, offset: usize, limit: usize) -> Vec<SavedS
             Family::Codex => parse_codex_session_jsonl(&path),
             Family::OpenCode | Family::Hermes | Family::MiMo | Family::DeepSeek => None,
         })
-        .collect()
+        .collect();
+    if family == Family::Codex {
+        apply_codex_thread_names(&family.root(&home), &mut sessions);
+    }
+    sessions
 }
 
 /// Contribution-heatmap entries across all six families, 210-day lookback.
@@ -1619,6 +1662,79 @@ mod tests {
         assert_eq!(s.cwd, "/w");
         assert_eq!(s.session_token.as_deref(), Some("sid"));
         let _ = std::fs::remove_file(&f);
+    }
+
+    #[test]
+    fn codex_thread_names_keep_latest_valid_name() {
+        let names = parse_codex_thread_names(concat!(
+            "{\"id\":\"t1\",\"thread_name\":\"Original title\"}\n",
+            "not json\n",
+            "{\"id\":\" t1 \",\"thread_name\":\" 新的会话标题 \",\"updated_at\":\"2026-10-05T00:00:00Z\"}\n",
+            "{\"id\":\"t1\",\"thread_name\":\"  \"}\n",
+            "{\"id\":\"t2\",\"thread_name\":null}\n",
+            "{\"id\":\"t3\",\"thread_name\":42}\n",
+            "{\"id\":\" \",\"thread_name\":\"Missing id\"}\n",
+            "{\"id\":\"t1\",\"thread_name\":",
+        ));
+        assert_eq!(names.len(), 1);
+        assert_eq!(names["t1"], "新的会话标题");
+    }
+
+    #[test]
+    fn codex_native_titles_refresh_and_preserve_session_data_and_fallbacks() {
+        let profile =
+            std::env::temp_dir().join(format!("echobird_codex_titles_{}", uuid::Uuid::new_v4()));
+        let history = profile.join("sessions");
+        std::fs::create_dir_all(&history).unwrap();
+        let rollout = history.join("rollout.jsonl");
+        let body = concat!(
+            "{\"type\":\"session_meta\",\"payload\":{\"id\":\"t1\",\"cwd\":\"/project\",\"source\":\"cli\"}}\n",
+            "{\"type\":\"response_item\",\"payload\":{\"type\":\"message\",\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"Original user request\"}]}}\n",
+        );
+        std::fs::write(&rollout, body).unwrap();
+        let fallback = parse_codex_session_jsonl(&rollout).unwrap();
+        let mut unnamed = fallback.clone();
+        unnamed.session_token = Some("unnamed".into());
+        let mut claude = fallback.clone();
+        claude.tool = "claude".into();
+        let baseline = vec![fallback, unnamed, claude];
+        let mut rows = baseline.clone();
+        apply_codex_thread_names(&history, &mut rows);
+        assert_eq!(rows[0].name, "Original user request", "no index yet");
+
+        let stamp = std::fs::metadata(&rollout).unwrap().modified().unwrap();
+        let index = profile.join("session_index.jsonl");
+        for title in [
+            "为 EchoBird 设计图标",
+            "Renamed Codex thread whose complete native title exceeds forty characters",
+        ] {
+            std::fs::write(
+                &index,
+                serde_json::json!({"id": "t1", "thread_name": title}).to_string(),
+            )
+            .unwrap();
+            let mut rows = baseline.clone();
+            apply_codex_thread_names(&history, &mut rows);
+            let mut expected = serde_json::to_value(&baseline).unwrap();
+            expected[0]["name"] = title.into();
+            assert_eq!(serde_json::to_value(&rows).unwrap(), expected);
+            assert_eq!(
+                std::fs::metadata(&rollout).unwrap().modified().unwrap(),
+                stamp
+            );
+            assert_eq!(std::fs::read_to_string(&rollout).unwrap(), body);
+        }
+
+        // A different history root must not reuse this profile's names.
+        let mut rows = baseline.clone();
+        apply_codex_thread_names(&profile.join("other-profile/sessions"), &mut rows);
+        assert_eq!(rows[0].name, "Original user request");
+        // An unreadable index preserves fallback titles and does not fail loading.
+        std::fs::remove_file(&index).unwrap();
+        std::fs::create_dir(&index).unwrap();
+        apply_codex_thread_names(&history, &mut rows);
+        assert_eq!(rows[0].name, "Original user request");
+        std::fs::remove_dir_all(&profile).unwrap();
     }
 
     // OpenCode (and its MiMo Code fork) store every spawned sub-agent as a
@@ -1974,6 +2090,7 @@ mod tests {
         let _ = std::fs::create_dir_all(&dir);
         let f = dir.join("rollout-ds.jsonl");
         let body = "{\"type\":\"session_meta\",\"payload\":{\"id\":\"sid\",\"cwd\":\"/w\",\"originator\":\"Codex Desktop\",\"source\":\"vscode\"}}\n\
+                    {\"type\":\"response_item\",\"payload\":{\"type\":\"message\",\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"<external_codex_apps_open_page>{\\\"page_id\\\":null}</external_codex_apps_open_page>\"}]}}\n\
                     {\"type\":\"response_item\",\"payload\":{\"type\":\"message\",\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"<recommended_plugins>\\nHere is a list of recommended plugins...\"}]}}\n\
                     {\"type\":\"response_item\",\"payload\":{\"type\":\"message\",\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"<image name=\\\"screenshot.png\\\">C:/Temp/screenshot.png</image>\"}]}}\n\
                     {\"type\":\"response_item\",\"payload\":{\"type\":\"message\",\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"修复真正的用户标题\"}]}}\n";

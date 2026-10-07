@@ -9,7 +9,7 @@ export const DeepSeekAccountSection: React.FC<{ showDivider?: boolean }> = ({
   const { accounts, selectedId, select, busy, remainingSeconds, refreshing, add, refresh, remove } =
     deepSeekAccounts;
   return (
-    <section className={showDivider ? 'mb-3' : undefined}>
+    <section>
       <AccountSectionButton
         iconSrc="/icons/tools/dsh.png"
         colorClassName="deepseek-account-pill"
@@ -23,6 +23,7 @@ export const DeepSeekAccountSection: React.FC<{ showDivider?: boolean }> = ({
             <AccountSectionRow
               key={account.id}
               colorClassName="deepseek-account-pill"
+              singleLine
               selected={selectedId === account.id}
               email={account.name}
               refreshing={refreshing.has(account.id)}

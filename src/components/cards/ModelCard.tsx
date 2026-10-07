@@ -8,6 +8,7 @@ import type { ModelUsageData } from '../../api/tauri';
 import type { TKey } from '../../i18n/types';
 import { useUsageClock } from '../../hooks/useUsageClock';
 import { formatQuotaPercent, quotaPercent, quotaPeriodKeys } from '../../utils/modelUsage';
+import { quotaColorClasses, quotaTone } from '../../utils/quotaColors';
 
 // Smart icon detection — match model name/ID to icon file
 export const getModelIcon = (name: string, modelId?: string): string | null => {
@@ -394,50 +395,59 @@ export const ModelCard = React.memo(
           // Usage mode - show quota bars or balance
           <div className="flex-1 flex flex-col justify-center space-y-1">
             {usageData?.quotas && usageData.quotas.length > 0 ? (
-              usageData.quotas.map((quota, idx) => (
-                <div key={idx} className="space-y-1">
-                  {quota.balance !== undefined && quota.balance !== null ? (
-                    // Balance display (for providers like DeepSeek) - centered, one line
-                    <div className="flex items-center justify-center gap-2">
-                      <span className="text-cyber-text font-bold text-2xl">
-                        {t('model.balance')}
-                      </span>
-                      <span className="text-cyber-text font-bold text-2xl">
-                        {quota.balance.toFixed(2)} {quota.balanceUnit || 'CNY'}
-                      </span>
-                    </div>
-                  ) : (
-                    // Percentage progress bar (for quota-based providers)
-                    <>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-cyber-text font-bold">
-                          {quota.period &&
-                            `${t(quotaPeriodKeys[quota.period])} ${t('model.quota.remaining')} `}
-                          {formatQuotaPercent(quota)}
+              usageData.quotas.map((quota, idx) => {
+                const remaining = quotaPercent(quota);
+                const colors = quotaColorClasses[quotaTone(remaining)];
+                return (
+                  <div key={idx} className="space-y-1">
+                    {quota.balance !== undefined && quota.balance !== null ? (
+                      // Balance display (for providers like DeepSeek) - centered, one line
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-cyber-text font-bold text-2xl">
+                          {t('model.balance')}
                         </span>
-                        <span className="text-cyber-text-muted text-[10px] translate-y-[2px]">
-                          {quota.resetAt > 0 ? formatCountdown(quota.resetAt - now, t) : '—'}
+                        <span className="text-cyber-text font-bold text-2xl">
+                          {quota.balance.toFixed(2)} {quota.balanceUnit || 'CNY'}
                         </span>
                       </div>
-                      <div
-                        role="progressbar"
-                        aria-label={
-                          quota.period ? t(quotaPeriodKeys[quota.period]) : t('model.quota.used')
-                        }
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={quotaPercent(quota) ?? undefined}
-                        className="h-1.5 bg-cyber-border/30 rounded-full overflow-hidden"
-                      >
+                    ) : (
+                      // Percentage progress bar (for quota-based providers)
+                      <>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="flex min-w-0 flex-1 items-center gap-2">
+                            {quota.period && (
+                              <span className="min-w-0 truncate text-cyber-text font-bold">
+                                {`${t(quotaPeriodKeys[quota.period])} ${t('model.quota.remaining')}`}
+                              </span>
+                            )}
+                            <span className="min-w-0 truncate text-cyber-text-muted text-[10px] translate-y-[2px]">
+                              {quota.resetAt > 0 ? formatCountdown(quota.resetAt - now, t) : '—'}
+                            </span>
+                          </span>
+                          <span className={`flex-shrink-0 font-bold ${colors.text}`}>
+                            {formatQuotaPercent(quota)}
+                          </span>
+                        </div>
                         <div
-                          className="h-full bg-gradient-to-r from-cyber-accent to-cyber-accent/70 rounded-full transition-all duration-300"
-                          style={{ width: `${quotaPercent(quota) ?? 0}%` }}
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))
+                          role="progressbar"
+                          aria-label={
+                            quota.period ? t(quotaPeriodKeys[quota.period]) : t('model.quota.used')
+                          }
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={remaining ?? undefined}
+                          className={`relative h-0 flex-shrink-0 rounded-full border-t-[6px] ${colors.track}`}
+                        >
+                          <div
+                            className={`absolute bottom-0 left-0 h-0 rounded-full border-t-[length:inherit] border-transparent bg-origin-border bg-gradient-to-r ${colors.gradient} transition-all duration-300`}
+                            style={{ width: `${remaining ?? 0}%` }}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })
             ) : (
               <div className="text-center text-cyber-text-muted text-xs">
                 {akSkMissing ? t('model.akSkRequired') : t('model.noUsageData')}

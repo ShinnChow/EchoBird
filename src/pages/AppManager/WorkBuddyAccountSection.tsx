@@ -1,10 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { Check, Gift } from 'lucide-react';
+import React from 'react';
+import { Gift } from 'lucide-react';
 import { useAppManager } from './context';
 import { ModelSwitchDivider } from './ModelSwitchDivider';
-import { AccountSectionButton, AccountSectionRow } from './AccountSectionPrimitives';
+import {
+  AccountSectionButton,
+  AccountSectionRewardButton,
+  AccountSectionRow,
+} from './AccountSectionPrimitives';
 import { QuotaCountdown } from './QuotaCountdown';
 import { useI18n } from '../../hooks/useI18n';
+import { useWorkBuddyClaimedToday } from './workBuddyDailyCredits';
 export const WorkBuddyAccountSection: React.FC<{ showDivider?: boolean }> = ({
   showDivider = true,
 }) => {
@@ -22,21 +27,13 @@ export const WorkBuddyAccountSection: React.FC<{ showDivider?: boolean }> = ({
     remove,
     claimDaily,
   } = workBuddyAccounts;
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => {
-    if (selectedTool !== 'workbuddy') return;
-    const timer = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(timer);
-  }, [selectedTool]);
-  const claimedToday = (at?: number | null) =>
-    at != null &&
-    Math.floor((at + 8 * 3600) / 86400) === Math.floor((now / 1000 + 8 * 3600) / 86400);
+  const claimedToday = useWorkBuddyClaimedToday(selectedTool === 'workbuddy');
   const formatCredits = (value?: number | null) =>
     value == null
       ? '—'
       : value.toLocaleString(undefined, { maximumFractionDigits: 2, useGrouping: false });
   return (
-    <section className={showDivider ? 'mb-3' : undefined}>
+    <section>
       <AccountSectionButton
         iconSrc={`/icons/tools/${selectedTool}.png`}
         colorClassName="workbuddy-account-pill"
@@ -64,22 +61,12 @@ export const WorkBuddyAccountSection: React.FC<{ showDivider?: boolean }> = ({
                 onDelete={() => void remove(account)}
                 leadingAction={
                   account.edition === 'workbuddy' ? (
-                    <button
-                      type="button"
-                      aria-label={`${t(dailyClaimed ? 'agent.dailyCreditsClaimed' : 'agent.claimDailyCredits')} ${account.name}`}
-                      disabled={refreshing.has(account.id) || dailyClaimed}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void claimDaily(account);
-                      }}
-                      className="account-icon-button flex h-5 w-5 items-center justify-center rounded-full disabled:opacity-40"
-                    >
-                      {dailyClaimed ? (
-                        <Check size={12} aria-hidden="true" />
-                      ) : (
-                        <Gift size={12} aria-hidden="true" />
-                      )}
-                    </button>
+                    <AccountSectionRewardButton
+                      email={account.name}
+                      claimed={dailyClaimed}
+                      disabled={refreshing.has(account.id)}
+                      onClaim={() => void claimDaily(account)}
+                    />
                   ) : undefined
                 }
                 secondary={

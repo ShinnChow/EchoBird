@@ -6,6 +6,7 @@ import { GrokAccountSection } from './GrokAccountSection';
 import { ManusAccountSection } from './ManusAccountSection';
 import { ModelSwitchDivider } from './ModelSwitchDivider';
 import { QuotaCountdown } from './QuotaCountdown';
+import { codexPlanLabel } from './codexPlanLabel';
 import { WorkBuddyAccountSection } from './WorkBuddyAccountSection';
 import { ZCodeAccountSection } from './ZCodeAccountSection';
 import { ClaudeCodeAccountSection } from './ClaudeCodeAccountSection';
@@ -772,18 +773,7 @@ export const CodexAccountSection: React.FC<{ showDivider?: boolean }> = ({
       {codexAccounts.length > 0 && (
         <div className="space-y-2">
           {codexAccounts.map((account) => {
-            const normalizedPlan = account.plan?.trim().toLowerCase().replace(/[-_]/g, ' ') ?? '';
-            const proTier = normalizedPlan.match(/^pro\s*(100|200|500)$/)?.[1];
-            const planLabel =
-              proTier || ['prolite', 'pro lite', 'pro 5x'].includes(normalizedPlan)
-                ? `Pro ${proTier ?? '100'}`
-                : ['pro', 'pro 20x'].includes(normalizedPlan)
-                  ? 'Pro 200'
-                  : ['promax', 'pro max'].includes(normalizedPlan)
-                    ? 'Pro 500'
-                    : normalizedPlan === 'team'
-                      ? 'Business'
-                      : normalizedPlan.replace(/\b\w/g, (letter) => letter.toUpperCase());
+            const planLabel = codexPlanLabel(account.plan);
             const singleWindow =
               account.quotaWindows?.length === 1 ? account.quotaWindows[0] : null;
             const quotaPercent = singleWindow

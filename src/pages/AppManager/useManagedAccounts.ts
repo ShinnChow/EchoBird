@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { accountError } from '../../utils/accountError';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { useI18n } from '../../hooks/useI18n';
+import { useNavigationStore } from '../../stores/navigationStore';
 
 export interface ManagedAccount {
   id: string;
@@ -41,6 +42,7 @@ export function useManagedAccounts<A extends ManagedAccount, L extends ManagedLo
   navigationKey = scope
 ) {
   const { t } = useI18n();
+  const activePage = useNavigationStore((state) => state.activePage);
   const confirm = useConfirm();
   const [rows, setRows] = useState<Record<string, A[]>>({});
   const [selection, setSelection] = useState<Record<string, string | null>>({});
@@ -158,7 +160,7 @@ export function useManagedAccounts<A extends ManagedAccount, L extends ManagedLo
       if (previous?.login.loginId)
         void previous.client.cancel(previous.login.loginId).catch(() => {});
     };
-  }, [enabled, navigationKey, reload, scope, stop]);
+  }, [activePage, enabled, navigationKey, reload, scope, stop]);
 
   const select = (id: string | null) => {
     revision.current += 1;
@@ -167,7 +169,7 @@ export function useManagedAccounts<A extends ManagedAccount, L extends ManagedLo
   };
 
   const finishLogin = async (account: A) => {
-    if (loginRevision.current === revision.current) select(account.id);
+    if (activePage !== 'accounts' && loginRevision.current === revision.current) select(account.id);
     setRows((prev) => ({
       ...prev,
       [scope]: [...(prev[scope] ?? []).filter((a) => a.id !== account.id), account],

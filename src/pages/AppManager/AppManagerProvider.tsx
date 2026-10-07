@@ -39,6 +39,22 @@ interface AppManagerProviderProps {
 
 export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children }) => {
   const { t, locale } = useI18n();
+  const [accountCardOrder, setAccountCardOrder] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('echobird_account_card_order');
+      const saved: unknown = raw ? JSON.parse(raw) : [];
+      return Array.isArray(saved) ? saved.filter((id): id is string => typeof id === 'string') : [];
+    } catch {
+      return [];
+    }
+  });
+  const accountOrderIndex = new Map(accountCardOrder.map((id, index) => [id, index]));
+  const orderedAccounts = <A extends { id: string }>(provider: string, accounts: A[]) =>
+    [...accounts].sort(
+      (a, b) =>
+        (accountOrderIndex.get(`${provider}:${a.id}`) ?? Infinity) -
+        (accountOrderIndex.get(`${provider}:${b.id}`) ?? Infinity)
+    );
 
   // From stores (replaces drilled props)
   const { detectedTools, setDetectedTools, isScanning, scanTools } = useToolsStore();
@@ -126,15 +142,19 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const accountsEnabled =
     isActive && detectedTools.some((tool) => tool.id === selectedTool && tool.installed);
+  const accountGroupEnabled = (...ids: string[]) =>
+    activePage === 'accounts'
+      ? detectedTools.some((tool) => ids.includes(tool.id) && tool.installed)
+      : accountsEnabled && ids.includes(selectedTool ?? '');
   const [isLaunching, setIsLaunching] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
   const isCodexTool = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
   const codexManaged = useCodexAccounts(
-    accountsEnabled && isCodexTool,
+    accountGroupEnabled('codex', 'chatgptdesktop'),
     !!(selectedTool && toolModelConfig[selectedTool]),
     () => setToolModelConfig((prev) => ({ ...prev, codex: null, chatgptdesktop: null })),
     setApplyError,
-    selectedTool ?? ''
+    activePage === 'accounts' ? 'accounts' : (selectedTool ?? '')
   );
   const {
     accounts: codexAccounts,
@@ -263,7 +283,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     setToolModelConfig((prev) => ({ ...prev, claudecode: null }));
   }, []);
   const claudeCodeAccounts = useClaudeCodeAccounts(
-    accountsEnabled && selectedTool === 'claudecode',
+    accountGroupEnabled('claudecode'),
     !!toolModelConfig.claudecode,
     clearClaudeCodeModel,
     setApplyError
@@ -274,18 +294,28 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const clearWorkBuddyModel = useCallback((edition: api.WorkBuddyEdition) => {
     setToolModelConfig((prev) => ({ ...prev, [edition]: null }));
   }, []);
-  const workBuddyAccounts = useWorkBuddyAccounts(
-    accountsEnabled ? workBuddyEdition : null,
-    !!(workBuddyEdition && toolModelConfig[workBuddyEdition]),
+  const workBuddyCnAccounts = useWorkBuddyAccounts(
+    'workbuddy',
+    !!toolModelConfig.workbuddy,
     clearWorkBuddyModel,
-    setApplyError
+    setApplyError,
+    accountGroupEnabled('workbuddy')
   );
+  const workBuddyAiAccounts = useWorkBuddyAccounts(
+    'workbuddyai',
+    !!toolModelConfig.workbuddyai,
+    clearWorkBuddyModel,
+    setApplyError,
+    accountGroupEnabled('workbuddyai')
+  );
+  const workBuddyAccounts =
+    workBuddyEdition === 'workbuddyai' ? workBuddyAiAccounts : workBuddyCnAccounts;
 
   const clearDeepSeekModel = useCallback(() => {
     setToolModelConfig((prev) => ({ ...prev, dsh: null }));
   }, []);
   const deepSeekAccounts = useDeepSeekAccounts(
-    accountsEnabled && selectedTool === 'dsh',
+    accountGroupEnabled('dsh'),
     !!toolModelConfig.dsh,
     clearDeepSeekModel,
     setApplyError
@@ -298,13 +328,13 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     (t) => t.id === selectedTool && (!isActive || t.installed === (viewMode === 'desktop'))
   );
   const grokAccounts = useGrokAccounts(
-    accountsEnabled && selectedTool === 'grok',
+    accountGroupEnabled('grok'),
     !!toolModelConfig.grok,
     clearGrokModel,
     setApplyError
   );
   const manusAccounts = useGrokAccounts(
-    accountsEnabled && selectedTool === 'manus',
+    accountGroupEnabled('manus'),
     false,
     () => {},
     setApplyError,
@@ -317,7 +347,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   );
   const grokBotAccounts = useCursorAccounts(
     'grokbot',
-    accountsEnabled && selectedTool === 'grokbot',
+    accountGroupEnabled('grokbot'),
     clearGrokBotModel,
     setApplyError
   );
@@ -328,18 +358,22 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   );
   const cursorAccounts = useCursorAccounts(
     'cursor',
-    accountsEnabled && selectedTool === 'cursor',
+    accountGroupEnabled('cursor'),
     clearCursorModel,
     setApplyError
   );
   const antigravityAccounts = useAntigravityAccounts(
-    accountsEnabled && (selectedTool === 'antigravity' || selectedTool === 'antigravitydesktop'),
-    selectedTool === 'antigravity' ? 'antigravity' : 'antigravitydesktop',
+    accountGroupEnabled('antigravity', 'antigravitydesktop'),
+    activePage === 'accounts'
+      ? 'antigravitydesktop'
+      : selectedTool === 'antigravity'
+        ? 'antigravity'
+        : 'antigravitydesktop',
     setApplyError
   );
 
   const zcodeAccounts = useZCodeAccounts(
-    accountsEnabled && selectedTool === 'zcode',
+    accountGroupEnabled('zcode'),
     !!toolModelConfig.zcode,
     () => setToolModelConfig((prev) => ({ ...prev, zcode: null })),
     setApplyError
@@ -869,16 +903,52 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         toolModelConfig,
         handleSelectModel,
         handleRestoreModel,
-        claudeCodeAccounts,
-        workBuddyAccounts,
-        zcodeAccounts,
-        deepSeekAccounts,
-        grokAccounts,
-        manusAccounts,
-        grokBotAccounts,
-        cursorAccounts,
-        antigravityAccounts,
-        codexAccounts,
+        accountCardOrder,
+        setAccountCardOrder,
+        claudeCodeAccounts: {
+          ...claudeCodeAccounts,
+          accounts: orderedAccounts('claudecode', claudeCodeAccounts.accounts),
+        },
+        workBuddyAccounts: {
+          ...workBuddyAccounts,
+          accounts: orderedAccounts(workBuddyEdition ?? 'workbuddy', workBuddyAccounts.accounts),
+        },
+        workBuddyAccountGroups: {
+          workbuddy: {
+            ...workBuddyCnAccounts,
+            accounts: orderedAccounts('workbuddy', workBuddyCnAccounts.accounts),
+          },
+          workbuddyai: {
+            ...workBuddyAiAccounts,
+            accounts: orderedAccounts('workbuddyai', workBuddyAiAccounts.accounts),
+          },
+        },
+        zcodeAccounts: {
+          ...zcodeAccounts,
+          accounts: orderedAccounts('zcode', zcodeAccounts.accounts),
+        },
+        deepSeekAccounts: {
+          ...deepSeekAccounts,
+          accounts: orderedAccounts('dsh', deepSeekAccounts.accounts),
+        },
+        grokAccounts: { ...grokAccounts, accounts: orderedAccounts('grok', grokAccounts.accounts) },
+        manusAccounts: {
+          ...manusAccounts,
+          accounts: orderedAccounts('manus', manusAccounts.accounts),
+        },
+        grokBotAccounts: {
+          ...grokBotAccounts,
+          accounts: orderedAccounts('grokbot', grokBotAccounts.accounts),
+        },
+        cursorAccounts: {
+          ...cursorAccounts,
+          accounts: orderedAccounts('cursor', cursorAccounts.accounts),
+        },
+        antigravityAccounts: {
+          ...antigravityAccounts,
+          accounts: orderedAccounts('antigravity', antigravityAccounts.accounts),
+        },
+        codexAccounts: orderedAccounts('codex', codexAccounts),
         selectedCodexAccountId,
         setSelectedCodexAccountId: selectCodexAccount,
         isLoadingCodexAccounts,

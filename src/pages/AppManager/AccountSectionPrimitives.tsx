@@ -1,5 +1,5 @@
 import React from 'react';
-import { LoaderCircle, RefreshCw, Trash2 } from 'lucide-react';
+import { Check, Gift, LoaderCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { useI18n } from '../../hooks/useI18n';
 
 export const AccountSectionButton: React.FC<{
@@ -58,12 +58,80 @@ export const AccountSectionButton: React.FC<{
   );
 };
 
+export const AccountSectionRewardButton: React.FC<{
+  email: string;
+  claimed: boolean;
+  disabled?: boolean;
+  onClaim: () => void;
+}> = ({ email, claimed, disabled, onClaim }) => {
+  const { t } = useI18n();
+  return (
+    <button
+      type="button"
+      aria-label={`${t(claimed ? 'agent.dailyCreditsClaimed' : 'agent.claimDailyCredits')} ${email}`}
+      disabled={disabled || claimed}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClaim();
+      }}
+      className="account-icon-button flex h-5 w-5 items-center justify-center rounded-full disabled:opacity-40"
+    >
+      {claimed ? <Check size={12} aria-hidden="true" /> : <Gift size={12} aria-hidden="true" />}
+    </button>
+  );
+};
+
+export const AccountSectionActions: React.FC<{
+  email: string;
+  refreshing?: boolean;
+  disabled?: boolean;
+  onRefresh?: () => void;
+  onDelete: () => void;
+}> = ({ email, refreshing, disabled, onRefresh, onDelete }) => {
+  const { t } = useI18n();
+  return (
+    <>
+      {onRefresh && (
+        <button
+          type="button"
+          aria-label={`${t('agent.refreshAccount')} ${email}`}
+          disabled={disabled || refreshing}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRefresh();
+          }}
+          className="account-icon-button flex h-5 w-5 items-center justify-center rounded-full disabled:opacity-40"
+        >
+          {refreshing ? (
+            <LoaderCircle size={12} className="animate-spin" aria-hidden="true" />
+          ) : (
+            <RefreshCw size={12} aria-hidden="true" />
+          )}
+        </button>
+      )}
+      <button
+        type="button"
+        aria-label={`${t('btn.delete')} ${email}`}
+        disabled={disabled}
+        onClick={(event) => {
+          event.stopPropagation();
+          onDelete();
+        }}
+        className="account-icon-button flex h-5 w-5 items-center justify-center rounded-full disabled:opacity-40"
+      >
+        <Trash2 size={11} aria-hidden="true" />
+      </button>
+    </>
+  );
+};
+
 export const AccountSectionRow: React.FC<{
   selected: boolean;
   email: string;
   plan?: React.ReactNode;
   planPrefix?: React.ReactNode;
   widePlan?: boolean;
+  singleLine?: boolean;
   secondary?: React.ReactNode;
   onSelect: () => void;
   onDelete: () => void;
@@ -77,6 +145,7 @@ export const AccountSectionRow: React.FC<{
   plan,
   planPrefix,
   widePlan,
+  singleLine,
   secondary,
   onSelect,
   onDelete,
@@ -85,7 +154,6 @@ export const AccountSectionRow: React.FC<{
   leadingAction,
   colorClassName = '',
 }) => {
-  const { t } = useI18n();
   return (
     <div
       role="radio"
@@ -104,50 +172,33 @@ export const AccountSectionRow: React.FC<{
       <span className="flex h-[16px] w-[16px] items-center justify-center rounded-full border-2 border-cyber-bg">
         {selected && <span className="h-[8px] w-[8px] rounded-full bg-cyber-bg" />}
       </span>
-      <span className="grid min-w-0 grid-cols-[minmax(0,1fr)] auto-rows-[16px] items-center">
+      <span
+        className={`grid min-w-0 ${singleLine ? 'grid-cols-[minmax(0,1fr)_auto] gap-2' : 'grid-cols-[minmax(0,1fr)] auto-rows-[16px]'} items-center`}
+      >
         <span className="block truncate text-[13px] font-semibold text-cyber-text">{email}</span>
         <span className="flex h-[16px] items-center gap-2 text-[12px] text-cyber-text">
           {secondary ?? '—'}
         </span>
       </span>
       <span className="grid auto-rows-[16px] items-center justify-items-center">
-        <span
-          className={`${planPrefix ? 'flex items-center gap-2 ' : ''}whitespace-nowrap text-[12px] font-semibold text-cyber-text`}
-        >
-          {planPrefix}
-          {plan || '—'}
-        </span>
-        <span className={`flex items-center ${leadingAction ? 'gap-0' : 'gap-1.5'}`}>
-          {leadingAction}
-          {onRefresh && (
-            <button
-              type="button"
-              aria-label={`${t('agent.refreshAccount')} ${email}`}
-              disabled={refreshing}
-              onClick={(event) => {
-                event.stopPropagation();
-                onRefresh();
-              }}
-              className="account-icon-button flex h-5 w-5 items-center justify-center rounded-full disabled:opacity-40"
-            >
-              {refreshing ? (
-                <LoaderCircle size={12} className="animate-spin" aria-hidden="true" />
-              ) : (
-                <RefreshCw size={12} aria-hidden="true" />
-              )}
-            </button>
-          )}
-          <button
-            type="button"
-            aria-label={`${t('btn.delete')} ${email}`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete();
-            }}
-            className="account-icon-button flex h-5 w-5 items-center justify-center rounded-full"
+        {!singleLine && (
+          <span
+            className={`${planPrefix ? 'flex items-center gap-2 ' : ''}whitespace-nowrap text-[12px] font-semibold text-cyber-text`}
           >
-            <Trash2 size={11} aria-hidden="true" />
-          </button>
+            {planPrefix}
+            {plan || '—'}
+          </span>
+        )}
+        <span
+          className={`flex items-center justify-self-end ${leadingAction ? 'gap-0' : 'gap-1.5'}`}
+        >
+          {leadingAction}
+          <AccountSectionActions
+            email={email}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            onDelete={onDelete}
+          />
         </span>
       </span>
     </div>

@@ -6,7 +6,7 @@ import { AccountSectionButton, AccountSectionRow } from './AccountSectionPrimiti
 export const GrokAccountSection: React.FC<{ showDivider?: boolean }> = ({ showDivider = true }) => {
   const { grokAccounts, isLaunching } = useAppManager();
   return (
-    <section className={showDivider ? 'mb-3' : undefined}>
+    <section>
       <AccountSectionButton
         iconSrc="/icons/tools/grok.svg"
         busy={grokAccounts.busy}

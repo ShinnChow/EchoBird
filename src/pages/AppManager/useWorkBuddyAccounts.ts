@@ -5,12 +5,13 @@ export function useWorkBuddyAccounts(
   edition: api.WorkBuddyEdition | null,
   hasModel: boolean,
   clearModel: (edition: api.WorkBuddyEdition) => void,
-  showError: (error: string) => void
+  showError: (error: string) => void,
+  enabled = edition !== null
 ) {
   const scope = edition ?? 'workbuddy';
   const managed = useManagedAccounts<api.WorkBuddyAccount, api.WorkBuddyLogin>(
     scope,
-    edition !== null,
+    enabled,
     hasModel,
     () => clearModel(scope),
     showError,

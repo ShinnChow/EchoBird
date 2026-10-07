@@ -23,9 +23,9 @@ vi.mock('../ModelNexus/context', () => {
   return { useModelNexus: () => ({ userModels }) };
 });
 vi.mock('../FreeModels', () => ({ useFreeModels: () => ({ routerEnabled: false }) }));
-vi.mock('./useClaudeCodeAccounts', () => ({ useClaudeCodeAccounts: () => ({}) }));
-vi.mock('./useWorkBuddyAccounts', () => ({ useWorkBuddyAccounts: () => ({}) }));
-vi.mock('./useDeepSeekAccounts', () => ({ useDeepSeekAccounts: () => ({}) }));
+vi.mock('./useClaudeCodeAccounts', () => ({ useClaudeCodeAccounts: () => ({ accounts: [] }) }));
+vi.mock('./useWorkBuddyAccounts', () => ({ useWorkBuddyAccounts: () => ({ accounts: [] }) }));
+vi.mock('./useDeepSeekAccounts', () => ({ useDeepSeekAccounts: () => ({ accounts: [] }) }));
 vi.mock('../../api/tauri', () => ({
   listZCodeAccounts: vi.fn(),
   startZCodeLogin: vi.fn(),

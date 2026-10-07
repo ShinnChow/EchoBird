@@ -17,13 +17,13 @@ import {
 } from '@dnd-kit/core';
 import {
   SortableContext,
-  useSortable,
   rectSortingStrategy,
   sortableKeyboardCoordinates,
   arrayMove,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { X, Box, ExternalLink, Plus, Lock, Unlock, RefreshCw, GripVertical } from 'lucide-react';
+import { X, Lock, Unlock, RefreshCw, GripVertical } from 'lucide-react';
+import { DirectoryRow } from '../../components/DirectoryRow';
+import { SortableCard } from '../../components/SortableCard';
 import { ModelCard, ModelCardSkeleton, getModelIcon, ModelIdCombobox } from '../../components';
 import { ViewModeTabs } from '../../components/ViewModeTabs';
 import { useToast } from '../../components/Toast';
@@ -766,43 +766,6 @@ function UsageAccessModal({
   );
 }
 
-// dnd-kit sortable wrapper for the model card grid. The grip handle at the
-// bottom-left corner is the ONLY drag surface, so the card's own clicks and
-// buttons (select / edit / delete / refresh) keep working untouched.
-function SortableModelCard({
-  id,
-  dragLabel,
-  children,
-}: {
-  id: string;
-  dragLabel: string;
-  children: React.ReactNode;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id,
-  });
-  return (
-    <div
-      ref={setNodeRef}
-      data-drag-model={id}
-      className={isDragging ? 'relative opacity-0' : 'relative'}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-    >
-      {children}
-      {/* No title attr: this is desktop software, not a web page — hover
-          tooltips feel out of place. aria-label stays for screen readers. */}
-      <button
-        {...attributes}
-        {...listeners}
-        aria-label={dragLabel}
-        className="absolute top-2 left-2 z-10 p-0.5 text-cyber-text-muted/60 hover:text-cyber-text transition-colors outline-none"
-      >
-        <GripVertical size={14} />
-      </button>
-    </div>
-  );
-}
-
 export function ModelNexusMain() {
   const { t } = useI18n();
   const {
@@ -851,7 +814,7 @@ export function ModelNexusMain() {
     setActiveDragId(id);
     // dnd-kit's active.rect is not measured yet at onDragStart (null), so
     // measure the grid node directly for the DragOverlay ghost's width.
-    const el = document.querySelector<HTMLElement>(`[data-drag-model="${id}"]`);
+    const el = document.querySelector<HTMLElement>(`[data-sortable-card="${id}"]`);
     setActiveDragWidth(el?.offsetWidth ?? 0);
   };
 
@@ -943,13 +906,18 @@ export function ModelNexusMain() {
                   strategy={rectSortingStrategy}
                 >
                   {userModels.map((model) => (
-                    <SortableModelCard
+                    <SortableCard
                       key={model.internalId}
                       id={model.internalId}
                       dragLabel={t('model.dragSort')}
                     >
-                      {renderModelCard(model)}
-                    </SortableModelCard>
+                      {(handle) => (
+                        <>
+                          {renderModelCard(model)}
+                          <span className="absolute top-2 left-2 z-10">{handle}</span>
+                        </>
+                      )}
+                    </SortableCard>
                   ))}
                 </SortableContext>
 
@@ -1043,70 +1011,16 @@ function sortByLocale(list: DirectoryEntry[], locale: string): DirectoryEntry[] 
 
 function ProviderRow({ entry, onAdd }: { entry: DirectoryEntry; onAdd: () => void }) {
   const iconSrc = getModelIcon(entry.name, '');
-  const hostname = (() => {
-    try {
-      return new URL(entry.url).hostname;
-    } catch {
-      return entry.url;
-    }
-  })();
   const openSite = () => shellOpen(entry.url).catch(() => window.open(entry.url, '_blank'));
-  // Two click+hover zones (50/50). Buttons sit underneath; the visual content
-  // floats on top with pointer-events-none so clicks pass through to whichever
-  // half they land on. Named groups (group/left, group/right) let the icons
-  // brighten in sync with their half's hover state.
   return (
-    <div className="relative flex items-stretch rounded overflow-hidden bg-cyber-surface">
-      {/* Click + hover layer (two equal halves) */}
-      <button
-        type="button"
-        onClick={onAdd}
-        aria-label={`Add model: ${entry.name}`}
-        className="group/left flex-1 min-h-[64px] bg-gradient-to-r from-transparent to-transparent hover:from-cyber-text/15 hover:to-transparent transition-[background-image] duration-200"
-      />
-      <button
-        type="button"
-        onClick={openSite}
-        aria-label={`Open ${entry.name} website`}
-        className="group/right flex-1 min-h-[64px] bg-gradient-to-l from-transparent to-transparent hover:from-cyber-text/15 hover:to-transparent transition-[background-image] duration-200"
-      />
-
-      {/* Visual content overlay (does not capture clicks) */}
-      <div className="pointer-events-none absolute inset-0 flex items-center gap-3 px-3">
-        <Plus
-          size={22}
-          strokeWidth={2.5}
-          className="flex-shrink-0 text-cyber-text-muted group-hover/left:text-cyber-text group-hover/left:scale-110 transition-all"
-        />
-        <div className="flex-shrink-0">
-          {iconSrc ? (
-            <img
-              src={iconSrc}
-              alt=""
-              className="w-6 h-6"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          ) : (
-            <div className="w-6 h-6 flex items-center justify-center text-cyber-text">
-              <Box size={22} />
-            </div>
-          )}
-        </div>
-        <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <div className="text-sm font-bold truncate leading-none">{entry.name}</div>
-          <div className="text-[10px] text-cyber-text-secondary truncate leading-tight mt-1 opacity-70">
-            {hostname}
-          </div>
-        </div>
-        <ExternalLink
-          size={18}
-          strokeWidth={2.25}
-          className="flex-shrink-0 text-cyber-text-muted group-hover/right:text-cyber-text group-hover/right:scale-110 transition-all"
-        />
-      </div>
-    </div>
+    <DirectoryRow
+      name={entry.name}
+      url={entry.url}
+      iconSrc={iconSrc}
+      onOpen={openSite}
+      openLabel={`Open ${entry.name} website`}
+      add={{ onClick: onAdd, label: `Add model: ${entry.name}` }}
+    />
   );
 }
 
@@ -1177,10 +1091,10 @@ export function ModelNexusPanel() {
   );
 
   return (
-    <div className="flex-1 p-2 overflow-y-auto">
+    <div className="flex-1 px-2 pb-2 overflow-y-auto">
       {sections.map((section) => (
-        <div key={section.key} className="mb-3">
-          <div className="px-1 pb-1.5 flex items-center gap-2">
+        <div key={section.key}>
+          <div className="px-1 py-2 flex items-center gap-2">
             <span className="flex-1 h-px bg-cyber-border/60" />
             <span className="text-[11px] font-semibold uppercase tracking-wider text-cyber-text-secondary whitespace-nowrap">
               {section.title}

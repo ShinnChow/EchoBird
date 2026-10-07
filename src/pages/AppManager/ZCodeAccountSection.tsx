@@ -6,46 +6,49 @@ import { AccountSectionButton, AccountSectionRow } from './AccountSectionPrimiti
 import { ModelSwitchDivider } from './ModelSwitchDivider';
 import { QuotaCountdown } from './QuotaCountdown';
 
+export const ZCodeAccountProviderChoice: React.FC<{ disabled?: boolean }> = ({ disabled }) => {
+  const { zcodeAccounts, isLaunching } = useAppManager();
+  const { t } = useI18n();
+  const { busy, provider, setProvider } = zcodeAccounts;
+  const providerLabel = provider === 'bigmodel' ? 'BigModel' : 'Z.ai';
+  return (
+    <button
+      type="button"
+      aria-label={t('agent.zcodeSwitchProvider').replace('{provider}', providerLabel)}
+      disabled={disabled || busy || isLaunching}
+      onClick={() => setProvider(provider === 'bigmodel' ? 'zai' : 'bigmodel')}
+      className="inline-flex h-4 items-center gap-1 rounded-sm focus-visible:outline focus-visible:outline-1"
+    >
+      <span>{providerLabel}</span>
+      <ArrowLeftRight size={12} aria-hidden="true" />
+    </button>
+  );
+};
+
+export const ZCodeAccountButton: React.FC<{ disabled?: boolean }> = ({ disabled }) => {
+  const { zcodeAccounts, isLaunching } = useAppManager();
+  const { busy, remainingSeconds, add } = zcodeAccounts;
+  return (
+    <AccountSectionButton
+      iconSrc="/icons/tools/zcode.png"
+      busy={busy}
+      disabled={disabled || isLaunching}
+      remainingSeconds={remainingSeconds}
+      onClick={() => void add()}
+      secondary={<ZCodeAccountProviderChoice disabled={disabled} />}
+    />
+  );
+};
+
 export const ZCodeAccountSection: React.FC<{ showDivider?: boolean }> = ({
   showDivider = true,
 }) => {
-  const { zcodeAccounts, isLaunching } = useAppManager();
+  const { zcodeAccounts } = useAppManager();
   const { t } = useI18n();
-  const {
-    accounts,
-    selectedId,
-    select,
-    busy,
-    remainingSeconds,
-    refreshing,
-    add,
-    refresh,
-    remove,
-    provider,
-    setProvider,
-  } = zcodeAccounts;
-  const providerLabel = provider === 'bigmodel' ? 'BigModel' : 'Z.ai';
+  const { accounts, selectedId, select, refreshing, refresh, remove } = zcodeAccounts;
   return (
-    <section className={showDivider ? 'mb-3' : undefined}>
-      <AccountSectionButton
-        iconSrc="/icons/tools/zcode.png"
-        busy={busy}
-        disabled={isLaunching}
-        remainingSeconds={remainingSeconds}
-        onClick={() => void add()}
-        secondary={
-          <button
-            type="button"
-            aria-label={t('agent.zcodeSwitchProvider').replace('{provider}', providerLabel)}
-            disabled={busy || isLaunching}
-            onClick={() => setProvider(provider === 'bigmodel' ? 'zai' : 'bigmodel')}
-            className="inline-flex h-4 items-center gap-1 rounded-sm focus-visible:outline focus-visible:outline-1"
-          >
-            <span>{providerLabel}</span>
-            <ArrowLeftRight size={12} aria-hidden="true" />
-          </button>
-        }
-      />
+    <section>
+      <ZCodeAccountButton />
       <div className="space-y-2">
         {accounts.map((account) => {
           const subscriptionEndAt = ['trial', 'free'].includes(account.plan?.toLowerCase() ?? '')

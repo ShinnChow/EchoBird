@@ -1,6 +1,15 @@
 // Sidebar navigation component
 import { useState, useEffect } from 'react';
-import { Box, Server, FolderHeart, Trophy, Monitor, Download, RefreshCw } from 'lucide-react';
+import {
+  Box,
+  Server,
+  FolderHeart,
+  Trophy,
+  Monitor,
+  Download,
+  RefreshCw,
+  Users,
+} from 'lucide-react';
 import { NavItem } from './NavItem';
 import { RoutingToggle } from './RoutingToggle';
 import { useI18n } from '../hooks/useI18n';
@@ -12,6 +21,7 @@ const isFullEdition = __APP_EDITION__ === 'full';
 
 export type PageType =
   | 'models'
+  | 'accounts'
   | 'freeModels'
   | 'apps'
   | 'aiCareer'
@@ -98,6 +108,12 @@ export const Sidebar = ({
           label={t('nav.modelNexus')}
           active={activePage === 'models'}
           onClick={() => onPageChange('models')}
+        />
+        <NavItem
+          icon={<Users size={20} />}
+          label={t('nav.accountCenter')}
+          active={activePage === 'accounts'}
+          onClick={() => onPageChange('accounts')}
         />
         <NavItem
           icon={

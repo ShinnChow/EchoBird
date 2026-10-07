@@ -1,0 +1,505 @@
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  closestCenter,
+  DragOverlay,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { Gift, GripVertical, LoaderCircle, RefreshCw, Users } from 'lucide-react';
+import { useAppManager } from '../AppManager/context';
+import {
+  AccountSectionActions,
+  AccountSectionRewardButton,
+} from '../AppManager/AccountSectionPrimitives';
+import {
+  useWorkBuddyClaimedToday,
+  workBuddyClaimedToday,
+} from '../AppManager/workBuddyDailyCredits';
+import { useNavigationStore } from '../../stores/navigationStore';
+import { ZCodeAccountProviderChoice } from '../AppManager/ZCodeAccountSection';
+import { DirectoryRow } from '../../components/DirectoryRow';
+import { SortableCard } from '../../components/SortableCard';
+import { QuotaCountdown } from '../AppManager/QuotaCountdown';
+import { useI18n } from '../../hooks/useI18n';
+import * as api from '../../api/tauri';
+import { accountError } from '../../utils/accountError';
+import { quotaColorClasses, quotaTone } from '../../utils/quotaColors';
+import {
+  accountCenterProviders,
+  type AccountCardData,
+  type AccountProvider,
+} from './accountCenterData';
+
+export function AccountCard({
+  provider,
+  account,
+  dailyClaimed = workBuddyClaimedToday(account.dailyClaimedAt),
+  dragHandle,
+}: {
+  provider: AccountProvider;
+  account: AccountCardData;
+  dailyClaimed?: boolean;
+  dragHandle?: ReactNode;
+}) {
+  const { t } = useI18n();
+  const name = [provider.name, account.detail].filter(Boolean).join(' · ');
+  const singleMetric = account.metrics.length === 1;
+  const balanceOnly =
+    singleMetric &&
+    account.metrics.every((metric) => metric.percent == null && metric.resetAt == null);
+  const evenlySpaced = account.metrics.length === 2 && !balanceOnly;
+  return (
+    <article
+      aria-label={`${name} ${account.identity}`}
+      className="flex h-44 flex-col gap-2 rounded-card border border-transparent bg-cyber-surface p-3"
+    >
+      <div className={`flex items-center ${dragHandle ? 'gap-1.5' : 'gap-2.5'}`}>
+        <span className="flex flex-shrink-0 items-center gap-1.5">
+          {dragHandle && <span className="-ml-1 flex h-6 items-center">{dragHandle}</span>}
+          <img src={provider.icon} alt="" className="h-6 w-6 flex-shrink-0 object-contain" />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-sm font-bold">{name}</span>
+        <span className="flex flex-shrink-0 items-center gap-1.5 text-cyber-text-muted">
+          {account.claim && (
+            <AccountSectionRewardButton
+              email={account.identity}
+              claimed={dailyClaimed}
+              disabled={!provider.installed || provider.busy || account.refreshing}
+              onClaim={() => void account.claim!()}
+            />
+          )}
+          <AccountSectionActions
+            email={account.identity}
+            refreshing={account.refreshing}
+            disabled={!provider.installed}
+            onRefresh={account.refresh}
+            onDelete={account.remove}
+          />
+        </span>
+      </div>
+      <div
+        className={
+          evenlySpaced ? 'grid min-h-0 flex-1 grid-rows-[30%_35%_35%] items-center' : 'contents'
+        }
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <h3 className="min-w-0 flex-1 truncate text-base font-bold">{account.identity}</h3>
+          {(account.plan || account.subscriptionEndAt !== undefined) && (
+            <span className="flex max-w-[132px] flex-shrink-0 items-center gap-2 text-xs text-cyber-text-secondary">
+              {account.subscriptionEndAt !== undefined && (
+                <span className="flex flex-shrink-0 items-center text-[10px] leading-3 [&>span]:w-auto [&>span]:leading-3">
+                  {account.subscriptionEndAt == null ? (
+                    <span aria-label={t('accountCenter.subscription')}>—</span>
+                  ) : (
+                    <QuotaCountdown
+                      resetAt={account.subscriptionEndAt}
+                      small
+                      label={t('accountCenter.subscription')}
+                    />
+                  )}
+                </span>
+              )}
+              {account.plan && <span className="min-w-0 truncate leading-3">{account.plan}</span>}
+            </span>
+          )}
+        </div>
+        <div
+          className={
+            evenlySpaced
+              ? 'contents'
+              : `flex min-h-0 flex-1 flex-col justify-center ${account.metrics.length === 2 ? 'gap-4' : 'gap-2'} ${balanceOnly ? 'items-center text-center' : ''}`
+          }
+        >
+          {account.metrics.map((metric, index) => {
+            const colors = quotaColorClasses[quotaTone(metric.percent)];
+            const loneBalance = balanceOnly && singleMetric && metric.label === t('model.balance');
+            const hideLabel =
+              loneBalance ||
+              provider.id === 'dsh' ||
+              (singleMetric &&
+                [t('accountCenter.quota'), t('agent.credits')].includes(metric.label));
+            return (
+              <div key={index} className="flex w-full flex-shrink-0 flex-col gap-1">
+                <div className={balanceOnly ? 'space-y-1' : 'flex h-4 items-center gap-2'}>
+                  <span
+                    className={balanceOnly ? 'contents' : 'flex min-w-0 flex-1 items-center gap-2'}
+                  >
+                    {!hideLabel && (
+                      <span className="block min-w-0 truncate text-xs text-cyber-text-secondary">
+                        {metric.label}
+                      </span>
+                    )}
+                    {metric.resetAt != null && (
+                      <QuotaCountdown
+                        resetAt={metric.resetAt}
+                        compact
+                        small
+                        label={t('accountCenter.reset')}
+                      />
+                    )}
+                  </span>
+                  <span
+                    aria-label={hideLabel ? `${metric.label} ${metric.value}` : undefined}
+                    className={`block flex-shrink-0 ${loneBalance ? 'font-bold' : 'font-semibold'} tabular-nums ${balanceOnly ? 'text-2xl' : 'text-xs'} ${metric.percent != null ? colors.text : ''}`}
+                  >
+                    {loneBalance && <span className="mr-2">{metric.label}</span>}
+                    {metric.value}
+                  </span>
+                </div>
+                {metric.percent != null ? (
+                  <div
+                    role="progressbar"
+                    aria-label={`${metric.label} ${account.identity}`}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.max(0, Math.min(100, metric.percent))}
+                    className={`relative h-0 flex-shrink-0 rounded-full border-t-4 ${colors.track}`}
+                  >
+                    <div
+                      className={`absolute bottom-0 left-0 h-0 rounded-full border-t-4 ${colors.fill}`}
+                      style={{ width: `${Math.max(0, Math.min(100, metric.percent))}%` }}
+                    />
+                  </div>
+                ) : metric.showProgress && !balanceOnly ? (
+                  <div
+                    aria-hidden="true"
+                    className="h-0 flex-shrink-0 rounded-full border-t-4 border-cyber-border"
+                  />
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+export function AccountCenterMain() {
+  const context = useAppManager();
+  const { t, locale } = useI18n();
+  const providers = accountCenterProviders(context, t, locale);
+  const activePage = useNavigationStore((state) => state.activePage);
+  const claimedToday = useWorkBuddyClaimedToday(
+    activePage === 'accounts' &&
+      providers.some((provider) => provider.accounts.some((account) => account.claim))
+  );
+  const loading = providers.some((provider) => provider.loading);
+  const { accountCardOrder: accountOrder, setAccountCardOrder: setAccountOrder } = context;
+  const orderIndex = new Map(accountOrder.map((id, index) => [id, index]));
+  const accounts = providers
+    .flatMap((provider) =>
+      provider.accounts.map((account) => ({
+        id: `${provider.id}:${account.id}`,
+        provider,
+        account,
+      }))
+    )
+    .sort((a, b) => (orderIndex.get(a.id) ?? Infinity) - (orderIndex.get(b.id) ?? Infinity));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [activeDragWidth, setActiveDragWidth] = useState(0);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const handleDragStart = (event: DragStartEvent) => {
+    const id = String(event.active.id);
+    setActiveDragId(id);
+    const el = Array.from(gridRef.current?.children ?? []).find(
+      (node) => node.getAttribute('data-sortable-card') === id
+    );
+    setActiveDragWidth(el?.getBoundingClientRect().width ?? 0);
+  };
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragId(null);
+    if (useNavigationStore.getState().activePage !== 'accounts' || loading) return;
+    const oldIndex = accounts.findIndex((item) => item.id === event.active.id);
+    const newIndex = accounts.findIndex((item) => item.id === event.over?.id);
+    if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+    const next = arrayMove(accounts, oldIndex, newIndex).map((item) => item.id);
+    setAccountOrder(next);
+    try {
+      localStorage.setItem('echobird_account_card_order', JSON.stringify(next));
+    } catch {
+      /* Keep this session's order if local storage is unavailable. */
+    }
+  };
+  useEffect(() => {
+    return useNavigationStore.subscribe((state, previous) => {
+      if (state.activePage !== previous.activePage) setActiveDragId(null);
+    });
+  }, []);
+  const activeDragAccount = accounts.find((item) => item.id === activeDragId);
+  return accounts.length ? (
+    <DndContext
+      key={activePage}
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={() => setActiveDragId(null)}
+      autoScroll={false}
+    >
+      <SortableContext items={accounts.map((item) => item.id)} strategy={rectSortingStrategy}>
+        <div ref={gridRef} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 pb-2">
+          {accounts.map(({ id, provider, account }) => (
+            <SortableCard
+              key={id}
+              id={id}
+              dragLabel={`${t('model.dragSort')} ${account.identity}`}
+              disabled={loading || activePage !== 'accounts'}
+            >
+              {(handle) => (
+                <AccountCard
+                  provider={provider}
+                  account={account}
+                  dailyClaimed={claimedToday(account.dailyClaimedAt)}
+                  dragHandle={handle}
+                />
+              )}
+            </SortableCard>
+          ))}
+        </div>
+      </SortableContext>
+      <DragOverlay>
+        {activeDragAccount && (
+          <div style={{ width: activeDragWidth }} className="pointer-events-none shadow-2xl">
+            <AccountCard
+              provider={activeDragAccount.provider}
+              account={activeDragAccount.account}
+              dailyClaimed={claimedToday(activeDragAccount.account.dailyClaimedAt)}
+              dragHandle={
+                <span aria-hidden="true" className="p-0.5 text-cyber-text-muted/60">
+                  <GripVertical size={14} />
+                </span>
+              }
+            />
+          </div>
+        )}
+      </DragOverlay>
+    </DndContext>
+  ) : loading ? (
+    <div
+      aria-label={t('accountCenter.loading')}
+      className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
+    >
+      {[0, 1, 2].map((index) => (
+        <div key={index} className="h-44 animate-pulse rounded-card bg-cyber-surface" />
+      ))}
+    </div>
+  ) : (
+    <div className="flex h-full min-h-52 flex-col items-center justify-center gap-3 text-cyber-text-secondary">
+      <Users size={28} aria-hidden="true" />
+      <span className="text-sm">{t('accountCenter.empty')}</span>
+    </div>
+  );
+}
+
+export function AccountCenterTitleActions() {
+  const context = useAppManager();
+  const { t, locale } = useI18n();
+  const activePage = useNavigationStore((state) => state.activePage);
+  const providers = accountCenterProviders(context, t, locale);
+  const latest = useRef(providers);
+  const batch = useRef<symbol | null>(null);
+  const [running, setRunning] = useState<'refresh' | 'claim' | null>(null);
+  const claimedToday = useWorkBuddyClaimedToday(
+    activePage === 'accounts' &&
+      providers.some((provider) => provider.accounts.some((account) => account.claim))
+  );
+  useEffect(() => {
+    latest.current = providers;
+  }, [providers]);
+  useEffect(() => {
+    const unsubscribe = useNavigationStore.subscribe((state, previous) => {
+      if (state.activePage !== previous.activePage) {
+        batch.current = null;
+        setRunning(null);
+      }
+    });
+    return () => {
+      unsubscribe();
+      batch.current = null;
+    };
+  }, []);
+  const accounts = providers
+    .filter((provider) => provider.installed)
+    .flatMap((provider) =>
+      provider.accounts.map((account) => ({ providerId: provider.id, account }))
+    );
+  const blocked =
+    context.isLaunching ||
+    activePage !== 'accounts' ||
+    providers.some(
+      (provider) =>
+        provider.busy || provider.loading || provider.accounts.some((account) => account.refreshing)
+    );
+  const claimable = accounts.some(
+    ({ account }) => account.claim && !claimedToday(account.dailyClaimedAt)
+  );
+  const run = async (action: 'refresh' | 'claim') => {
+    if (batch.current || blocked || !accounts.length || (action === 'claim' && !claimable)) return;
+    const request = Symbol();
+    batch.current = request;
+    setRunning(action);
+    try {
+      for (const target of accounts) {
+        if (batch.current !== request || useNavigationStore.getState().activePage !== 'accounts')
+          break;
+        const provider = latest.current.find((provider) => provider.id === target.providerId);
+        const account = provider?.accounts.find((account) => account.id === target.account.id);
+        if (
+          !provider?.installed ||
+          provider.busy ||
+          provider.loading ||
+          !account ||
+          account.refreshing
+        )
+          continue;
+        if (action === 'claim') {
+          if (account.claim && !workBuddyClaimedToday(account.dailyClaimedAt))
+            await account.claim();
+        } else {
+          await account.refresh();
+        }
+      }
+    } finally {
+      if (batch.current === request) {
+        batch.current = null;
+        setRunning(null);
+      }
+    }
+  };
+  const buttonClass =
+    'flex items-center gap-1.5 text-sm font-mono px-3 py-1.5 border border-cyber-border rounded-button transition-colors text-cyber-text hover:bg-cyber-text/10 disabled:text-cyber-text-muted disabled:opacity-50';
+  return (
+    <div className="ml-auto flex-shrink-0 flex items-stretch gap-3">
+      <button
+        type="button"
+        aria-label={t('accountCenter.claimAll')}
+        disabled={blocked || running !== null || !claimable}
+        onClick={() => run('claim')}
+        className={buttonClass}
+      >
+        {running === 'claim' ? (
+          <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+        ) : (
+          <Gift size={16} aria-hidden="true" />
+        )}
+      </button>
+      <button
+        type="button"
+        aria-label={t('accountCenter.refreshAll')}
+        disabled={blocked || running !== null || !accounts.length}
+        onClick={() => run('refresh')}
+        className={buttonClass}
+      >
+        <RefreshCw
+          size={13}
+          className={running === 'refresh' ? 'animate-spin' : ''}
+          aria-hidden="true"
+        />
+        {t('accountCenter.refreshAll')}
+      </button>
+    </div>
+  );
+}
+
+export function AccountCenterPanel() {
+  const context = useAppManager();
+  const { t, locale } = useI18n();
+  const providers = accountCenterProviders(context, t, locale).sort(
+    (a, b) => Number(b.installed) - Number(a.installed)
+  );
+  const pending = providers.some((provider) => provider.busy);
+  const openWebsite = async (website: string) => {
+    try {
+      await api.openExternal(website);
+    } catch (error) {
+      context.setApplyError(accountError(error, t));
+    }
+  };
+  return (
+    <div className="flex-1 px-2 pb-2 overflow-y-auto overflow-x-hidden">
+      <section>
+        <h3 className="px-1 py-2 flex items-center gap-2">
+          <span className="flex-1 h-px bg-cyber-border/60" />
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-cyber-text-secondary whitespace-nowrap">
+            {t('accountCenter.subscriptionProviders')}
+          </span>
+          <span className="flex-1 h-px bg-cyber-border/60" />
+        </h3>
+        <div className="flex min-h-16 items-center justify-center rounded bg-cyber-surface text-xs text-cyber-text-muted">
+          {t('accountCenter.noSubscriptionProviders')}
+        </div>
+      </section>
+      <section>
+        <h3 className="px-1 py-2 flex items-center gap-2">
+          <span className="flex-1 h-px bg-cyber-border/60" />
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-cyber-text-secondary whitespace-nowrap">
+            {t('agent.addCurrentAccount')}
+          </span>
+          <span className="flex-1 h-px bg-cyber-border/60" />
+        </h3>
+        <div className="space-y-2">
+          {providers.map((provider) => {
+            const disabled =
+              !provider.installed || context.isLaunching || (pending && !provider.busy);
+            const hostname = provider.website ? new URL(provider.website).hostname : '—';
+            return (
+              <section key={provider.id} aria-label={provider.name}>
+                <DirectoryRow
+                  name={provider.name}
+                  url={provider.website}
+                  iconSrc={provider.icon}
+                  onOpen={() => void openWebsite(provider.website!)}
+                  openLabel={t('accountCenter.website').replace('{name}', provider.name)}
+                  add={{
+                    onClick: provider.add,
+                    label: provider.busy
+                      ? t('agent.waitingForBrowser').replace(
+                          '{seconds}',
+                          String(provider.remainingSeconds)
+                        )
+                      : `${t('agent.addCurrentAccount')} ${provider.name}`,
+                    disabled,
+                    busy: provider.busy,
+                  }}
+                  secondary={
+                    provider.busy ? (
+                      t('agent.waitingForBrowser').replace(
+                        '{seconds}',
+                        String(provider.remainingSeconds)
+                      )
+                    ) : !provider.installed ? (
+                      `${hostname} · ${t('status.notInstalled')}`
+                    ) : provider.id === 'zcode' ? (
+                      <span className="flex items-center gap-2">
+                        <span className="min-w-0 truncate">{hostname}</span>
+                        <span className="pointer-events-auto relative flex-shrink-0">
+                          <ZCodeAccountProviderChoice disabled={disabled} />
+                        </span>
+                      </span>
+                    ) : undefined
+                  }
+                />
+              </section>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}

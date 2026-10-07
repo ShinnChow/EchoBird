@@ -60,8 +60,10 @@ describe('WorkBuddy account card', () => {
   it.each(['体验版', '标准版', '高级版', '旗舰版', 'Free', 'Pro', 'Team', null])(
     'shows the account tier %s above the actions',
     (plan) => {
-      expect(renderAccount({ plan })).toContain(
-        `>${plan || '—'}</span><span class="flex items-center gap-0">`
+      expect(renderAccount({ plan })).toMatch(
+        new RegExp(
+          `>${plan || '—'}</span><span[^>]*><button[^>]*aria-label="agent.dailyCreditsClaimed test@example.com"`
+        )
       );
     }
   );
