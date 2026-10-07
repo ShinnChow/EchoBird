@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { accountError } from '../../utils/accountError';
+import { accountError, isAccountAuthorizationError } from '../../utils/accountError';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { useI18n } from '../../hooks/useI18n';
 import { useNavigationStore } from '../../stores/navigationStore';
@@ -46,6 +46,9 @@ export function useManagedAccounts<A extends ManagedAccount, L extends ManagedLo
   const confirm = useConfirm();
   const [rows, setRows] = useState<Record<string, A[]>>({});
   const [selection, setSelection] = useState<Record<string, string | null>>({});
+  const [authorizationFailures, setAuthorizationFailures] = useState<Record<string, Set<string>>>(
+    {}
+  );
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(new Set<string>());
@@ -69,6 +72,20 @@ export function useManagedAccounts<A extends ManagedAccount, L extends ManagedLo
   const refreshRequests = useRef(new Map<string, symbol>());
   const pending = useRef<{ login: L; client: AccountClient<A, L> } | null>(null);
   const clearTimers = useRef<(() => void) | null>(null);
+
+  const setAuthorizationFailed = (id: string, failed: boolean) => {
+    setAuthorizationFailures((prev) => {
+      const ids = new Set(prev[scope]);
+      if (failed) ids.add(id);
+      else ids.delete(id);
+      return { ...prev, [scope]: ids };
+    });
+  };
+
+  const invalidateRefresh = (id: string) => {
+    const requests = refreshRequests.current;
+    if (requests.delete(id)) setRefreshing(new Set(requests.keys()));
+  };
 
   const stop = useCallback(() => {
     attempt.current += 1;
@@ -169,6 +186,8 @@ export function useManagedAccounts<A extends ManagedAccount, L extends ManagedLo
   };
 
   const finishLogin = async (account: A) => {
+    invalidateRefresh(account.id);
+    setAuthorizationFailed(account.id, false);
     if (activePage !== 'accounts' && loginRevision.current === revision.current) select(account.id);
     setRows((prev) => ({
       ...prev,
@@ -281,7 +300,11 @@ export function useManagedAccounts<A extends ManagedAccount, L extends ManagedLo
     }
   };
 
-  const refresh = async (account: A, operation?: (account: A) => Promise<A>) => {
+  const refresh = async (
+    account: A,
+    operation?: (account: A) => Promise<A>,
+    onError?: (error: unknown) => void
+  ) => {
     const requests = refreshRequests.current;
     const adapter = clientRef.current;
     if (!enabled || requests.has(account.id) || requests.size >= (adapter.refreshLimit ?? Infinity))
@@ -292,7 +315,8 @@ export function useManagedAccounts<A extends ManagedAccount, L extends ManagedLo
     setRefreshing(new Set(requests.keys()));
     try {
       const updated = await (operation ?? adapter.refresh)(account);
-      if (current === generation.current) {
+      if (current === generation.current && requests.get(account.id) === request) {
+        setAuthorizationFailed(account.id, false);
         invalidateList();
         setRows((prev) => ({
           ...prev,
@@ -300,9 +324,13 @@ export function useManagedAccounts<A extends ManagedAccount, L extends ManagedLo
         }));
       }
     } catch (error) {
-      if (current === generation.current) {
-        const message = accountError(error, t);
-        showError(adapter.refreshError?.(account, message) ?? message);
+      if (current === generation.current && requests.get(account.id) === request) {
+        if (isAccountAuthorizationError(error)) setAuthorizationFailed(account.id, true);
+        if (onError) onError(error);
+        else {
+          const message = accountError(error, t);
+          showError(adapter.refreshError?.(account, message) ?? message);
+        }
       }
     } finally {
       if (requests.get(account.id) === request) {
@@ -329,6 +357,8 @@ export function useManagedAccounts<A extends ManagedAccount, L extends ManagedLo
     try {
       await adapter.remove(account);
       if (current !== generation.current) return;
+      invalidateRefresh(account.id);
+      setAuthorizationFailed(account.id, false);
       invalidateList();
       setRows((prev) => ({
         ...prev,
@@ -345,6 +375,7 @@ export function useManagedAccounts<A extends ManagedAccount, L extends ManagedLo
 
   return {
     accounts: rows[scope] ?? [],
+    authorizationFailedIds: authorizationFailures[scope] ?? new Set<string>(),
     selectedId: enabled && !hasModel ? (selection[scope] ?? null) : null,
     select,
     busy,

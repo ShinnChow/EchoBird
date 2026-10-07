@@ -5,8 +5,18 @@ import { QuotaCountdown } from './QuotaCountdown';
 
 export const CursorAccountSection: React.FC<{ tool: 'cursor' | 'grokbot' }> = ({ tool }) => {
   const { cursorAccounts, grokBotAccounts, isLaunching } = useAppManager();
-  const { accounts, selectedId, select, busy, remainingSeconds, refreshing, refresh, add, remove } =
-    tool === 'cursor' ? cursorAccounts : grokBotAccounts;
+  const {
+    accounts,
+    selectedId,
+    select,
+    busy,
+    remainingSeconds,
+    refreshing,
+    authorizationFailedIds,
+    refresh,
+    add,
+    remove,
+  } = tool === 'cursor' ? cursorAccounts : grokBotAccounts;
   return (
     <section>
       <AccountSectionButton
@@ -28,6 +38,7 @@ export const CursorAccountSection: React.FC<{ tool: 'cursor' | 'grokbot' }> = ({
                 : account.usage?.plan
             }
             refreshing={refreshing.has(account.id)}
+            authorizationFailed={authorizationFailedIds.has(account.id)}
             onRefresh={() => void refresh(account)}
             onSelect={() => select(account.id)}
             onDelete={() => void remove(account)}

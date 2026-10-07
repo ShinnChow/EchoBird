@@ -32,6 +32,7 @@ function fixture(remainingPercent: number | null = 40, busy = false) {
       busy,
       remainingSeconds: 60,
       refreshing: new Set<string>(),
+      authorizationFailedIds: new Set(),
       add: vi.fn(),
       select: vi.fn(),
       refresh: vi.fn(),

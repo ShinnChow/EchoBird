@@ -20,7 +20,8 @@ export interface AccountCardData {
   subscriptionEndAt?: number | null;
   metrics: AccountMetric[];
   refreshing: boolean;
-  refresh: () => Promise<void>;
+  authorizationFailed: boolean;
+  refresh: (onError?: (error: unknown) => void) => Promise<void>;
   claim?: () => Promise<void>;
   dailyClaimedAt?: number | null;
   remove: () => void;
@@ -45,8 +46,13 @@ interface AccountGroup<A> {
   loading: boolean;
   remainingSeconds: number;
   refreshing: Set<string>;
+  authorizationFailedIds: Set<string>;
   add: () => Promise<void>;
-  refresh: (account: A) => Promise<void>;
+  refresh: (
+    account: A,
+    operation?: (account: A) => Promise<A>,
+    onError?: (error: unknown) => void
+  ) => Promise<void>;
   remove: (account: A) => Promise<void>;
 }
 
@@ -134,7 +140,8 @@ export function accountCenterProviders(
       id: account.id,
       ...describe(account),
       refreshing: group.refreshing.has(account.id),
-      refresh: () => group.refresh(account),
+      authorizationFailed: group.authorizationFailedIds.has(account.id),
+      refresh: (onError) => group.refresh(account, undefined, onError),
       remove: () => void group.remove(account),
     })),
   });
@@ -150,6 +157,7 @@ export function accountCenterProviders(
         loading: context.isLoadingCodexAccounts,
         remainingSeconds: context.codexOAuthRemainingSeconds,
         refreshing: context.refreshingCodexAccountIds,
+        authorizationFailedIds: context.codexAuthorizationFailedIds,
         add: context.addCodexAccount,
         refresh: context.refreshCodexAccountQuota,
         remove: context.deleteCodexAccount,

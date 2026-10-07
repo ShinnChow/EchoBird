@@ -2,6 +2,7 @@ import React, { useLayoutEffect } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useManagedAccounts, type AccountClient, type ManagedLogin } from './useManagedAccounts';
+import { useNavigationStore } from '../../stores/navigationStore';
 
 vi.mock('../../hooks/useI18n', () => {
   const t = (key: string) => key;
@@ -51,6 +52,7 @@ async function mount() {
 }
 
 beforeEach(() => {
+  useNavigationStore.getState().setActivePage('apps');
   vi.useFakeTimers();
   vi.clearAllMocks();
   client = {
@@ -74,6 +76,155 @@ afterEach(() => {
 });
 
 describe('shared account request boundaries', () => {
+  it('collects raw refresh errors per request without suppressing other individual errors', async () => {
+    const rows = [account, { id: 'other', quota: 80 }];
+    vi.mocked(client.list).mockResolvedValue(rows);
+    const collect = vi.fn();
+    const authError = new Error('accountError.network|HTTP 401 Unauthorized');
+    vi.mocked(client.refresh).mockRejectedValueOnce(authError);
+    await mount();
+    await act(async () => {
+      await state.refresh(account, undefined, collect);
+    });
+    expect(collect).toHaveBeenCalledExactlyOnceWith(authError);
+    expect(showError).not.toHaveBeenCalled();
+    expect([...state.authorizationFailedIds]).toEqual(['saved']);
+    expect(state.accounts).toEqual(rows);
+    vi.mocked(client.refresh).mockRejectedValueOnce('accountError.network');
+    await act(async () => {
+      await state.refresh(rows[1]);
+    });
+    expect(showError).toHaveBeenCalledExactlyOnceWith('accountError.network');
+    expect(collect).toHaveBeenCalledTimes(1);
+    expect(state.authorizationFailedIds.has('other')).toBe(false);
+    expect(state.accounts).toEqual(rows);
+    await act(async () => {
+      await state.refresh(account, undefined, collect);
+    });
+    expect(state.authorizationFailedIds.size).toBe(0);
+    expect(collect).toHaveBeenCalledTimes(1);
+    expect(client.start).not.toHaveBeenCalled();
+    expect(client.remove).not.toHaveBeenCalled();
+  });
+
+  it('retains per-account authorization failures across passive navigation and clears on a successful retry', async () => {
+    const rows = [account, { id: 'other', quota: 80 }];
+    vi.mocked(client.list).mockResolvedValue(rows);
+    vi.mocked(client.refresh).mockRejectedValueOnce('accountError.loginRequired');
+    await mount();
+    await act(async () => {
+      await state.refresh(account);
+    });
+    expect([...state.authorizationFailedIds]).toEqual(['saved']);
+    expect(state.accounts).toEqual(rows);
+    expect(state.selectedId).toBe('saved');
+    act(() => useNavigationStore.getState().setActivePage('accounts'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect([...state.authorizationFailedIds]).toEqual(['saved']);
+    expect(client.refresh).toHaveBeenCalledTimes(1);
+    expect(client.start).not.toHaveBeenCalled();
+    expect(client.remove).not.toHaveBeenCalled();
+    expect(clearModel).not.toHaveBeenCalled();
+    expect(showError).toHaveBeenCalledTimes(1);
+    vi.mocked(client.refresh).mockRejectedValueOnce('accountError.network');
+    await act(async () => {
+      await state.refresh(account);
+    });
+    expect([...state.authorizationFailedIds]).toEqual(['saved']);
+    const retry = deferred<Account>();
+    vi.mocked(client.refresh).mockReturnValueOnce(retry.promise);
+    let task!: Promise<void>;
+    act(() => {
+      task = state.refresh(account);
+    });
+    expect(state.authorizationFailedIds.has('saved')).toBe(true);
+    expect(state.refreshing.has('saved')).toBe(true);
+    await act(async () => {
+      retry.resolve({ ...account, quota: 42 });
+      await task;
+    });
+    expect(state.authorizationFailedIds.size).toBe(0);
+    expect(state.accounts).toEqual([{ ...account, quota: 42 }, rows[1]]);
+    expect(state.refreshing.size).toBe(0);
+  });
+
+  it.each([
+    ['login', true],
+    ['login', false],
+    ['remove', true],
+    ['remove', false],
+  ] as const)(
+    'clears failed authorization after %s and ignores an older quota result (failure=%s)',
+    async (action, failure) => {
+      vi.mocked(client.refresh).mockRejectedValueOnce('accountError.loginRequired');
+      await mount();
+      await act(async () => {
+        await state.refresh(account);
+      });
+      const late = deferred<void>();
+      vi.mocked(client.refresh).mockImplementationOnce(async () => {
+        await late.promise;
+        if (failure) throw new Error('accountError.loginRequired');
+        return { ...account, quota: 1 };
+      });
+      let task!: Promise<void>;
+      act(() => {
+        task = state.refresh(account);
+      });
+      if (action === 'login') {
+        const updated = { ...account, quota: 80 };
+        vi.mocked(client.poll!).mockResolvedValueOnce(updated);
+        vi.mocked(client.list).mockResolvedValue([updated]);
+        await act(async () => {
+          await state.add();
+        });
+      } else {
+        await act(async () => {
+          await state.remove(account);
+        });
+      }
+      expect(state.authorizationFailedIds.size).toBe(0);
+      expect(state.refreshing.size).toBe(0);
+      await act(async () => {
+        late.resolve();
+        await task;
+      });
+      expect(state.authorizationFailedIds.size).toBe(0);
+      expect(showError).toHaveBeenCalledTimes(1);
+      expect(state.accounts).toEqual(action === 'login' ? [{ ...account, quota: 80 }] : []);
+    }
+  );
+
+  it('ignores an authorization failure returned after leaving and re-entering the page', async () => {
+    await mount();
+    const late = deferred<void>();
+    vi.mocked(client.refresh).mockImplementationOnce(async () => {
+      await late.promise;
+      throw new Error('accountError.loginRequired');
+    });
+    let task!: Promise<void>;
+    act(() => {
+      task = state.refresh(account);
+    });
+    act(() => useNavigationStore.getState().setActivePage('models'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    act(() => useNavigationStore.getState().setActivePage('apps'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      late.resolve();
+      await task;
+    });
+    expect(state.authorizationFailedIds.size).toBe(0);
+    expect(showError).not.toHaveBeenCalled();
+    expect(state.accounts).toEqual([account]);
+  });
+
   it.each(['refresh', 'remove'] as const)(
     'does not overwrite an explicit %s with an older account list',
     async (action) => {

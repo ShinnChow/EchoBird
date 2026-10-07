@@ -28,6 +28,7 @@ export const ClaudeCodeAccountSection: React.FC<{ showDivider?: boolean }> = ({
               email={account.email}
               plan={account.plan}
               refreshing={refreshing.has(account.id)}
+              authorizationFailed={claudeCodeAccounts.authorizationFailedIds.has(account.id)}
               onSelect={() => select(account.id)}
               onRefresh={() => void refresh(account)}
               onDelete={() => void remove(account)}

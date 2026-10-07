@@ -20,6 +20,7 @@ function renderAccount(quotaPercent: number | null, busy = false) {
       busy,
       remainingSeconds: 60,
       refreshing: new Set(),
+      authorizationFailedIds: new Set(),
       select: () => {},
       add: async () => {},
       refresh: async () => {},

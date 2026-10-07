@@ -40,6 +40,11 @@ const en: Translations = {
   'nav.modelNexus': 'Model Nexus',
   'nav.accountCenter': 'Account Management',
   'accountCenter.quota': 'Available quota',
+  'accountCenter.authFailed': 'Authorization failed',
+  'accountCenter.batchAuthFailed':
+    'Authorization failed for {n} accounts. Add them again to sign in.',
+  'accountCenter.batchRefreshFailed':
+    'Could not refresh {n} accounts. Check your network or try again later.',
   'accountCenter.window': 'Quota {n}',
   'accountCenter.reset': 'Quota resets',
   'accountCenter.subscription': 'Subscription ends',

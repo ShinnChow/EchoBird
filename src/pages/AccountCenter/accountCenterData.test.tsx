@@ -15,6 +15,7 @@ function context() {
     loading: false,
     remainingSeconds: 0,
     refreshing: new Set<string>(),
+    authorizationFailedIds: new Set<string>(),
     add: vi.fn(),
     refresh: vi.fn(),
     remove: vi.fn(),
@@ -26,6 +27,7 @@ function context() {
     isLoadingCodexAccounts: false,
     codexOAuthRemainingSeconds: 0,
     refreshingCodexAccountIds: new Set<string>(),
+    codexAuthorizationFailedIds: new Set<string>(),
     addCodexAccount: vi.fn(),
     refreshCodexAccountQuota: vi.fn(),
     deleteCodexAccount: vi.fn(),
@@ -45,6 +47,52 @@ const providers = (state: AppManagerContextType) =>
   accountCenterProviders(state, (key) => key, 'en');
 
 describe('Account Center display data', () => {
+  it('replaces failed account quotas and balances with a short status while keeping identity and actions', () => {
+    const state = context();
+    state.codexAccounts = [
+      {
+        id: 'same',
+        email: 'failed@example.test',
+        plan: 'Plus',
+        active: false,
+        quotaWindows: [
+          { label: '5h', remainingPercent: 75, resetAt: 1900000000 },
+          { label: '7d', remainingPercent: 80 },
+        ],
+      },
+    ];
+    state.codexAuthorizationFailedIds.add('same');
+    state.deepSeekAccounts.accounts = [
+      {
+        id: 'same',
+        name: 'Balance account',
+        active: false,
+        balances: [{ currency: 'CNY', amount: 12.5 }],
+      },
+    ];
+    const groups = providers(state);
+    const codex = groups[0];
+    const balance = groups.find((p) => p.id === 'dsh')!;
+    expect(codex.accounts[0].authorizationFailed).toBe(true);
+    expect(balance.accounts[0].authorizationFailed).toBe(false);
+    state.deepSeekAccounts.authorizationFailedIds.add('same');
+    for (const provider of providers(state).filter((p) => ['codex', 'dsh'].includes(p.id))) {
+      const account = provider.accounts[0];
+      const markup = renderToStaticMarkup(<AccountCard provider={provider} account={account} />);
+      expect(markup).toContain('role="status"');
+      expect(markup).toContain('>accountCenter.authFailed<');
+      expect(markup).toContain(account.identity);
+      expect(markup).toContain(`agent.refreshAccount ${account.identity}`);
+      expect(markup).toContain(`btn.delete ${account.identity}`);
+      expect(markup).not.toContain('role="progressbar"');
+      expect(markup).not.toContain('accountCenter.reset');
+      expect(markup).not.toContain('>75%<');
+      expect(markup).not.toContain('>5h<');
+      expect(markup).not.toContain('12.50');
+      if (account.plan) expect(markup).toContain(`>${account.plan}<`);
+    }
+  });
+
   it('shows real balances without making up percentages and preserves unknown vs zero', () => {
     const state = context();
     state.deepSeekAccounts.accounts = [

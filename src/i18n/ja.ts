@@ -42,6 +42,11 @@ const ja: Partial<Translations> = {
   'nav.modelNexus': 'モデルセンター',
   'nav.accountCenter': 'アカウント管理',
   'accountCenter.quota': '利用可能な枠',
+  'accountCenter.authFailed': '認証失敗',
+  'accountCenter.batchAuthFailed':
+    '{n} 個のアカウントで認証に失敗しました。再度追加してログインしてください。',
+  'accountCenter.batchRefreshFailed':
+    '{n} 個のアカウントを更新できませんでした。ネットワークを確認するか、しばらくしてから再試行してください。',
   'accountCenter.window': '利用枠 {n}',
   'accountCenter.reset': '利用枠のリセット',
   'accountCenter.subscription': 'サブスクリプション期限',

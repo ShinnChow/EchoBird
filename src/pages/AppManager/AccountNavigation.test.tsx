@@ -1,4 +1,5 @@
 import React, { useLayoutEffect } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import * as api from '../../api/tauri';
@@ -6,19 +7,24 @@ import { useToolsStore } from '../../stores/toolsStore';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { AppManagerProvider } from '../../pages/AppManager/AppManagerProvider';
 import { useAppManager } from '../../pages/AppManager/context';
-import { CodexAccountSection } from './AppManagerComponents';
+import { AppManagerErrorModal, AppManagerPanel, CodexAccountSection } from './AppManagerComponents';
 import { AccountSectionRow } from './AccountSectionPrimitives';
 import {
   AccountCenterMain,
   AccountCenterPanel,
   AccountCenterTitleActions,
+  AccountCard,
 } from '../AccountCenter/AccountCenter';
 import { open as folderPicker } from '@tauri-apps/plugin-dialog';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 
 vi.hoisted(() => vi.stubGlobal('__APP_EDITION__', 'full'));
 vi.mock('../../hooks/useI18n', () => {
-  const t = (k: string) => k;
+  const summaries: Record<string, string> = {
+    'accountCenter.batchAuthFailed': 'Authorization failed: {n}',
+    'accountCenter.batchRefreshFailed': 'Refresh failed: {n}',
+  };
+  const t = (k: string) => summaries[k] ?? k;
   return { useI18n: () => ({ t, locale: 'en' }) };
 });
 vi.mock('../../components/ConfirmDialog', () => ({ useConfirm: () => async () => true }));
@@ -119,21 +125,35 @@ vi.mock('../../api/tauri', () => {
 
 let renderer: ReactTestRenderer;
 let state: ReturnType<typeof useAppManager>;
-function Harness({ center = false, desktop = false }: { center?: boolean; desktop?: boolean }) {
+const applyErrorEvents: (string | null)[] = [];
+function Harness({
+  center = false,
+  desktop = false,
+  panel = false,
+}: {
+  center?: boolean;
+  desktop?: boolean;
+  panel?: boolean;
+}) {
   const ctx = useAppManager();
   useLayoutEffect(() => {
     state = ctx;
   });
-  return center || desktop ? (
+  useLayoutEffect(() => {
+    applyErrorEvents.push(ctx.applyError);
+  }, [ctx.applyError]);
+  return center || desktop || panel ? (
     <>
       {center && (
         <>
           <AccountCenterTitleActions />
           <AccountCenterMain />
           <AccountCenterPanel />
+          <AppManagerErrorModal />
         </>
       )}
       {desktop && <CodexAccountSection />}
+      {panel && <AppManagerPanel />}
     </>
   ) : null;
 }
@@ -194,6 +214,7 @@ async function mount(tool: Tool, installed = true) {
   await tick();
 }
 beforeEach(() => {
+  applyErrorEvents.length = 0;
   vi.clearAllMocks();
   vi.useFakeTimers();
   for (const name of listNames) vi.mocked(api[name]).mockResolvedValue([]);
@@ -608,6 +629,416 @@ const rewardAccount: api.WorkBuddyAccount = {
   expiresAt: null,
 };
 
+const refreshFor = {
+  codex: 'refreshCodexAccountQuota',
+  chatgptdesktop: 'refreshCodexAccountQuota',
+  claudecode: 'refreshClaudeCodeAccountQuota',
+  dsh: 'refreshDeepSeekAccountQuota',
+  workbuddy: 'refreshWorkBuddyAccountQuota',
+  workbuddyai: 'refreshWorkBuddyAccountQuota',
+  antigravity: 'refreshAntigravityAccount',
+  antigravitydesktop: 'refreshAntigravityAccount',
+  cursor: 'refreshCursorAccount',
+  grokbot: 'refreshGrokBotAccount',
+  zcode: 'refreshZCodeAccountQuota',
+  grok: 'refreshGrokAccount',
+  manus: 'refreshManusAccount',
+} as const;
+
+it.each(Object.keys(listFor) as Tool[])(
+  'desktop auth status %s: hides stale quota, shares the status across pages and restores it after a successful retry',
+  async (tool) => {
+    const resetAt = Date.now() / 1000 + 86400;
+    const saved = {
+      ...rewardAccount,
+      id: 'saved',
+      name: 'Saved user',
+      email: 'saved@example.test',
+      active: true,
+      edition: tool === 'workbuddyai' ? 'workbuddyai' : 'workbuddy',
+      provider: 'bigmodel',
+      plan: 'Plus',
+      quotaPercent: 64,
+      quotaResetAt: resetAt,
+      quotaWindows: [{ label: '7d', remainingPercent: 64, resetAt }],
+      remainingPercent: 64,
+      resetAt,
+      fiveHour: { remainingPercent: 64, resetAt },
+      sevenDay: { remainingPercent: 64, resetAt },
+      balances: [{ currency: 'CNY', amount: 12.34 }],
+      quotas: [{ name: 'gemini-pro', remainingPercent: 64, resetAt }],
+      usage: { remainingPercent: 64, resetAt, plan: 'Plus' },
+      credits: { total: 500 },
+    };
+    const healthy = {
+      ...saved,
+      id: 'healthy',
+      name: 'Healthy user',
+      email: 'healthy@example.test',
+      active: false,
+    };
+    vi.mocked(api[listFor[tool]]).mockResolvedValue([saved, healthy] as never);
+    await mount(tool);
+    act(() =>
+      renderer.update(
+        <AppManagerProvider>
+          <Harness panel />
+        </AppManagerProvider>
+      )
+    );
+    const rows = () => renderer.root.findByType(AppManagerPanel).findAllByType(AccountSectionRow);
+    const markup = (index: number) =>
+      renderToStaticMarkup(
+        <AccountSectionRow
+          {...(rows()[index].props as React.ComponentProps<typeof AccountSectionRow>)}
+        />
+      );
+    const before = markup(0);
+    const healthyQuota = renderToStaticMarkup(<>{rows()[1].props.secondary}</>);
+    expect(rows()).toHaveLength(2);
+    expect(rows()[0].findAllByProps({ role: 'status' })).toHaveLength(0);
+    expect(api[refreshFor[tool]]).not.toHaveBeenCalled();
+    act(() => rows()[1].findByProps({ role: 'radio' }).props.onClick());
+    const stopPropagation = vi.fn();
+    const clickRefresh = (index: number) => {
+      const row = rows()[index];
+      const button = row
+        .findAllByType('button')
+        .find((button) => String(button.props['aria-label']).startsWith('agent.refreshAccount '))!;
+      button.props.onClick({ stopPropagation });
+    };
+    vi.mocked(api[refreshFor[tool]]).mockRejectedValueOnce('accountError.network');
+    await act(async () => {
+      clickRefresh(1);
+    });
+    expect(rows()[1].findAllByProps({ role: 'status' })).toHaveLength(0);
+    expect(rows()[1].props.selected).toBe(true);
+    expect(renderToStaticMarkup(<>{rows()[1].props.secondary}</>)).toBe(healthyQuota);
+    vi.mocked(api[refreshFor[tool]]).mockRejectedValueOnce('accountError.network|HTTP 401');
+    await act(async () => {
+      clickRefresh(0);
+    });
+    expect(stopPropagation).toHaveBeenCalledTimes(2);
+    expect(rows()[0].findByProps({ role: 'status' }).children).toEqual([
+      'accountCenter.authFailed',
+    ]);
+    expect(rows()[0].findAllByProps({ role: 'progressbar' })).toHaveLength(0);
+    expect(rows()[0].props.selected).toBe(false);
+    expect(rows()[1].props.selected).toBe(true);
+    expect(rows()[1].findAllByProps({ role: 'status' })).toHaveLength(0);
+    const failed = markup(0);
+    expect(failed).not.toContain('64%');
+    expect(failed).not.toContain('12.34');
+    expect(failed).not.toContain('>500');
+    expect(failed).toContain(rows()[0].props.email);
+    if (tool !== 'dsh') expect(failed).toContain('Plus');
+    expect(failed).toContain('agent.refreshAccount');
+    expect(failed).toContain('btn.delete');
+    act(() => {
+      state.setApplyError(null);
+      useNavigationStore.getState().setActivePage('accounts');
+      renderer.update(
+        <AppManagerProvider>
+          <Harness center />
+        </AppManagerProvider>
+      );
+    });
+    await tick();
+    const centerCard = renderer.root
+      .findAllByType(AccountCard)
+      .find((card) => card.props.account.id === 'saved')!;
+    expect(centerCard.findByProps({ role: 'status' }).children).toEqual([
+      'accountCenter.authFailed',
+    ]);
+    expect(api[refreshFor[tool]]).toHaveBeenCalledTimes(2);
+    act(() => {
+      useNavigationStore.getState().setActivePage('apps');
+      renderer.update(
+        <AppManagerProvider>
+          <Harness panel />
+        </AppManagerProvider>
+      );
+    });
+    await tick();
+    expect(rows()[0].findAllByProps({ role: 'status' })).toHaveLength(1);
+    expect(api[refreshFor[tool]]).toHaveBeenCalledTimes(2);
+    const radio = rows()[0].findByProps({ role: 'radio' });
+    const preventDefault = vi.fn();
+    act(() =>
+      radio.props.onKeyDown({ key: ' ', target: radio, currentTarget: radio, preventDefault })
+    );
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(rows()[0].props.selected).toBe(true);
+    let resolve!: (value: never) => void;
+    vi.mocked(api[refreshFor[tool]]).mockReturnValueOnce(
+      new Promise<never>((done) => {
+        resolve = done;
+      })
+    );
+    act(() => clickRefresh(0));
+    expect(rows()[0].props.refreshing).toBe(true);
+    expect(rows()[0].findAllByProps({ role: 'status' })).toHaveLength(1);
+    await act(async () => {
+      resolve((tool === 'cursor' || tool === 'grokbot' ? saved.usage : saved) as never);
+    });
+    expect(rows()[0].props.refreshing).toBe(false);
+    expect(rows()[0].findAllByProps({ role: 'status' })).toHaveLength(0);
+    expect(markup(0)).toBe(before);
+    for (const [key, action] of Object.entries(api))
+      if (/^(start|switch|delete|claim|restore)/.test(key) && vi.isMockFunction(action))
+        expect(action).not.toHaveBeenCalled();
+  }
+);
+
+it('Account Center: a batch marks only authorization failures, preserves them on return and restores quota after retry', async () => {
+  const failed: api.CodexAccount = {
+    id: 'same',
+    email: 'failed@example.test',
+    plan: 'Pro',
+    active: false,
+    quotaWindows: [{ label: '7d', remainingPercent: 25 }],
+  };
+  const healthy = { ...failed, id: 'healthy', email: 'healthy@example.test' };
+  const buddy = { ...rewardAccount, id: 'same' };
+  const balance: api.DeepSeekAccount = {
+    id: 'same',
+    name: 'Balance',
+    active: false,
+    balances: [{ currency: 'CNY', amount: 12.5 }],
+  };
+  vi.mocked(api.listCodexAccounts).mockResolvedValue([failed, healthy]);
+  vi.mocked(api.listWorkBuddyAccounts).mockResolvedValue([buddy]);
+  vi.mocked(api.listDeepSeekAccounts).mockResolvedValue([balance]);
+  vi.mocked(api.refreshCodexAccountQuota).mockImplementation(async (id) => {
+    if (id === 'same') throw new Error('accountError.loginRequired');
+    return healthy;
+  });
+  vi.mocked(api.refreshWorkBuddyAccountQuota).mockRejectedValue('accountError.auth|HTTP 503');
+  vi.mocked(api.refreshDeepSeekAccountQuota).mockRejectedValue('accountError.network');
+  await showAccountCenter(['codex', 'workbuddy', 'dsh']);
+  const card = (label: string) => renderer.root.findByProps({ 'aria-label': label });
+  const failedCard = () => card('ChatGPT / Codex failed@example.test');
+  expect(api.refreshCodexAccountQuota).not.toHaveBeenCalled();
+  await act(async () => {
+    await renderer.root.findByProps({ 'aria-label': 'accountCenter.refreshAll' }).props.onClick();
+  });
+  expect(failedCard().findByProps({ role: 'status' }).children).toEqual([
+    'accountCenter.authFailed',
+  ]);
+  expect(failedCard().findAllByProps({ role: 'progressbar' })).toHaveLength(0);
+  expect(
+    card('ChatGPT / Codex healthy@example.test').findAllByProps({ role: 'status' })
+  ).toHaveLength(0);
+  expect(
+    card('ChatGPT / Codex healthy@example.test').findAllByProps({ role: 'progressbar' })
+  ).toHaveLength(1);
+  expect(card('WorkBuddy Reward').findAllByProps({ role: 'status' })).toHaveLength(0);
+  expect(card('DeepSeek Harness Balance').findAllByProps({ role: 'status' })).toHaveLength(0);
+  expect(state.codexAuthorizationFailedIds.has('same')).toBe(true);
+  expect(state.workBuddyAccountGroups.workbuddy.authorizationFailedIds.size).toBe(0);
+  expect(state.deepSeekAccounts.authorizationFailedIds.size).toBe(0);
+  expect(state.deepSeekAccounts.accounts).toEqual([balance]);
+  expect(state.workBuddyAccountGroups.workbuddy.accounts).toEqual([buddy]);
+  expect(state.applyError).toBe('Authorization failed: 1 Refresh failed: 2');
+  expect(applyErrorEvents).toEqual([null, 'Authorization failed: 1 Refresh failed: 2']);
+  act(() => useNavigationStore.getState().setActivePage('models'));
+  await tick();
+  act(() => useNavigationStore.getState().setActivePage('accounts'));
+  await tick();
+  expect(failedCard().findAllByProps({ role: 'status' })).toHaveLength(1);
+  expect(api.refreshCodexAccountQuota).toHaveBeenCalledTimes(2);
+  expect(api.refreshWorkBuddyAccountQuota).toHaveBeenCalledTimes(1);
+  expect(api.refreshDeepSeekAccountQuota).toHaveBeenCalledTimes(1);
+  let resolve!: (account: api.CodexAccount) => void;
+  vi.mocked(api.refreshCodexAccountQuota).mockReturnValueOnce(
+    new Promise((done) => {
+      resolve = done;
+    })
+  );
+  let task!: Promise<void>;
+  act(() => {
+    task = state.refreshCodexAccountQuota(state.codexAccounts.find((row) => row.id === 'same')!);
+  });
+  expect(failedCard().findAllByProps({ role: 'status' })).toHaveLength(1);
+  expect(state.refreshingCodexAccountIds.has('same')).toBe(true);
+  await act(async () => {
+    resolve({ ...failed, quotaWindows: [{ label: '7d', remainingPercent: 80 }] });
+    await task;
+  });
+  expect(failedCard().findAllByProps({ role: 'status' })).toHaveLength(0);
+  expect(failedCard().findByProps({ role: 'progressbar' }).props['aria-valuenow']).toBe(80);
+  expect(state.codexAuthorizationFailedIds.size).toBe(0);
+  expect(api.startCodexLogin).not.toHaveBeenCalled();
+  expect(api.switchCodexAccount).not.toHaveBeenCalled();
+  expect(api.claimWorkBuddyDailyCredits).not.toHaveBeenCalled();
+  expect(api.deleteCodexAccount).not.toHaveBeenCalled();
+  expect(api.startTool).not.toHaveBeenCalled();
+});
+
+it.each([
+  [
+    'authorization',
+    'accountError.loginRequired',
+    'accountError.network|HTTP 401',
+    'Authorization failed: 2',
+  ],
+  ['connection', 'accountError.network', 'accountError.auth|HTTP 429', 'Refresh failed: 2'],
+  [
+    'mixed',
+    'accountError.auth|HTTP 403',
+    'accountError.quotaTimeout',
+    'Authorization failed: 1 Refresh failed: 1',
+  ],
+  ['success', null, null, null],
+])(
+  'Account Center: shows one summary only after all bulk refreshes finish (%s)',
+  async (_kind, firstError, secondError, summary) => {
+    const rows: api.CodexAccount[] = ['first', 'second', 'last'].map((id) => ({
+      id,
+      email: `${id}@example.test`,
+      active: false,
+      quotaPercent: 25,
+    }));
+    vi.mocked(api.listCodexAccounts).mockResolvedValue(rows);
+    let resolve!: (row: api.CodexAccount) => void;
+    vi.mocked(api.refreshCodexAccountQuota).mockImplementation(async (id) => {
+      if (id === 'last')
+        return new Promise((done) => {
+          resolve = done;
+        });
+      const error = id === 'first' ? firstError : secondError;
+      if (error) throw new Error(error);
+      return { ...rows.find((row) => row.id === id)!, quotaPercent: 80 };
+    });
+    await showAccountCenter(['codex']);
+    const refreshAll = renderer.root.findByProps({ 'aria-label': 'accountCenter.refreshAll' });
+    let task!: Promise<void>;
+    act(() => {
+      task = refreshAll.props.onClick();
+      void refreshAll.props.onClick();
+    });
+    await tick();
+    expect(vi.mocked(api.refreshCodexAccountQuota).mock.calls).toEqual([
+      ['first'],
+      ['second'],
+      ['last'],
+    ]);
+    expect(state.applyError).toBeNull();
+    expect(applyErrorEvents).toEqual([null]);
+    expect(renderer.root.findByType(AppManagerErrorModal).findAllByType('button')).toHaveLength(0);
+    expect(refreshAll.props.disabled).toBe(true);
+    expect(state.codexAccounts[0].quotaPercent).toBe(firstError ? 25 : 80);
+    expect(state.codexAccounts[1].quotaPercent).toBe(secondError ? 25 : 80);
+    await act(async () => {
+      resolve({ ...rows[2], quotaPercent: 90 });
+      await task;
+    });
+    expect(state.codexAccounts[2].quotaPercent).toBe(90);
+    expect(state.applyError).toBe(summary);
+    expect(applyErrorEvents).toEqual(summary ? [null, summary] : [null]);
+    const modal = renderer.root.findByType(AppManagerErrorModal);
+    expect(modal.findAllByType('button')).toHaveLength(summary ? 1 : 0);
+    if (summary) {
+      expect(modal.findByType('p').children).toEqual([summary]);
+      act(() => modal.findByType('button').props.onClick());
+      await tick();
+      expect(state.applyError).toBeNull();
+      expect(modal.findAllByType('button')).toHaveLength(0);
+      expect(api.refreshCodexAccountQuota).toHaveBeenCalledTimes(3);
+    }
+    expect(refreshAll.props.disabled).toBe(false);
+    vi.mocked(api.refreshCodexAccountQuota).mockImplementation(async (id) => ({
+      ...rows.find((row) => row.id === id)!,
+      quotaPercent: 100,
+    }));
+    await act(async () => {
+      await refreshAll.props.onClick();
+    });
+    expect(state.applyError).toBeNull();
+    expect(state.codexAuthorizationFailedIds.size).toBe(0);
+    expect(api.refreshCodexAccountQuota).toHaveBeenCalledTimes(6);
+    expect(api.startCodexLogin).not.toHaveBeenCalled();
+    expect(api.switchCodexAccount).not.toHaveBeenCalled();
+    expect(api.claimWorkBuddyDailyCredits).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['leave', 'reenter', 'unmount'])(
+  'Account Center: discards collected batch failures on %s and permits a new batch',
+  async (next) => {
+    const rows: api.CodexAccount[] = ['failed', 'pending', 'queued'].map((id) => ({
+      id,
+      email: `${id}@example.test`,
+      active: false,
+      quotaPercent: 25,
+    }));
+    vi.mocked(api.listCodexAccounts).mockResolvedValue(rows);
+    let reject!: (error: Error) => void;
+    vi.mocked(api.refreshCodexAccountQuota).mockImplementation(async (id) => {
+      if (id === 'failed') throw new Error('accountError.loginRequired');
+      return new Promise((_, fail) => {
+        reject = fail;
+      });
+    });
+    await showAccountCenter(['codex']);
+    let task!: Promise<void>;
+    act(() => {
+      task = renderer.root
+        .findByProps({ 'aria-label': 'accountCenter.refreshAll' })
+        .props.onClick();
+    });
+    await tick();
+    expect([...state.codexAuthorizationFailedIds]).toEqual(['failed']);
+    expect(state.applyError).toBeNull();
+    if (next === 'unmount') {
+      act(() => {
+        renderer.update(
+          <AppManagerProvider>
+            <Harness />
+          </AppManagerProvider>
+        );
+      });
+    } else {
+      act(() => useNavigationStore.getState().setActivePage('models'));
+      await tick();
+      if (next === 'reenter') {
+        act(() => useNavigationStore.getState().setActivePage('accounts'));
+        await tick();
+      }
+    }
+    await act(async () => {
+      reject(new Error('accountError.network'));
+      await task;
+    });
+    expect(vi.mocked(api.refreshCodexAccountQuota).mock.calls).toEqual([['failed'], ['pending']]);
+    expect(state.applyError).toBeNull();
+    expect(applyErrorEvents).toEqual([null]);
+    if (next === 'unmount') {
+      act(() => {
+        renderer.update(
+          <AppManagerProvider>
+            <Harness center />
+          </AppManagerProvider>
+        );
+      });
+    } else if (next === 'leave') {
+      act(() => useNavigationStore.getState().setActivePage('accounts'));
+      await tick();
+    }
+    vi.mocked(api.refreshCodexAccountQuota).mockImplementation(async (id) => ({
+      ...rows.find((row) => row.id === id)!,
+      quotaPercent: 100,
+    }));
+    await act(async () => {
+      await renderer.root.findByProps({ 'aria-label': 'accountCenter.refreshAll' }).props.onClick();
+    });
+    expect(api.refreshCodexAccountQuota).toHaveBeenCalledTimes(5);
+    expect(state.codexAuthorizationFailedIds.size).toBe(0);
+    expect(state.applyError).toBeNull();
+    expect(applyErrorEvents).toEqual([null]);
+  }
+);
+
 it('Account Center: individual/batch rewards share locks, skip claimed/international accounts and preserve partial failures', async () => {
   const now = Date.now() / 1000;
   const rows = ['manual', 'failed', 'success', 'claimed'].map((id) => ({
@@ -795,7 +1226,7 @@ it('Account Center: refreshes all installed account groups sequentially once and
   for (const [key, action] of Object.entries(api))
     if (key.startsWith('switch') && vi.isMockFunction(action))
       expect(action).not.toHaveBeenCalled();
-  expect(state.applyError).toBe('agent.refreshAccountFailed');
+  expect(state.applyError).toBe('Refresh failed: 1');
   expect(refreshAll.props.disabled).toBe(false);
 });
 

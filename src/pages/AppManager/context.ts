@@ -5,6 +5,7 @@ import type { useGrokAccounts } from './useGrokAccounts';
 import type { useWorkBuddyAccounts } from './useWorkBuddyAccounts';
 import type { useZCodeAccounts } from './useZCodeAccounts';
 import type { useClaudeCodeAccounts } from './useClaudeCodeAccounts';
+import type { useCodexAccounts } from './useCodexAccounts';
 import { createContext, useContext } from 'react';
 import type { ModelConfig, LocalTool } from '../../api/types';
 import type { CodexAccount } from '../../api/tauri';
@@ -47,8 +48,9 @@ export interface AppManagerContextType {
   isAddingCodexAccount: boolean;
   codexOAuthRemainingSeconds: number;
   refreshingCodexAccountIds: Set<string>;
+  codexAuthorizationFailedIds: Set<string>;
   addCodexAccount: () => Promise<void>;
-  refreshCodexAccountQuota: (account: CodexAccount) => Promise<void>;
+  refreshCodexAccountQuota: ReturnType<typeof useCodexAccounts>['refresh'];
   deleteCodexAccount: (account: CodexAccount) => Promise<void>;
   selectedToolData: LocalTool | undefined;
   applyError: string | null;

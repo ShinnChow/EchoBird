@@ -192,6 +192,7 @@ describe('WorkBuddy account interactions', () => {
         accounts: [cn],
         selectedId: null,
         refreshing: new Set(),
+        authorizationFailedIds: new Set(),
         select,
         claimDaily,
       },
@@ -351,6 +352,7 @@ describe('WorkBuddy account interactions', () => {
       workBuddyAccounts: {
         accounts: [{ ...cn, dailyClaimedAt: Date.now() / 1000 }],
         refreshing: new Set([cn.id]),
+        authorizationFailedIds: new Set(),
       },
     } as unknown as AppManagerContextType;
     act(() => {

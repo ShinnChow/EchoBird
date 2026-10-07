@@ -34,6 +34,7 @@ function renderAccount(overrides: Partial<WorkBuddyAccount> = {}, locale?: strin
       busy,
       remainingSeconds: 100,
       refreshing: new Set(),
+      authorizationFailedIds: new Set(),
       select: () => {},
       add: async () => {},
       refresh: async () => {},

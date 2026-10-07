@@ -35,6 +35,7 @@ describe.each(['antigravity', 'antigravitydesktop'] as const)('%s account contro
         refresh,
         remove,
         refreshing: new Set(refreshing ? [account.id] : []),
+        authorizationFailedIds: new Set(),
         add: vi.fn(),
         busy: false,
         remainingSeconds: 0,

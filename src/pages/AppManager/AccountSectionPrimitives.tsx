@@ -132,6 +132,7 @@ export const AccountSectionRow: React.FC<{
   planPrefix?: React.ReactNode;
   widePlan?: boolean;
   singleLine?: boolean;
+  authorizationFailed?: boolean;
   secondary?: React.ReactNode;
   onSelect: () => void;
   onDelete: () => void;
@@ -146,6 +147,7 @@ export const AccountSectionRow: React.FC<{
   planPrefix,
   widePlan,
   singleLine,
+  authorizationFailed,
   secondary,
   onSelect,
   onDelete,
@@ -154,6 +156,7 @@ export const AccountSectionRow: React.FC<{
   leadingAction,
   colorClassName = '',
 }) => {
+  const { t } = useI18n();
   return (
     <div
       role="radio"
@@ -177,7 +180,13 @@ export const AccountSectionRow: React.FC<{
       >
         <span className="block truncate text-[13px] font-semibold text-cyber-text">{email}</span>
         <span className="flex h-[16px] items-center gap-2 text-[12px] text-cyber-text">
-          {secondary ?? '—'}
+          {authorizationFailed ? (
+            <span role="status" className="truncate font-semibold">
+              {t('accountCenter.authFailed')}
+            </span>
+          ) : (
+            (secondary ?? '—')
+          )}
         </span>
       </span>
       <span className="grid auto-rows-[16px] items-center justify-items-center">

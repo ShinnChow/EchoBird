@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import codexSource from '../../src-tauri/src/services/codex_accounts.rs?raw';
 import claudeSource from '../../src-tauri/src/services/claude_code_accounts.rs?raw';
 import oauthSource from '../../src-tauri/src/services/claude_code_oauth.rs?raw';
-import { accountError } from './accountError';
+import { accountError, isAccountAuthorizationError } from './accountError';
 import { en } from '../i18n/en';
 import zhHans from '../i18n/zh-Hans';
 import zhHant from '../i18n/zh-Hant';
@@ -12,6 +12,33 @@ import type { TKey } from '../i18n/types';
 const t = (key: TKey) => zhHans[key] ?? en[key];
 
 describe('account errors', () => {
+  it.each([
+    'accountError.loginRequired',
+    'accountError.expired',
+    'accountError.auth',
+    'accountError.auth|HTTP 400|invalid_grant',
+    'accountError.auth|HTTP 403 Forbidden',
+    'accountError.quota|HTTP 401',
+    new Error('accountError.network|HTTP 401 Unauthorized'),
+  ])('recognizes a saved-account authorization failure (%s)', (error) => {
+    expect(isAccountAuthorizationError(error)).toBe(true);
+  });
+
+  it.each([
+    'accountError.network',
+    'accountError.quotaTimeout',
+    'accountError.authResponse',
+    'accountError.read',
+    'accountError.denied|HTTP 403',
+    'accountError.auth|HTTP 429',
+    'accountError.auth|HTTP 503 Service Unavailable',
+    'accountError.quota|HTTP 40123',
+    '401 Unauthorized',
+    null,
+  ])('does not mistake other failures for lost authorization (%s)', (error) => {
+    expect(isAccountAuthorizationError(error)).toBe(false);
+  });
+
   it('localizes both backend strings and Error objects without leaking diagnostics', () => {
     expect(accountError('accountError.expired', t)).toBe(zhHans['accountError.expired']);
     expect(accountError(new Error('accountError.write|Permission denied'), t)).toBe(

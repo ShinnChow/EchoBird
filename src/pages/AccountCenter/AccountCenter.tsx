@@ -33,7 +33,7 @@ import { SortableCard } from '../../components/SortableCard';
 import { QuotaCountdown } from '../AppManager/QuotaCountdown';
 import { useI18n } from '../../hooks/useI18n';
 import * as api from '../../api/tauri';
-import { accountError } from '../../utils/accountError';
+import { accountError, isAccountAuthorizationError } from '../../utils/accountError';
 import { quotaColorClasses, quotaTone } from '../../utils/quotaColors';
 import {
   accountCenterProviders,
@@ -58,7 +58,7 @@ export function AccountCard({
   const balanceOnly =
     singleMetric &&
     account.metrics.every((metric) => metric.percent == null && metric.resetAt == null);
-  const evenlySpaced = account.metrics.length === 2 && !balanceOnly;
+  const evenlySpaced = !account.authorizationFailed && account.metrics.length === 2 && !balanceOnly;
   return (
     <article
       aria-label={`${name} ${account.identity}`}
@@ -118,68 +118,77 @@ export function AccountCard({
           className={
             evenlySpaced
               ? 'contents'
-              : `flex min-h-0 flex-1 flex-col justify-center ${account.metrics.length === 2 ? 'gap-4' : 'gap-2'} ${balanceOnly ? 'items-center text-center' : ''}`
+              : `flex min-h-0 flex-1 flex-col justify-center ${account.metrics.length === 2 ? 'gap-4' : 'gap-2'} ${balanceOnly || account.authorizationFailed ? 'items-center text-center' : ''}`
           }
         >
-          {account.metrics.map((metric, index) => {
-            const colors = quotaColorClasses[quotaTone(metric.percent)];
-            const loneBalance = balanceOnly && singleMetric && metric.label === t('model.balance');
-            const hideLabel =
-              loneBalance ||
-              provider.id === 'dsh' ||
-              (singleMetric &&
-                [t('accountCenter.quota'), t('agent.credits')].includes(metric.label));
-            return (
-              <div key={index} className="flex w-full flex-shrink-0 flex-col gap-1">
-                <div className={balanceOnly ? 'space-y-1' : 'flex h-4 items-center gap-2'}>
-                  <span
-                    className={balanceOnly ? 'contents' : 'flex min-w-0 flex-1 items-center gap-2'}
-                  >
-                    {!hideLabel && (
-                      <span className="block min-w-0 truncate text-xs text-cyber-text-secondary">
-                        {metric.label}
-                      </span>
-                    )}
-                    {metric.resetAt != null && (
-                      <QuotaCountdown
-                        resetAt={metric.resetAt}
-                        compact
-                        small
-                        label={t('accountCenter.reset')}
-                      />
-                    )}
-                  </span>
-                  <span
-                    aria-label={hideLabel ? `${metric.label} ${metric.value}` : undefined}
-                    className={`block flex-shrink-0 ${loneBalance ? 'font-bold' : 'font-semibold'} tabular-nums ${balanceOnly ? 'text-2xl' : 'text-xs'} ${metric.percent != null ? colors.text : ''}`}
-                  >
-                    {loneBalance && <span className="mr-2">{metric.label}</span>}
-                    {metric.value}
-                  </span>
-                </div>
-                {metric.percent != null ? (
-                  <div
-                    role="progressbar"
-                    aria-label={`${metric.label} ${account.identity}`}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={Math.max(0, Math.min(100, metric.percent))}
-                    className={`relative h-0 flex-shrink-0 rounded-full border-t-4 ${colors.track}`}
-                  >
-                    <div
-                      className={`absolute bottom-0 left-0 h-0 rounded-full border-t-4 ${colors.fill}`}
-                      style={{ width: `${Math.max(0, Math.min(100, metric.percent))}%` }}
-                    />
+          {account.authorizationFailed ? (
+            <span role="status" className="text-sm font-semibold text-cyber-error">
+              {t('accountCenter.authFailed')}
+            </span>
+          ) : (
+            account.metrics.map((metric, index) => {
+              const colors = quotaColorClasses[quotaTone(metric.percent)];
+              const loneBalance =
+                balanceOnly && singleMetric && metric.label === t('model.balance');
+              const hideLabel =
+                loneBalance ||
+                provider.id === 'dsh' ||
+                (singleMetric &&
+                  [t('accountCenter.quota'), t('agent.credits')].includes(metric.label));
+              return (
+                <div key={index} className="flex w-full flex-shrink-0 flex-col gap-1">
+                  <div className={balanceOnly ? 'space-y-1' : 'flex h-4 items-center gap-2'}>
+                    <span
+                      className={
+                        balanceOnly ? 'contents' : 'flex min-w-0 flex-1 items-center gap-2'
+                      }
+                    >
+                      {!hideLabel && (
+                        <span className="block min-w-0 truncate text-xs text-cyber-text-secondary">
+                          {metric.label}
+                        </span>
+                      )}
+                      {metric.resetAt != null && (
+                        <QuotaCountdown
+                          resetAt={metric.resetAt}
+                          compact
+                          small
+                          label={t('accountCenter.reset')}
+                        />
+                      )}
+                    </span>
+                    <span
+                      aria-label={hideLabel ? `${metric.label} ${metric.value}` : undefined}
+                      className={`block flex-shrink-0 ${loneBalance ? 'font-bold' : 'font-semibold'} tabular-nums ${balanceOnly ? 'text-2xl' : 'text-xs'} ${metric.percent != null ? colors.text : ''}`}
+                    >
+                      {loneBalance && <span className="mr-2">{metric.label}</span>}
+                      {metric.value}
+                    </span>
                   </div>
-                ) : metric.showProgress && !balanceOnly ? (
-                  <div
-                    aria-hidden="true"
-                    className="h-0 flex-shrink-0 rounded-full border-t-4 border-cyber-border"
-                  />
-                ) : null}
-              </div>
-            );
-          })}
+                  {metric.percent != null ? (
+                    <div
+                      role="progressbar"
+                      aria-label={`${metric.label} ${account.identity}`}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={Math.max(0, Math.min(100, metric.percent))}
+                      className={`relative h-0 flex-shrink-0 rounded-full border-t-4 ${colors.track}`}
+                    >
+                      <div
+                        className={`absolute bottom-0 left-0 h-0 rounded-full border-t-4 ${colors.fill}`}
+                        style={{ width: `${Math.max(0, Math.min(100, metric.percent))}%` }}
+                      />
+                    </div>
+                  ) : metric.showProgress && !balanceOnly ? (
+                    <div
+                      aria-hidden="true"
+                      className="h-0 flex-shrink-0 rounded-full border-t-4 border-cyber-border"
+                    />
+                  ) : null}
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </article>
@@ -354,6 +363,13 @@ export function AccountCenterTitleActions() {
     const request = Symbol();
     batch.current = request;
     setRunning(action);
+    let authFailures = 0;
+    let otherFailures = 0;
+    const collectError = (error: unknown) => {
+      if (isAccountAuthorizationError(error)) authFailures += 1;
+      else otherFailures += 1;
+    };
+    if (action === 'refresh') context.setApplyError(null);
     try {
       for (const target of accounts) {
         if (batch.current !== request || useNavigationStore.getState().activePage !== 'accounts')
@@ -372,8 +388,22 @@ export function AccountCenterTitleActions() {
           if (account.claim && !workBuddyClaimedToday(account.dailyClaimedAt))
             await account.claim();
         } else {
-          await account.refresh();
+          await account.refresh(collectError);
         }
+      }
+      if (
+        action === 'refresh' &&
+        batch.current === request &&
+        useNavigationStore.getState().activePage === 'accounts'
+      ) {
+        const summary = [
+          authFailures && t('accountCenter.batchAuthFailed').replace('{n}', String(authFailures)),
+          otherFailures &&
+            t('accountCenter.batchRefreshFailed').replace('{n}', String(otherFailures)),
+        ]
+          .filter(Boolean)
+          .join(' ');
+        if (summary) context.setApplyError(summary);
       }
     } finally {
       if (batch.current === request) {

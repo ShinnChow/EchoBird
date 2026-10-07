@@ -756,6 +756,7 @@ export const CodexAccountSection: React.FC<{ showDivider?: boolean }> = ({
     isAddingCodexAccount,
     codexOAuthRemainingSeconds,
     refreshingCodexAccountIds,
+    codexAuthorizationFailedIds,
     addCodexAccount,
     refreshCodexAccountQuota,
     deleteCodexAccount,
@@ -793,6 +794,7 @@ export const CodexAccountSection: React.FC<{ showDivider?: boolean }> = ({
                   ) : undefined
                 }
                 refreshing={refreshingCodexAccountIds.has(account.id)}
+                authorizationFailed={codexAuthorizationFailedIds.has(account.id)}
                 onSelect={() => setSelectedCodexAccountId(account.id)}
                 onRefresh={() => void refreshCodexAccountQuota(account)}
                 onDelete={() => void deleteCodexAccount(account)}

@@ -20,6 +20,7 @@ describe.each(['grokbot', 'cursor'] as const)('%s account controls', (tool) => {
         remove,
         refresh,
         refreshing: new Set(refreshing ? ['one'] : []),
+        authorizationFailedIds: new Set(),
         add: vi.fn(),
         busy,
         remainingSeconds: 60,

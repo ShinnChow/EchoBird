@@ -23,6 +23,7 @@ export const GrokAccountSection: React.FC<{ showDivider?: boolean }> = ({ showDi
               email={account.email}
               plan={account.plan}
               refreshing={grokAccounts.refreshing.has(account.id)}
+              authorizationFailed={grokAccounts.authorizationFailedIds.has(account.id)}
               onSelect={() => grokAccounts.select(account.id)}
               onRefresh={() => void grokAccounts.refresh(account)}
               onDelete={() => void grokAccounts.remove(account)}

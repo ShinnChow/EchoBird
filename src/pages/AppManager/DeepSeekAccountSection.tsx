@@ -27,6 +27,7 @@ export const DeepSeekAccountSection: React.FC<{ showDivider?: boolean }> = ({
               selected={selectedId === account.id}
               email={account.name}
               refreshing={refreshing.has(account.id)}
+              authorizationFailed={deepSeekAccounts.authorizationFailedIds.has(account.id)}
               onSelect={() => select(account.id)}
               onRefresh={() => void refresh(account)}
               onDelete={() => void remove(account)}

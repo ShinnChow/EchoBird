@@ -11,6 +11,7 @@ function render(balances: DeepSeekAccount['balances'], busy = false) {
       accounts: [{ id: 'one', name: 'DeepSeek user', balances, active: true }],
       selectedId: 'one',
       refreshing: new Set(['one']),
+      authorizationFailedIds: new Set(),
       busy,
       remainingSeconds: 120,
     },

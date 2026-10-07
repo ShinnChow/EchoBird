@@ -215,6 +215,7 @@ describe('CodexAccountSection', () => {
       isAddingCodexAccount: false,
       codexOAuthRemainingSeconds: 0,
       refreshingCodexAccountIds: new Set(),
+      codexAuthorizationFailedIds: new Set(),
       addCodexAccount: async () => {},
       refreshCodexAccountQuota: async () => {},
       deleteCodexAccount: async () => {},
@@ -257,6 +258,7 @@ describe('CodexAccountSection', () => {
       isAddingCodexAccount: false,
       codexOAuthRemainingSeconds: 0,
       refreshingCodexAccountIds: new Set(),
+      codexAuthorizationFailedIds: new Set(),
     };
     const markup = renderToStaticMarkup(
       <AppManagerContext.Provider value={context as AppManagerContextType}>
@@ -302,6 +304,7 @@ describe('CodexAccountSection', () => {
       isAddingCodexAccount: false,
       codexOAuthRemainingSeconds: 0,
       refreshingCodexAccountIds: new Set(),
+      codexAuthorizationFailedIds: new Set(),
     };
     const markup = renderToStaticMarkup(
       <AppManagerContext.Provider value={context as AppManagerContextType}>
@@ -322,6 +325,7 @@ describe('CodexAccountSection', () => {
       isAddingCodexAccount: false,
       codexOAuthRemainingSeconds: 0,
       refreshingCodexAccountIds: new Set(),
+      codexAuthorizationFailedIds: new Set(),
     };
     const markup = renderToStaticMarkup(
       <AppManagerContext.Provider value={context as AppManagerContextType}>
@@ -447,6 +451,7 @@ describe.each(['codex', 'chatgptdesktop'])('%s Web Search control', (client) => 
         codexAccounts: [],
         selectedCodexAccountId: account,
         refreshingCodexAccountIds: new Set(),
+        codexAuthorizationFailedIds: new Set(),
         codexWebSearch: false,
         isLaunching: pending,
       } as unknown as AppManagerContextType;
@@ -534,6 +539,7 @@ describe.each(['grokbot', 'cursor', 'manus'] as const)('%s account-only panel', 
         busy: true,
         remainingSeconds: 60,
         refreshing: new Set(),
+        authorizationFailedIds: new Set(),
       },
       viewMode: 'desktop',
       launchAfterApply: false,

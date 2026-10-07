@@ -13,6 +13,7 @@ it('keeps single-line refresh/delete actions isolated from account selection', (
       accounts: [account],
       selectedId: 'one',
       refreshing: new Set(['one']),
+      authorizationFailedIds: new Set(),
       select,
       refresh,
       remove,

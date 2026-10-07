@@ -80,6 +80,7 @@ export const AntigravityAccountSection: React.FC = () => {
                 )
               }
               refreshing={refreshing.has(account.id)}
+              authorizationFailed={antigravityAccounts.authorizationFailedIds.has(account.id)}
               onRefresh={() => void refresh(account)}
               onSelect={() => select(account.id)}
               onDelete={() => void remove(account)}

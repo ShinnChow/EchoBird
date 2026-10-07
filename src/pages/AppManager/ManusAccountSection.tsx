@@ -27,6 +27,7 @@ export const ManusAccountSection: React.FC = () => {
                 plan={account.plan}
                 secondary={credits ? `${credits.total} ${t('agent.credits')}` : undefined}
                 refreshing={manusAccounts.refreshing.has(account.id)}
+                authorizationFailed={manusAccounts.authorizationFailedIds.has(account.id)}
                 onSelect={() => manusAccounts.select(account.id)}
                 onRefresh={() => void manusAccounts.refresh(account)}
                 onDelete={() => void manusAccounts.remove(account)}

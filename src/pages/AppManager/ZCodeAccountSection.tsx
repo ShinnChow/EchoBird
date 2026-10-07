@@ -77,6 +77,7 @@ export const ZCodeAccountSection: React.FC<{ showDivider?: boolean }> = ({
                 ) : undefined
               }
               refreshing={refreshing.has(account.id)}
+              authorizationFailed={zcodeAccounts.authorizationFailedIds.has(account.id)}
               onSelect={() => select(account.id)}
               onRefresh={() => void refresh(account)}
               onDelete={() => void remove(account)}
