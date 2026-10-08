@@ -59,7 +59,7 @@
   </tr>
   <tr>
     <td width="150" align="center">
-      <a href="https://sidrune.ai/register?source=github&amp;campaign=github-echobird&amp;promo=ECHOBIRD"><img src="docs/sponsors/sidrune.svg" width="92" alt="Sidrune AI" /></a>
+      <a href="https://sidrune.ai/register?source=github&amp;campaign=github-echobird&amp;promo=ECHOBIRD"><img src="docs/sponsors/sidrune.png" width="92" alt="Sidrune AI" /></a>
     </td>
     <td>
       <a href="https://sidrune.ai/register?source=github&amp;campaign=github-echobird&amp;promo=ECHOBIRD"><strong>Sidrune AI</strong></a><br/>
