@@ -148,6 +148,13 @@ export function AccountCard({
                           {metric.label}
                         </span>
                       )}
+                      {provider.id === 'workbuddy' &&
+                        !dailyClaimed &&
+                        metric.label === t('agent.rewardCredits') && (
+                          <span className="flex-shrink-0 text-[10px] font-semibold leading-[16px] text-cyber-text">
+                            {t('agent.dailyCreditsUnclaimed')}
+                          </span>
+                        )}
                       {metric.resetAt != null && (
                         <QuotaCountdown
                           resetAt={metric.resetAt}

@@ -1309,7 +1309,7 @@ export function FreeModelsPanel() {
         className="flex-1 min-h-0 flex flex-col"
       >
         {activeTab === 'saved' ? (
-          <div className="flex-1 p-2 overflow-y-auto">
+          <div className="flex-1 px-2 pt-0.5 pb-2 overflow-y-auto">
             {isLoadingModels ? (
               <div className="h-full flex items-center justify-center" aria-busy="true">
                 <RefreshCw size={18} className="animate-spin text-cyber-text-muted" />
