@@ -236,6 +236,8 @@ export type TKey =
   | 'freeModels.updated'
   | 'freeModels.disclaimer'
   | 'freeModels.router.title'
+  | 'freeModels.router.disabled'
+  | 'freeModels.router.enabled'
   | 'freeModels.router.waiting'
   | 'freeModels.router.noAvailable'
   | 'freeModels.router.emptyTitle'

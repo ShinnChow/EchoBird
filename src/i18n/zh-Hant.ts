@@ -112,6 +112,8 @@ const zhHant: Partial<Translations> = {
   'freeModels.updated': '目錄更新',
   'freeModels.disclaimer': '免費額度與使用條件可能隨時變更，正式使用前請確認服務商最新規則。',
   'freeModels.router.title': '免切換智能路由',
+  'freeModels.router.disabled': '未啟用',
+  'freeModels.router.enabled': '已啟用',
   'freeModels.router.waiting': '等待新增模型',
   'freeModels.router.noAvailable': '暫無可用模型',
   'freeModels.router.emptyTitle': '目前已接入 0 個模型',

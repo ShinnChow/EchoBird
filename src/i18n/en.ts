@@ -119,6 +119,8 @@ const en: Translations = {
   'freeModels.disclaimer':
     'Free quotas and eligibility can change at any time. Check the provider terms before relying on a model.',
   'freeModels.router.title': 'Hands-Free Smart Router',
+  'freeModels.router.disabled': 'Disabled',
+  'freeModels.router.enabled': 'Enabled',
   'freeModels.router.waiting': 'Waiting for models',
   'freeModels.router.noAvailable': 'No available models',
   'freeModels.router.emptyTitle': '0 models connected',

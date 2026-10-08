@@ -38,7 +38,7 @@ import {
   KeyRound,
   Plus,
   RefreshCw,
-  Route,
+  Waypoints,
   SquarePen,
   Trash2,
   X,
@@ -51,12 +51,13 @@ import { useConfirm } from '../../components/ConfirmDialog';
 import { useToast } from '../../components/Toast';
 import { useI18n } from '../../hooks/useI18n';
 import { useNavigationStore } from '../../stores/navigationStore';
+import { copyText } from '../../utils/copyText';
 import { useModelNexus } from '../ModelNexus/context';
 import './FreeModels.css';
 
-const NODE_COLUMN_GAP = 28;
-const NODE_ROW_GAP = 56;
-const HUB_TO_NODE_GAP = 72;
+const NODE_COLUMN_GAP = 20;
+const NODE_ROW_GAP = 44;
+const HUB_TO_NODE_GAP = 64;
 const HUB_ARROW_GAP = 4;
 const HUB_ARROW_HEIGHT = 12;
 const HUB_ARROW_LINE_GAP = 2;
@@ -468,7 +469,7 @@ export function FreeModelsTitleActions() {
 
             <div className="px-6 pt-6 pb-6 pr-14 space-y-4">
               <div className="flex gap-3">
-                <Route size={18} className="mt-0.5 flex-shrink-0 text-cyber-accent" />
+                <Waypoints size={18} className="mt-0.5 flex-shrink-0 text-cyber-accent" />
                 <div>
                   <div className="text-sm font-semibold text-cyber-text">
                     {t('freeModels.help.routerTitle')}
@@ -513,6 +514,7 @@ export function FreeModelsTitleActions() {
 interface RouteModelCardProps {
   model: RouteModelNode;
   priority: number;
+  active?: boolean;
   onEdit?: (id: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
 }
@@ -520,6 +522,7 @@ interface RouteModelCardProps {
 function RouteModelCard({
   model,
   priority,
+  active = false,
   onEdit,
   onRemove,
   dragHandleProps,
@@ -530,59 +533,77 @@ function RouteModelCard({
 }) {
   const { t } = useI18n();
   const confirm = useConfirm();
+  const iconSrc = getModelIcon(model.provider, model.modelId);
 
   return (
     <div
       aria-hidden={overlay || undefined}
-      className={`free-model-route-node relative rounded-lg ${overlay ? 'is-dragging' : ''}`}
+      className={`free-model-route-node relative min-h-[80px] rounded-card p-3 flex items-center ${active ? 'is-active' : ''} ${overlay ? 'is-dragging shadow-2xl' : ''}`}
     >
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"
+      >
+        <span className="free-model-route-priority absolute right-3 font-mono font-semibold">
+          {priority}
+        </span>
+      </div>
       <button
         {...dragHandleProps}
         type="button"
         tabIndex={overlay ? -1 : dragHandleProps?.tabIndex}
         aria-label={`${t('freeModels.router.priority')} ${priority}: ${model.modelId}`}
-        className="relative w-full min-h-[72px] rounded-lg p-3 pr-9 text-left flex flex-col justify-center cursor-default touch-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyber-accent"
-      >
-        <span className="free-model-route-priority absolute -left-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[11px] font-mono font-bold">
-          {priority}
-        </span>
-        <span className="block w-full text-xs font-semibold text-cyber-text truncate">
-          {shortModelName(model.modelId)}
-        </span>
-        <span className="block w-full mt-1 text-[10px] text-cyber-text-muted truncate">
-          {model.provider}
-        </span>
-      </button>
-      <div className="absolute right-1.5 inset-y-0 flex flex-col justify-center gap-1">
-        {onEdit && (
-          <button
-            type="button"
-            tabIndex={overlay ? -1 : undefined}
-            onClick={() => void onEdit(model.id)}
-            className="h-7 w-7 rounded-md flex items-center justify-center text-cyber-text-muted/60 hover:text-cyber-text hover:bg-cyber-text/10 transition-colors"
-            aria-label={`${t('btn.edit')} ${shortModelName(model.modelId)}`}
-          >
-            <SquarePen size={14} strokeWidth={2.25} />
-          </button>
+        className="absolute inset-0 rounded-card touch-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyber-accent"
+      />
+      <div className="relative z-10 pointer-events-none flex w-full items-center gap-2.5">
+        {iconSrc ? (
+          <img src={iconSrc} alt="" className="h-12 w-12 shrink-0 object-contain" />
+        ) : (
+          <Box
+            size={48}
+            className="h-12 w-12 shrink-0 text-cyber-text-secondary"
+            aria-hidden="true"
+          />
         )}
-        <button
-          type="button"
-          tabIndex={overlay ? -1 : undefined}
-          onClick={async () => {
-            const ok = await confirm({
-              title: t('model.deleteTitle'),
-              message: `${model.modelId} — ${t('freeModels.router.removeConfirm')}`,
-              confirmText: t('btn.delete'),
-              cancelText: t('btn.cancel'),
-              type: 'danger',
-            });
-            if (ok) await onRemove(model.id);
-          }}
-          className="h-7 w-7 rounded-md flex items-center justify-center text-cyber-text-muted/60 hover:text-red-500 hover:bg-cyber-text/10 transition-colors"
-          aria-label={`${t('btn.remove')} ${shortModelName(model.modelId)}`}
-        >
-          <Trash2 size={14} strokeWidth={2.25} />
-        </button>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex min-w-0 items-center gap-1">
+            <span className="min-w-0 flex-1 text-sm font-semibold text-cyber-text truncate">
+              {model.provider}
+            </span>
+            <div className="pointer-events-auto flex shrink-0 items-center gap-1">
+              {onEdit && (
+                <button
+                  type="button"
+                  tabIndex={overlay ? -1 : undefined}
+                  onClick={() => void onEdit(model.id)}
+                  className="h-6 w-6 rounded-button flex items-center justify-center text-cyber-text-muted/70 hover:text-cyber-text hover:bg-cyber-text/10 transition-colors"
+                  aria-label={`${t('btn.edit')} ${shortModelName(model.modelId)}`}
+                >
+                  <SquarePen size={14} strokeWidth={2.25} />
+                </button>
+              )}
+              <button
+                type="button"
+                tabIndex={overlay ? -1 : undefined}
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: t('model.deleteTitle'),
+                    message: `${model.modelId} — ${t('freeModels.router.removeConfirm')}`,
+                    confirmText: t('btn.delete'),
+                    cancelText: t('btn.cancel'),
+                    type: 'danger',
+                  });
+                  if (ok) await onRemove(model.id);
+                }}
+                className="h-6 w-6 rounded-button flex items-center justify-center text-cyber-text-muted/70 hover:text-red-500 hover:bg-cyber-text/10 transition-colors"
+                aria-label={`${t('btn.remove')} ${shortModelName(model.modelId)}`}
+              >
+                <Trash2 size={14} strokeWidth={2.25} />
+              </button>
+            </div>
+          </div>
+          <span className="text-xs text-cyber-text-secondary truncate">{model.modelId}</span>
+        </div>
       </div>
     </div>
   );
@@ -694,6 +715,7 @@ export function FreeModelsMain() {
   const [activityPaths, setActivityPaths] = useState<RoutePath[]>([]);
   const [routeArrow, setRouteArrow] = useState<RouteArrow | null>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 1, height: 1 });
+  const [nodeColumns, setNodeColumns] = useState(3);
   const [routerActivity, setRouterActivity] = useState<api.SmartRouterActivity>({
     candidateId: null,
     active: false,
@@ -739,6 +761,12 @@ export function FreeModelsMain() {
     if (!stage || !hub) return;
     const stageBox = stage.getBoundingClientRect();
     const hubBox = hub.getBoundingClientRect();
+    setNodeColumns(
+      Math.max(
+        1,
+        Math.min(3, Math.floor((stageBox.width - 16 + NODE_COLUMN_GAP) / (160 + NODE_COLUMN_GAP)))
+      )
+    );
     const endX = hubBox.left - stageBox.left + hubBox.width / 2;
     const endY = hubBox.bottom - stageBox.top;
 
@@ -864,7 +892,7 @@ export function FreeModelsMain() {
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [selectedModels, updatePaths]);
+  }, [selectedModels, nodeColumns, updatePaths]);
 
   const activityIsVisible =
     routerActivity.candidateId !== null &&
@@ -873,15 +901,15 @@ export function FreeModelsMain() {
   const activeRoutePath = activityIsVisible
     ? activityPaths.find((path) => path.id === routerActivity.candidateId)
     : undefined;
-  const routeRowCount = selectedModels.length === 0 ? 0 : Math.ceil(selectedModels.length / 4);
+  const routeRowCount = Math.ceil(selectedModels.length / nodeColumns);
   const stageMinHeight = Math.max(
     550,
     24 +
-      118 +
+      156 +
       HUB_TO_NODE_GAP +
-      routeRowCount * 72 +
+      routeRowCount * 80 +
       Math.max(0, routeRowCount - 1) * NODE_ROW_GAP +
-      NODE_ROW_GAP +
+      32 +
       32
   );
 
@@ -919,14 +947,51 @@ export function FreeModelsMain() {
 
         <div
           ref={hubRef}
-          className="free-model-router-hub relative z-10 mx-auto w-max min-w-[270px] min-h-[118px] rounded-2xl flex flex-col items-center justify-center text-center px-4 py-3 cursor-default"
+          className="free-model-router-hub relative z-10 mx-auto w-full max-w-[380px] min-h-[156px] rounded-xl p-5"
         >
-          <div className="whitespace-nowrap text-xl font-semibold text-cyber-text">
-            {t('freeModels.router.title')}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-card bg-cyber-accent/10 text-cyber-accent">
+                <Waypoints size={22} aria-hidden="true" />
+              </div>
+              <div className="text-lg font-semibold text-cyber-text">
+                {t('freeModels.router.title')}
+              </div>
+            </div>
+            <span
+              className={`flex shrink-0 items-center gap-1.5 text-xs ${routerEnabled ? 'text-green-500 [[data-theme=light]_&]:text-green-800' : 'text-cyber-text-muted'}`}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
+              {t(routerEnabled ? 'freeModels.router.enabled' : 'freeModels.router.disabled')}
+            </span>
           </div>
-          <div className="mt-3 space-y-1.5 text-center text-[10px] font-mono free-model-router-state">
-            <div className="whitespace-nowrap">OpenAI : {routerBaseUrl}</div>
-            <div className="whitespace-nowrap">Anthropic : {routerAnthropicBaseUrl}</div>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            {[
+              ['OpenAI', routerBaseUrl],
+              ['Anthropic', routerAnthropicBaseUrl],
+            ].map(([protocol, endpoint]) => (
+              <button
+                key={protocol}
+                type="button"
+                aria-label={`${t('btn.copy')} ${protocol}`}
+                onClick={() => {
+                  void copyText(`http://${endpoint}`).then((ok) =>
+                    showToast(
+                      ok ? 'success' : 'error',
+                      t(ok ? 'feedback.step1.copied' : 'feedback.step1.failed')
+                    )
+                  );
+                }}
+                className="block min-w-0 rounded-button bg-cyber-bg/60 px-3 py-2 text-left select-none"
+              >
+                <span className="flex h-5 items-center text-[10px] font-semibold text-cyber-text-muted">
+                  {protocol}
+                </span>
+                <span className="mt-1 block break-all text-xs font-mono text-cyber-text-secondary">
+                  {endpoint}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 
@@ -957,10 +1022,7 @@ export function FreeModelsMain() {
                 <div
                   className="free-model-node-grid relative z-10 px-2"
                   style={{
-                    gridTemplateColumns:
-                      selectedModels.length >= 4
-                        ? 'repeat(4, minmax(0, 1fr))'
-                        : `repeat(${selectedModels.length}, minmax(140px, 190px))`,
+                    gridTemplateColumns: `repeat(${Math.min(selectedModels.length, nodeColumns)}, minmax(0, 240px))`,
                     columnGap: NODE_COLUMN_GAP,
                     rowGap: NODE_ROW_GAP,
                     marginTop: HUB_TO_NODE_GAP,
@@ -971,6 +1033,7 @@ export function FreeModelsMain() {
                       key={model.id}
                       model={model}
                       priority={index + 1}
+                      active={routerEnabled && activeRoutePath?.id === model.id}
                       registerNode={setNodeRef}
                       onEdit={model.id === 'local-server' ? undefined : editSelectedModel}
                       onRemove={removeSelectedModel}
@@ -997,10 +1060,7 @@ export function FreeModelsMain() {
                 document.body
               )}
             </DndContext>
-            <p
-              className="text-center text-xs text-cyber-text-muted"
-              style={{ marginTop: NODE_ROW_GAP }}
-            >
+            <p className="text-center text-xs text-cyber-text-muted" style={{ marginTop: 32 }}>
               {t('freeModels.router.reorderHint')}
             </p>
           </>

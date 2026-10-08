@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Box, RefreshCw, Server, SquarePen, Trash2 } from 'lucide-react';
+import { Box, Waypoints, RefreshCw, Server, SquarePen, Trash2 } from 'lucide-react';
 import type { ModelConfig } from '../api/types';
 import type { ModelUsageData } from '../api/tauri';
 import type { TKey } from '../i18n';
@@ -43,9 +43,10 @@ export function ModelListCard({
   onDeleteModel,
   t,
 }: ModelListCardProps) {
-  const isLocalModel = model.internalId === 'local-server' || model.internalId === 'smart-router';
+  const isSmartRouter = model.internalId === 'smart-router';
+  const isLocalModel = model.internalId === 'local-server' || isSmartRouter;
   const canManage = !isLocalModel && model.modelType !== 'DEMO';
-  const iconSrc = getModelIcon('', model.modelId || '');
+  const iconSrc = isSmartRouter ? null : getModelIcon('', model.modelId || '');
 
   return (
     <div
@@ -77,7 +78,13 @@ export function ModelListCard({
           <div
             className={`w-6 h-6 flex items-center justify-center ${isLocalModel ? 'text-cyber-accent' : 'text-cyber-text'}`}
           >
-            {isLocalModel ? <Server size={22} /> : <Box size={22} />}
+            {isSmartRouter ? (
+              <Waypoints size={22} />
+            ) : isLocalModel ? (
+              <Server size={22} />
+            ) : (
+              <Box size={22} />
+            )}
           </div>
         )}
       </div>

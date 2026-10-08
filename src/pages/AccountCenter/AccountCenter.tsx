@@ -62,7 +62,7 @@ export function AccountCard({
   return (
     <article
       aria-label={`${name} ${account.identity}`}
-      className="flex h-44 flex-col gap-2 rounded-card border border-transparent bg-cyber-surface p-3"
+      className="flex h-44 flex-col gap-2 rounded-card border border-transparent bg-cyber-surface p-3 transition-colors hover:bg-cyber-elevated"
     >
       <div className={`flex items-center ${dragHandle ? 'gap-1.5' : 'gap-2.5'}`}>
         <span className="flex flex-shrink-0 items-center gap-1.5">

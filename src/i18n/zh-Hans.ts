@@ -110,6 +110,8 @@ const zhHans: Partial<Translations> = {
   'freeModels.updated': '目录更新',
   'freeModels.disclaimer': '免费额度和使用条件可能随时变化，正式使用前请确认服务商最新规则。',
   'freeModels.router.title': '免切换智能路由',
+  'freeModels.router.disabled': '未启用',
+  'freeModels.router.enabled': '已启用',
   'freeModels.router.waiting': '等待添加模型',
   'freeModels.router.noAvailable': '暂无可用模型',
   'freeModels.router.emptyTitle': '当前已接入 0 个模型',

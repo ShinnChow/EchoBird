@@ -120,6 +120,8 @@ const ja: Partial<Translations> = {
   'freeModels.disclaimer':
     '無料枠や利用条件は変更される場合があります。利用前にプロバイダーの最新条件をご確認ください。',
   'freeModels.router.title': '切替不要ルーター',
+  'freeModels.router.disabled': '無効',
+  'freeModels.router.enabled': '有効',
   'freeModels.router.waiting': 'モデルの追加待ち',
   'freeModels.router.noAvailable': '利用可能なモデルなし',
   'freeModels.router.emptyTitle': '接続済みモデルは 0 件です',
