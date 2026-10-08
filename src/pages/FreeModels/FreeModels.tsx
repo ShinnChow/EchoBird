@@ -948,17 +948,13 @@ export function FreeModelsMain() {
           ref={hubRef}
           className="free-model-router-hub relative z-10 mx-auto w-full max-w-[380px] min-h-[156px] rounded-xl p-5"
         >
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-card text-cyber-accent">
-                <Waypoints size={22} aria-hidden="true" />
-              </div>
-              <div className="text-lg font-semibold text-cyber-text">
-                {t('freeModels.router.title')}
-              </div>
+          <div className="grid h-10 grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2">
+            <Waypoints size={22} aria-hidden="true" className="text-cyber-accent" />
+            <div className="min-w-0 truncate text-lg font-semibold leading-none text-cyber-text">
+              {t('freeModels.router.title')}
             </div>
             <span
-              className={`flex shrink-0 items-center gap-1.5 text-xs ${routerEnabled ? 'text-green-500 [[data-theme=light]_&]:text-green-800' : 'text-cyber-text-muted'}`}
+              className={`flex items-center gap-1.5 whitespace-nowrap text-xs font-medium leading-none ${routerEnabled ? 'text-green-500 [[data-theme=light]_&]:text-green-800' : 'text-cyber-text-muted'}`}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
               {t(routerEnabled ? 'freeModels.router.enabled' : 'freeModels.router.disabled')}

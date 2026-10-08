@@ -38,7 +38,7 @@ const en: Translations = {
   'agent.authorizationCode': 'Authorization code',
   // Navigation
   'nav.modelNexus': 'Model Nexus',
-  'nav.accountCenter': 'Account Management',
+  'nav.accountCenter': 'Accounts',
   'accountCenter.quota': 'Available quota',
   'accountCenter.authFailed': 'Authorization failed',
   'accountCenter.batchAuthFailed':
