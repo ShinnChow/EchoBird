@@ -1,91 +1,89 @@
-//! DeepSeek usage provider
-//!
-//! API: GET https://api.deepseek.com/user/balance
-//! Response: { balance_infos: [{ currency, total_balance, granted_balance, topped_up_balance }], is_available }
+//! DeepSeek balance: GET https://api.deepseek.com/user/balance.
 
-use super::{now_millis, parse_f64, ModelUsageData, UsageProvider, UsageQuota, UsageResult};
-use reqwest;
-use std::time::Duration;
+use super::{api_url, fetch_usage, parse_f64, UsageProvider, UsageQuota, UsageResult};
 
 pub struct DeepSeekProvider;
 
+fn parse_balance(body: &serde_json::Value) -> Option<UsageQuota> {
+    let info = body.get("balance_infos")?.as_array()?.first()?;
+    let amount = info.get("total_balance").and_then(parse_f64)?;
+    let currency = info.get("currency")?.as_str()?;
+    if !matches!(currency, "CNY" | "USD") {
+        return None;
+    }
+    UsageQuota::balance(amount, currency)
+}
+
 #[async_trait::async_trait]
 impl UsageProvider for DeepSeekProvider {
-    async fn query_usage(&self, api_key: &str, _base_url: &str) -> Result<UsageResult, String> {
-        let client = reqwest::Client::new();
-
-        let resp = client
-            .get("https://api.deepseek.com/user/balance")
-            .header("Authorization", format!("Bearer {}", api_key))
-            .header("Accept", "application/json")
-            .timeout(Duration::from_secs(15))
-            .send()
-            .await
-            .map_err(|e| format!("Network error: {}", e))?;
-
-        let status = resp.status();
-        if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
-            return Ok(UsageResult {
-                success: false,
-                data: None,
-                error: Some(format!("Authentication failed (HTTP {})", status)),
-            });
+    async fn query_usage(&self, api_key: &str, base_url: &str) -> Result<UsageResult, String> {
+        if !self.can_handle(base_url) {
+            return Ok(UsageResult::failure("Unsupported DeepSeek API host"));
         }
-
-        if !status.is_success() {
-            let body = resp.text().await.unwrap_or_default();
-            return Ok(UsageResult {
-                success: false,
-                data: None,
-                error: Some(format!("API error (HTTP {}): {}", status, body)),
-            });
-        }
-
-        let body: serde_json::Value = resp
-            .json()
-            .await
-            .map_err(|e| format!("Failed to parse response: {}", e))?;
-
-        // DeepSeek returns balance, show as balance instead of percentage
-        let total_balance = body
-            .get("balance_infos")
-            .and_then(|v| v.as_array())
-            .and_then(|arr| arr.first())
-            .and_then(|info| info.get("total_balance"))
-            .and_then(parse_f64)
-            .unwrap_or(0.0);
-
-        let currency = body
-            .get("balance_infos")
-            .and_then(|v| v.as_array())
-            .and_then(|arr| arr.first())
-            .and_then(|info| info.get("currency"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("CNY");
-
-        // For balance display, percentage is not meaningful, set to 0
-        // UI will detect balance field and show balance instead
-        Ok(UsageResult {
-            success: true,
-            data: Some(ModelUsageData {
-                quotas: vec![UsageQuota {
-                    period: None,
-                    percentage: 0.0,
-                    reset_at: now_millis() + 30 * 24 * 60 * 60 * 1000, // 30 days from now
-                    balance: Some(total_balance),
-                    balance_unit: Some(currency.to_string()),
-                }],
-                last_updated: Some(now_millis()),
-            }),
-            error: None,
+        let body = match fetch_usage(
+            "https://api.deepseek.com/user/balance",
+            &format!("Bearer {api_key}"),
+        )
+        .await
+        {
+            Ok(body) => body,
+            Err(error) => return Ok(UsageResult::failure(error)),
+        };
+        Ok(match parse_balance(&body) {
+            Some(quota) => UsageResult::from_quotas(vec![quota]),
+            None => UsageResult::failure("No balance data available"),
         })
     }
 
     fn can_handle(&self, base_url: &str) -> bool {
-        base_url.contains("api.deepseek.com")
+        api_url(base_url, &["api.deepseek.com"]).is_some()
     }
 
     fn name(&self) -> &'static str {
         "DeepSeek"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn official_balance_fixture_preserves_currency_and_zero() {
+        for (amount, currency) in [("10.50", "CNY"), ("0", "USD")] {
+            let quota = parse_balance(&json!({"is_available":true,"balance_infos":[{
+                "currency":currency,"total_balance":amount,
+                "granted_balance":"1.00","topped_up_balance":"9.50"
+            }]}))
+            .unwrap();
+            assert_eq!(quota.balance, amount.parse::<f64>().ok());
+            assert_eq!(quota.balance_unit.as_deref(), Some(currency));
+            assert_eq!(quota.reset_at, 0);
+        }
+    }
+
+    #[test]
+    fn missing_or_nonfinite_balance_and_missing_currency_are_unknown() {
+        for body in [
+            json!({}),
+            json!({"balance_infos":[]}),
+            json!({"balance_infos":[{"currency":"CNY"}]}),
+            json!({"balance_infos":[{"total_balance":"10"}]}),
+            json!({"balance_infos":[{"currency":"CNY","total_balance":"NaN"}]}),
+            json!({"balance_infos":[{"currency":"USD","total_balance":"inf"}]}),
+        ] {
+            assert!(parse_balance(&body).is_none());
+        }
+    }
+
+    #[tokio::test]
+    async fn relay_host_cannot_send_a_key_to_the_official_balance_api() {
+        let result = DeepSeekProvider
+            .query_usage("fixture-key", "https://relay.example/api.deepseek.com")
+            .await
+            .unwrap();
+        assert!(!result.success);
+        assert!(result.data.is_none());
     }
 }

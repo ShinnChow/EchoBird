@@ -1039,7 +1039,79 @@ it.each(['leave', 'reenter', 'unmount'])(
   }
 );
 
-it('Account Center: individual/batch rewards share locks, skip claimed/international accounts and preserve partial failures', async () => {
+it('Account Center: title actions stay enabled with no saved accounts and do not start automatic actions', async () => {
+  await showAccountCenter(['workbuddy']);
+  const claimAll = renderer.root.findByProps({ 'aria-label': 'accountCenter.claimAll' });
+  const refreshAll = renderer.root.findByProps({ 'aria-label': 'accountCenter.refreshAll' });
+  expect(claimAll.props.disabled).toBe(false);
+  expect(refreshAll.props.disabled).toBe(false);
+  await act(async () => {
+    await claimAll.props.onClick();
+    await refreshAll.props.onClick();
+  });
+  for (const [key, action] of Object.entries(api))
+    if (/^(start|refresh|switch|delete|claim|restore)/.test(key) && vi.isMockFunction(action))
+      expect(action).not.toHaveBeenCalled();
+  expect(state.applyError).toBeNull();
+});
+
+it.each(['refresh', 'claim'] as const)(
+  'Account Center: %s stays available during page-entry reload and only locks for explicit requests',
+  async (action) => {
+    const row = {
+      ...rewardAccount,
+      dailyClaimedAt: action === 'claim' ? Date.now() / 1000 : null,
+    };
+    vi.mocked(api.listWorkBuddyAccounts).mockResolvedValue([row]);
+    await showAccountCenter(['workbuddy']);
+    const claimAll = renderer.root.findByProps({ 'aria-label': 'accountCenter.claimAll' });
+    const refreshAll = renderer.root.findByProps({ 'aria-label': 'accountCenter.refreshAll' });
+    expect(claimAll.props.disabled).toBe(false);
+    expect(refreshAll.props.disabled).toBe(false);
+    act(() => useNavigationStore.getState().setActivePage('models'));
+    await tick();
+    let resolveList!: (rows: api.WorkBuddyAccount[]) => void;
+    vi.mocked(api.listWorkBuddyAccounts).mockReturnValueOnce(
+      new Promise((done) => {
+        resolveList = done;
+      })
+    );
+    act(() => useNavigationStore.getState().setActivePage('accounts'));
+    await tick();
+    expect(state.workBuddyAccountGroups.workbuddy.loading).toBe(true);
+    expect(claimAll.props.disabled).toBe(false);
+    expect(refreshAll.props.disabled).toBe(false);
+    for (const [key, operation] of Object.entries(api))
+      if (/^(start|refresh|switch|delete|claim|restore)/.test(key) && vi.isMockFunction(operation))
+        expect(operation).not.toHaveBeenCalled();
+    let resolveAction!: (row: api.WorkBuddyAccount) => void;
+    const pending = new Promise<api.WorkBuddyAccount>((done) => {
+      resolveAction = done;
+    });
+    const operation =
+      action === 'claim' ? api.claimWorkBuddyDailyCredits : api.refreshWorkBuddyAccountQuota;
+    vi.mocked(operation).mockReturnValueOnce(pending);
+    const button = action === 'claim' ? claimAll : refreshAll;
+    act(() => {
+      void button.props.onClick();
+      void button.props.onClick();
+    });
+    expect(operation).toHaveBeenCalledExactlyOnceWith('workbuddy', row.id);
+    expect(claimAll.props.disabled).toBe(true);
+    expect(refreshAll.props.disabled).toBe(true);
+    const updated = { ...row, remaining: 200, rewardRemaining: 300 };
+    await act(async () => resolveAction(updated));
+    await act(async () => resolveList([row]));
+    expect(state.workBuddyAccountGroups.workbuddy.accounts).toEqual([updated]);
+    expect(claimAll.props.disabled).toBe(false);
+    expect(refreshAll.props.disabled).toBe(false);
+    expect(api.switchWorkBuddyAccount).not.toHaveBeenCalled();
+    expect(api.startTool).not.toHaveBeenCalled();
+    expect(state.applyError).toBeNull();
+  }
+);
+
+it('Account Center: individual/batch rewards share locks, retry claimed accounts, exclude international accounts and preserve partial failures', async () => {
   const now = Date.now() / 1000;
   const rows = ['manual', 'failed', 'success', 'claimed'].map((id) => ({
     ...rewardAccount,
@@ -1102,8 +1174,10 @@ it('Account Center: individual/batch rewards share locks, skip claimed/internati
   });
   expect(vi.mocked(api.claimWorkBuddyDailyCredits).mock.calls).toEqual([
     ['workbuddy', 'manual'],
+    ['workbuddy', 'manual'],
     ['workbuddy', 'failed'],
     ['workbuddy', 'success'],
+    ['workbuddy', 'claimed'],
   ]);
   expect(
     state.workBuddyAccountGroups.workbuddy.accounts.find((row) => row.id === 'failed')
@@ -1288,7 +1362,7 @@ it('Account Center: China day rollover enables rewards without auto claiming or 
     renderer.root.findByProps({ 'aria-label': 'agent.dailyCreditsClaimed Reward' }).props.disabled
   ).toBe(true);
   const claimAll = renderer.root.findByProps({ 'aria-label': 'accountCenter.claimAll' });
-  expect(claimAll.props.disabled).toBe(true);
+  expect(claimAll.props.disabled).toBe(false);
   await act(async () => {
     await vi.advanceTimersByTimeAsync(60_000);
   });

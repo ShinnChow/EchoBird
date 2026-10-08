@@ -263,6 +263,7 @@ const ja: Partial<Translations> = {
   'model.akSkSecretKey': 'Secret Access Key',
   'model.balance': '残高',
   'model.quota.accessFailed': '使用量のアクセス設定を読み込み・保存できません。',
+  'model.quota.refreshFailed': '{n} 件のモデルの使用量更新に失敗しました：',
   'model.quota.teamHint':
     'チームプランは両方の ID を入力してください。個人プランは空欄のまま保存します。',
   'model.quota.fiveHour': '5時間',

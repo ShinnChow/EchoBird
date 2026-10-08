@@ -25,7 +25,7 @@ async fn get_data(
         .await
         .map_err(|_| "accountError.network")?;
     if !response.status().is_success() {
-        return Err(format!("accountError.auth|HTTP {}", response.status()));
+        return Err(super::http_error(response.status()));
     }
     let body: Value = response
         .json()

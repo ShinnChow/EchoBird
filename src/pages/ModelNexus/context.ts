@@ -24,6 +24,7 @@ export interface ModelNexusCtx {
   // Models
   userModels: ModelConfig[];
   setUserModels: React.Dispatch<React.SetStateAction<ModelConfig[]>>;
+  updateUserModel: (model: ModelConfig, form: NewModelForm) => void;
   isLoadingModels: boolean;
   selectedModel: string | null;
   setSelectedModel: (id: string | null) => void;

@@ -400,9 +400,18 @@ fn http() -> Result<reqwest::Client, String> {
         .map_err(|_| "accountError.network".into())
 }
 
+fn http_error(status: reqwest::StatusCode) -> String {
+    let key = if matches!(status.as_u16(), 429 | 500..=599) {
+        "accountError.quota"
+    } else {
+        "accountError.auth"
+    };
+    format!("{key}|HTTP {}", status.as_u16())
+}
+
 async fn envelope(response: reqwest::Response) -> Result<Value, String> {
     if !response.status().is_success() {
-        return Err(format!("accountError.auth|HTTP {}", response.status()));
+        return Err(http_error(response.status()));
     }
     let value: Value = response
         .json()
@@ -573,7 +582,7 @@ pub async fn poll_login(login_id: &str) -> Result<Option<Account>, String> {
             .await
             .map_err(|_| "accountError.network")?;
         if !response.status().is_success() {
-            return Err(format!("accountError.auth|HTTP {}", response.status()));
+            return Err(http_error(response.status()));
         }
         let value: Value = response
             .json()

@@ -12,7 +12,10 @@
 //! site runs sub2api it returns 200 and we render bars, otherwise (404, bad
 //! key, non-JSON, wrong shape) we silently show "暂无用量数据".
 
-use super::{now_millis, parse_f64, ModelUsageData, UsageProvider, UsageQuota, UsageResult};
+use super::{
+    api_url, now_millis, parse_f64, parse_reset_time, ModelUsageData, QuotaPeriod, UsageProvider,
+    UsageQuota, UsageResult,
+};
 use chrono::TimeZone;
 use reqwest;
 use std::time::Duration;
@@ -22,10 +25,11 @@ pub struct Sub2ApiProvider;
 /// Build the /v1/usage endpoint from a base_url.
 /// cc-vibe.com/v1 (OpenAI) or cc-vibe.com (Anthropic) both -> https://cc-vibe.com/v1/usage
 fn build_usage_url(base_url: &str) -> String {
-    if let Ok(u) = url::Url::parse(base_url) {
-        if let Some(host) = u.host_str() {
-            return format!("{}://{}/v1/usage", u.scheme(), host);
-        }
+    if let Ok(mut url) = url::Url::parse(base_url) {
+        url.set_path("/v1/usage");
+        url.set_query(None);
+        url.set_fragment(None);
+        return url.to_string();
     }
     let trimmed = base_url.trim_end_matches('/');
     if trimmed.ends_with("/v1") {
@@ -47,14 +51,10 @@ fn parse_plan_limit(plan_name: &str) -> f64 {
             break;
         }
     }
-    num.parse().unwrap_or(0.0)
-}
-
-/// Parse an RFC-3339 timestamp (e.g. "2026-07-17T17:27:45+08:00") to unix ms.
-fn parse_iso_ms(s: &str) -> Option<i64> {
-    chrono::DateTime::parse_from_rfc3339(s)
+    num.parse::<f64>()
         .ok()
-        .map(|dt| dt.timestamp_millis())
+        .filter(|value| value.is_finite())
+        .unwrap_or(0.0)
 }
 
 /// Daily quota resets at next midnight in CC Vibe's timezone (CST, +08:00).
@@ -73,83 +73,59 @@ fn daily_reset_ms() -> i64 {
 /// Build one quota bar per enforced limit found in the `subscription` object
 /// (daily/weekly/monthly). sub2api populates only the limits a plan enforces,
 /// so a 天卡 yields 1 bar (daily) and a 月卡 yields 3 (daily+weekly+monthly).
-/// Returns None when there is no subscription or no usable limit, so the
-/// caller can fall back to the plan-name heuristic.
-fn parse_subscription_quotas(body: &serde_json::Value) -> Option<Vec<UsageQuota>> {
+/// Missing usage remains unknown. Only cc-vibe's confirmed deployment uses
+/// today's API-key spend to work around its stale daily subscription aggregate.
+fn parse_subscription_quotas(body: &serde_json::Value, base_url: &str) -> Option<Vec<UsageQuota>> {
     let sub = body.get("subscription")?;
     let mut quotas: Vec<UsageQuota> = Vec::new();
     let week_ms = 7 * 24 * 60 * 60 * 1000;
-    let month_ms = 30 * 24 * 60 * 60 * 1000;
-    let pct = |usage: f64, limit: f64| (usage / limit * 100.0).clamp(0.0, 100.0);
-
-    if let Some(limit) = sub.get("daily_limit_usd").and_then(parse_f64) {
-        if limit > 0.0 {
-            // `subscription.daily_usage_usd` is STALE: it holds the previous
-            // day's spend and does NOT reset to 0 at the start of a new day
-            // until new usage arrives. So a fresh day with 0 usage still reads
-            // yesterday's value (e.g. 200.70 against a 200 limit) -> bogus
-            // 100%. The authoritative current-day figure is
-            // `usage.today.actual_cost`; fall back to `daily_usage_usd` only
-            // when the upstream omits `usage.today` (older sub2api builds).
-            let usage = body
-                .get("usage")
-                .and_then(|u| u.get("today"))
-                .and_then(|t| t.get("actual_cost"))
-                .and_then(parse_f64)
-                .or_else(|| sub.get("daily_usage_usd").and_then(parse_f64))
-                .unwrap_or(0.0);
-            quotas.push(UsageQuota {
-                period: Some(super::QuotaPeriod::Daily),
-                percentage: pct(usage, limit),
-                reset_at: daily_reset_ms(),
-                balance: None,
-                balance_unit: None,
-            });
+    let cc_vibe = api_url(base_url, &["cc-vibe.com"])
+        .is_some_and(|url| url.port_or_known_default() == Some(443));
+    let aggregate_daily = sub.get("daily_usage_usd").and_then(parse_f64);
+    let daily_usage = if cc_vibe {
+        match body.pointer("/usage/today/actual_cost") {
+            Some(today) => parse_f64(today),
+            None => aggregate_daily,
         }
-    }
+    } else {
+        aggregate_daily
+    };
+    let weekly_reset = sub
+        .get("weekly_window_start")
+        .and_then(parse_reset_time)
+        .and_then(|start| start.checked_add(week_ms));
 
-    if let Some(limit) = sub.get("weekly_limit_usd").and_then(parse_f64) {
-        if limit > 0.0 {
-            let usage = sub
-                .get("weekly_usage_usd")
+    for (period, limit_field, usage, reset) in [
+        (
+            QuotaPeriod::Daily,
+            "daily_limit_usd",
+            daily_usage,
+            cc_vibe.then(daily_reset_ms),
+        ),
+        (
+            QuotaPeriod::Weekly,
+            "weekly_limit_usd",
+            sub.get("weekly_usage_usd").and_then(parse_f64),
+            weekly_reset,
+        ),
+        // Subscription expiry is not the monthly quota-window reset. The
+        // upstream response exposes no monthly_window_start or reset time.
+        (
+            QuotaPeriod::Monthly,
+            "monthly_limit_usd",
+            sub.get("monthly_usage_usd").and_then(parse_f64),
+            None,
+        ),
+    ] {
+        if let (Some(limit), Some(usage)) = (
+            sub.get(limit_field)
                 .and_then(parse_f64)
-                .unwrap_or(0.0);
-            let reset = sub
-                .get("weekly_window_start")
-                .and_then(|v| v.as_str())
-                .and_then(parse_iso_ms)
-                .map(|ms| ms + week_ms)
-                .unwrap_or_else(|| now_millis() + week_ms);
-            quotas.push(UsageQuota {
-                period: Some(super::QuotaPeriod::Weekly),
-                percentage: pct(usage, limit),
-                reset_at: reset,
-                balance: None,
-                balance_unit: None,
-            });
-        }
-    }
-
-    if let Some(limit) = sub.get("monthly_limit_usd").and_then(parse_f64) {
-        if limit > 0.0 {
-            let usage = sub
-                .get("monthly_usage_usd")
-                .and_then(parse_f64)
-                .unwrap_or(0.0);
-            // expires_at = subscription end = monthly quota reset (CC Vibe plans
-            // are monthly; the API exposes no separate monthly-reset field).
-            let reset = sub
-                .get("expires_at")
-                .and_then(|v| v.as_str())
-                .and_then(parse_iso_ms)
-                .unwrap_or_else(|| now_millis() + month_ms);
-            quotas.push(UsageQuota {
-                period: Some(super::QuotaPeriod::Monthly),
-                percentage: pct(usage, limit),
-                reset_at: reset,
-                balance: None,
-                balance_unit: None,
-            });
+                .filter(|limit| *limit > 0.0),
+            usage,
+        ) {
+            if let Some(quota) = UsageQuota::window(period, usage / limit * 100.0, reset) {
+                quotas.push(quota);
+            }
         }
     }
 
@@ -161,10 +137,18 @@ fn parse_subscription_quotas(body: &serde_json::Value) -> Option<Vec<UsageQuota>
 }
 
 fn parse_balance_quota(body: &serde_json::Value) -> Option<UsageQuota> {
-    let balance = body
-        .get("remaining")
-        .and_then(parse_f64)
-        .or_else(|| body.get("balance").and_then(parse_f64))?;
+    if body
+        .get("subscription")
+        .is_some_and(|value| !value.is_null())
+        || body.get("mode").and_then(|value| value.as_str()) == Some("quota_limited")
+    {
+        return None;
+    }
+    let balance = body.get("balance").and_then(parse_f64).or_else(|| {
+        body.get("remaining")
+            .and_then(parse_f64)
+            .filter(|value| *value >= 0.0)
+    })?;
     let unit = body
         .get("unit")
         .or_else(|| body.get("currency"))
@@ -172,13 +156,7 @@ fn parse_balance_quota(body: &serde_json::Value) -> Option<UsageQuota> {
         .filter(|s| !s.trim().is_empty())
         .unwrap_or("USD");
 
-    Some(UsageQuota {
-        period: None,
-        percentage: 0.0,
-        reset_at: now_millis() + 30 * 24 * 60 * 60 * 1000,
-        balance: Some(balance),
-        balance_unit: Some(unit.to_string()),
-    })
+    UsageQuota::balance(balance, unit)
 }
 
 /// Empty result: no usage data. Sub2Api is the catch-all fallback provider, so
@@ -227,7 +205,7 @@ impl UsageProvider for Sub2ApiProvider {
         // Prefer the structured `subscription` object: it carries explicit
         // per-window limits (daily/weekly/monthly), so we render one bar per
         // enforced limit (天卡=daily only, 月卡=daily+weekly+monthly).
-        if let Some(quotas) = parse_subscription_quotas(&body) {
+        if let Some(quotas) = parse_subscription_quotas(&body, base_url) {
             return Ok(UsageResult {
                 success: true,
                 data: Some(ModelUsageData {
@@ -236,6 +214,16 @@ impl UsageProvider for Sub2ApiProvider {
                 }),
                 error: None,
             });
+        }
+
+        // An unlimited/malformed subscription is not a wallet; remaining=-1
+        // means no enforced quota, not a negative monetary balance.
+        if body
+            .get("subscription")
+            .is_some_and(|value| !value.is_null())
+            || body.get("mode").and_then(|value| value.as_str()) == Some("quota_limited")
+        {
+            return Ok(no_data());
         }
 
         // Wallet / API-call mode exposes a remaining balance instead of enforced
@@ -265,29 +253,26 @@ impl UsageProvider for Sub2ApiProvider {
         if plan_limit <= 0.0 {
             return Ok(no_data());
         }
-        let actual_cost = body
+        let Some(actual_cost) = body
             .get("usage")
             .and_then(|u| u.get("total"))
             .and_then(|u| u.get("actual_cost"))
             .and_then(parse_f64)
-            .unwrap_or(0.0);
-        let percentage = (actual_cost / plan_limit * 100.0).clamp(0.0, 100.0);
-        // Reset window from plan name (日/周/月). sub2api returns no reset time.
-        let reset_at = if plan_name.contains('月') {
-            now_millis() + 30 * 24 * 60 * 60 * 1000
-        } else if plan_name.contains('周') {
-            now_millis() + 7 * 24 * 60 * 60 * 1000
-        } else {
-            now_millis() + 24 * 60 * 60 * 1000
+        else {
+            return Ok(no_data());
         };
+        let percentage = actual_cost / plan_limit * 100.0;
+        if !percentage.is_finite() {
+            return Ok(no_data());
+        }
 
         Ok(UsageResult {
             success: true,
             data: Some(ModelUsageData {
                 quotas: vec![UsageQuota {
                     period: None,
-                    percentage,
-                    reset_at,
+                    percentage: percentage.clamp(0.0, 100.0),
+                    reset_at: 0,
                     balance: None,
                     balance_unit: None,
                 }],
@@ -327,7 +312,8 @@ mod tests {
             "daily_usage": [{ "date": "2026-07-14" }],
             "usage": { "total": { "actual_cost": 96.12 } }
         });
-        let quotas = parse_subscription_quotas(&body).expect("subscription present");
+        let quotas = parse_subscription_quotas(&body, "https://relay.example/v1")
+            .expect("subscription present");
         assert_eq!(quotas.len(), 3);
         assert!((quotas[0].percentage - 48.06).abs() < 0.1);
         assert!((quotas[1].percentage - 6.87).abs() < 0.1);
@@ -343,7 +329,8 @@ mod tests {
             },
             "daily_usage": [{ "date": "2026-07-14" }]
         });
-        let quotas = parse_subscription_quotas(&body).expect("subscription present");
+        let quotas = parse_subscription_quotas(&body, "https://relay.example/v1")
+            .expect("subscription present");
         assert_eq!(quotas.len(), 1);
         assert!((quotas[0].percentage - 25.0).abs() < 0.01);
     }
@@ -357,7 +344,8 @@ mod tests {
             },
             "daily_usage": [{ "date": "2026-07-14" }]
         });
-        let quotas = parse_subscription_quotas(&body).expect("subscription present");
+        let quotas = parse_subscription_quotas(&body, "https://relay.example/v1")
+            .expect("subscription present");
         assert_eq!(quotas.len(), 1);
     }
 
@@ -398,7 +386,7 @@ mod tests {
             "planName": "X",
             "usage": { "total": { "actual_cost": 10.0 } }
         });
-        assert!(parse_subscription_quotas(&body).is_none());
+        assert!(parse_subscription_quotas(&body, "https://relay.example/v1").is_none());
     }
 
     #[test]
@@ -426,7 +414,8 @@ mod tests {
                 "total": { "actual_cost": 296.8321385 }
             }
         });
-        let quotas = parse_subscription_quotas(&body).expect("subscription present");
+        let quotas = parse_subscription_quotas(&body, "https://cc-vibe.com/v1")
+            .expect("subscription present");
         assert_eq!(quotas.len(), 3);
         // Daily bar must reflect today's 0 usage, not the stale 200.708.
         assert!(
@@ -450,8 +439,102 @@ mod tests {
             },
             "daily_usage": [{ "date": "2026-07-14" }]
         });
-        let quotas = parse_subscription_quotas(&body).expect("subscription present");
+        let quotas = parse_subscription_quotas(&body, "https://cc-vibe.com/v1")
+            .expect("subscription present");
         assert_eq!(quotas.len(), 1);
         assert!((quotas[0].percentage - 25.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn usage_endpoint_preserves_ports_ipv6_and_removes_query_and_fragment() {
+        for (base, endpoint) in [
+            (
+                "https://relay.example:8443/v1",
+                "https://relay.example:8443/v1/usage",
+            ),
+            (
+                "http://127.0.0.1:8765/v1?x=1#usage",
+                "http://127.0.0.1:8765/v1/usage",
+            ),
+            ("http://[::1]:8765/v1", "http://[::1]:8765/v1/usage"),
+        ] {
+            assert_eq!(build_usage_url(base), endpoint);
+        }
+    }
+
+    #[test]
+    fn generic_subscription_daily_usage_is_aggregate_not_one_api_keys_today_cost() {
+        let body = json!({
+            "subscription":{"daily_limit_usd":200,"daily_usage_usd":150},
+            "usage":{"today":{"actual_cost":10}}
+        });
+        for base in [
+            "https://relay.example/v1",
+            "https://cc-vibe.com.relay.example/v1",
+            "https://relay.example/cc-vibe.com/v1",
+            "https://cc-vibe.com:8443/v1",
+            "http://cc-vibe.com/v1",
+        ] {
+            let quotas = parse_subscription_quotas(&body, base).unwrap();
+            assert_eq!(quotas[0].percentage, 75.0);
+            assert_eq!(quotas[0].reset_at, 0);
+        }
+        let quotas = parse_subscription_quotas(&body, "https://cc-vibe.com/v1").unwrap();
+        assert_eq!(quotas[0].percentage, 5.0);
+        assert!(quotas[0].reset_at > now_millis());
+    }
+
+    #[test]
+    fn monthly_expiry_is_not_a_reset_and_missing_weekly_anchor_is_unknown() {
+        let body = json!({"subscription":{
+            "weekly_limit_usd":100,"weekly_usage_usd":25,
+            "monthly_limit_usd":400,"monthly_usage_usd":50,
+            "expires_at":"2027-10-08T00:00:00Z"
+        }});
+        let quotas = parse_subscription_quotas(&body, "https://relay.example/v1").unwrap();
+        assert_eq!(quotas.len(), 2);
+        assert_eq!(quotas[0].reset_at, 0);
+        assert_eq!(quotas[1].reset_at, 0);
+        assert_eq!(quotas[1].percentage, 12.5);
+    }
+
+    #[test]
+    fn invalid_or_absent_subscription_usage_is_not_fabricated_as_zero() {
+        for body in [
+            json!({"subscription":{"daily_limit_usd":200}}),
+            json!({"subscription":{"weekly_limit_usd":200,"weekly_usage_usd":"NaN"}}),
+            json!({"subscription":{"monthly_limit_usd":"inf","monthly_usage_usd":1}}),
+            json!({"subscription":{"daily_limit_usd":1e-300,"daily_usage_usd":1e300}}),
+        ] {
+            assert!(parse_subscription_quotas(&body, "https://relay.example/v1").is_none());
+        }
+        let zero = json!({"subscription":{"daily_limit_usd":200,"daily_usage_usd":0}});
+        assert_eq!(
+            parse_subscription_quotas(&zero, "https://relay.example/v1").unwrap()[0].percentage,
+            0.0
+        );
+        let invalid_today = json!({
+            "subscription":{"daily_limit_usd":200,"daily_usage_usd":50},
+            "usage":{"today":{"actual_cost":"NaN"}}
+        });
+        assert!(parse_subscription_quotas(&invalid_today, "https://cc-vibe.com/v1").is_none());
+    }
+
+    #[test]
+    fn unlimited_subscription_sentinel_and_api_key_budget_are_not_wallet_balances() {
+        for body in [
+            json!({"mode":"subscription","remaining":-1,"unit":"USD","subscription":{}}),
+            json!({"mode":"quota_limited","remaining":100,"balance":100,"unit":"USD"}),
+            json!({"remaining":-1,"unit":"USD"}),
+            json!({"balance":"NaN","unit":"USD"}),
+        ] {
+            assert!(parse_balance_quota(&body).is_none());
+        }
+        let quota = parse_balance_quota(
+            &json!({"mode":"unrestricted","balance":0,"remaining":0,"unit":"USD"}),
+        )
+        .unwrap();
+        assert_eq!(quota.balance, Some(0.0));
+        assert_eq!(quota.reset_at, 0);
     }
 }

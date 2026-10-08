@@ -8,6 +8,43 @@ fn account() -> Saved {
     .unwrap()
 }
 
+#[tokio::test]
+async fn http_quota_failures_preserve_status_without_expiring_credentials() {
+    use axum::{routing::any, Router};
+
+    for (status, expected) in [
+        (200, None),
+        (401, Some("accountError.auth|HTTP 401")),
+        (403, Some("accountError.auth|HTTP 403")),
+        (429, Some("accountError.quota|HTTP 429")),
+        (500, Some("accountError.quota|HTTP 500")),
+        (503, Some("accountError.quota|HTTP 503")),
+    ] {
+        let status = reqwest::StatusCode::from_u16(status).unwrap();
+        let body = if status.is_success() {
+            r#"{"code":0,"data":{"balance":20}}"#
+        } else {
+            "not json"
+        };
+        let app = Router::new().fallback(any(move || async move { (status, body) }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let client = super::super::http().unwrap();
+        let response = client.get(&url).send().await.unwrap();
+        let envelope = super::super::envelope(response).await;
+        let quota = get_data(&client, &url, "Bearer fixture-access").await;
+        server.abort();
+        for result in [envelope, quota] {
+            if let Some(expected) = expected {
+                assert_eq!(result.unwrap_err(), expected);
+            } else {
+                assert_eq!(result.unwrap(), json!({"balance":20}));
+            }
+        }
+    }
+}
+
 #[test]
 fn compact_tiers_also_apply_to_cached_accounts_without_refresh_or_writes() {
     for (name, expected) in [

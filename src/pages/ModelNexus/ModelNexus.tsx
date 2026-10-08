@@ -42,8 +42,19 @@ import { useFreeModels } from '../FreeModels/FreeModels';
 /** Whether a model's endpoint is Volcengine (cn) - needs AK/SK for usage.
  *  Mirrors the backend can_handle + URL-selection (baseUrl if non-empty, else anthropicUrl). */
 const isVolcengineUrl = (baseUrl: string, anthropicUrl?: string | null) => {
-  const url = (baseUrl || anthropicUrl || '').toLowerCase();
-  return url.includes('ark.cn-beijing') || url.includes('volcengine') || url.includes('volces.com');
+  try {
+    const url = new URL(baseUrl || anthropicUrl || '');
+    return (
+      url.protocol === 'https:' &&
+      url.hostname === 'ark.cn-beijing.volces.com' &&
+      !url.username &&
+      !url.password &&
+      !url.port &&
+      /^\/api\/coding(?:\/v[13])?$/.test(url.pathname.replace(/\/+$/, ''))
+    );
+  } catch {
+    return false;
+  }
 };
 
 const isZhipuCnUrl = (baseUrl: string, anthropicUrl?: string | null) => {
@@ -81,8 +92,41 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
   const [viewMode, setViewMode] = useState<'config' | 'usage'>('config');
   const [modelUsageData, setModelUsageData] = useState<Record<string, ModelUsageData>>({});
   const usageAccessRevision = useRef<Record<string, number>>({});
+  const editingUsageModel = useRef<ModelConfig | null>(null);
+  const usageBatchPending = useRef(false);
+  const usageRequests = useRef(new Map<string, number>());
   const [isRefreshingUsage, setIsRefreshingUsage] = useState(false);
   const [refreshingUsageIds, setRefreshingUsageIds] = useState<Set<string>>(new Set());
+
+  const invalidateModelUsage = useCallback((modelId: string) => {
+    usageAccessRevision.current[modelId] = (usageAccessRevision.current[modelId] ?? 0) + 1;
+    setModelUsageData((previous) => {
+      const next = { ...previous };
+      delete next[modelId];
+      return next;
+    });
+    setRefreshingUsageIds((previous) => {
+      const next = new Set(previous);
+      next.delete(modelId);
+      return next;
+    });
+  }, []);
+
+  const updateUserModel = (updated: ModelConfig, form: NewModelForm) => {
+    const previous = editingUsageModel.current;
+    if (
+      !previous ||
+      previous.internalId !== updated.internalId ||
+      previous.apiKey !== form.apiKey ||
+      previous.baseUrl !== form.baseUrl ||
+      (previous.anthropicUrl || '') !== form.anthropicUrl
+    ) {
+      invalidateModelUsage(updated.internalId);
+    }
+    setUserModels((models) =>
+      models.map((model) => (model.internalId === updated.internalId ? updated : model))
+    );
+  };
   // Volcengine AK/SK (per-model: one account per model)
   const { showToast } = useToast();
   const [volcAkSkMissingIds, setVolcAkSkMissingIds] = useState<Set<string>>(new Set());
@@ -115,6 +159,7 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
       setModelModalAnimatingOut(false);
       setShowAddModelModal(false);
       setEditingModelId(null);
+      editingUsageModel.current = null;
       setModelModalDestination('modelNexus');
     }, 200);
   }, []);
@@ -159,6 +204,7 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
         /* fallback to stale model */
       }
 
+      editingUsageModel.current = freshModel;
       setModelModalDestination('modelNexus');
       setEditingModelId(freshModel.internalId);
       if (freshModel.apiKey?.startsWith('enc:v1:') && api.isKeyDestroyed) {
@@ -181,9 +227,10 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
   const handleCardDelete = useCallback(
     async (modelId: string) => {
       await api.deleteModel(modelId);
+      invalidateModelUsage(modelId);
       setUserModels((prev) => prev.filter((m) => m.internalId !== modelId));
     },
-    [setUserModels]
+    [setUserModels, invalidateModelUsage]
   );
 
   // Test state
@@ -302,39 +349,78 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
 
   // Refresh usage for all models
   const refreshAllUsage = useCallback(async () => {
-    if (isRefreshingUsage) return;
-    setIsRefreshingUsage(true);
-
-    // Parallel fetch; merge into existing so failed models keep their last data.
-    const revisions = userModels.map((model) => usageAccessRevision.current[model.internalId] ?? 0);
-    const results = await Promise.allSettled(
-      userModels.map((model) => api.queryModelUsage(model.internalId))
+    if (usageBatchPending.current) return;
+    const models = userModels.filter(
+      (model) =>
+        usageRequests.current.get(model.internalId) !==
+        (usageAccessRevision.current[model.internalId] ?? 0)
     );
-    setModelUsageData((prev) => {
-      const next = { ...prev };
-      results.forEach((r, i) => {
-        if (
-          r.status === 'fulfilled' &&
-          r.value.success &&
-          r.value.data &&
-          revisions[i] === (usageAccessRevision.current[userModels[i].internalId] ?? 0)
-        ) {
-          next[userModels[i].internalId] = r.value.data;
+    if (!models.length) return;
+    usageBatchPending.current = true;
+    setIsRefreshingUsage(true);
+    const revisions = models.map((model) => usageAccessRevision.current[model.internalId] ?? 0);
+    models.forEach((model, i) => usageRequests.current.set(model.internalId, revisions[i]));
+    setRefreshingUsageIds(
+      (previous) => new Set([...previous, ...models.map((model) => model.internalId)])
+    );
+    try {
+      // Failed models keep their last data; obsolete configurations cannot publish results.
+      const results = await Promise.allSettled(
+        models.map(async (model) => api.queryModelUsage(model.internalId))
+      );
+      setModelUsageData((prev) => {
+        const next = { ...prev };
+        results.forEach((r, i) => {
+          if (
+            r.status === 'fulfilled' &&
+            r.value.success &&
+            r.value.data &&
+            revisions[i] === (usageAccessRevision.current[models[i].internalId] ?? 0)
+          ) {
+            next[models[i].internalId] = r.value.data;
+          }
+        });
+        return next;
+      });
+      const failed = models.filter(
+        (model, i) =>
+          revisions[i] === (usageAccessRevision.current[model.internalId] ?? 0) &&
+          !(results[i].status === 'fulfilled' && results[i].value.success && results[i].value.data)
+      );
+      if (failed.length) {
+        showToast(
+          'error',
+          `${t('model.quota.refreshFailed').replace('{n}', String(failed.length))} ${failed.map((model) => model.name).join(', ')}`
+        );
+      }
+    } finally {
+      models.forEach((model, i) => {
+        if (usageRequests.current.get(model.internalId) === revisions[i]) {
+          usageRequests.current.delete(model.internalId);
         }
       });
-      return next;
-    });
-    setIsRefreshingUsage(false);
-  }, [isRefreshingUsage, userModels]);
+      setRefreshingUsageIds((previous) => {
+        const next = new Set(previous);
+        models.forEach((model, i) => {
+          if (revisions[i] === (usageAccessRevision.current[model.internalId] ?? 0)) {
+            next.delete(model.internalId);
+          }
+        });
+        return next;
+      });
+      usageBatchPending.current = false;
+      setIsRefreshingUsage(false);
+    }
+  }, [userModels, showToast, t]);
 
   // Refresh usage for a single model
-  const refreshSingleUsage = async (modelId: string, accessChanged = false) => {
-    if (refreshingUsageIds.has(modelId) && !accessChanged) return;
-
+  const refreshSingleUsage = async (modelId: string) => {
     const model = userModels.find((m) => m.internalId === modelId);
     if (!model) return;
 
     const revision = usageAccessRevision.current[modelId] ?? 0;
+    if (usageRequests.current.get(modelId) === revision) return;
+    usageRequests.current.set(modelId, revision);
     setRefreshingUsageIds((prev) => new Set(prev).add(model.internalId));
     try {
       const result = await api.queryModelUsage(model.internalId);
@@ -358,9 +444,12 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
       } else if (result.error) {
         showToast('error', result.error);
       }
-    } catch {
-      /* silent */
+    } catch (error) {
+      if (revision === (usageAccessRevision.current[modelId] ?? 0)) {
+        showToast('error', typeof error === 'string' ? error : t('error.requestFailed'));
+      }
     } finally {
+      if (usageRequests.current.get(modelId) === revision) usageRequests.current.delete(modelId);
       setRefreshingUsageIds((prev) => {
         if (revision !== (usageAccessRevision.current[modelId] ?? 0)) return prev;
         const next = new Set(prev);
@@ -390,6 +479,7 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
   const saveVolcAksk = async (internalId: string, accessKey: string, secretKey: string) => {
     try {
       await api.saveVolcAksk(internalId, accessKey, secretKey);
+      invalidateModelUsage(internalId);
       setVolcAkSkMissingIds((prev) => {
         const next = new Set(prev);
         next.delete(internalId);
@@ -473,6 +563,7 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
       value={{
         userModels,
         setUserModels,
+        updateUserModel,
         isLoadingModels,
         selectedModel,
         setSelectedModel,
@@ -551,15 +642,9 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
                 zhipuTeamModal.modelId,
                 organizationId && projectId ? { organizationId, projectId } : null
               );
-              usageAccessRevision.current[zhipuTeamModal.modelId] =
-                (usageAccessRevision.current[zhipuTeamModal.modelId] ?? 0) + 1;
-              setModelUsageData((previous) => {
-                const next = { ...previous };
-                delete next[zhipuTeamModal.modelId];
-                return next;
-              });
+              invalidateModelUsage(zhipuTeamModal.modelId);
               setZhipuTeamModal(null);
-              await refreshSingleUsage(zhipuTeamModal.modelId, true);
+              await refreshSingleUsage(zhipuTeamModal.modelId);
             } catch {
               showToast('error', t('model.quota.accessFailed'));
             }
@@ -1129,6 +1214,7 @@ export function AddModelModal() {
     keyDestroyed,
     closeModelModal,
     setUserModels,
+    updateUserModel,
     setShowAddModelModal,
     modelModalDestination,
     setModelModalDestination,
@@ -1430,9 +1516,7 @@ export function AddModelModal() {
                       baseUrl: updatedModel.baseUrl,
                       modelId: updatedModel.modelId ?? newModelForm.modelId,
                     });
-                    setUserModels((prev) =>
-                      prev.map((m) => (m.internalId === editingModelId ? updatedModel : m))
-                    );
+                    updateUserModel(updatedModel, newModelForm);
                   }
                 } else {
                   const newModel = await api.addModel({

@@ -41,6 +41,16 @@ pub struct UsageQuota {
 }
 
 impl UsageQuota {
+    fn balance(amount: f64, unit: &str) -> Option<Self> {
+        (amount.is_finite() && !unit.trim().is_empty()).then(|| Self {
+            percentage: 0.0,
+            reset_at: 0,
+            period: None,
+            balance: Some(amount),
+            balance_unit: Some(unit.to_string()),
+        })
+    }
+
     fn window(period: QuotaPeriod, used: f64, reset_at: Option<i64>) -> Option<Self> {
         used.is_finite().then(|| Self {
             percentage: used.clamp(0.0, 100.0),
@@ -298,12 +308,61 @@ pub(crate) fn parse_f64(value: &serde_json::Value) -> Option<f64> {
     value
         .as_f64()
         .or_else(|| value.as_str().and_then(|s| s.parse().ok()))
+        .filter(|value| value.is_finite())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn balance_payloads_keep_real_amounts_without_a_percentage_or_reset() {
+        for amount in [0.0, -1.25, 5384.70840195] {
+            let quota = UsageQuota::balance(amount, "USD").unwrap();
+            assert_eq!(quota.balance, Some(amount));
+            assert_eq!(quota.balance_unit.as_deref(), Some("USD"));
+            assert_eq!(quota.period, None);
+            assert_eq!(quota.percentage, 0.0);
+            assert_eq!(quota.reset_at, 0);
+        }
+        for amount in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(UsageQuota::balance(amount, "USD").is_none());
+        }
+        assert!(UsageQuota::balance(1.0, " ").is_none());
+        for value in [json!("NaN"), json!("inf"), json!("1e999"), json!(null)] {
+            assert!(parse_f64(&value).is_none());
+        }
+        assert_eq!(parse_f64(&json!("0")), Some(0.0));
+    }
+
+    #[test]
+    fn official_balance_hosts_do_not_match_relay_names_paths_or_plain_http() {
+        for host in [
+            "api.deepseek.com",
+            "api.siliconflow.cn",
+            "api.siliconflow.com",
+            "api.stepfun.com",
+            "api.stepfun.ai",
+            "api.novita.ai",
+            "openrouter.ai",
+            "zenmux.ai",
+        ] {
+            assert!(!matches!(
+                detect_provider(&format!("https://{host}/v1")),
+                Some(Provider::Sub2Api(_))
+            ));
+            for base in [
+                format!("https://{host}.relay.example/v1"),
+                format!("https://relay.example/{host}/v1"),
+                format!("https://relay.example/v1?host={host}"),
+                format!("http://{host}/v1"),
+                format!("https://user@{host}/v1"),
+            ] {
+                assert!(matches!(detect_provider(&base), Some(Provider::Sub2Api(_))));
+            }
+        }
+    }
 
     #[test]
     fn reset_times_accept_iso_seconds_and_milliseconds_but_not_missing_values() {
@@ -373,5 +432,39 @@ mod tests {
             assert!(!error.contains("test-api-key"));
             server.join().unwrap();
         }
+    }
+
+    #[tokio::test]
+    async fn request_success_positive_control_sends_required_json_headers() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}/balance", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                .unwrap();
+            let mut request = Vec::new();
+            let mut chunk = [0; 4096];
+            while !request.windows(4).any(|bytes| bytes == b"\r\n\r\n") {
+                let length = stream.read(&mut chunk).unwrap();
+                assert!(length > 0);
+                request.extend_from_slice(&chunk[..length]);
+            }
+            let request = String::from_utf8_lossy(&request).to_ascii_lowercase();
+            assert!(request.contains("authorization: bearer fixture-key"));
+            assert!(request.contains("accept: application/json"));
+            assert!(request.contains("content-type: application/json"));
+            let body = r#"{"availableBalance":"1000000"}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+        });
+        let body = fetch_usage(&endpoint, "Bearer fixture-key").await.unwrap();
+        assert_eq!(body["availableBalance"], "1000000");
+        server.join().unwrap();
     }
 }

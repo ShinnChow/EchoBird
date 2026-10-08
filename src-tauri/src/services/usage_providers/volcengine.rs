@@ -12,7 +12,7 @@
 //! session/weekly/monthly quota fields that the console Cookie endpoint does;
 //! this is a best-effort implementation.
 
-use super::{now_millis, parse_f64, ModelUsageData, UsageProvider, UsageQuota, UsageResult};
+use super::{api_url, parse_f64, UsageProvider, UsageQuota, UsageResult};
 use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -204,13 +204,16 @@ fn normalize_level(s: &str) -> Option<&'static str> {
 }
 
 fn norm_percent(v: &serde_json::Value) -> Option<f64> {
-    let n = parse_f64(v)?;
-    Some(if n <= 1.0 { n * 100.0 } else { n })
+    parse_f64(v).filter(|n| n.is_finite() && (0.0..=100.0).contains(n))
 }
 
 fn norm_reset_ms(v: &serde_json::Value) -> Option<i64> {
-    let n = parse_f64(v)? as i64;
-    Some(if n > 1_000_000_000_000 { n } else { n * 1000 })
+    // GetCodingPlanUsage returns epoch seconds.
+    let seconds = v.as_i64().or_else(|| v.as_str()?.parse::<i64>().ok())?;
+    if seconds <= 0 {
+        return None;
+    }
+    seconds.checked_mul(1000)
 }
 
 /// Extract (level, percent, reset_ms) from a quota record object.
@@ -247,7 +250,7 @@ fn extract_record(obj: &serde_json::Value) -> Option<(&'static str, f64, i64)> {
     ]
     .iter()
     .find_map(|k| obj.get(k).and_then(norm_reset_ms))
-    .unwrap_or_else(now_millis);
+    .unwrap_or(0);
     Some((level, percent, reset))
 }
 
@@ -299,14 +302,14 @@ fn parse_usage(raw: &serde_json::Value) -> Option<Vec<UsageQuota>> {
             .or_else(|| direct("FiveHourPercent"))
             .or_else(|| direct("SessionPercent"))
         {
-            records.push(("session", p, now_millis()));
+            records.push(("session", p, 0));
         }
         if let Some(p) = direct("WeekUsagePercentage").or_else(|| direct("WeeklyUsagePercentage")) {
-            records.push(("weekly", p, now_millis()));
+            records.push(("weekly", p, 0));
         }
         if let Some(p) = direct("MonthUsagePercentage").or_else(|| direct("MonthlyUsagePercentage"))
         {
-            records.push(("monthly", p, now_millis()));
+            records.push(("monthly", p, 0));
         }
     }
 
@@ -342,15 +345,14 @@ fn parse_usage(raw: &serde_json::Value) -> Option<Vec<UsageQuota>> {
 
 // ─── Provider trait ───
 
-fn region_from_url(base_url: &str) -> String {
-    let l = base_url.to_lowercase();
-    if l.contains("cn-beijing") {
-        "cn-beijing".to_string()
-    } else if l.contains("ap-southeast") {
-        "ap-southeast-1".to_string()
-    } else {
-        "cn-beijing".to_string()
-    }
+fn coding_region(base_url: &str) -> Option<&'static str> {
+    let url = api_url(base_url, &["ark.cn-beijing.volces.com"])?;
+    (url.port().is_none()
+        && matches!(
+            url.path().trim_end_matches('/'),
+            "/api/coding" | "/api/coding/v1" | "/api/coding/v3"
+        ))
+    .then_some("cn-beijing")
 }
 
 impl VolcengineProvider {
@@ -360,6 +362,7 @@ impl VolcengineProvider {
         internal_id: &str,
         base_url: &str,
     ) -> Result<UsageResult, String> {
+        let region = coding_region(base_url).ok_or("Unsupported Volcengine CodingPlan endpoint")?;
         let Some((access_key, secret_key)) = read_creds(internal_id) else {
             return Ok(UsageResult {
                 success: false,
@@ -367,75 +370,26 @@ impl VolcengineProvider {
                 error: Some("VOLC_AKSK_REQUIRED".to_string()),
             });
         };
-        let region = region_from_url(base_url);
-
-        let actions = [
-            "GetCodingPlanUsage",
-            "GetUsageDetails",
-            "GetAFPUsage",
-            "ListSeatInfoUsages",
-            "GetSeatInfoUsage",
-            "GetPersonalPlan",
-        ];
-        let body_variants: [serde_json::Value; 6] = [
-            serde_json::json!({ "ProjectName": PROJECT_NAME }),
-            serde_json::json!({ "ProjectName": PROJECT_NAME, "PlanType": "CodingPlan" }),
-            serde_json::json!({ "ProjectName": PROJECT_NAME, "ProductType": "CodingPlan" }),
-            serde_json::json!({ "ProjectName": PROJECT_NAME, "PackageType": "CodingPlan" }),
-            serde_json::json!({ "ProjectName": PROJECT_NAME, "ResourceType": "CodingPlan" }),
-            serde_json::json!({}),
-        ];
-
-        let mut first_err: Option<String> = None;
-        'outer: for action in actions {
-            for body in &body_variants {
-                match signed_ark_request(&access_key, &secret_key, &region, action, body).await {
-                    Ok(resp) => {
-                        if let Some(quotas) = parse_usage(&resp) {
-                            return Ok(UsageResult {
-                                success: true,
-                                data: Some(ModelUsageData {
-                                    quotas,
-                                    last_updated: Some(now_millis()),
-                                }),
-                                error: None,
-                            });
-                        }
-                        // parsed nothing -> try next variant
+        let body = serde_json::json!({ "ProjectName": PROJECT_NAME });
+        Ok(
+            match signed_ark_request(
+                &access_key,
+                &secret_key,
+                region,
+                "GetCodingPlanUsage",
+                &body,
+            )
+            .await
+            {
+                Ok(resp) => match parse_usage(&resp) {
+                    Some(quotas) => UsageResult::from_quotas(quotas),
+                    None => {
+                        UsageResult::failure("无法解析用量数据(AK/SK 接口可能不返回完整额度)。")
                     }
-                    Err(e) => {
-                        let low = e.to_lowercase();
-                        let is_auth_err = low.contains("invalidaccesskey")
-                            || low.contains("signaturedoesnotmatch")
-                            || low.contains("invalidaccesskeyid")
-                            || low.contains("accessdenied")
-                            || low.contains("authfailure")
-                            || low.contains("unauthorized")
-                            || low.contains("http 401")
-                            || low.contains("http 403");
-                        if first_err.is_none() {
-                            first_err = Some(e);
-                        }
-                        // Credential/signature errors fail every variant - stop early
-                        // (otherwise we'd burn through all 36 calls with the same bad key).
-                        if is_auth_err {
-                            break 'outer;
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(UsageResult {
-            success: false,
-            data: None,
-            error: Some(format!(
-                "无法解析用量数据(AK/SK 接口可能不返回完整额度)。{}",
-                first_err
-                    .map(|e| format!("最近错误: {e}"))
-                    .unwrap_or_default()
-            )),
-        })
+                },
+                Err(error) => UsageResult::failure(error),
+            },
+        )
     }
 }
 
@@ -454,11 +408,166 @@ impl UsageProvider for VolcengineProvider {
     }
 
     fn can_handle(&self, base_url: &str) -> bool {
-        let url = base_url.to_lowercase();
-        url.contains("ark.cn-beijing") || url.contains("volcengine") || url.contains("volces.com")
+        coding_region(base_url).is_some()
     }
 
     fn name(&self) -> &'static str {
         "Volcengine"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::services::usage_providers::QuotaPeriod;
+    use serde_json::json;
+
+    #[test]
+    fn coding_plan_percent_is_already_a_percentage_including_values_below_one() {
+        for percent in [0.0, 0.5, 1.0, 25.0, 100.0] {
+            let quotas = parse_usage(&json!({"Result":{"QuotaUsage":[{
+                "Level":"session","Percent":percent,"ResetTimestamp":1800000000
+            }]}}))
+            .unwrap();
+            assert_eq!(quotas.len(), 1);
+            assert_eq!(quotas[0].period, Some(QuotaPeriod::FiveHour));
+            assert_eq!(quotas[0].percentage, percent);
+            assert_eq!(quotas[0].reset_at, 1800000000000);
+        }
+    }
+
+    #[test]
+    fn parses_coding_windows_in_order_and_keeps_the_first_record() {
+        let quotas = parse_usage(&json!({"Result":{
+            "QuotaUsage":[
+                {"Level":"monthly","Percent":40,"ResetTimestamp":"1802000000"},
+                {"Level":"weekly","Percent":30,"ResetTimestamp":1801000000},
+                {"Level":"session","Percent":"25","ResetTimestamp":1800000000},
+                {"Level":"session","Percent":99,"ResetTimestamp":1803000000}
+            ],
+            "FiveHourUsagePercentage":80
+        }}))
+        .unwrap();
+        assert_eq!(quotas.len(), 3);
+        for (quota, period, percent, reset) in [
+            (&quotas[0], QuotaPeriod::FiveHour, 25.0, 1800000000000),
+            (&quotas[1], QuotaPeriod::Weekly, 30.0, 1801000000000),
+            (&quotas[2], QuotaPeriod::Monthly, 40.0, 1802000000000),
+        ] {
+            assert_eq!(quota.period, Some(period));
+            assert_eq!(quota.percentage, percent);
+            assert_eq!(quota.reset_at, reset);
+        }
+    }
+
+    #[test]
+    fn missing_or_invalid_reset_is_unknown_without_inventing_a_quota() {
+        let quotas = parse_usage(&json!({"Result":{"QuotaUsage":[{
+            "Level":"session","Percent":25
+        }]}}))
+        .unwrap();
+        assert_eq!(quotas[0].reset_at, 0);
+        for reset in [
+            json!(null),
+            json!(0),
+            json!(-1),
+            json!("bad"),
+            json!(i64::MAX),
+        ] {
+            let quotas = parse_usage(&json!({"Result":{"QuotaUsage":[{
+                "Level":"session","Percent":25,"ResetTimestamp":reset
+            }]}}))
+            .unwrap();
+            assert_eq!(quotas[0].reset_at, 0);
+        }
+        for percent in [
+            json!(null),
+            json!(-1),
+            json!(101),
+            json!("NaN"),
+            json!(true),
+        ] {
+            assert!(parse_usage(&json!({"Result":{"QuotaUsage":[{
+                "Level":"session","Percent":percent,"ResetTimestamp":1800000000
+            }]}}))
+            .is_none());
+        }
+        assert!(parse_usage(&json!({"Result":{"QuotaUsage":[{
+            "Level":"session","ResetTimestamp":1800000000
+        }]}}))
+        .is_none());
+        assert!(parse_usage(&json!({"Result":{"QuotaUsage":[]}})).is_none());
+    }
+
+    #[test]
+    fn direct_percentage_fallback_keeps_unknown_reset_times() {
+        let quotas = parse_usage(&json!({"Result":{
+            "FiveHourUsagePercentage":0.5,
+            "WeeklyUsagePercentage":1,
+            "MonthlyUsagePercentage":25
+        }}))
+        .unwrap();
+        assert_eq!(quotas.len(), 3);
+        assert_eq!(quotas[0].percentage, 0.5);
+        assert_eq!(quotas[1].percentage, 1.0);
+        assert_eq!(quotas[2].percentage, 25.0);
+        assert!(quotas.iter().all(|quota| quota.reset_at == 0));
+    }
+
+    #[test]
+    fn recognizes_only_existing_cn_coding_routes() {
+        for path in [
+            "/api/coding",
+            "/api/coding/",
+            "/api/coding/v1",
+            "/api/coding/v3/",
+        ] {
+            let url = format!("https://ark.cn-beijing.volces.com{path}");
+            assert!(VolcengineProvider.can_handle(&url));
+            assert_eq!(coding_region(&url), Some("cn-beijing"));
+        }
+        for url in [
+            "https://ark.cn-beijing.volces.com/api/plan",
+            "https://ark.cn-beijing.volces.com/api/v3/compatible",
+            "https://ark.cn-beijing.volces.com/api/coding-other",
+            "https://ark.cn-beijing.volces.com/api/coding/unknown",
+            "https://ark.cn-beijing.volces.com.evil.test/api/coding",
+            "https://evil.test/ark.cn-beijing.volces.com/api/coding",
+            "https://user@ark.cn-beijing.volces.com/api/coding",
+            "https://ark.cn-beijing.volces.com:8443/api/coding",
+            "http://ark.cn-beijing.volces.com/api/coding",
+            "https://ark.ap-southeast.bytepluses.com/api/coding",
+            "https://www.volcengine.com/api/coding",
+        ] {
+            assert!(!VolcengineProvider.can_handle(url), "{url}");
+        }
+        assert!(
+            VolcengineProvider.can_handle("https://ark.cn-beijing.volces.com:443/api/coding/v3")
+        );
+    }
+
+    #[test]
+    fn recognizes_bundled_and_remote_cn_coding_defaults_without_adding_byteplus_quota() {
+        for source in [
+            include_str!("../../../../src/data/modelDirectory.json"),
+            include_str!("../../../../docs/api/model-directory/index.json"),
+        ] {
+            let directory: serde_json::Value = serde_json::from_str(source).unwrap();
+            let providers = directory["providers"].as_array().unwrap();
+            let cn = providers
+                .iter()
+                .find(|entry| entry["name"] == "火山引擎")
+                .unwrap();
+            for key in ["baseUrl", "anthropicUrl"] {
+                assert!(VolcengineProvider.can_handle(cn[key].as_str().unwrap()));
+            }
+            let global = providers
+                .iter()
+                .find(|entry| entry["name"] == "BytePlus")
+                .unwrap();
+            for key in ["baseUrl", "anthropicUrl"] {
+                assert!(!VolcengineProvider.can_handle(global[key].as_str().unwrap()));
+            }
+        }
     }
 }

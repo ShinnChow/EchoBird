@@ -90,7 +90,7 @@ struct AccountMetadata {
     subscription_end_at: Option<i64>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AccountQuotaCache {
     #[serde(default)]
@@ -170,6 +170,10 @@ async fn refresh_auth_tokens(auth: &mut Value) -> Result<(), String> {
     if !status.is_success() {
         return Err(format!("accountError.auth|HTTP {}", status.as_u16()));
     }
+    apply_refreshed_tokens(auth, &body)
+}
+
+fn apply_refreshed_tokens(auth: &mut Value, body: &Value) -> Result<(), String> {
     let access_token = non_empty_string(body.get("access_token"))
         .ok_or_else(|| "accountError.format".to_string())?;
     let tokens = auth
@@ -186,6 +190,7 @@ async fn refresh_auth_tokens(auth: &mut Value) -> Result<(), String> {
             Value::String(next_refresh_token),
         );
     }
+    auth["last_refresh"] = Value::String(chrono::Utc::now().to_rfc3339());
     Ok(())
 }
 
@@ -764,21 +769,26 @@ async fn exchange_oauth_code(
     Ok(body)
 }
 
-fn store_oauth_token_response(token_response: &Value) -> Result<CodexAccountSummary, String> {
+fn auth_from_oauth_token_response(token_response: &Value) -> Result<Value, String> {
     let access_token = non_empty_string(token_response.get("access_token"))
         .ok_or_else(|| "accountError.authResponse".to_string())?;
     let id_token = non_empty_string(token_response.get("id_token"))
         .ok_or_else(|| "accountError.authResponse".to_string())?;
     let refresh_token = non_empty_string(token_response.get("refresh_token"));
-    let auth = serde_json::json!({
+    Ok(serde_json::json!({
         "auth_mode": "chatgpt",
         "tokens": {
             "id_token": id_token,
             "access_token": access_token,
             "refresh_token": refresh_token,
             "account_id": Value::Null,
-        }
-    });
+        },
+        "last_refresh": chrono::Utc::now().to_rfc3339(),
+    }))
+}
+
+fn store_oauth_token_response(token_response: &Value) -> Result<CodexAccountSummary, String> {
+    let auth = auth_from_oauth_token_response(token_response)?;
     let raw =
         serde_json::to_vec_pretty(&auth).map_err(|error| format!("accountError.format|{error}"))?;
     let metadata = save_snapshot(&raw, &auth, &account_store_dir()?)?;
@@ -1028,6 +1038,31 @@ pub fn delete_account(account_id: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn quota_cache_from_usage(
+    body: &Value,
+    plan: Option<String>,
+    cached: Option<AccountQuotaCache>,
+) -> Result<AccountQuotaCache, String> {
+    let quota_percent = quota_percent_from_usage(body)?
+        .or_else(|| cached.as_ref().and_then(|cache| cache.quota_percent));
+    let quota_reset_at = quota_reset_at_from_usage(body)
+        .or_else(|| cached.as_ref().and_then(|cache| cache.quota_reset_at));
+    let quota_windows = if body.get("rate_limit").is_some() {
+        ["primary_window", "secondary_window"]
+            .iter()
+            .filter_map(|key| quota_window(body, key))
+            .collect()
+    } else {
+        cached.map_or_else(Vec::new, |cache| cache.quota_windows)
+    };
+    Ok(AccountQuotaCache {
+        quota_percent,
+        quota_reset_at,
+        quota_windows,
+        plan,
+    })
+}
+
 pub async fn refresh_account_quota(account_id: &str) -> Result<CodexAccountSummary, String> {
     if !valid_account_id(account_id) {
         return Err("accountError.invalidAccount".to_string());
@@ -1080,41 +1115,13 @@ pub async fn refresh_account_quota(account_id: &str) -> Result<CodexAccountSumma
     }
     metadata.subscription_end_at = metadata_from_auth(&auth, &raw)?.subscription_end_at;
     let plan = non_empty_string(body.get("plan_type")).or_else(|| metadata.plan.clone());
-    let mut quota_percent = quota_percent_from_usage(&body)?;
-    if quota_percent.is_none()
-        && plan
-            .as_deref()
-            .is_some_and(|value| value.eq_ignore_ascii_case("free"))
-    {
-        quota_percent = Some(100);
-    }
-    let mut quota_reset_at = quota_reset_at_from_usage(&body);
-    if quota_percent.is_none() {
-        quota_percent =
-            read_quota_cache(&store_dir, account_id).and_then(|cache| cache.quota_percent);
-    }
-    if quota_reset_at.is_none() {
-        quota_reset_at =
-            read_quota_cache(&store_dir, account_id).and_then(|cache| cache.quota_reset_at);
-    }
-    let quota_windows = if body.get("rate_limit").is_some() {
-        ["primary_window", "secondary_window"]
-            .iter()
-            .filter_map(|key| quota_window(&body, key))
-            .collect::<Vec<_>>()
-    } else {
-        read_quota_cache(&store_dir, account_id).map_or_else(Vec::new, |cache| cache.quota_windows)
-    };
+    let quota_cache =
+        quota_cache_from_usage(&body, plan, read_quota_cache(&store_dir, account_id))?;
     write_private_file(
         &quota_path(&store_dir, account_id),
-        serde_json::to_string(&serde_json::json!({
-            "quotaPercent": quota_percent,
-            "quotaResetAt": quota_reset_at,
-            "quotaWindows": quota_windows,
-            "plan": plan,
-        }))
-        .map_err(|error| format!("accountError.quota|{error}"))?
-        .as_bytes(),
+        serde_json::to_string(&quota_cache)
+            .map_err(|error| format!("accountError.quota|{error}"))?
+            .as_bytes(),
     )?;
 
     let active_id = active_account_id(&codex_dir.join("auth.json"));
@@ -1220,6 +1227,116 @@ mod tests {
             }
         }))
         .unwrap()
+    }
+
+    fn assert_recent_last_refresh(auth: &Value, before: chrono::DateTime<chrono::Utc>) {
+        let refreshed =
+            chrono::DateTime::parse_from_rfc3339(auth["last_refresh"].as_str().unwrap()).unwrap();
+        assert_eq!(refreshed.offset().local_minus_utc(), 0);
+        assert!(refreshed >= before);
+        assert!(refreshed <= chrono::Utc::now());
+    }
+
+    #[test]
+    fn oauth_creation_records_native_last_refresh() {
+        let before = chrono::Utc::now();
+        let auth = auth_from_oauth_token_response(&json!({
+            "access_token":"fixture-access", "id_token":"fixture-id", "refresh_token":"fixture-refresh"
+        })).unwrap();
+        assert_recent_last_refresh(&auth, before);
+        assert_eq!(auth["auth_mode"], "chatgpt");
+        assert_eq!(auth["tokens"]["access_token"], "fixture-access");
+        assert_eq!(auth["tokens"]["id_token"], "fixture-id");
+        assert_eq!(auth["tokens"]["refresh_token"], "fixture-refresh");
+        assert_eq!(auth["tokens"]["account_id"], Value::Null);
+        assert!(auth_from_oauth_token_response(&json!({"access_token":"fixture"})).is_err());
+    }
+
+    #[test]
+    fn token_renewal_updates_last_refresh_and_preserves_or_rotates_optional_tokens() {
+        let mut auth: Value = serde_json::from_slice(&oauth(
+            "fixture@example.test",
+            "fixture-account",
+            "old-refresh",
+        ))
+        .unwrap();
+        auth["last_refresh"] = json!("2020-01-01T00:00:00Z");
+        auth["native_setting"] = json!(true);
+        let old_id = auth["tokens"]["id_token"].clone();
+        let before = chrono::Utc::now();
+        apply_refreshed_tokens(&mut auth, &json!({"access_token":"first-access"})).unwrap();
+        assert_recent_last_refresh(&auth, before);
+        assert_eq!(auth["tokens"]["id_token"], old_id);
+        assert_eq!(auth["tokens"]["refresh_token"], "old-refresh");
+
+        let before = chrono::Utc::now();
+        apply_refreshed_tokens(
+            &mut auth,
+            &json!({
+                "access_token":"next-access", "id_token":"next-id", "refresh_token":"next-refresh"
+            }),
+        )
+        .unwrap();
+        assert_recent_last_refresh(&auth, before);
+        assert_eq!(auth["tokens"]["access_token"], "next-access");
+        assert_eq!(auth["tokens"]["id_token"], "next-id");
+        assert_eq!(auth["tokens"]["refresh_token"], "next-refresh");
+        assert_eq!(auth["tokens"]["account_id"], "fixture-account");
+        assert_eq!(auth["native_setting"], true);
+    }
+
+    #[test]
+    fn rejected_token_updates_leave_tokens_and_last_refresh_unchanged() {
+        for body in [json!({}), json!({"access_token":" "})] {
+            let mut auth: Value = serde_json::from_slice(&oauth(
+                "fixture@example.test",
+                "fixture-account",
+                "fixture-refresh",
+            ))
+            .unwrap();
+            auth["last_refresh"] = json!("2020-01-01T00:00:00Z");
+            let original = auth.clone();
+            assert!(apply_refreshed_tokens(&mut auth, &body).is_err());
+            assert_eq!(auth, original);
+        }
+        let mut auth = json!({"tokens":null,"last_refresh":"2020-01-01T00:00:00Z"});
+        let original = auth.clone();
+        assert!(
+            apply_refreshed_tokens(&mut auth, &json!({"access_token":"fixture-access"})).is_err()
+        );
+        assert_eq!(auth, original);
+    }
+
+    #[test]
+    fn free_usage_without_windows_is_unknown_or_keeps_cached_quota() {
+        for body in [
+            json!({"plan_type":"free"}),
+            json!({"plan_type":"free","rate_limit":null}),
+            json!({"plan_type":"free","rate_limit":{}}),
+            json!({"plan_type":"free","rate_limit":{"primary_window":null,"secondary_window":null}}),
+        ] {
+            let cache = quota_cache_from_usage(&body, Some("free".into()), None).unwrap();
+            assert_eq!(cache.quota_percent, None);
+            assert_eq!(cache.quota_reset_at, None);
+            assert!(cache.quota_windows.is_empty());
+            let saved = AccountQuotaCache {
+                quota_percent: Some(25),
+                quota_reset_at: Some(1_800_000_100),
+                quota_windows: vec![],
+                plan: Some("free".into()),
+            };
+            let cache = quota_cache_from_usage(&body, Some("free".into()), Some(saved)).unwrap();
+            assert_eq!(cache.quota_percent, Some(25));
+            assert_eq!(cache.quota_reset_at, Some(1_800_000_100));
+        }
+        let cache = quota_cache_from_usage(
+            &json!({"rate_limit":{"primary_window":{"used_percent":0}}}),
+            Some("free".into()),
+            None,
+        )
+        .unwrap();
+        assert_eq!(cache.quota_percent, Some(100));
+        assert_eq!(serde_json::to_value(cache).unwrap()["quotaPercent"], 100);
     }
 
     #[test]

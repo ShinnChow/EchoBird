@@ -180,6 +180,7 @@ export type TKey =
   | 'model.akSkSecretKey'
   | 'model.balance'
   | 'model.quota.accessFailed'
+  | 'model.quota.refreshFailed'
   | 'model.quota.teamHint'
   | 'model.quota.fiveHour'
   | 'model.quota.daily'

@@ -234,6 +234,7 @@ const en: Translations = {
   'model.akSkSecretKey': 'Secret Access Key',
   'model.balance': 'Balance',
   'model.quota.accessFailed': 'Unable to load or save usage access settings.',
+  'model.quota.refreshFailed': 'Usage refresh failed for {n} models:',
   'model.quota.teamHint': 'Team plans require both IDs. Leave both empty to use a personal plan.',
   'model.quota.fiveHour': '5 hours',
   'model.quota.daily': 'Daily',

@@ -324,10 +324,6 @@ export function AccountCenterTitleActions() {
   const latest = useRef(providers);
   const batch = useRef<symbol | null>(null);
   const [running, setRunning] = useState<'refresh' | 'claim' | null>(null);
-  const claimedToday = useWorkBuddyClaimedToday(
-    activePage === 'accounts' &&
-      providers.some((provider) => provider.accounts.some((account) => account.claim))
-  );
   useEffect(() => {
     latest.current = providers;
   }, [providers]);
@@ -350,16 +346,11 @@ export function AccountCenterTitleActions() {
     );
   const blocked =
     context.isLaunching ||
-    activePage !== 'accounts' ||
     providers.some(
-      (provider) =>
-        provider.busy || provider.loading || provider.accounts.some((account) => account.refreshing)
+      (provider) => provider.busy || provider.accounts.some((account) => account.refreshing)
     );
-  const claimable = accounts.some(
-    ({ account }) => account.claim && !claimedToday(account.dailyClaimedAt)
-  );
   const run = async (action: 'refresh' | 'claim') => {
-    if (batch.current || blocked || !accounts.length || (action === 'claim' && !claimable)) return;
+    if (batch.current || blocked || activePage !== 'accounts' || !accounts.length) return;
     const request = Symbol();
     batch.current = request;
     setRunning(action);
@@ -376,17 +367,9 @@ export function AccountCenterTitleActions() {
           break;
         const provider = latest.current.find((provider) => provider.id === target.providerId);
         const account = provider?.accounts.find((account) => account.id === target.account.id);
-        if (
-          !provider?.installed ||
-          provider.busy ||
-          provider.loading ||
-          !account ||
-          account.refreshing
-        )
-          continue;
+        if (!provider?.installed || provider.busy || !account || account.refreshing) continue;
         if (action === 'claim') {
-          if (account.claim && !workBuddyClaimedToday(account.dailyClaimedAt))
-            await account.claim();
+          if (account.claim) await account.claim();
         } else {
           await account.refresh(collectError);
         }
@@ -419,7 +402,7 @@ export function AccountCenterTitleActions() {
       <button
         type="button"
         aria-label={t('accountCenter.claimAll')}
-        disabled={blocked || running !== null || !claimable}
+        disabled={blocked || running !== null}
         onClick={() => run('claim')}
         className={buttonClass}
       >
@@ -432,7 +415,7 @@ export function AccountCenterTitleActions() {
       <button
         type="button"
         aria-label={t('accountCenter.refreshAll')}
-        disabled={blocked || running !== null || !accounts.length}
+        disabled={blocked || running !== null}
         onClick={() => run('refresh')}
         className={buttonClass}
       >

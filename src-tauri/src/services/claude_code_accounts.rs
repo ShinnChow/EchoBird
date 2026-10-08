@@ -353,6 +353,36 @@ async fn request_quota(token: &str) -> Result<reqwest::Response, String> {
         .map_err(|_| "accountError.network".to_string())
 }
 
+fn quota_http_error(status: reqwest::StatusCode) -> String {
+    let key = match status.as_u16() {
+        401 => LOGIN_REQUIRED,
+        403 => "accountError.denied",
+        429 => "accountError.rateLimited",
+        500..=599 => "accountError.unavailable",
+        _ => "accountError.quota",
+    };
+    format!("{key}|HTTP {}", status.as_u16())
+}
+
+async fn renewal_response(response: reqwest::Response) -> Result<Value, String> {
+    let status = response.status();
+    let body = response.json::<Value>().await;
+    if !status.is_success() {
+        if status == reqwest::StatusCode::BAD_REQUEST
+            && body
+                .as_ref()
+                .is_ok_and(|body| body["error"].as_str() == Some("invalid_grant"))
+        {
+            return Err(format!(
+                "{LOGIN_REQUIRED}|HTTP {}|invalid_grant",
+                status.as_u16()
+            ));
+        }
+        return Err(quota_http_error(status));
+    }
+    body.map_err(|_| "accountError.format".to_string())
+}
+
 async fn renew(dir: &Path, account: &mut SavedAccount) -> Result<(), String> {
     let refresh_token = text(&account.oauth, "refreshToken").ok_or(LOGIN_REQUIRED)?;
     let old_token = text(&account.oauth, "accessToken")
@@ -369,13 +399,7 @@ async fn renew(dir: &Path, account: &mut SavedAccount) -> Result<(), String> {
         .send()
         .await
         .map_err(|_| "accountError.network".to_string())?;
-    if !response.status().is_success() {
-        return Err("accountError.loginRequired".to_string());
-    }
-    let body: Value = response
-        .json()
-        .await
-        .map_err(|_| "accountError.format".to_string())?;
+    let body = renewal_response(response).await?;
     let token = text(&body, "access_token").ok_or("accountError.format")?;
     account.oauth["accessToken"] = json!(token);
     if let Some(token) = text(&body, "refresh_token") {
@@ -410,11 +434,8 @@ pub async fn refresh(id: &str) -> Result<ClaudeCodeAccount, String> {
             request_quota(text(&account.oauth, "accessToken").ok_or(LOGIN_REQUIRED)?).await?;
     }
     let status = response.status();
-    if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
-        return Err("accountError.loginRequired".to_string());
-    }
     if !status.is_success() {
-        return Err(format!("accountError.quota|HTTP {}", status.as_u16()));
+        return Err(quota_http_error(status));
     }
     let body: Value = response
         .json()
@@ -444,6 +465,70 @@ pub async fn delete(id: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn renewal_preserves_http_failures_and_only_invalidates_explicit_credentials() {
+        use axum::{routing::any, Router};
+
+        for (status, body, expected) in [
+            (200, r#"{"access_token":"fixture-access"}"#, None),
+            (200, "not json", Some("accountError.format")),
+            (
+                400,
+                r#"{"error":"invalid_grant"}"#,
+                Some("accountError.loginRequired|HTTP 400|invalid_grant"),
+            ),
+            (
+                400,
+                r#"{"error":"invalid_request"}"#,
+                Some("accountError.quota|HTTP 400"),
+            ),
+            (
+                400,
+                r#"{"message":"invalid_grant"}"#,
+                Some("accountError.quota|HTTP 400"),
+            ),
+            (400, "invalid_grant", Some("accountError.quota|HTTP 400")),
+            (401, "not json", Some("accountError.loginRequired|HTTP 401")),
+            (
+                403,
+                r#"{"error":"invalid_grant"}"#,
+                Some("accountError.denied|HTTP 403"),
+            ),
+            (429, "not json", Some("accountError.rateLimited|HTTP 429")),
+            (503, "not json", Some("accountError.unavailable|HTTP 503")),
+        ] {
+            let status = reqwest::StatusCode::from_u16(status).unwrap();
+            let app = Router::new().fallback(any(move || async move { (status, body) }));
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let url = format!("http://{}", listener.local_addr().unwrap());
+            let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+            let response = reqwest::Client::new().get(url).send().await.unwrap();
+            let result = renewal_response(response).await;
+            server.abort();
+            if let Some(expected) = expected {
+                assert_eq!(result.unwrap_err(), expected);
+            } else {
+                assert_eq!(result.unwrap()["access_token"], "fixture-access");
+            }
+        }
+    }
+
+    #[test]
+    fn usage_denial_and_transient_failures_keep_their_status() {
+        for (status, expected) in [
+            (401, "accountError.loginRequired|HTTP 401"),
+            (403, "accountError.denied|HTTP 403"),
+            (429, "accountError.rateLimited|HTTP 429"),
+            (500, "accountError.unavailable|HTTP 500"),
+            (400, "accountError.quota|HTTP 400"),
+        ] {
+            assert_eq!(
+                quota_http_error(reqwest::StatusCode::from_u16(status).unwrap()),
+                expected
+            );
+        }
+    }
 
     #[test]
     fn recognizes_max_tiers_without_guessing_an_unknown_tier() {
