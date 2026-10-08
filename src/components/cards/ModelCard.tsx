@@ -86,7 +86,7 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
     // APIMart — API image/video relay; own-name match only (model brands win).
     [['apimart', 'api mart'], 'apimart'],
     [['grooroute'], 'grooroute'],
-    [['fluxion'], 'fluxion'],
+    [['sidrune', 'fluxion'], 'sidrune'],
   ];
 
   for (const [keywords, icon] of iconMap) {
@@ -96,7 +96,6 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
       if (icon === '88api') return './icons/models/88api.png';
       if (icon === 'apimart') return './icons/models/apimart.png';
       if (icon === 'grooroute') return './icons/models/grooroute.png';
-      if (icon === 'fluxion') return './icons/models/fluxion.png';
       if (icon === 'byteplus') return './icons/models/byteplus.png';
       if (icon === 'qianwen') return './icons/models/qianwen.png';
       return `./icons/models/${icon}.svg`;

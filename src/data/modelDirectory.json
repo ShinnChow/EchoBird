@@ -446,10 +446,10 @@
       "region": "cn"
     },
     {
-      "name": "Fluxion AI",
-      "url": "https://fluxionai.space/register?source=github&campaign=github-echobird&promo=ECHOBIRD",
-      "baseUrl": "https://fluxionai.space/v1",
-      "anthropicUrl": "https://fluxionai.space",
+      "name": "Sidrune AI",
+      "url": "https://sidrune.ai/register?source=github&campaign=github-echobird&promo=ECHOBIRD",
+      "baseUrl": "https://sidrune.ai/v1",
+      "anthropicUrl": "https://sidrune.ai",
       "modelId": "claude-opus-5",
       "modelIds": [
         "claude-opus-5",

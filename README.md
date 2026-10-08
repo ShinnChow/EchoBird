@@ -60,11 +60,11 @@
   </tr>
   <tr>
     <td width="150" align="center">
-      <a href="https://fluxionai.space/register?source=github&amp;campaign=github-echobird&amp;promo=ECHOBIRD"><img src="docs/sponsors/fluxion.png" width="92" alt="Fluxion AI" /></a>
+      <a href="https://sidrune.ai/register?source=github&amp;campaign=github-echobird&amp;promo=ECHOBIRD"><img src="docs/sponsors/sidrune.svg" width="92" alt="Sidrune AI" /></a>
     </td>
     <td>
-      <a href="https://fluxionai.space/register?source=github&amp;campaign=github-echobird&amp;promo=ECHOBIRD"><strong>Fluxion AI</strong></a><br/>
-      Fluxion AI helps individual developers and businesses access and manage leading AI models worldwide through a unified API. Dynamic routing across multiple upstream connections improves availability, with transparent model performance, response times, and costs. When using Fable 5.1, Fluxion AI can save up to approximately 90% compared with Claude's official API pricing.
+      <a href="https://sidrune.ai/register?source=github&amp;campaign=github-echobird&amp;promo=ECHOBIRD"><strong>Sidrune AI</strong></a><br/>
+      Sidrune AI helps individual developers and businesses access and manage leading AI models worldwide through a unified API. Dynamic routing across multiple upstream connections improves availability, with transparent model performance, response times, and costs. When using Fable 5.1, Sidrune AI can save up to approximately 90% compared with Claude's official API pricing.
     </td>
   </tr>
 </table>
