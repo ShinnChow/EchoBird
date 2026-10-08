@@ -61,7 +61,7 @@ const en: Translations = {
   'nav.localServer': 'Local LLM',
   'nav.smartRouter': 'Smart Router',
   'nav.motherAgent': 'One-Click Install',
-  'nav.feedback': 'Request a tool',
+  'nav.feedback': 'Suggest an app',
   'nav.changelog': 'Changelog',
   'changelog.loading': 'Loading…',
   'changelog.error': "Couldn't load the changelog — check your connection and try again.",
@@ -148,10 +148,10 @@ const en: Translations = {
     'Removes this entry from your "My AI Projects" list only — the project files on your machine stay where they are.',
   'page.localServer': 'LOCAL LLM',
   'page.motherAgent': 'ONE-CLICK INSTALL',
-  'page.feedback': 'REQUEST A TOOL',
-  'feedback.title': 'Tell us which AI tool you want supported',
+  'page.feedback': 'SUGGEST AN APP',
+  'feedback.title': 'Tell us which AI app you want EchoBird to support',
   'feedback.intro':
-    'Share the tool name, official website, and the features you need: installation, account switching, or model switching. Submit tool requests directly. For a problem report, first copy the last 30 log lines.',
+    'Share the app name, official website, and the features you need: installation, account switching, or model switching. Submit app suggestions directly. For a problem report, first copy the last 30 log lines.',
   'feedback.step1.title': 'Report a problem: Copy the last 30 log lines',
   'feedback.step1.desc':
     'When something goes wrong, copy the last 30 backend log lines and paste them into your report to help us identify the problem.',
@@ -159,9 +159,9 @@ const en: Translations = {
   'feedback.step1.copied': 'Copied to clipboard',
   'feedback.step1.empty': 'No logs to copy yet (app just started?)',
   'feedback.step1.failed': 'Copy failed, please try again',
-  'feedback.step2.title': 'Request a tool: Submit directly',
+  'feedback.step2.title': 'Suggest an app: Submit directly',
   'feedback.step2.desc':
-    'Click below to create a GitHub issue. For a tool request, describe the tool and the features you need. For a problem report, paste your logs and briefly describe what you were doing. We will follow up.',
+    'Click below to create a GitHub issue. For an app suggestion, describe the app and the features you need. For a problem report, paste your logs and briefly describe what you were doing. We will follow up.',
   'feedback.step2.button': 'Submit on GitHub',
   'feedback.step2.fallbackButton': 'Email us',
   'feedback.networkNote':

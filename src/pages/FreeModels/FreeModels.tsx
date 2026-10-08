@@ -950,7 +950,7 @@ export function FreeModelsMain() {
         >
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-card bg-cyber-accent/10 text-cyber-accent">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-card text-cyber-accent">
                 <Waypoints size={22} aria-hidden="true" />
               </div>
               <div className="text-lg font-semibold text-cyber-text">

@@ -64,7 +64,7 @@ const ja: Partial<Translations> = {
   'nav.localServer': 'ローカル LLM',
   'nav.smartRouter': 'スマートルーター',
   'nav.motherAgent': '簡単インストール',
-  'nav.feedback': '対応リクエスト',
+  'nav.feedback': 'アプリを提案',
   'nav.changelog': '更新履歴',
   'changelog.loading': '読み込み中…',
   'changelog.error': '更新履歴を読み込めませんでした。ネットワークを確認して再試行してください。',
@@ -166,10 +166,10 @@ const ja: Partial<Translations> = {
   'aiCareer.noActivity': 'アクティビティなし',
   'page.localServer': 'ローカル LLM',
   'page.motherAgent': 'ワンクリックインストール',
-  'page.feedback': '対応リクエスト',
-  'feedback.title': '対応してほしい AI ツールを教えてください',
+  'page.feedback': 'アプリを提案',
+  'feedback.title': 'EchoBird に対応してほしい AI アプリを教えてください',
   'feedback.intro':
-    'ツール名、公式サイト、インストール・アカウント切り替え・モデル切り替えなど必要な機能をお知らせください。対応リクエストはそのまま送信できます。不具合の報告時は、先に直近 30 行のログをコピーしてください。',
+    'アプリ名、公式サイト、インストール・アカウント切り替え・モデル切り替えなど必要な機能をお知らせください。アプリの提案はそのまま送信できます。不具合の報告時は、先に直近 30 行のログをコピーしてください。',
   'feedback.step1.title': '不具合の報告：直近 30 行のログをコピー',
   'feedback.step1.desc':
     '問題が発生した場合は、ボタンから直近 30 行のバックエンドログをコピーし、報告に貼り付けてください。原因の特定に役立ちます。',
@@ -177,9 +177,9 @@ const ja: Partial<Translations> = {
   'feedback.step1.copied': 'クリップボードにコピーしました',
   'feedback.step1.empty': 'コピーするログがありません（起動直後ですか？）',
   'feedback.step1.failed': 'コピーに失敗しました。もう一度お試しください',
-  'feedback.step2.title': '対応リクエスト：そのまま送信',
+  'feedback.step2.title': 'アプリを提案：そのまま送信',
   'feedback.step2.desc':
-    '下のボタンから GitHub issue を作成してください。対応リクエストにはツールと必要な機能を、不具合の報告にはログと簡単な操作内容をご記入ください。確認次第、対応を検討いたします。',
+    '下のボタンから GitHub issue を作成してください。アプリの提案にはアプリ名と必要な機能を、不具合の報告にはログと簡単な操作内容をご記入ください。確認次第、対応を検討いたします。',
   'feedback.step2.button': 'GitHub で送信',
   'feedback.step2.fallbackButton': 'メールで送信',
   'feedback.networkNote':
