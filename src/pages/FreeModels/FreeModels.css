@@ -63,12 +63,11 @@
 }
 
 .free-model-route-priority {
-  top: 50%;
+  top: -0.75rem;
   color: rgb(var(--accent-rgb) / 0.3);
-  font-size: 5rem;
+  font-size: 8.25rem;
   line-height: 1;
   letter-spacing: -0.08em;
-  transform: translateY(-50%);
 }
 
 .free-model-route-node.is-active {

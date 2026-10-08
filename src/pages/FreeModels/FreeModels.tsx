@@ -904,8 +904,7 @@ export function FreeModelsMain() {
   const routeRowCount = Math.ceil(selectedModels.length / nodeColumns);
   const stageMinHeight = Math.max(
     550,
-    24 +
-      156 +
+    156 +
       HUB_TO_NODE_GAP +
       routeRowCount * 80 +
       Math.max(0, routeRowCount - 1) * NODE_ROW_GAP +
@@ -914,10 +913,10 @@ export function FreeModelsMain() {
   );
 
   return (
-    <div className="free-model-router h-full min-h-[620px] px-2 py-1">
+    <div className="free-model-router h-full min-h-[620px] px-2 pb-1">
       <div
         ref={stageRef}
-        className={`relative h-full pt-6 overflow-hidden ${routerEnabled ? '' : 'is-disabled'}`}
+        className={`relative h-full overflow-hidden ${routerEnabled ? '' : 'is-disabled'}`}
         style={{ minHeight: stageMinHeight }}
       >
         <svg
