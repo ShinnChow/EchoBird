@@ -7,7 +7,13 @@
       "baseUrl": "https://token-plan-cn.xiaomimimo.com/v1",
       "anthropicUrl": "https://token-plan-cn.xiaomimimo.com/anthropic",
       "modelId": "mimo-v2.6-pro",
-      "modelIds": ["mimo-v2.6-pro", "mimo-v2.6-flash", "mimo-v2.5-pro", "mimo-v2.5"],
+      "modelIds": [
+        "mimo-v2.6-pro",
+        "mimo-v2.6-pro-ultraspeed",
+        "mimo-v2.6-flash",
+        "mimo-v2.5-pro",
+        "mimo-v2.5"
+      ],
       "region": "cn"
     },
     {
@@ -25,7 +31,7 @@
       "baseUrl": "https://api.minimax.io/v1",
       "anthropicUrl": "https://api.minimax.io/anthropic",
       "modelId": "MiniMax-M3",
-      "modelIds": ["MiniMax-M3", "MiniMax-M2.7"],
+      "modelIds": ["MiniMax-M3.1-Flash-Preview", "MiniMax-M3", "MiniMax-M2.7"],
       "region": "global"
     },
     {
@@ -34,7 +40,7 @@
       "baseUrl": "https://api.minimax.cn/v1",
       "anthropicUrl": "https://api.minimax.cn/anthropic",
       "modelId": "MiniMax-M3",
-      "modelIds": ["MiniMax-M3", "MiniMax-M2.7"],
+      "modelIds": ["MiniMax-M3.1-Flash-Preview", "MiniMax-M3", "MiniMax-M2.7"],
       "region": "cn"
     },
     {
@@ -43,7 +49,7 @@
       "baseUrl": "https://open.bigmodel.cn/api/coding/paas/v4",
       "anthropicUrl": "https://open.bigmodel.cn/api/anthropic",
       "modelId": "glm-5.3",
-      "modelIds": ["glm-5.3", "glm-5.3-flash"],
+      "modelIds": ["glm-5.3", "glm-5.3-flash", "glm-5-turbo"],
       "region": "cn"
     },
     {
@@ -214,9 +220,54 @@
         "glm-5.3",
         "deepseek-v4-pro",
         "deepseek-v4-flash-0731",
-        "deepseek-v4-flash-vision-exp"
+        "deepseek-v4-flash-vision-exp",
+        "auto",
+        "qwen3.8-flash",
+        "deepseek-v4.1-flash",
+        "glm-5.2",
+        "deepseek-v4-pro-0813",
+        "qwen3.6-plus",
+        "deepseek-v4-flash",
+        "deepseek-v3.2",
+        "kimi-k2.7-code",
+        "kimi-k2.6",
+        "kimi-k2.5",
+        "glm-5.1",
+        "glm-5",
+        "MiniMax-M2.5"
       ],
       "region": "cn"
+    },
+    {
+      "name": "Qwen Global",
+      "url": "https://modelstudio.console.alibabacloud.com/",
+      "baseUrl": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+      "anthropicUrl": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/apps/anthropic",
+      "modelId": "qwen3.8-max",
+      "modelIds": [
+        "auto",
+        "qwen3.8-max",
+        "qwen3.8-flash",
+        "qwen3.7-max",
+        "qwen3.7-plus",
+        "qwen3.6-flash",
+        "glm-5.3",
+        "glm-5.2",
+        "deepseek-v4.1-flash",
+        "deepseek-v4-pro",
+        "deepseek-v4-pro-0813",
+        "deepseek-v4-flash-0731",
+        "qwen3.6-plus",
+        "deepseek-v4-flash",
+        "deepseek-v3.2",
+        "kimi-k2.7-code",
+        "kimi-k2.6",
+        "kimi-k2.5",
+        "glm-5.1",
+        "glm-5",
+        "MiniMax-M2.5"
+      ],
+      "region": "global"
     },
     {
       "name": "Anthropic",

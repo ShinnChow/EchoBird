@@ -13,6 +13,7 @@ use std::path::Path;
 /// Canonical Codex config identity. Every apply_codex run reuses this
 /// provider section so model switches do not accumulate stale sections.
 const CODEX_PROVIDER: &str = "OpenAI";
+const DEEPSEEK_DESKTOP_EFFORTS: &str = r#"["low", "medium", "high", "xhigh", "ultra", "max"]"#;
 
 // ─── Per-model capability registry ───
 //
@@ -31,6 +32,7 @@ const DEFAULT_CODEX_CONTEXT_WINDOW: u64 = 1_000_000;
 /// the historic Codex default — so unknown models keep working as before.
 fn model_context_window_for(model_id: &str) -> u64 {
     match model_id {
+        "deepseek-flash" | "deepseek-v4-pro" => 1_048_576,
         "MiniMax-M3" => 1_000_000,
         "MiniMax-M2.7" => 204_800,
         _ => DEFAULT_CODEX_CONTEXT_WINDOW,
@@ -54,6 +56,19 @@ fn codex_web_search_mode(base_url: &str, enabled: Option<bool>) -> &'static str 
     } else {
         "disabled"
     }
+}
+
+fn codex_responses_base_url(base_url: &str) -> String {
+    let base_url = base_url.trim_end_matches('/');
+    if let Ok(mut url) = url::Url::parse(base_url) {
+        if matches!(url.host_str(), Some("open.bigmodel.cn" | "api.z.ai"))
+            && matches!(url.path(), "/api/coding/paas/v4" | "/api/paas/v4")
+        {
+            url.set_path("/api/v1");
+            return url.to_string();
+        }
+    }
+    base_url.to_string()
 }
 
 // Codex CLI and ChatGPT desktop share ~/.codex/config.toml.
@@ -97,7 +112,13 @@ fn write_codex_canonical_fields(
     // Top-level string keys.
     c = toml_write_top(&c, "model_provider", CODEX_PROVIDER);
     c = toml_write_top(&c, "model", model);
-    c = toml_write_top(&c, "model_reasoning_effort", "high");
+    let template = codex_catalog::template_for_model(codex_base_url, model);
+    let reasoning = template
+        .as_ref()
+        .filter(|_| !codex_catalog::url_matches_domain(codex_base_url, "xiaomimimo.com"))
+        .and_then(|t| t["default_reasoning_level"].as_str())
+        .unwrap_or("high");
+    c = toml_write_top(&c, "model_reasoning_effort", reasoning);
     // Evict legacy keys we no longer own. Older EchoBird versions wrote
     // `review_model = "gpt-5.5"`; we stopped writing it (Codex no longer
     // consumes it). But our TOML helpers are update-or-insert — they
@@ -135,6 +156,45 @@ fn write_codex_canonical_fields(
     if codex_catalog::url_matches_domain(codex_base_url, "xiaomimimo.com") {
         c = toml_write_top_raw(&c, "model_supports_reasoning_summaries", "true");
         c = toml_write_top(&c, "model_reasoning_summary", "none");
+    }
+
+    // DeepSeek's desktop allowlist exposes max; the catalog still limits
+    // the selected model to its supported low/high/max reasoning levels.
+    if codex_catalog::url_matches_domain(codex_base_url, "deepseek.com") {
+        c = toml_write_table_value_raw(
+            &c,
+            "desktop",
+            "enabled-reasoning-efforts",
+            DEEPSEEK_DESKTOP_EFFORTS,
+        );
+    } else {
+        let previous_provider = toml_read_top(content, "model_provider");
+        let previous_url = toml_read_table_value(
+            content,
+            &format!("model_providers.{previous_provider}"),
+            "base_url",
+        );
+        if codex_catalog::url_matches_domain(&previous_url, "deepseek.com")
+            && toml_read_table_value(content, "desktop", "enabled-reasoning-efforts")
+                == DEEPSEEK_DESKTOP_EFFORTS
+        {
+            // Remove only our exact list when leaving DeepSeek, keeping
+            // custom effort lists and every other desktop setting.
+            let mut in_desktop = false;
+            c = c
+                .lines()
+                .filter(|line| {
+                    let t = line.trim();
+                    if t.starts_with('[') && t.ends_with(']') {
+                        in_desktop = t == "[desktop]";
+                    }
+                    !in_desktop
+                        || t.split_once('=')
+                            .map_or(true, |(key, _)| key.trim() != "enabled-reasoning-efforts")
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+        }
     }
 
     // [model_providers.OpenAI] string keys.
@@ -191,12 +251,12 @@ pub(crate) fn apply_codex_at(
         };
     }
 
-    let base_url = model_info
-        .base_url
-        .as_deref()
-        .unwrap_or("https://api.openai.com/v1")
-        .trim_end_matches('/')
-        .to_string();
+    let base_url = codex_responses_base_url(
+        model_info
+            .base_url
+            .as_deref()
+            .unwrap_or("https://api.openai.com/v1"),
+    );
 
     // For local-LLM endpoints (127.0.0.1 / localhost), llama-server
     // ignores the API key entirely. Codex CLI, on the other hand, refuses to
@@ -255,7 +315,11 @@ pub(crate) fn apply_codex_at(
     // Resolve the real context window for the selected model so Codex writes
     // `model_context_window` / `model_auto_compact_token_limit` matching the
     // model's actual token budget rather than the historic 1M default.
-    let context_window = model_context_window_for(model_id);
+    let catalog_template = codex_catalog::template_for_model(&base_url, model_id);
+    let context_window = catalog_template
+        .as_ref()
+        .and_then(|template| template["context_window"].as_u64())
+        .unwrap_or_else(|| model_context_window_for(model_id));
 
     ensure_parent(&config_path);
 
@@ -274,17 +338,15 @@ pub(crate) fn apply_codex_at(
         model_info.web_search,
     );
 
-    // Model catalog — direct third-party providers (DeepSeek / MiniMax / MiMo)
+    // Model catalog — documented direct third-party providers
     // need `model_catalog_json` so Codex knows the real model's context window,
     // reasoning levels, and tool capabilities. Vendors without a bundled
     // catalog keep Codex's default behavior.
     // The stale line is evicted by `write_codex_canonical_fields` on every
     // canonicalize, so switching to a non-catalog vendor cannot leave a
     // dangling pointer.
-    let catalog_template = codex_catalog::template_for_url(&base_url);
-    if let Some(template_str) = catalog_template {
-        let catalog_path = codex_catalog::models_json_path();
-        let template = serde_json::from_str(template_str).unwrap_or_default();
+    if let Some(template) = catalog_template {
+        let catalog_path = codex_catalog::models_json_path(codex_dir);
         // Stamp the SELECTED model onto the vendor capability template and
         // write a single-entry catalog. Unknown model versions remain usable
         // with conservative capabilities; vendor-documented image models are
@@ -295,16 +357,19 @@ pub(crate) fn apply_codex_at(
             model_info.name.as_deref().unwrap_or(model_id),
             context_window,
         );
-        // Only add the config line if the file write succeeded — a dangling
-        // model_catalog_json pointing at a missing file makes Codex error on
-        // startup.
-        if write_json_file(&catalog_path, &catalog).is_ok() {
-            new_content = toml_write_top(
-                &new_content,
-                "model_catalog_json",
-                &catalog_path.to_string_lossy(),
-            );
+        // Abort before changing config/auth if the required capability
+        // catalog cannot be written.
+        if let Err(error) = write_json_file(&catalog_path, &catalog) {
+            return ApplyResult {
+                success: false,
+                message: format!("Codex model catalog error: {error}"),
+            };
         }
+        new_content = toml_write_top(
+            &new_content,
+            "model_catalog_json",
+            &catalog_path.to_string_lossy(),
+        );
     } else {
         // Leaving a bundled vendor for a non-bundled vendor:
         // the canonical write evicted the `model_catalog_json` line, so Codex
@@ -314,7 +379,7 @@ pub(crate) fn apply_codex_at(
         // pointed at a different path (e.g. MiniMax docs' custom-catalog.json)
         // must not trigger deletion of our file, and a config that never
         // mentioned a catalog must leave whatever's on disk alone.
-        let catalog_path = codex_catalog::models_json_path();
+        let catalog_path = codex_catalog::models_json_path(codex_dir);
         if codex_catalog_referenced(&existing, &catalog_path.to_string_lossy())
             && catalog_path.exists()
         {
@@ -689,6 +754,334 @@ mod tests {
     #[test]
     fn model_context_window_for_known_model() {
         assert_eq!(model_context_window_for("MiniMax-M2.7"), 204_800);
+    }
+
+    #[test]
+    fn deepseek_context_matches_official_catalog_in_config_and_generated_catalog() {
+        let template = serde_json::from_str(codex_catalog::DEEPSEEK_TEMPLATE).unwrap();
+        for model in ["deepseek-flash", "deepseek-v4-pro"] {
+            let context = model_context_window_for(model);
+            assert_eq!(context, 1_048_576);
+            let config =
+                write_codex_canonical_fields("", "https://api.deepseek.com", model, context, None);
+            assert_eq!(toml_read_top(&config, "model_context_window"), "1048576");
+            assert_eq!(
+                toml_read_top(&config, "model_auto_compact_token_limit"),
+                "943718"
+            );
+            let catalog = codex_catalog::build_catalog(&template, model, "Custom name", context);
+            assert_eq!(catalog["models"][0]["context_window"], 1_048_576);
+            assert_eq!(catalog["models"][0]["max_context_window"], 1_048_576);
+            assert_eq!(catalog["models"][0]["display_name"], "Custom name");
+        }
+    }
+
+    #[test]
+    fn deepseek_desktop_efforts_preserve_settings_and_do_not_leak_on_switch() {
+        let mut config = "# keep\nshow_raw_agent_reasoning = false\n\
+                          [desktop]\ncustom-setting = true\n\
+                          [projects.fixture]\ntrust_level = \"trusted\"\n"
+            .to_string();
+        for model in ["deepseek-flash", "deepseek-v4-pro", "deepseek-v4-pro"] {
+            config = write_codex_canonical_fields(
+                &config,
+                "https://api.deepseek.com",
+                model,
+                model_context_window_for(model),
+                None,
+            );
+            assert_eq!(
+                toml_read_table_value(&config, "desktop", "enabled-reasoning-efforts"),
+                DEEPSEEK_DESKTOP_EFFORTS
+            );
+            assert_eq!(config.matches("[desktop]").count(), 1);
+            assert_eq!(config.matches("enabled-reasoning-efforts =").count(), 1);
+        }
+        let reapplied = write_codex_canonical_fields(
+            &config,
+            "https://api.deepseek.com",
+            "deepseek-v4-pro",
+            model_context_window_for("deepseek-v4-pro"),
+            None,
+        );
+        assert_eq!(reapplied, config);
+
+        for base_url in [
+            "https://api.xiaomimimo.com/v1",
+            "https://provider.example/v1",
+        ] {
+            let other = write_codex_canonical_fields(
+                &config,
+                base_url,
+                "other-model",
+                DEFAULT_CODEX_CONTEXT_WINDOW,
+                None,
+            );
+            assert!(!other.contains("enabled-reasoning-efforts"));
+            assert!(other.contains("# keep"));
+            assert_eq!(toml_read_top(&other, "show_raw_agent_reasoning"), "false");
+            assert_eq!(
+                toml_read_table_value(&other, "desktop", "custom-setting"),
+                "true"
+            );
+            assert_eq!(
+                toml_read_table_value(&other, "projects.fixture", "trust_level"),
+                "trusted"
+            );
+        }
+    }
+
+    #[test]
+    fn other_providers_preserve_custom_desktop_efforts() {
+        for previous_url in ["https://api.deepseek.com", "https://provider.example/v1"] {
+            let config = format!(
+                "model_provider = \"custom\"\n\
+                 [desktop]\nenabled-reasoning-efforts = [\"none\", \"high\"]\n\
+                 [model_providers.custom]\nbase_url = \"{previous_url}\"\n"
+            );
+            let other = write_codex_canonical_fields(
+                &config,
+                "https://api.xiaomimimo.com/v1",
+                "mimo-v2.5",
+                DEFAULT_CODEX_CONTEXT_WINDOW,
+                None,
+            );
+            assert_eq!(
+                toml_read_table_value(&other, "desktop", "enabled-reasoning-efforts"),
+                r#"["none", "high"]"#
+            );
+        }
+    }
+
+    #[test]
+    fn vendor_application_writes_isolated_catalogs_and_preserves_switching_state() {
+        let fixture =
+            std::env::temp_dir().join(format!("echobird-codex-catalog-{}", uuid::Uuid::new_v4()));
+        let codex_dir = fixture.join("codex");
+        let state_dir = fixture.join("state");
+        fs::create_dir_all(&codex_dir).unwrap();
+        let config_path = codex_dir.join("config.toml");
+        let catalog_path = codex_dir.join("models.json");
+        let original_auth = r#"{"OPENAI_API_KEY":"fixture-before"}"#;
+        fs::write(codex_dir.join("auth.json"), original_auth).unwrap();
+        fs::write(
+            &config_path,
+            "# keep\n[projects.fixture]\ntrust_level = \"trusted\"\n",
+        )
+        .unwrap();
+
+        for tool in ["codex", "chatgptdesktop"] {
+            for (base_url, model, expected_base, context, effort) in [
+                (
+                    "https://api.deepseek.com",
+                    "deepseek-flash",
+                    "https://api.deepseek.com",
+                    1_048_576,
+                    "high",
+                ),
+                (
+                    "https://api.xiaomimimo.com/v1",
+                    "mimo-v2.6-pro",
+                    "https://api.xiaomimimo.com/v1",
+                    1_048_576,
+                    "high",
+                ),
+                (
+                    "https://token-plan-cn.xiaomimimo.com/v1",
+                    "mimo-v2.5-pro",
+                    "https://token-plan-cn.xiaomimimo.com/v1",
+                    1_048_576,
+                    "high",
+                ),
+                (
+                    "https://api.minimax.cn/v1",
+                    "MiniMax-M3.1-Flash-Preview",
+                    "https://api.minimax.cn/v1",
+                    524_288,
+                    "max",
+                ),
+                (
+                    "https://api.minimax.io/v1",
+                    "MiniMax-M3.1-Flash-Preview",
+                    "https://api.minimax.io/v1",
+                    524_288,
+                    "max",
+                ),
+                (
+                    "https://open.bigmodel.cn/api/coding/paas/v4",
+                    "glm-5.3",
+                    "https://open.bigmodel.cn/api/v1",
+                    1_048_576,
+                    "max",
+                ),
+                (
+                    "https://api.z.ai/api/coding/paas/v4",
+                    "glm-5.3",
+                    "https://api.z.ai/api/v1",
+                    1_048_576,
+                    "max",
+                ),
+                (
+                    "https://open.bigmodel.cn/api/v1",
+                    "glm-5-turbo",
+                    "https://open.bigmodel.cn/api/v1",
+                    204_800,
+                    "max",
+                ),
+                (
+                    "https://token-plan.maas.qianwenaiapi.com/compatible-mode/v1",
+                    "qwen3.8-max",
+                    "https://token-plan.maas.qianwenaiapi.com/compatible-mode/v1",
+                    983_616,
+                    "xhigh",
+                ),
+                (
+                    "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+                    "qwen3.8-flash",
+                    "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+                    983_616,
+                    "xhigh",
+                ),
+                (
+                    "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+                    "deepseek-v4-pro",
+                    "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+                    163_840,
+                    "medium",
+                ),
+                (
+                    "https://workspace.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+                    "qwen3.8-max",
+                    "https://workspace.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+                    983_616,
+                    "xhigh",
+                ),
+            ] {
+                let info: ModelInfo = serde_json::from_value(serde_json::json!({
+                    "name": "Custom name", "model": model, "baseUrl": base_url,
+                    "apiKey": "fixture-key", "webSearch": false
+                }))
+                .unwrap();
+                let result = apply_codex_at(tool, &info, &codex_dir, &state_dir);
+                assert!(result.success, "{}", result.message);
+                let config = fs::read_to_string(&config_path).unwrap();
+                assert_eq!(
+                    toml_read_table_value(&config, "model_providers.OpenAI", "base_url"),
+                    expected_base
+                );
+                assert_eq!(
+                    toml_read_table_value(&config, "model_providers.OpenAI", "wire_api"),
+                    "responses"
+                );
+                assert_eq!(
+                    toml_read_top(&config, "model_context_window"),
+                    context.to_string()
+                );
+                assert_eq!(
+                    toml_read_top(&config, "model_auto_compact_token_limit"),
+                    codex_compact_limit_for(context).to_string()
+                );
+                assert_eq!(toml_read_top(&config, "model_reasoning_effort"), effort);
+                assert_eq!(
+                    toml_read_top(&config, "model_catalog_json"),
+                    catalog_path.to_string_lossy().replace('\\', "/")
+                );
+                assert_eq!(
+                    toml_read_table_value(&config, "projects.fixture", "trust_level"),
+                    "trusted"
+                );
+                assert!(config.contains("# keep"));
+                let catalog: serde_json::Value =
+                    serde_json::from_str(&fs::read_to_string(&catalog_path).unwrap()).unwrap();
+                assert_eq!(catalog["models"].as_array().unwrap().len(), 1);
+                assert_eq!(catalog["models"][0]["slug"], model);
+                assert_eq!(catalog["models"][0]["display_name"], "Custom name");
+                assert_eq!(catalog["models"][0]["context_window"], context);
+                let before = config;
+                assert!(apply_codex_at(tool, &info, &codex_dir, &state_dir).success);
+                assert_eq!(fs::read_to_string(&config_path).unwrap(), before);
+            }
+        }
+        assert_eq!(
+            fs::read_to_string(state_dir.join("codex-auth.bak.json")).unwrap(),
+            original_auth
+        );
+        let unknown: ModelInfo = serde_json::from_value(serde_json::json!({
+            "model": "future", "baseUrl": "https://reseller.example/v1", "apiKey": "fixture-key"
+        }))
+        .unwrap();
+        assert!(apply_codex_at("codex", &unknown, &codex_dir, &state_dir).success);
+        assert!(!catalog_path.exists());
+        assert!(toml_read_top(
+            &fs::read_to_string(&config_path).unwrap(),
+            "model_catalog_json"
+        )
+        .is_empty());
+
+        let config_before = fs::read(&config_path).unwrap();
+        let auth_before = fs::read(codex_dir.join("auth.json")).unwrap();
+        let mut missing_key = unknown;
+        missing_key.api_key = None;
+        assert!(!apply_codex_at("codex", &missing_key, &codex_dir, &state_dir).success);
+        assert_eq!(fs::read(&config_path).unwrap(), config_before);
+        assert_eq!(fs::read(codex_dir.join("auth.json")).unwrap(), auth_before);
+        fs::remove_dir_all(fixture).unwrap();
+    }
+
+    #[test]
+    fn catalog_write_failure_preserves_config_and_auth() {
+        let fixture =
+            std::env::temp_dir().join(format!("echobird-codex-write-{}", uuid::Uuid::new_v4()));
+        let codex_dir = fixture.join("codex");
+        let state_dir = fixture.join("state");
+        let catalog_path = codex_dir.join("models.json");
+        fs::create_dir_all(&catalog_path).unwrap();
+        let config_path = codex_dir.join("config.toml");
+        let auth_path = codex_dir.join("auth.json");
+        let original_config = "model = \"before\"\n[projects.fixture]\ntrust_level = \"trusted\"\n";
+        let original_auth = r#"{"OPENAI_API_KEY":"fixture-before"}"#;
+        fs::write(&config_path, original_config).unwrap();
+        fs::write(&auth_path, original_auth).unwrap();
+        let info: ModelInfo = serde_json::from_value(serde_json::json!({
+            "model": "mimo-v2.6-pro", "baseUrl": "https://api.xiaomimimo.com/v1",
+            "apiKey": "fixture-new"
+        }))
+        .unwrap();
+
+        let result = apply_codex_at("codex", &info, &codex_dir, &state_dir);
+        assert!(!result.success);
+        assert!(result.message.contains("Codex model catalog error"));
+        assert_eq!(fs::read_to_string(&config_path).unwrap(), original_config);
+        assert_eq!(fs::read_to_string(&auth_path).unwrap(), original_auth);
+
+        fs::remove_dir(&catalog_path).unwrap();
+        assert!(apply_codex_at("codex", &info, &codex_dir, &state_dir).success);
+        assert!(catalog_path.is_file());
+        assert_eq!(
+            toml_read_top(&fs::read_to_string(&config_path).unwrap(), "model"),
+            "mimo-v2.6-pro"
+        );
+        fs::remove_dir_all(fixture).unwrap();
+    }
+
+    #[test]
+    fn responses_endpoint_normalization_only_changes_documented_glm_routes() {
+        for base_url in [
+            "https://open.bigmodel.cn/api/v1",
+            "https://api.z.ai/api/v1",
+            "https://reseller.example/api/coding/paas/v4",
+            "https://open.bigmodel.cn/custom/v1",
+        ] {
+            assert_eq!(codex_responses_base_url(base_url), base_url);
+        }
+        assert_eq!(
+            codex_responses_base_url("https://open.bigmodel.cn/api/paas/v4/"),
+            "https://open.bigmodel.cn/api/v1"
+        );
+        assert_eq!(
+            codex_responses_base_url("https://api.z.ai/api/coding/paas/v4/"),
+            "https://api.z.ai/api/v1"
+        );
     }
 
     #[test]
