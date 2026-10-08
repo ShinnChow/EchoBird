@@ -772,23 +772,30 @@ img[src*='/icons/tools/openscience.svg'] {
   animation: spinnerShimmer 2.4s linear infinite;
 }
 
-/* Spinner glyph — gentle pulse so the asterisk feels alive even between
-   character swaps */
-@keyframes spinnerGlyphPulse {
-  0%,
-  100% {
-    opacity: 0.65;
-    transform: scale(0.9);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.1);
+/* Six-dot braille spinner, matching Coffee-CLI's conversation view */
+@keyframes spinnerBraille {
+  to {
+    transform: translateX(-10ch);
   }
 }
 
 .spinner-glyph {
   display: inline-block;
-  animation: spinnerGlyphPulse 1.2s ease-in-out infinite;
+  width: 1ch;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.spinner-glyph::after {
+  display: inline-block;
+  content: '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';
+  animation: spinnerBraille 0.9s steps(10, end) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner-glyph::after {
+    animation: none;
+  }
 }
 
 /* Streaming caret for assistant messages */

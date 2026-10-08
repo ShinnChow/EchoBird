@@ -75,27 +75,18 @@ function ReadonlyChips({ chips }: { chips: BubbleChip[] }) {
   );
 }
 
-// ── Claude-Code-style "thinking" indicator ────────────────────────────────────
-// Cycling asterisk glyph (forward + reverse) plus a random verb with ellipsis,
-// rendered in theme green. Same shape as Claude Code's terminal spinner.
-const SPINNER_GLYPHS = ['·', '✢', '*', '✶', '✻', '✽'];
-const SPINNER_FRAMES = [...SPINNER_GLYPHS, ...[...SPINNER_GLYPHS].reverse()];
+// ── Six-dot "thinking" indicator, matching Coffee-CLI ─────────────────────────
 // Per-locale verb arrays + format wrapper live in src/i18n/spinnerVerbs.ts
 // — moved out so non-en/zh locales (zh-Hant, ja) get native flavor verbs
 // instead of falling through to the English list mid-conversation.
 
-// Linux WebKitGTK pins a CPU core animating the gradient sweep + setInterval
-// glyph cycle, so on Linux we render a static frame instead. One verb,
-// one glyph, no caret, no shimmer/pulse — picked fresh each time the
-// indicator mounts (i.e. each new agent turn) so it still feels alive.
+// Keep Linux's static indicator to avoid WebKitGTK's animation CPU cost.
+// Pick a fresh verb each time the indicator mounts (each new agent turn).
 function InputDotsStatic() {
   const { locale } = useI18n();
   const verbs = getSpinnerVerbs(locale);
   const formatVerb = (v: string) => formatSpinnerVerb(v, locale);
 
-  const [staticGlyph] = useState(
-    () => SPINNER_GLYPHS[Math.floor(Math.random() * SPINNER_GLYPHS.length)]
-  );
   const staticVerb = useMemo(() => {
     // eslint-disable-next-line react-hooks/purity
     const pickRandom = () => formatVerb(verbs[Math.floor(Math.random() * verbs.length)]);
@@ -105,8 +96,11 @@ function InputDotsStatic() {
 
   return (
     <span className="inline-flex items-center gap-2">
-      <span className="inline-block w-3 text-center font-mono text-base leading-none text-cyber-accent">
-        {staticGlyph}
+      <span
+        className="inline-block w-3 translate-y-[2px] text-center font-mono text-base leading-none text-cyber-accent"
+        aria-hidden="true"
+      >
+        ⠋
       </span>
       <span className="font-mono text-sm text-cyber-accent">{staticVerb}</span>
     </span>
@@ -123,13 +117,6 @@ function InputDotsAnimated() {
   const verbs = getSpinnerVerbs(locale);
   const formatVerb = (v: string) => formatSpinnerVerb(v, locale);
   const pickRandom = () => formatVerb(verbs[Math.floor(Math.random() * verbs.length)]);
-
-  // Glyph cycle (·✢*✶✻✽ forward + reverse)
-  const [frame, setFrame] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setFrame((f) => (f + 1) % SPINNER_FRAMES.length), 100);
-    return () => clearInterval(id);
-  }, []);
 
   // Typewriter cycle: show → erase → type a new verb → repeat
   const [target, setTarget] = useState<string>(pickRandom);
@@ -174,10 +161,17 @@ function InputDotsAnimated() {
 
   return (
     <span className="inline-flex items-center gap-2">
-      <span className="spinner-glyph inline-block w-3 text-center font-mono text-base leading-none text-cyber-accent">
-        {SPINNER_FRAMES[frame]}
+      <span
+        className="inline-block w-3 translate-y-[2px] text-center font-mono text-base leading-none text-cyber-accent"
+        aria-hidden="true"
+      >
+        <span className="spinner-glyph" />
       </span>
       <span className="inline-flex items-baseline font-mono text-sm">
+        {/* Preserve the verb's height while the visible text is erased. */}
+        <span className="invisible w-0 shrink-0 whitespace-nowrap" aria-hidden="true">
+          {target}
+        </span>
         <span className="spinner-shimmer">{shown}</span>
         {/* Caret only appears while we're actively rewriting the verb
                     (erase/type). During the steady "show" phase it's hidden so
