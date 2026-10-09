@@ -952,9 +952,9 @@ export function FreeModelsMain() {
 
         <div
           ref={hubRef}
-          className="free-model-router-hub relative z-10 mx-auto w-full max-w-[380px] min-h-[156px] rounded-xl p-5"
+          className="free-model-router-hub relative z-10 mx-auto w-full max-w-[380px] rounded-xl p-5"
         >
-          <div className="grid h-10 grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2">
+          <div className="grid h-8 grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2">
             <Waypoints size={22} aria-hidden="true" className="text-cyber-accent" />
             <div className="min-w-0 truncate text-lg font-semibold leading-none text-cyber-text">
               {t('freeModels.router.title')}
