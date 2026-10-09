@@ -49,6 +49,95 @@ const providers = (state: AppManagerContextType) =>
   accountCenterProviders(state, (key) => key, 'en');
 
 describe('Account Center display data', () => {
+  it.each(['pro', 'free', 'Free'])(
+    'keeps Manus %s subscription expiry separate from its credit balance and refresh time',
+    (plan) => {
+      const state = context();
+      state.manusAccounts.accounts = [
+        {
+          id: 'manus',
+          email: 'manus@example.test',
+          active: true,
+          plan,
+          credits: { total: 1300, free: 1000, refresh: 300, nextRefreshAt: 1791561600 },
+          subscriptionEndAt: 1794132901,
+        },
+      ];
+      const account = providers(state).find((p) => p.id === 'manus')!.accounts[0];
+      expect(account.subscriptionEndAt).toBe(
+        plan.toLowerCase() === 'free' ? undefined : 1794132901
+      );
+      expect(account.metrics).toEqual([{ label: 'agent.credits', value: '1,300' }]);
+      state.manusAccounts.accounts = [
+        { ...state.manusAccounts.accounts[0], subscriptionEndAt: null },
+      ];
+      const provider = providers(state).find((p) => p.id === 'manus')!;
+      expect(provider.accounts[0].subscriptionEndAt).toBeUndefined();
+      expect(
+        renderToStaticMarkup(<AccountCard provider={provider} account={provider.accounts[0]} />)
+      ).not.toContain('aria-label="accountCenter.subscription"');
+    }
+  );
+
+  it('shows Cue weekly reset separately from Manus balance and additional purchased credits', () => {
+    const state = context();
+    const credits = { total: 24000, free: null, refresh: null, nextRefreshAt: null };
+    state.cueAccounts.accounts = [
+      {
+        id: 'cue',
+        email: 'cue@example.test',
+        active: true,
+        plan: 'plus',
+        credits,
+        weekly: { remainingPercent: 80, resetAt: 1792145701 },
+      },
+    ];
+    state.manusAccounts.accounts = [
+      { id: 'manus', email: 'manus@example.test', active: true, plan: 'free', credits },
+    ];
+    const groups = providers(state);
+    expect(groups.find((p) => p.id === 'cue')!.accounts[0].metrics).toEqual([
+      {
+        label: '7d',
+        value: '80%',
+        percent: 80,
+        resetAt: 1792145701,
+        showProgress: true,
+      },
+    ]);
+    expect(groups.find((p) => p.id === 'manus')!.accounts[0].metrics).toEqual([
+      {
+        label: 'agent.credits',
+        value: '24,000',
+      },
+    ]);
+  });
+  it.each(['plus', 'pro', 'max', 'free'])(
+    'keeps Cue %s subscription expiry distinct from weekly quota and hides missing expiry',
+    (plan) => {
+      const state = context();
+      state.cueAccounts.accounts = [
+        {
+          id: 'cue',
+          email: 'cue@example.test',
+          active: true,
+          plan,
+          credits: null,
+          subscriptionEndAt: 1794132901,
+          weekly: { remainingPercent: 80, resetAt: 1792145701 },
+        },
+      ];
+      const account = providers(state).find((p) => p.id === 'cue')!.accounts[0];
+      expect(account.subscriptionEndAt).toBe(plan === 'free' ? undefined : 1794132901);
+      expect(account.metrics[0]).toMatchObject({ label: '7d', percent: 80, resetAt: 1792145701 });
+      state.cueAccounts.accounts = [{ ...state.cueAccounts.accounts[0], subscriptionEndAt: null }];
+      const provider = providers(state).find((p) => p.id === 'cue')!;
+      expect(provider.accounts[0].subscriptionEndAt).toBeUndefined();
+      expect(
+        renderToStaticMarkup(<AccountCard provider={provider} account={provider.accounts[0]} />)
+      ).not.toContain('aria-label="accountCenter.subscription"');
+    }
+  );
   it('keeps Cue sign-in stages and balance independent of Manus', () => {
     const state = context();
     state.cueAccounts.busy = true;

@@ -3,7 +3,7 @@
 use super::cursor_auth::{read, write};
 use super::electron_storage::{cipher, decrypt, encrypt};
 use super::manus_accounts::{
-    cookie_db, native_session, profile, set_cookie, Account, Credits, LoginPoll,
+    cookie_db, native_session, profile, set_cookie, Account as ManusAccount, Credits,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -17,6 +17,29 @@ use std::{
 const LOGIN_SECONDS: i64 = 60;
 static ACCOUNT_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 static PENDING: std::sync::Mutex<Option<Pending>> = std::sync::Mutex::new(None);
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeeklyQuota {
+    pub remaining_percent: Option<f64>,
+    pub reset_at: Option<i64>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Account {
+    #[serde(flatten)]
+    base: ManusAccount,
+    weekly: Option<WeeklyQuota>,
+}
+
+#[derive(Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginPoll {
+    account: Option<Account>,
+    awaiting_client_exit: bool,
+    expires_at: Option<i64>,
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -253,16 +276,28 @@ pub async fn poll_login(id: &str) -> Result<LoginPoll, String> {
     }
     let mut store = load_store()?;
     // Cue subscriptions are independent of the Manus plan returned by UserInfo.
-    account.plan = store.get(&account.id).and_then(|s| s.account.plan.clone());
+    account.plan = store
+        .get(&account.id)
+        .and_then(|s| s.account.base.plan.clone());
     account.credits = store
         .get(&account.id)
-        .and_then(|s| s.account.credits.clone());
+        .and_then(|s| s.account.base.credits.clone());
+    let weekly = store
+        .get(&account.id)
+        .and_then(|s| s.account.weekly.clone());
+    account.subscription_end_at = store
+        .get(&account.id)
+        .and_then(|s| s.account.base.subscription_end_at);
     for saved in store.values_mut() {
-        saved.account.active = false;
+        saved.account.base.active = false;
     }
     account.active = true;
+    let account = Account {
+        base: account,
+        weekly,
+    };
     store.insert(
-        account.id.clone(),
+        account.base.id.clone(),
         Saved {
             account: account.clone(),
             session: encrypt(&cipher(&pending.dir)?, &token)?,
@@ -304,7 +339,7 @@ pub async fn switch(id: &str) -> Result<Account, String> {
     let previous_owner = owner(&dir)?;
     write_native(&dir, Some(&token), Some(&saved.owner))?;
     for (key, saved) in &mut store {
-        saved.account.active = key == id;
+        saved.account.base.active = key == id;
     }
     if let Err(error) = write(&store_path()?, &store) {
         write_native(&dir, previous.as_deref(), previous_owner.as_ref())
@@ -318,7 +353,27 @@ pub async fn switch(id: &str) -> Result<Account, String> {
         .clone())
 }
 
-fn membership(value: &Value) -> Result<(Option<String>, Option<Credits>), String> {
+fn integer(value: &Value, key: &str) -> Result<Option<i64>, String> {
+    value
+        .get(key)
+        .map(|value| {
+            value
+                .as_i64()
+                .or_else(|| value.as_str().and_then(|v| v.parse().ok()))
+                .filter(|v| *v >= 0)
+                .ok_or_else(|| "accountError.quota".into())
+        })
+        .transpose()
+}
+
+type Membership = (
+    Option<String>,
+    Option<Credits>,
+    Option<WeeklyQuota>,
+    Option<i64>,
+);
+
+fn membership(value: &Value, now_ms: i64) -> Result<Membership, String> {
     let membership = value
         .get("membership")
         .filter(|v| v.is_object())
@@ -327,18 +382,40 @@ fn membership(value: &Value) -> Result<(Option<String>, Option<Credits>), String
         membership[*key]
             .as_str()
             .filter(|v| !v.trim().is_empty())
-            .map(str::to_owned)
+            .map(|plan| {
+                match plan {
+                    "agents_20_monthly" | "agents_20_yearly" => "plus",
+                    "agents_100_monthly" | "agents_100_yearly" => "pro",
+                    "agents_200_monthly" | "agents_200_yearly" => "max",
+                    plan => plan,
+                }
+                .to_owned()
+            })
     });
-    let total = match value.get("remainingCredits") {
-        None => None,
-        Some(value) => Some(
-            value
-                .as_i64()
-                .or_else(|| value.as_str().and_then(|v| v.parse().ok()))
-                .filter(|v| *v >= 0)
-                .ok_or("accountError.quota")?,
-        ),
+    let total = integer(value, "remainingCredits")?;
+    let subscription_end_at = if matches!(plan.as_deref(), Some("plus" | "pro" | "max")) {
+        integer(membership, "validUntilMs")?
+            .filter(|time| *time > 0)
+            .map(|time| time / 1000)
+    } else {
+        None
     };
+    let limit = integer(value, "limitCredits")?;
+    let start = integer(value, "windowStartMs")?;
+    let end = integer(value, "windowEndMs")?;
+    // Connect's protobuf JSON omits zero used/reserved credits. Purchased credits
+    // are a separate bucket and must not increase the weekly percentage.
+    let used = integer(value, "usedCredits")?.unwrap_or(0);
+    let reserved = integer(value, "reservedCredits")?.unwrap_or(0);
+    let weekly = limit.zip(start).zip(end).map(|((limit, start), end)| {
+        let active = limit > 0 && start <= now_ms && now_ms < end;
+        WeeklyQuota {
+            remaining_percent: active.then(|| {
+                (100.0 - (used as f64 + reserved as f64) / limit as f64 * 100.0).clamp(0.0, 100.0)
+            }),
+            reset_at: active.then_some(end / 1000),
+        }
+    });
     Ok((
         plan,
         total.map(|total| Credits {
@@ -347,6 +424,8 @@ fn membership(value: &Value) -> Result<(Option<String>, Option<Credits>), String
             refresh: None,
             next_refresh_at: None,
         }),
+        weekly,
+        subscription_end_at,
     ))
 }
 pub async fn refresh(id: &str) -> Result<Account, String> {
@@ -375,9 +454,14 @@ pub async fn refresh(id: &str) -> Result<Account, String> {
     if !response.status().is_success() {
         return Err(format!("accountError.quota|HTTP {}", response.status()));
     }
-    let (plan, credits) = membership(&response.json().await.map_err(|_| "accountError.format")?)?;
-    saved.account.plan = plan;
-    saved.account.credits = credits;
+    let (plan, credits, weekly, subscription_end_at) = membership(
+        &response.json().await.map_err(|_| "accountError.format")?,
+        chrono::Utc::now().timestamp_millis(),
+    )?;
+    saved.account.base.plan = plan;
+    saved.account.base.credits = credits;
+    saved.account.weekly = weekly;
+    saved.account.base.subscription_end_at = subscription_end_at;
     let account = saved.account.clone();
     write(&store_path()?, &store)?;
     Ok(account)
@@ -394,20 +478,23 @@ mod tests {
     use super::*;
     #[test]
     fn cue_plan_and_balance_use_cue_membership_not_manus_credits() {
-        let (plan, credits) = membership(&serde_json::json!({
+        let (plan, credits, _, _) = membership(&serde_json::json!({
             "membership": {"membershipVersion":"pro"}, "remainingCredits":"1300", "usedCredits":"700"
-        })).unwrap();
+        }), 0).unwrap();
         assert_eq!(plan.as_deref(), Some("pro"));
         assert_eq!(credits.unwrap().total, 1300);
         assert_eq!(
-            membership(&serde_json::json!({"membership":{"planKey":"free"},"remainingCredits":0}))
-                .unwrap()
-                .1
-                .unwrap()
-                .total,
+            membership(
+                &serde_json::json!({"membership":{"planKey":"free"},"remainingCredits":0}),
+                0
+            )
+            .unwrap()
+            .1
+            .unwrap()
+            .total,
             0
         );
-        assert!(membership(&serde_json::json!({"membership":{}}))
+        assert!(membership(&serde_json::json!({"membership":{}}), 0)
             .unwrap()
             .1
             .is_none());
@@ -416,8 +503,176 @@ mod tests {
             serde_json::json!({"membership":{},"remainingCredits":-1}),
             serde_json::json!({"membership":{},"remainingCredits":"bad"}),
         ] {
-            assert!(membership(&value).is_err());
+            assert!(membership(&value, 0).is_err());
         }
+    }
+    #[test]
+    fn cue_keeps_free_and_invitation_plus_distinct_from_paid_plans() {
+        for (member, expected) in [
+            (
+                serde_json::json!({"membershipVersion":"free","source":"none"}),
+                "free",
+            ),
+            (
+                serde_json::json!({"membershipVersion":"plus","planKey":"agents_20_monthly","source":"invitation"}),
+                "plus",
+            ),
+            (
+                serde_json::json!({"membershipVersion":"pro","source":"paid"}),
+                "pro",
+            ),
+            (
+                serde_json::json!({"membershipVersion":"max","source":"paid"}),
+                "max",
+            ),
+            (serde_json::json!({"planKey":"agents_100_yearly"}), "pro"),
+            (serde_json::json!({"planKey":"agents_200_monthly"}), "max"),
+        ] {
+            assert_eq!(
+                membership(&serde_json::json!({"membership":member}), 0)
+                    .unwrap()
+                    .0
+                    .as_deref(),
+                Some(expected)
+            );
+        }
+        assert!(membership(&serde_json::json!({"membership":{}}), 0)
+            .unwrap()
+            .0
+            .is_none());
+    }
+    #[test]
+    fn cue_subscription_expiry_is_independent_of_weekly_reset_and_optional_for_invitation_plus() {
+        for plan in ["plus", "pro", "max"] {
+            let value = serde_json::json!({
+                "membership":{"membershipVersion":plan,"validUntilMs":"1794132901689"},
+                "windowStartMs":"1791540901689", "windowEndMs":"1792145701689",
+                "limitCredits":"5000"
+            });
+            let (_, _, weekly, subscription) = membership(&value, 1791541000000).unwrap();
+            assert_eq!(subscription, Some(1794132901));
+            assert_eq!(weekly.unwrap().reset_at, Some(1792145701));
+        }
+        for member in [
+            serde_json::json!({"membershipVersion":"free","validUntilMs":"1794132901689"}),
+            serde_json::json!({"membershipVersion":"plus","source":"invitation"}),
+            serde_json::json!({"membershipVersion":"plus","source":"invitation","validUntilMs":"0"}),
+        ] {
+            assert!(membership(&serde_json::json!({"membership":member}), 0)
+                .unwrap()
+                .3
+                .is_none());
+        }
+        assert!(membership(
+            &serde_json::json!({"membership":{"membershipVersion":"pro","validUntilMs":"invalid"}}),
+            0
+        )
+        .is_err());
+    }
+    #[test]
+    fn weekly_usage_counts_reserved_credits_but_excludes_purchased_balance() {
+        let (_, _, weekly, _) = membership(&serde_json::json!({
+            "membership":{"membershipVersion":"plus","source":"invitation"},
+            "windowStartMs":"1791540901689", "windowEndMs":"1792145701689",
+            "limitCredits":"5000", "usedCredits":"900", "reservedCredits":"100",
+            "weeklyRemainingCredits":"4000", "purchasedRemainingCredits":"20000", "remainingCredits":"24000"
+        }), 1791541000000).unwrap();
+        let weekly = weekly.unwrap();
+        assert_eq!(weekly.remaining_percent, Some(80.0));
+        assert_eq!(weekly.reset_at, Some(1792145701));
+    }
+    #[test]
+    fn weekly_usage_distinguishes_protobuf_zero_defaults_from_missing_or_expired_windows() {
+        let mut value = serde_json::json!({"membership":{}, "windowStartMs":1000,"windowEndMs":604801000,"limitCredits":5000});
+        assert_eq!(
+            membership(&value, 1000)
+                .unwrap()
+                .2
+                .unwrap()
+                .remaining_percent,
+            Some(100.0)
+        );
+        value["usedCredits"] = 5000.into();
+        assert_eq!(
+            membership(&value, 1000)
+                .unwrap()
+                .2
+                .unwrap()
+                .remaining_percent,
+            Some(0.0)
+        );
+        value["reservedCredits"] = 100.into();
+        assert_eq!(
+            membership(&value, 1000)
+                .unwrap()
+                .2
+                .unwrap()
+                .remaining_percent,
+            Some(0.0)
+        );
+        for now in [999, 604801000] {
+            let weekly = membership(&value, now).unwrap().2.unwrap();
+            assert!(weekly.remaining_percent.is_none());
+            assert!(weekly.reset_at.is_none());
+        }
+        value["limitCredits"] = 0.into();
+        assert!(membership(&value, 1000)
+            .unwrap()
+            .2
+            .unwrap()
+            .remaining_percent
+            .is_none());
+        for key in [
+            "limitCredits",
+            "usedCredits",
+            "reservedCredits",
+            "windowStartMs",
+            "windowEndMs",
+        ] {
+            let mut malformed = value.clone();
+            malformed[key] = "invalid".into();
+            assert!(membership(&malformed, 1000).is_err());
+        }
+        assert!(membership(
+            &serde_json::json!({"membership":{},"remainingCredits":123}),
+            0
+        )
+        .unwrap()
+        .2
+        .is_none());
+    }
+    #[test]
+    fn old_saved_cue_accounts_load_and_new_weekly_summaries_round_trip() {
+        let value = serde_json::json!({
+            "account":{"id":"cue","email":"cue@example.test","plan":"plus","active":true,"credits":null},
+            "session":"encrypted-session", "owner":{"tokenHash":"hash","userId":"user"}
+        });
+        let mut saved: Saved = serde_json::from_value(value.clone()).unwrap();
+        assert!(saved.account.weekly.is_none());
+        assert!(saved.account.base.subscription_end_at.is_none());
+        saved.account.weekly = Some(WeeklyQuota {
+            remaining_percent: Some(80.0),
+            reset_at: Some(1792145701),
+        });
+        saved.account.base.subscription_end_at = Some(1794132901);
+        let encoded = serde_json::to_value(&saved).unwrap();
+        assert_eq!(encoded["account"]["id"], "cue");
+        assert_eq!(encoded["account"]["subscriptionEndAt"], 1794132901_i64);
+        assert_eq!(
+            serde_json::to_string(&saved)
+                .unwrap()
+                .matches("\"subscriptionEndAt\"")
+                .count(),
+            1
+        );
+        assert_eq!(encoded["session"], value["session"]);
+        assert_eq!(encoded["owner"], value["owner"]);
+        let decoded: Saved = serde_json::from_value(encoded).unwrap();
+        assert_eq!(decoded.account.base.subscription_end_at, Some(1794132901));
+        assert_eq!(
+            decoded.account.weekly.unwrap().remaining_percent,
+            Some(80.0)
+        );
     }
     #[test]
     fn owner_must_match_both_session_and_authenticated_account() {

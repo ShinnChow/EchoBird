@@ -376,12 +376,19 @@ export function accountCenterProviders(
         (account) => ({
           identity: account.email,
           plan: account.plan,
-          metrics: [
-            {
-              label: t('agent.credits'),
-              value: number('credits' in account ? account.credits?.total : null),
-            },
-          ],
+          subscriptionEndAt:
+            !isFreePlan(account.plan) && 'subscriptionEndAt' in account
+              ? (account.subscriptionEndAt ?? undefined)
+              : undefined,
+          metrics:
+            tool === 'cue' && 'weekly' in account && account.weekly
+              ? [quota(account.weekly.remainingPercent, account.weekly.resetAt, '7d')]
+              : [
+                  {
+                    label: t('agent.credits'),
+                    value: number('credits' in account ? account.credits?.total : null),
+                  },
+                ],
         })
       )
     ),

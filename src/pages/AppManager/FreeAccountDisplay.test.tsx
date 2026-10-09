@@ -143,3 +143,45 @@ it.each([null, 'SuperGrok'])(
     }
   }
 );
+
+it.each(['free', 'plus', 'pro', 'max'])(
+  'Cue: displays the actual %s tier and weekly quota in both account views',
+  (plan) => {
+    state.cueAccounts = {
+      ...state.cueAccounts,
+      accounts: [
+        {
+          ...row(),
+          plan,
+          credits: { total: 20000, free: null, refresh: null, nextRefreshAt: null },
+          weekly: { remainingPercent: 0, resetAt: 1900000000 },
+        },
+      ],
+    };
+    for (const html of markup('cue')) {
+      expect(html).toContain(`>${plan[0].toUpperCase()}${plan.slice(1)}<`);
+      expect(html).toContain('>0%<');
+      expect(html).toContain('aria-label="7d free@example.test"');
+      expect(html).not.toContain('>model.noUsageData<');
+      expect(html).not.toContain('20000');
+      expect(html).not.toContain('title=');
+      expect(html).not.toContain('cursor-');
+    }
+    expect(state.cueAccounts.refresh).not.toHaveBeenCalled();
+    expect(state.cueAccounts.add).not.toHaveBeenCalled();
+    expect(markup('manus')[0]).toContain('>model.noUsageData<');
+  }
+);
+
+it('Cue: does not fabricate weekly usage for an inactive Free window', () => {
+  state.cueAccounts = {
+    ...state.cueAccounts,
+    accounts: [{ ...row(), weekly: { remainingPercent: null, resetAt: null } }],
+  };
+  for (const html of markup('cue')) {
+    expect(html).toContain('>Free<');
+    expect(html).toContain('>model.noUsageData<');
+    expect(html).not.toContain('role="progressbar"');
+    expect(html).not.toContain('>0%<');
+  }
+});

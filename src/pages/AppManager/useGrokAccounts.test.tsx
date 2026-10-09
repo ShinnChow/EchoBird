@@ -596,6 +596,61 @@ describe('Grok Build account lifecycle', () => {
     expect(api.switchCueAccount).not.toHaveBeenCalled();
   });
 
+  it('updates Manus subscription and credits only on explicit refresh and preserves them on failure', async () => {
+    const manus: api.ManusAccount = {
+      ...account,
+      plan: 'free',
+      credits: { total: 1300, free: 1000, refresh: 300, nextRefreshAt: null },
+    };
+    vi.mocked(api.listManusAccounts).mockResolvedValue([manus]);
+    await mount('manus');
+    expect(api.refreshManusAccount).not.toHaveBeenCalled();
+    const updated = {
+      ...manus,
+      plan: 'pro',
+      subscriptionEndAt: 1794132901,
+      credits: { total: 8000, free: 1000, refresh: 300, nextRefreshAt: 1791561600 },
+    };
+    vi.mocked(api.refreshManusAccount).mockResolvedValueOnce(updated);
+    const selected = state.selectedId;
+    await act(async () => state.refresh(manus));
+    expect(state.accounts).toEqual([updated]);
+    expect(state.selectedId).toBe(selected);
+    expect(api.refreshManusAccount).toHaveBeenCalledWith(manus.id);
+    expect(api.refreshCueAccount).not.toHaveBeenCalled();
+    expect(api.switchManusAccount).not.toHaveBeenCalled();
+    expect(api.startManusLogin).not.toHaveBeenCalled();
+    expect(api.openExternal).not.toHaveBeenCalled();
+    vi.mocked(api.refreshManusAccount).mockRejectedValueOnce(
+      new Error('accountError.loginRequired')
+    );
+    await act(async () => state.refresh(state.accounts[0]));
+    expect(state.accounts).toEqual([updated]);
+    expect(state.refreshing.size).toBe(0);
+    expect(showError).toHaveBeenCalledWith('accountError.loginRequired');
+  });
+
+  it('updates Cue weekly usage only on explicit refresh and preserves the cached summary on failure', async () => {
+    const cue: api.CueAccount = { ...account, plan: 'plus', credits: null };
+    vi.mocked(api.listCueAccounts).mockResolvedValue([cue]);
+    await mount('cue');
+    expect(api.refreshCueAccount).not.toHaveBeenCalled();
+    const updated = { ...cue, weekly: { remainingPercent: 80, resetAt: 1792145701 } };
+    vi.mocked(api.refreshCueAccount).mockResolvedValueOnce(updated);
+    const selected = state.selectedId;
+    await act(async () => state.refresh(cue));
+    expect(state.accounts).toEqual([updated]);
+    expect(state.selectedId).toBe(selected);
+    expect(api.refreshCueAccount).toHaveBeenCalledWith(cue.id);
+    expect(api.refreshManusAccount).not.toHaveBeenCalled();
+    expect(api.switchCueAccount).not.toHaveBeenCalled();
+    vi.mocked(api.refreshCueAccount).mockRejectedValueOnce(new Error('accountError.network'));
+    await act(async () => state.refresh(state.accounts[0]));
+    expect(state.accounts).toEqual([updated]);
+    expect(state.refreshing.size).toBe(0);
+    expect(showError).toHaveBeenCalledWith('accountError.network');
+  });
+
   it.each(['leave', 'timeout'] as const)(
     'ignores a late Cue login result after %s',
     async (end) => {

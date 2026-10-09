@@ -41,7 +41,7 @@ export function useGrokAccounts(
   const startGeneration = useRef(0);
   const [exitAttempt, setExitAttempt] = useState<string | null>(null);
   const managed = useManagedAccounts<
-    api.GrokAccount | api.ManusAccount,
+    api.GrokAccount | api.ManusAccount | api.CueAccount,
     api.GrokLogin | api.ManusLogin
   >(tool, enabled, hasModel, clearModel, showError, {
     ...client,

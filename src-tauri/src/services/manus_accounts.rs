@@ -31,6 +31,7 @@ pub struct Account {
     pub plan: Option<String>,
     pub active: bool,
     pub credits: Option<Credits>,
+    pub subscription_end_at: Option<i64>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -308,7 +309,10 @@ async fn close_app() -> Result<(), String> {
 }
 
 pub(super) async fn profile(token: &str) -> Result<Account, String> {
-    let response = request(token, "UserInfo").await?;
+    parse_profile(&request(token, "UserInfo").await?)
+}
+
+fn parse_profile(response: &Value) -> Result<Account, String> {
     let id = response["userId"]
         .as_str()
         .filter(|value| !value.is_empty())
@@ -317,12 +321,31 @@ pub(super) async fn profile(token: &str) -> Result<Account, String> {
         .as_str()
         .filter(|value| !value.is_empty())
         .ok_or("accountError.authResponse")?;
+    let plan = response["membershipVersion"].as_str().map(str::to_owned);
+    let subscription_end_at = if plan
+        .as_deref()
+        .is_some_and(|plan| !plan.eq_ignore_ascii_case("free"))
+    {
+        match response.get("currentPeriodEnd") {
+            None | Some(Value::Null) => None,
+            Some(value) => Some(
+                value
+                    .as_i64()
+                    .or_else(|| value.as_str()?.parse().ok())
+                    .ok_or("accountError.format")?,
+            )
+            .filter(|end| *end > 0),
+        }
+    } else {
+        None
+    };
     Ok(Account {
         id: format!("{:x}", Sha256::digest(id.as_bytes())),
         email: email.into(),
-        plan: response["membershipVersion"].as_str().map(str::to_owned),
+        plan,
         active: false,
         credits: None,
+        subscription_end_at,
     })
 }
 
@@ -642,9 +665,15 @@ pub async fn refresh(id: &str) -> Result<Account, String> {
     let mut store = load_store()?;
     let saved = store.get_mut(id).ok_or("accountError.invalidAccount")?;
     let token = decrypt(&cipher(&dir)?, &saved.session)?;
+    let profile = profile(&token).await?;
+    if profile.id != id {
+        return Err("accountError.invalidAccount".into());
+    }
     saved.account.credits = Some(parse_credits(
         &request(&token, "GetAvailableCredits").await?,
     )?);
+    saved.account.plan = profile.plan;
+    saved.account.subscription_end_at = profile.subscription_end_at;
     let account = saved.account.clone();
     write(&store_path()?, &store)?;
     Ok(account)
@@ -660,6 +689,68 @@ pub async fn delete(id: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn subscription_end_uses_official_seconds_and_not_credit_refresh_time() {
+        for end in [
+            serde_json::json!(1794132901_i64),
+            serde_json::json!("1794132901"),
+        ] {
+            let account = parse_profile(&serde_json::json!({
+                "userId":"fixture-user", "email":"manus@example.test", "membershipVersion":"pro",
+                "currentPeriodEnd":end, "nextRefreshTime":"2026-10-10T00:00:00Z"
+            }))
+            .unwrap();
+            assert_eq!(account.plan.as_deref(), Some("pro"));
+            assert_eq!(account.subscription_end_at, Some(1794132901));
+            assert!(account.credits.is_none());
+        }
+    }
+
+    #[test]
+    fn free_missing_or_zero_subscription_end_stays_unknown_without_inferred_duration() {
+        for value in [
+            serde_json::json!({"membershipVersion":"free","currentPeriodEnd":"1794132901"}),
+            serde_json::json!({"membershipVersion":"Free","currentPeriodEnd":"1794132901"}),
+            serde_json::json!({"membershipVersion":"pro"}),
+            serde_json::json!({"membershipVersion":"pro","currentPeriodEnd":"0"}),
+            serde_json::json!({"membershipVersion":"pro","currentPeriodEnd":null}),
+            serde_json::json!({"membershipVersion":"pro","currentPeriodEnd":-1}),
+            serde_json::json!({"currentPeriodEnd":"1794132901"}),
+        ] {
+            let mut profile = value;
+            profile["userId"] = "fixture-user".into();
+            profile["email"] = "manus@example.test".into();
+            assert!(parse_profile(&profile)
+                .unwrap()
+                .subscription_end_at
+                .is_none());
+        }
+        assert!(parse_profile(&serde_json::json!({
+            "userId":"fixture-user", "email":"manus@example.test", "membershipVersion":"pro",
+            "currentPeriodEnd":"invalid"
+        }))
+        .is_err());
+        assert!(parse_profile(&serde_json::json!({"membershipVersion":"pro"})).is_err());
+    }
+
+    #[test]
+    fn existing_manus_cache_loads_and_subscription_summary_round_trips() {
+        let value = serde_json::json!({
+            "account":{"id":"manus","email":"manus@example.test","plan":"pro","active":true,
+                "credits":{"total":1300,"free":1000,"refresh":300,"nextRefreshAt":1791561600}},
+            "session":"encrypted-session"
+        });
+        let mut saved: Saved = serde_json::from_value(value.clone()).unwrap();
+        assert!(saved.account.subscription_end_at.is_none());
+        saved.account.subscription_end_at = Some(1794132901);
+        let encoded = serde_json::to_value(&saved).unwrap();
+        assert_eq!(encoded["session"], value["session"]);
+        assert_eq!(encoded["account"]["credits"], value["account"]["credits"]);
+        let decoded: Saved = serde_json::from_value(encoded).unwrap();
+        assert_eq!(decoded.account.subscription_end_at, Some(1794132901));
+        assert!(decoded.account.active);
+    }
 
     #[test]
     fn electron_cookie_layout_supports_root_and_network_without_creating_a_database() {
