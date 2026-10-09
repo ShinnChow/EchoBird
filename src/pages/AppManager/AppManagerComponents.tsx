@@ -7,6 +7,7 @@ import { ManusAccountSection } from './ManusAccountSection';
 import { ModelSwitchDivider } from './ModelSwitchDivider';
 import { QuotaCountdown } from './QuotaCountdown';
 import { codexPlanLabel } from './codexPlanLabel';
+import { isFreePlan } from './accountPlanLabel';
 import { WorkBuddyAccountSection } from './WorkBuddyAccountSection';
 import { ZCodeAccountSection } from './ZCodeAccountSection';
 import { ClaudeCodeAccountSection } from './ClaudeCodeAccountSection';
@@ -799,7 +800,11 @@ export const CodexAccountSection: React.FC<{ showDivider?: boolean }> = ({
                 onRefresh={() => void refreshCodexAccountQuota(account)}
                 onDelete={() => void deleteCodexAccount(account)}
                 secondary={
-                  account.quotaWindows && account.quotaWindows.length > 1 ? (
+                  isFreePlan(planLabel) &&
+                  !account.quotaWindows?.length &&
+                  quotaPercent == null &&
+                  quotaResetAt == null ? undefined : account.quotaWindows &&
+                    account.quotaWindows.length > 1 ? (
                     <span className="flex h-[16px] min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap text-[11px] font-semibold leading-[16px] text-cyber-text">
                       {account.quotaWindows.map((window, index) => (
                         <span key={index} className="flex flex-shrink-0 items-center">

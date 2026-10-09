@@ -2,6 +2,7 @@ import React from 'react';
 import { useAppManager } from './context';
 import { AccountSectionButton, AccountSectionRow } from './AccountSectionPrimitives';
 import { QuotaCountdown } from './QuotaCountdown';
+import { isFreePlan } from './accountPlanLabel';
 
 export const CursorAccountSection: React.FC<{ tool: 'cursor' | 'grokbot' }> = ({ tool }) => {
   const { cursorAccounts, grokBotAccounts, isLaunching } = useAppManager();
@@ -43,28 +44,32 @@ export const CursorAccountSection: React.FC<{ tool: 'cursor' | 'grokbot' }> = ({
             onSelect={() => select(account.id)}
             onDelete={() => void remove(account)}
             secondary={
-              <span className="flex h-[16px] items-center justify-between">
-                <span
-                  role="progressbar"
-                  aria-label={account.email}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={account.usage?.remainingPercent ?? undefined}
-                  aria-valuetext={account.usage?.remainingPercent == null ? '—' : undefined}
-                  className="h-1.5 min-w-[56px] max-w-[80px] flex-1 overflow-hidden rounded-full bg-cyber-border"
-                >
+              isFreePlan(account.usage?.plan) &&
+              account.usage?.remainingPercent == null &&
+              account.usage?.resetAt == null ? undefined : (
+                <span className="flex h-[16px] items-center justify-between">
                   <span
-                    className="block h-full rounded-full bg-cyber-bg"
-                    style={{ width: `${account.usage?.remainingPercent ?? 0}%` }}
-                  />
+                    role="progressbar"
+                    aria-label={account.email}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={account.usage?.remainingPercent ?? undefined}
+                    aria-valuetext={account.usage?.remainingPercent == null ? '—' : undefined}
+                    className="h-1.5 min-w-[56px] max-w-[80px] flex-1 overflow-hidden rounded-full bg-cyber-border"
+                  >
+                    <span
+                      className="block h-full rounded-full bg-cyber-bg"
+                      style={{ width: `${account.usage?.remainingPercent ?? 0}%` }}
+                    />
+                  </span>
+                  <span className="ml-[6px] w-[30px] flex-shrink-0 text-right text-[12px] font-semibold leading-[16px] text-cyber-text">
+                    {account.usage?.remainingPercent == null
+                      ? '—'
+                      : `${Math.round(account.usage.remainingPercent)}%`}
+                  </span>
+                  <QuotaCountdown resetAt={account.usage?.resetAt} />
                 </span>
-                <span className="ml-[6px] w-[30px] flex-shrink-0 text-right text-[12px] font-semibold leading-[16px] text-cyber-text">
-                  {account.usage?.remainingPercent == null
-                    ? '—'
-                    : `${Math.round(account.usage.remainingPercent)}%`}
-                </span>
-                <QuotaCountdown resetAt={account.usage?.resetAt} />
-              </span>
+              )
             }
           />
         ))}

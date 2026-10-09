@@ -5,6 +5,7 @@ import { useAppManager } from './context';
 import { AccountSectionButton, AccountSectionRow } from './AccountSectionPrimitives';
 import { ModelSwitchDivider } from './ModelSwitchDivider';
 import { QuotaCountdown } from './QuotaCountdown';
+import { accountPlanLabel, isFreePlan } from './accountPlanLabel';
 
 export const ZCodeAccountProviderChoice: React.FC<{ disabled?: boolean }> = ({ disabled }) => {
   const { zcodeAccounts, isLaunching } = useAppManager();
@@ -66,7 +67,7 @@ export const ZCodeAccountSection: React.FC<{ showDivider?: boolean }> = ({
                   >
                     {account.plan === 'Trial'
                       ? t('agent.zcodeTrial')
-                      : account.plan.replace(/^ZCode\s+/i, '')}
+                      : accountPlanLabel(account.plan.replace(/^ZCode\s+/i, ''))}
                   </span>
                 ) : null
               }
@@ -82,7 +83,11 @@ export const ZCodeAccountSection: React.FC<{ showDivider?: boolean }> = ({
               onRefresh={() => void refresh(account)}
               onDelete={() => void remove(account)}
               secondary={
-                account.quotaWindows && account.quotaWindows.length > 1 ? (
+                isFreePlan(account.plan?.replace(/^ZCode\s+/i, '')) &&
+                !account.quotaWindows?.length &&
+                account.remainingPercent == null &&
+                account.resetAt == null ? undefined : account.quotaWindows &&
+                  account.quotaWindows.length > 1 ? (
                   <span className="flex h-[16px] min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap text-[11px] font-semibold leading-[16px] text-cyber-text">
                     {account.quotaWindows.map((window, index) => (
                       <span key={index} className="flex flex-shrink-0 items-center">

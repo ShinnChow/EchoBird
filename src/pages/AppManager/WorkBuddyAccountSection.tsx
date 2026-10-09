@@ -10,6 +10,7 @@ import {
 import { QuotaCountdown } from './QuotaCountdown';
 import { useI18n } from '../../hooks/useI18n';
 import { useWorkBuddyClaimedToday } from './workBuddyDailyCredits';
+import { isFreePlan } from './accountPlanLabel';
 export const WorkBuddyAccountSection: React.FC<{ showDivider?: boolean }> = ({
   showDivider = true,
 }) => {
@@ -71,41 +72,50 @@ export const WorkBuddyAccountSection: React.FC<{ showDivider?: boolean }> = ({
                   ) : undefined
                 }
                 secondary={
-                  <span className="flex h-[16px] min-w-0 items-center gap-1 overflow-hidden text-[11px] font-semibold whitespace-nowrap">
-                    <span
-                      className="flex flex-shrink-0 items-center gap-1"
-                      aria-label={t('agent.baseCredits')}
-                    >
-                      {formatCredits(account.baseRemaining)}
-                      {hasBase && (
-                        <QuotaCountdown
-                          resetAt={account.baseResetAt}
-                          compact
-                          label={t('agent.baseCreditsReset')}
-                        />
+                  isFreePlan(account.plan) &&
+                  account.remaining == null &&
+                  account.baseRemaining == null &&
+                  account.rewardRemaining == null &&
+                  account.addonRemaining == null ? undefined : (
+                    <span className="flex h-[16px] min-w-0 items-center gap-1 overflow-hidden text-[11px] font-semibold whitespace-nowrap">
+                      <span
+                        className="flex flex-shrink-0 items-center gap-1"
+                        aria-label={t('agent.baseCredits')}
+                      >
+                        {formatCredits(account.baseRemaining)}
+                        {hasBase && (
+                          <QuotaCountdown
+                            resetAt={account.baseResetAt}
+                            compact
+                            label={t('agent.baseCreditsReset')}
+                          />
+                        )}
+                      </span>
+                      {hasAddon && (
+                        <span className="flex-shrink-0" aria-label={t('agent.purchasedCredits')}>
+                          {formatCredits(account.addonRemaining)}
+                        </span>
+                      )}
+                      {account.edition === 'workbuddy' && !dailyClaimed ? (
+                        <span
+                          className="flex-shrink-0"
+                          aria-label={t('agent.dailyCreditsUnclaimed')}
+                        >
+                          {t('agent.dailyCreditsUnclaimed')}
+                        </span>
+                      ) : (
+                        hasReward && (
+                          <span
+                            className="flex flex-shrink-0 items-center gap-0.5"
+                            aria-label={t('agent.rewardCredits')}
+                          >
+                            <Gift size={10} aria-hidden="true" />
+                            {formatCredits(account.rewardRemaining)}
+                          </span>
+                        )
                       )}
                     </span>
-                    {hasAddon && (
-                      <span className="flex-shrink-0" aria-label={t('agent.purchasedCredits')}>
-                        {formatCredits(account.addonRemaining)}
-                      </span>
-                    )}
-                    {account.edition === 'workbuddy' && !dailyClaimed ? (
-                      <span className="flex-shrink-0" aria-label={t('agent.dailyCreditsUnclaimed')}>
-                        {t('agent.dailyCreditsUnclaimed')}
-                      </span>
-                    ) : (
-                      hasReward && (
-                        <span
-                          className="flex flex-shrink-0 items-center gap-0.5"
-                          aria-label={t('agent.rewardCredits')}
-                        >
-                          <Gift size={10} aria-hidden="true" />
-                          {formatCredits(account.rewardRemaining)}
-                        </span>
-                      )
-                    )}
-                  </span>
+                  )
                 }
               />
             );

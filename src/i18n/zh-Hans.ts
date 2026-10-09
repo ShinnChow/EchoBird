@@ -289,7 +289,7 @@ const zhHans: Partial<Translations> = {
   'agent.modelSwitch': '模型切换',
   'agent.addCurrentAccount': '添加账号',
   'agent.zcodeSwitchProvider': '切换登录平台（当前为 {provider}）',
-  'agent.zcodeTrial': '体验',
+  'agent.zcodeTrial': '体验版',
   'agent.waitingForBrowser': '等待浏览器操作({seconds})',
   'agent.manusExitClient': '请手动退出 Manus({seconds})',
   'agent.claudeDesktopLoginClient': '请在 Claude 中登录({seconds})',

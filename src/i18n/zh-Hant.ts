@@ -309,7 +309,7 @@ const zhHant: Partial<Translations> = {
   'agent.modelSwitch': '模型切換',
   'agent.addCurrentAccount': '新增帳號',
   'agent.zcodeSwitchProvider': '切換登入平台（目前為 {provider}）',
-  'agent.zcodeTrial': '體驗',
+  'agent.zcodeTrial': '體驗版',
   'agent.waitingForBrowser': '等待瀏覽器操作({seconds})',
   'agent.manusExitClient': '請手動結束 Manus({seconds})',
   'agent.claudeDesktopLoginClient': '請在 Claude 中登入({seconds})',

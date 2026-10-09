@@ -3,6 +3,7 @@ import type { ManagedAccount } from '../AppManager/useManagedAccounts';
 import type { AntigravityQuota, WorkBuddyAccount } from '../../api/tauri';
 import type { TKey } from '../../i18n';
 import { codexPlanLabel } from '../AppManager/codexPlanLabel';
+import { isFreePlan } from '../AppManager/accountPlanLabel';
 
 export interface AccountMetric {
   label: string;
@@ -148,14 +149,27 @@ export function accountCenterProviders(
           ? t('agent.manusExitClient')
           : undefined,
     add: () => void group.add(),
-    accounts: group.accounts.map((account) => ({
-      id: account.id,
-      ...describe(account),
-      refreshing: group.refreshing.has(account.id),
-      authorizationFailed: group.authorizationFailedIds.has(account.id),
-      refresh: (onError) => group.refresh(account, undefined, onError),
-      remove: () => void group.remove(account),
-    })),
+    accounts: group.accounts.map((account) => {
+      const summary = describe(account);
+      const free = isFreePlan(summary.plan);
+      return {
+        id: account.id,
+        ...summary,
+        subscriptionEndAt:
+          free && summary.subscriptionEndAt == null ? undefined : summary.subscriptionEndAt,
+        metrics:
+          free &&
+          summary.metrics.every(
+            (metric) => metric.value === '—' && metric.percent == null && metric.resetAt == null
+          )
+            ? []
+            : summary.metrics,
+        refreshing: group.refreshing.has(account.id),
+        authorizationFailed: group.authorizationFailedIds.has(account.id),
+        refresh: (onError) => group.refresh(account, undefined, onError),
+        remove: () => void group.remove(account),
+      };
+    }),
   });
   return [
     provider(
@@ -208,13 +222,10 @@ export function accountCenterProviders(
       (account) => ({
         identity: account.email,
         plan: account.plan,
-        metrics:
-          account.plan?.toLowerCase() === 'free' && !account.fiveHour && !account.sevenDay
-            ? []
-            : [
-                quota(account.fiveHour?.remainingPercent, account.fiveHour?.resetAt, '5h'),
-                quota(account.sevenDay?.remainingPercent, account.sevenDay?.resetAt, '7d'),
-              ],
+        metrics: [
+          quota(account.fiveHour?.remainingPercent, account.fiveHour?.resetAt, '5h'),
+          quota(account.sevenDay?.remainingPercent, account.sevenDay?.resetAt, '7d'),
+        ],
       })
     ),
     provider(
@@ -226,13 +237,10 @@ export function accountCenterProviders(
       (account) => ({
         identity: account.email,
         plan: account.plan,
-        metrics:
-          account.plan?.toLowerCase() === 'free' && !account.fiveHour && !account.sevenDay
-            ? []
-            : [
-                quota(account.fiveHour?.remainingPercent, account.fiveHour?.resetAt, '5h'),
-                quota(account.sevenDay?.remainingPercent, account.sevenDay?.resetAt, '7d'),
-              ],
+        metrics: [
+          quota(account.fiveHour?.remainingPercent, account.fiveHour?.resetAt, '5h'),
+          quota(account.sevenDay?.remainingPercent, account.sevenDay?.resetAt, '7d'),
+        ],
       })
     ),
     provider(
@@ -339,7 +347,7 @@ export function accountCenterProviders(
       '/icons/tools/grok.svg',
       ['grok'],
       context.grokAccounts,
-      (account) => ({ identity: account.email, plan: account.plan, metrics: [quota()] })
+      (account) => ({ identity: account.email, plan: account.plan, metrics: [] })
     ),
     provider(
       'grokbot',

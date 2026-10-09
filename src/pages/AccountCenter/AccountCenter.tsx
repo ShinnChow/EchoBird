@@ -31,6 +31,7 @@ import { ZCodeAccountProviderChoice } from '../AppManager/ZCodeAccountSection';
 import { DirectoryRow } from '../../components/DirectoryRow';
 import { SortableCard } from '../../components/SortableCard';
 import { QuotaCountdown } from '../AppManager/QuotaCountdown';
+import { accountPlanLabel } from '../AppManager/accountPlanLabel';
 import { useI18n } from '../../hooks/useI18n';
 import * as api from '../../api/tauri';
 import { accountError, isAccountAuthorizationError } from '../../utils/accountError';
@@ -111,9 +112,7 @@ export function AccountCard({
                 </span>
               )}
               {account.plan && (
-                <span className="min-w-0 truncate leading-3">
-                  {account.plan.replace(/^[a-z]/, (letter) => letter.toUpperCase())}
-                </span>
+                <span className="min-w-0 truncate leading-3">{accountPlanLabel(account.plan)}</span>
               )}
             </span>
           )}

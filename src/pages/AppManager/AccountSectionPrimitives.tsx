@@ -1,6 +1,7 @@
 import React from 'react';
 import { Check, Gift, LoaderCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { useI18n } from '../../hooks/useI18n';
+import { accountPlanLabel } from './accountPlanLabel';
 
 export const AccountSectionButton: React.FC<{
   iconSrc: string;
@@ -191,7 +192,7 @@ export const AccountSectionRow: React.FC<{
               {t('accountCenter.authFailed')}
             </span>
           ) : (
-            (secondary ?? '—')
+            (secondary ?? <span className="truncate text-[11px]">{t('model.noUsageData')}</span>)
           )}
         </span>
       </span>
@@ -201,9 +202,7 @@ export const AccountSectionRow: React.FC<{
             className={`${planPrefix ? 'flex items-center gap-2 ' : ''}whitespace-nowrap text-[12px] font-semibold text-cyber-text`}
           >
             {planPrefix}
-            {(typeof plan === 'string'
-              ? plan.replace(/^[a-z]/, (letter) => letter.toUpperCase())
-              : plan) || '—'}
+            {(typeof plan === 'string' ? accountPlanLabel(plan) : plan) || '—'}
           </span>
         )}
         <span
