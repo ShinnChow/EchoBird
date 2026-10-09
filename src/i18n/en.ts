@@ -70,6 +70,7 @@ const en: Translations = {
   'nav.aiCareer': 'My AI Career',
   // Page titles
   'page.modelNexus': 'MODEL NEXUS',
+  'page.accountCenter': 'Account Management',
   'page.freeModels': 'SMART ROUTER',
   'freeModels.search': 'Search provider or model',
   'freeModels.noCard': 'No card',
@@ -122,7 +123,7 @@ const en: Translations = {
   'freeModels.router.title': 'Hands-Free Smart Router',
   'freeModels.view.smart': 'Smart',
   'freeModels.view.super': 'Super',
-  'freeModels.super.title': 'Hands-Free Super Router',
+  'freeModels.super.title': 'Super Router',
   'freeModels.super.description':
     'A main model connects to your AI app and delegates tasks to other models during routing. For example, after you submit a task in Claude Code or Codex, each model works on it independently. Once all models have finished, the main model brings together their results, evaluates them against one another, and integrates their strengths into a final plan to execute. On complex tasks, this collaboration could push beyond the capabilities of a single leading model. Running multiple models in parallel also multiplies token usage and cost.',
   'freeModels.super.unavailable': '(In development and testing; currently unavailable)',

@@ -281,6 +281,12 @@
   line-height: 1.6;
 }
 
+/* Keep account quota labels, countdowns and values in the same line box. */
+.account-card-metric-row span,
+.account-card-metric-row .text-xs {
+  line-height: 1rem;
+}
+
 /* Disable letter-spacing on CJK — character-level tracking is a Latin habit. */
 :lang(zh) .tracking-wide,
 :lang(zh) .tracking-wider,

@@ -144,7 +144,13 @@ export function AccountCard({
                   [t('accountCenter.quota'), t('agent.credits')].includes(metric.label));
               return (
                 <div key={index} className="flex w-full flex-shrink-0 flex-col gap-1">
-                  <div className={balanceOnly ? 'space-y-1' : 'flex h-4 items-center gap-2'}>
+                  <div
+                    className={
+                      balanceOnly
+                        ? 'space-y-1'
+                        : 'account-card-metric-row flex h-4 items-center gap-2'
+                    }
+                  >
                     <span
                       className={
                         balanceOnly ? 'contents' : 'flex min-w-0 flex-1 items-center gap-2'

@@ -275,7 +275,7 @@ function App() {
                                   <div className="flex items-baseline gap-3 flex-1 min-w-0">
                                     <h2 className="cjk-title flex-shrink-0">
                                       {is('models') && t('page.modelNexus')}
-                                      {is('accounts') && t('nav.accountCenter')}
+                                      {is('accounts') && t('page.accountCenter')}
                                       {is('freeModels') && t('page.freeModels')}
 
                                       {is('apps') && t('page.appManager')}

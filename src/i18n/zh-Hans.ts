@@ -62,6 +62,7 @@ const zhHans: Partial<Translations> = {
   'changelog.empty': '暂无更新日志。',
   'nav.aiCareer': '我的AI生涯',
   'page.modelNexus': '模型中心',
+  'page.accountCenter': '账号管理',
   'page.freeModels': '智能路由',
   'freeModels.search': '搜索平台或模型',
   'freeModels.noCard': '无需绑卡',
@@ -113,7 +114,7 @@ const zhHans: Partial<Translations> = {
   'freeModels.router.title': '免切换智能路由',
   'freeModels.view.smart': '智能',
   'freeModels.view.super': '超级',
-  'freeModels.super.title': '免切换超级路由',
+  'freeModels.super.title': '超级路由',
   'freeModels.super.description':
     '由一个主模型对接 AI 应用，并在路由阶段将任务分配给其他模型。例如，在 Claude Code 或 Codex 中提交任务后，各模型将独立完成任务。待所有模型完成后，主模型会汇总所有结果，交叉评估并整合各方优势，形成并执行最终方案。多模型协作有望在复杂任务中突破单一顶尖模型的能力边界，但多模型并行也会成倍放大 Token 消耗与使用成本。',
   'freeModels.super.unavailable': '（开发调试中，暂不可用）',

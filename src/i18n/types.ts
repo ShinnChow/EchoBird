@@ -63,6 +63,7 @@ export type TKey =
   | 'changelog.empty'
   // Page titles
   | 'page.modelNexus'
+  | 'page.accountCenter'
   | 'page.freeModels'
   | 'page.appManager'
   | 'page.localServer'
