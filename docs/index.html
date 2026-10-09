@@ -1391,7 +1391,7 @@
                 'nav.download': '下载',
                 'hero.h1.line1': '让 AI 的橄榄枝',
                 'hero.h1.line2': '抵达千家万户',
-                'hero.lede.html': 'EchoBird 支持 <strong>ChatGPT、Codex CLI、Claude Code 多账号切换</strong>与额度查看，用<strong>多模型智能路由</strong>按优先级调用、故障自动切换。一键安装 AI 工具、部署本地大模型，把 AI 带到每一台电脑上。',
+                'hero.lede.html': '很多朋友让我教他们使用 AI，但每个人的系统不同，安装和选择模型都要反复解释，甚至有些人不愿购买模型。于是，我开发了 EchoBird，让第一次接触 AI 的人也能快速上手，不用求人，少走弯路。',
                 'workflow.eyebrow': '账号与模型调度',
                 'workflow.title': '多账号切换与多模型智能路由',
                 'workflow.sub': '管理 ChatGPT、Codex CLI、Claude Code 的多个账号，让兼容工具通过一个本地 API 调用多个模型。',
@@ -1439,9 +1439,11 @@
                 'pillar3.li2': '双协议代理:OpenAI + Anthropic 双端点同时可用',
                 'pillar3.li3': 'GGUF / HuggingFace 任意模型即拉即跑',
                 'tools.title': '原生支持你已经在用的工具',
-                'tools.sub': '29 款主流 AI 工具,大部分一键安装 + 切换模型。',
+                'tools.sub': '39 款主流 AI 工具,大部分一键安装 + 切换模型。',
                 'tools.mimodesktop': 'MiMo 桌面端',
                 'tools.kimidesktop': 'Kimi 桌面端',
+                'tools.clinedesktop': 'Cline 桌面端',
+                'tools.minimaxdesktop': 'MiniMax 桌面端',
                 'relays.title': '优质中转站推荐',
                 'relays.sub': '模型中心已收录，获取 API Key 后即可接入你的 AI 工具。',
                 'relays.ccvibe.desc': 'Claude、GPT 等编程模型 API',
@@ -1491,7 +1493,7 @@
                 'nav.download': 'Download',
                 'hero.h1.line1': 'Let the olive branch',
                 'hero.h1.line2': 'of AI reach every home.',
-                'hero.lede.html': 'Manage <strong>ChatGPT, Codex CLI, and Claude Code accounts</strong> and track quota in one place. Use <strong>multi-model smart routing</strong> with priority and automatic failover. Install AI tools and deploy local LLMs in one click.',
+                'hero.lede.html': 'Many friends ask me to teach them how to use AI, but each uses a different system. Installation and model selection take repeated explanations, and some do not want to pay for models. So I built EchoBird to help first-time AI users get started quickly, without relying on others or taking unnecessary detours.',
                 'workflow.eyebrow': 'ACCOUNTS & MODEL ROUTING',
                 'workflow.title': 'Multi-account switching and multi-model smart routing',
                 'workflow.sub': 'Manage multiple ChatGPT, Codex CLI, and Claude Code accounts, and connect compatible tools to multiple models through one local API.',
@@ -1539,9 +1541,11 @@
                 'pillar3.li2': 'Dual-protocol proxy: OpenAI + Anthropic endpoints both available',
                 'pillar3.li3': 'Any GGUF / HuggingFace model — pull and run',
                 'tools.title': 'Native support for tools you already use',
-                'tools.sub': '29 mainstream AI tools — most install + switch models in one click.',
+                'tools.sub': '39 mainstream AI tools — most install + switch models in one click.',
                 'tools.mimodesktop': 'MiMo Desktop',
                 'tools.kimidesktop': 'Kimi Desktop',
+                'tools.clinedesktop': 'Cline Desktop',
+                'tools.minimaxdesktop': 'MiniMax Desktop',
                 'relays.title': 'Recommended API relays',
                 'relays.sub': 'Available in Model Nexus. Get an API key to connect your AI tools.',
                 'relays.ccvibe.desc': 'API access for Claude, GPT and more',
@@ -1665,7 +1669,7 @@
             <span class="gradient" data-i18n="hero.h1.line2">抵达千家万户</span>
         </h1>
         <p class="lede" data-i18n-html="hero.lede.html">
-            EchoBird 支持 <strong>ChatGPT、Codex CLI、Claude Code 多账号切换</strong>与额度查看，用<strong>多模型智能路由</strong>按优先级调用、故障自动切换。一键安装 AI 工具、部署本地大模型，把 AI 带到每一台电脑上。
+            很多朋友让我教他们使用 AI，但每个人的系统不同，安装和选择模型都要反复解释，甚至有些人不愿购买模型。于是，我开发了 EchoBird，让第一次接触 AI 的人也能快速上手，不用求人，少走弯路。
         </p>
         <p class="platforms">
             <span data-i18n="hero.platforms">Windows · macOS · Linux · 免费</span><span class="macos-hint" id="macosHint" style="display:none"> · <span data-i18n="hero.macosHint">macOS 首次启动</span> <code>xattr -cr /Applications/EchoBird.app</code></span>
@@ -1876,7 +1880,7 @@
         <div class="section-head reveal">
             <div class="section-eyebrow">SUPPORTED AGENTS</div>
             <h2 class="section-title" data-i18n="tools.title">原生支持你已经在用的工具</h2>
-            <p class="section-sub" data-i18n="tools.sub">29 款主流 AI 工具,大部分一键安装 + 切换模型。</p>
+            <p class="section-sub" data-i18n="tools.sub">39 款主流 AI 工具,大部分一键安装 + 切换模型。</p>
         </div>
         <div class="tools-grid reveal">
             <div class="tool-card"><div class="ico"><img src="./icons/tools/openclaw.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">OpenClaw</div></div></div>
@@ -1892,15 +1896,27 @@
             <div class="tool-card"><div class="ico"><img src="./icons/tools/pi.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Pi</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/omp.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Oh My Pi (OMP)</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/qwencode.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">QwenCode</div></div></div>
+            <div class="tool-card"><div class="ico"><img src="./icons/tools/cline.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Cline CLI</div></div></div>
+            <div class="tool-card"><div class="ico"><img src="./icons/tools/antigravity.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Antigravity CLI</div></div></div>
+            <div class="tool-card"><div class="ico"><img src="./icons/tools/minimaxcode.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">MiniMax CLI</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/chatgptdesktop.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">ChatGPT</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/claudedesktop.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Claude Desktop</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/geminidesktop.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Gemini Desktop</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/opencodedesktop.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">OpenCode Desktop</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/kimidesktop.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name" data-i18n="tools.kimidesktop">Kimi 桌面端</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/mimodesktop.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name" data-i18n="tools.mimodesktop">MiMo 桌面端</div></div></div>
+            <div class="tool-card"><div class="ico"><img src="./icons/tools/clinedesktop.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name" data-i18n="tools.clinedesktop">Cline 桌面端</div></div></div>
+            <div class="tool-card"><div class="ico"><img src="./icons/tools/antigravitydesktop.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Antigravity</div></div></div>
+            <div class="tool-card"><div class="ico"><img src="./icons/tools/minimaxdesktop.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name" data-i18n="tools.minimaxdesktop">MiniMax 桌面端</div></div></div>
+            <div class="tool-card"><div class="ico"><img src="./icons/tools/dsh.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">DeepSeek Harness</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/coffeecli.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Coffee CLI</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/workbuddy.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">WorkBuddy</div></div></div>
+            <div class="tool-card"><div class="ico"><img src="./icons/tools/workbuddyai.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">WorkBuddy AI</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/zcode.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">ZCode</div></div></div>
+            <div class="tool-card"><div class="ico"><img src="./icons/tools/grokbot.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Grok Bot</div></div></div>
+            <div class="tool-card"><div class="ico"><img src="./icons/tools/manus.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Manus</div></div></div>
+            <div class="tool-card"><div class="ico"><img src="./icons/tools/cue.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Cue</div></div></div>
+            <div class="tool-card"><div class="ico"><img src="./icons/tools/muse.png" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Muse</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/cursor.svg" alt="" width="36" height="36" loading="lazy" class="mono"></div><div class="meta"><div class="name">Cursor</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/vscode.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Visual Studio Code</div></div></div>
             <div class="tool-card"><div class="ico"><img src="./icons/tools/claudescience.svg" alt="" width="36" height="36" loading="lazy"></div><div class="meta"><div class="name">Claude Science</div></div></div>
