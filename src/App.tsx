@@ -333,7 +333,13 @@ function App() {
                                 <div className={pageScroll(is('models'))}>
                                   <ModelNexusMain />
                                 </div>
-                                <div className={pageScroll(is('accounts'))}>
+                                <div
+                                  className={
+                                    is('accounts')
+                                      ? 'flex-1 overflow-y-auto overflow-x-hidden cursor-default'
+                                      : 'hidden'
+                                  }
+                                >
                                   <AccountCenterMain />
                                 </div>
                                 <div
