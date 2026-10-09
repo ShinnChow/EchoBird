@@ -32,6 +32,7 @@ function context() {
     refreshCodexAccountQuota: vi.fn(),
     deleteCodexAccount: vi.fn(),
     claudeCodeAccounts: group(),
+    claudeDesktopAccounts: group(),
     deepSeekAccounts: group(),
     workBuddyAccountGroups: { workbuddy: group(), workbuddyai: group() },
     antigravityAccounts: group(),
@@ -47,6 +48,17 @@ const providers = (state: AppManagerContextType) =>
   accountCenterProviders(state, (key) => key, 'en');
 
 describe('Account Center display data', () => {
+  it('shows native Claude sign-in and exit instructions in their respective stages', () => {
+    const state = context();
+    state.claudeDesktopAccounts.busy = true;
+    expect(providers(state).find((provider) => provider.id === 'claudedesktop')?.waitingLabel).toBe(
+      'agent.claudeDesktopLoginClient'
+    );
+    state.claudeDesktopAccounts.awaitingClientExit = true;
+    expect(providers(state).find((provider) => provider.id === 'claudedesktop')?.waitingLabel).toBe(
+      'agent.claudeDesktopExitClient'
+    );
+  });
   it('shows the Manus exit instruction only during its native login capture stage', () => {
     const state = context();
     expect(providers(state).every((provider) => provider.waitingLabel === undefined)).toBe(true);
@@ -227,30 +239,64 @@ describe('Account Center display data', () => {
     ]);
   });
 
-  it('keeps both Claude windows unknown until each has its own quota data', () => {
-    const state = context();
-    const row = { id: 'claude', email: 'claude@example.test', plan: 'Max', active: false };
-    state.claudeCodeAccounts.accounts = [row];
-    const provider = providers(state).find((p) => p.id === 'claudecode')!;
-    expect(provider.accounts[0].metrics).toMatchObject([
-      { label: '5h', value: '—', percent: undefined, resetAt: undefined },
-      { label: '7d', value: '—', percent: undefined, resetAt: undefined },
-    ]);
-    const markup = renderToStaticMarkup(
-      <AccountCard provider={provider} account={provider.accounts[0]} />
-    );
-    expect(markup).toContain('>5h<');
-    expect(markup).toContain('>7d<');
-    expect(markup).not.toContain('role="progressbar"');
-    expect(markup).not.toContain('>0%<');
-    state.claudeCodeAccounts.accounts = [
-      { ...row, fiveHour: { remainingPercent: 0, resetAt: 123 } },
-    ];
-    expect(providers(state).find((p) => p.id === 'claudecode')!.accounts[0].metrics).toMatchObject([
-      { label: '5h', value: '0%', percent: 0, resetAt: 123 },
-      { label: '7d', value: '—', percent: undefined, resetAt: undefined },
-    ]);
-  });
+  it.each(['claudecode', 'claudedesktop'])(
+    'keeps both %s windows unknown until each has its own quota data',
+    (id) => {
+      const state = context();
+      const group = id === 'claudecode' ? state.claudeCodeAccounts : state.claudeDesktopAccounts;
+      const row = { id: 'claude', email: 'claude@example.test', plan: 'Max', active: false };
+      group.accounts = [row];
+      const provider = providers(state).find((p) => p.id === id)!;
+      expect(provider.accounts[0].subscriptionEndAt).toBeUndefined();
+      expect(provider.accounts[0].metrics).toMatchObject([
+        { label: '5h', value: '—', percent: undefined, resetAt: undefined },
+        { label: '7d', value: '—', percent: undefined, resetAt: undefined },
+      ]);
+      const markup = renderToStaticMarkup(
+        <AccountCard provider={provider} account={provider.accounts[0]} />
+      );
+      expect(markup).toContain('>5h<');
+      expect(markup).toContain('>7d<');
+      expect(markup).not.toContain('role="progressbar"');
+      expect(markup).not.toContain('>0%<');
+      group.accounts = [{ ...row, fiveHour: { remainingPercent: 0, resetAt: 123 } }];
+      expect(providers(state).find((p) => p.id === id)!.accounts[0].metrics).toMatchObject([
+        { label: '5h', value: '0%', percent: 0, resetAt: 123 },
+        { label: '7d', value: '—', percent: undefined, resetAt: undefined },
+      ]);
+    }
+  );
+
+  it.each(['claudecode', 'claudedesktop'])(
+    'shows the shared missing-usage status for Free %s without a subscription placeholder',
+    (id) => {
+      const state = context();
+      const group = id === 'claudecode' ? state.claudeCodeAccounts : state.claudeDesktopAccounts;
+      const row = { id: 'free', email: 'free@example.test', plan: 'Free', active: false };
+      group.accounts = [row];
+      const provider = providers(state).find((p) => p.id === id)!;
+      const account = provider.accounts[0];
+      expect(account.subscriptionEndAt).toBeUndefined();
+      expect(account.metrics).toEqual([]);
+      const markup = renderToStaticMarkup(<AccountCard provider={provider} account={account} />);
+      expect(markup).toContain('>Free<');
+      expect(markup).toContain('>model.noUsageData<');
+      expect(markup).not.toContain('aria-label="accountCenter.subscription"');
+      expect(markup).not.toContain('role="progressbar"');
+      expect(markup).not.toContain('>—<');
+      expect(markup).not.toContain('>0%<');
+
+      group.accounts = [{ ...row, fiveHour: { remainingPercent: 0, resetAt: 123 } }];
+      const withUsage = providers(state).find((p) => p.id === id)!.accounts[0];
+      expect(withUsage.metrics).toMatchObject([
+        { label: '5h', value: '0%', percent: 0, resetAt: 123 },
+        { label: '7d', value: '—', percent: undefined },
+      ]);
+      expect(
+        renderToStaticMarkup(<AccountCard provider={provider} account={withUsage} />)
+      ).not.toContain('>model.noUsageData<');
+    }
+  );
 
   it('keeps Plus short/weekly quotas and subscription expiry as three independent deadlines', async () => {
     vi.useFakeTimers();

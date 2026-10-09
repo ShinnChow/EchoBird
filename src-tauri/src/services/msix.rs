@@ -76,6 +76,19 @@ pub(crate) fn resolve_launch_uri(configured: &str) -> Option<String> {
     }
 }
 
+#[cfg(windows)]
+pub(crate) fn roaming_data_dir(configured: &str, app_name: &str) -> Option<std::path::PathBuf> {
+    let uri = resolve_launch_uri(configured)?;
+    let family = uri.strip_prefix("shell:AppsFolder\\")?.split_once('!')?.0;
+    Some(
+        std::path::PathBuf::from(std::env::var_os("LOCALAPPDATA")?)
+            .join("Packages")
+            .join(family)
+            .join("LocalCache/Roaming")
+            .join(app_name),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

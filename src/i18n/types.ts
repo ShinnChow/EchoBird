@@ -3,6 +3,7 @@
 // Translation key definitions
 export type TKey =
   | 'accountError.closeClient'
+  | 'accountError.quitClaudeDesktop'
   | 'accountError.initializeClient'
   | 'accountError.failed'
   | 'accountError.home'
@@ -270,6 +271,8 @@ export type TKey =
   | 'agent.zcodeTrial'
   | 'agent.waitingForBrowser'
   | 'agent.manusExitClient'
+  | 'agent.claudeDesktopLoginClient'
+  | 'agent.claudeDesktopExitClient'
   | 'agent.refreshAccount'
   | 'agent.baseCredits'
   | 'agent.baseCreditsReset'

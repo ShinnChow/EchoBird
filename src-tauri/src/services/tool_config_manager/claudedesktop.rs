@@ -85,6 +85,16 @@ fn read_config_object(path: &Path) -> Result<serde_json::Value, String> {
     Ok(value)
 }
 
+pub(crate) fn claude_desktop_uses_third_party_mode() -> Result<bool, String> {
+    let paths = resolve_claudedesktop_paths()
+        .ok_or_else(|| "Cannot resolve the Claude Desktop configuration directory.".to_string())?;
+    third_party_mode_at(&paths)
+}
+
+fn third_party_mode_at(paths: &ClaudeDesktopLayout) -> Result<bool, String> {
+    Ok(read_config_object(&paths.cfg_official)?["deploymentMode"] == "3p")
+}
+
 /// Change the deployment mode while preserving other native settings.
 fn set_claude_deployment_mode(path: &Path, mode: &str) -> Result<(), String> {
     let mut cfg = read_config_object(path)?;
@@ -581,6 +591,7 @@ mod tests {
         for path in [&paths.cfg_official, &paths.cfg_threep] {
             write_json_file(path, &settings).unwrap();
         }
+        assert!(!third_party_mode_at(&paths).unwrap());
         let profile_path = paths
             .lib_dir
             .join(format!("{CLAUDE_DESKTOP_PROFILE_ID}.json"));
@@ -600,6 +611,7 @@ mod tests {
             .unwrap();
             let result = apply_claudedesktop_at(&info, &paths, &relay_path);
             assert!(result.success, "{}", result.message);
+            assert!(third_party_mode_at(&paths).unwrap());
             let profile = read_json_file(&profile_path).unwrap();
             assert_eq!(profile["inferenceModels"][0]["labelOverride"], model);
             assert_eq!(profile["inferenceModels"][0]["prefer1m"], relay_mode);
@@ -625,6 +637,7 @@ mod tests {
             }
         }
         assert!(restore_claudedesktop_at(&paths, &relay_path).success);
+        assert!(!third_party_mode_at(&paths).unwrap());
         assert!(!profile_path.exists());
         assert!(!paths.lib_dir.join("_meta.json").exists());
         assert!(!relay_path.exists());

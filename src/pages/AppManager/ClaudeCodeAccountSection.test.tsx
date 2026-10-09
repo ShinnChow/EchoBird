@@ -3,8 +3,15 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { ClaudeCodeAccountSection } from './ClaudeCodeAccountSection';
 import { AppManagerContext, type AppManagerContextType } from './context';
+import type { ClaudeCodeAccount } from '../../api/tauri';
 
-function renderAccount(quotaPercent: number | null, busy = false) {
+function renderAccount(
+  quotaPercent: number | null,
+  busy = false,
+  desktop = false,
+  awaitingExit = true,
+  overrides: Partial<ClaudeCodeAccount> = {}
+) {
   const context = {
     claudeCodeAccounts: {
       accounts: [
@@ -14,6 +21,7 @@ function renderAccount(quotaPercent: number | null, busy = false) {
           plan: 'Max 5X',
           fiveHour: quotaPercent == null ? null : { remainingPercent: quotaPercent },
           sevenDay: { remainingPercent: 82 },
+          ...overrides,
         },
       ],
       selectedId: 'test',
@@ -27,9 +35,13 @@ function renderAccount(quotaPercent: number | null, busy = false) {
       remove: async () => {},
     },
   } as unknown as AppManagerContextType;
+  context.claudeDesktopAccounts = {
+    ...context.claudeCodeAccounts,
+    awaitingClientExit: desktop && busy && awaitingExit,
+  } as AppManagerContextType['claudeDesktopAccounts'];
   return renderToStaticMarkup(
     <AppManagerContext.Provider value={context}>
-      <ClaudeCodeAccountSection showDivider={false} />
+      <ClaudeCodeAccountSection showDivider={false} desktop={desktop} />
     </AppManagerContext.Provider>
   );
 }
@@ -39,8 +51,11 @@ describe('Claude Code account card', () => {
     const markup = renderAccount(37);
     expect(markup).toContain('test@example.com');
     expect(markup).toContain('Max 5X');
-    expect(markup).toContain('5h: 37%');
-    expect(markup).toContain('7d: 82%');
+    expect(markup).toContain('37%');
+    expect(markup).toContain('82%');
+    expect(markup).not.toContain('5h:');
+    expect(markup).not.toContain('7d:');
+    expect(markup).not.toContain('w-[64px]');
     expect(markup).not.toContain('width:');
     expect(markup).not.toContain('h-1.5');
     expect(markup).toContain('aria-checked="true"');
@@ -54,8 +69,21 @@ describe('Claude Code account card', () => {
 
   it('distinguishes unavailable quota from an exhausted account', () => {
     expect(renderAccount(null)).toContain('—');
-    expect(renderAccount(null)).not.toContain('5h: 0%');
-    expect(renderAccount(0)).toContain('5h: 0%');
+    expect(renderAccount(null)).not.toContain('0%');
+    expect(renderAccount(0)).toContain('0%');
+    expect(renderAccount(0)).toContain('5h');
+    expect(renderAccount(0)).toContain('7d');
+    expect(renderAccount(0)).toContain('·');
+  });
+  it('shows Free and one unavailable-data status instead of three placeholders', () => {
+    const markup = renderAccount(null, false, true, true, { plan: 'Free', sevenDay: null });
+    expect(markup).toContain('Free');
+    expect(markup).toContain('model.noUsageData');
+    expect(markup).not.toContain('—');
+    expect(markup).not.toContain('0%');
+    const text = markup.replace(/<[^>]*>/g, '');
+    expect(text).not.toContain('5h');
+    expect(text).not.toContain('7d');
   });
 
   it('disables adding and shows the existing waiting label during OAuth', () => {
@@ -63,5 +91,23 @@ describe('Claude Code account card', () => {
     expect(markup).toContain('disabled=""');
     expect(markup).toContain('agent.waitingForBrowser');
     expect(markup).not.toContain('agent.addCurrentAccount');
+  });
+  it('reuses the Claude layout and shows the desktop normal-exit stage', () => {
+    const markup = renderAccount(null, true, true);
+    expect(markup).toContain('/icons/tools/claudedesktop.svg');
+    expect(markup).toContain('claude-account-pill');
+    expect(markup).toContain('agent.claudeDesktopExitClient');
+    expect(markup).toContain('—');
+    expect(markup).not.toContain('5h:');
+    expect(markup).toContain('grid h-12');
+    expect(markup.match(/Max 5X/g)).toHaveLength(1);
+    expect(markup).not.toContain('cursor-');
+    expect(markup).not.toContain('title=');
+  });
+  it('asks for native sign-in rather than browser operation in the desktop login stage', () => {
+    const markup = renderAccount(null, true, true, false);
+    expect(markup).toContain('agent.claudeDesktopLoginClient');
+    expect(markup).not.toContain('agent.waitingForBrowser');
+    expect(markup).not.toContain('agent.claudeDesktopExitClient');
   });
 });

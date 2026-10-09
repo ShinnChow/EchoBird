@@ -393,6 +393,9 @@ describe('PageAwareHint', () => {
       claudeCodeAccounts: {
         selectedId: selectedAccount,
       } as AppManagerContextType['claudeCodeAccounts'],
+      claudeDesktopAccounts: {
+        selectedId: selectedAccount,
+      } as AppManagerContextType['claudeDesktopAccounts'],
     };
     return renderToStaticMarkup(
       <AppManagerContext.Provider value={context as AppManagerContextType}>
@@ -422,6 +425,9 @@ describe('PageAwareHint', () => {
   it('hides the proxy reminder when a Claude Code account is selected', async () => {
     const markup = await renderHint('claudecode', 'saved-account');
     expect(markup).not.toContain('hint.devInvite');
+  });
+  it('hides the proxy reminder when a Claude Desktop account is selected', async () => {
+    expect(await renderHint('claudedesktop', 'saved-account')).not.toContain('hint.devInvite');
   });
 
   it('shows neither tool-specific reminder for other tools', async () => {
@@ -483,33 +489,72 @@ describe.each(['codex', 'chatgptdesktop'])('%s Web Search control', (client) => 
   );
 });
 
-describe('Claude Desktop 1M control', () => {
-  it.each([false, true])('shows the independent switch with API Router=%s', async (relay) => {
-    const { AppManagerPanel } = await import('./AppManagerComponents');
-    const { ModelNexusContext } = await import('../ModelNexus/context');
-    const { ConfirmDialogProvider } = await import('../../components/ConfirmDialog');
-    const context = {
-      selectedTool: 'claudedesktop',
-      selectedToolData: { ...tool, id: 'claudedesktop' },
-      toolModelConfig: {},
-      userModels: [],
-      claudeDesktopRelayMode: relay,
-      claudeDesktop1mMode: true,
-      claude1mMode: false,
-      claudeCodeAccounts: { selectedId: null },
-    } as unknown as AppManagerContextType;
-    const markup = renderToStaticMarkup(
-      <ConfirmDialogProvider>
-        <ModelNexusContext.Provider value={{} as React.ContextType<typeof ModelNexusContext>}>
-          <AppManagerContext.Provider value={context}>
-            <AppManagerPanel />
-          </AppManagerContext.Provider>
-        </ModelNexusContext.Provider>
-      </ConfirmDialogProvider>
-    );
-    expect(markup).toMatch(/aria-checked="true" aria-label="1M"/);
-    expect(markup).toContain('agent.claude1mHint');
-  });
+describe.each(['claudedesktop', 'claudecode'])('%s routing controls', (client) => {
+  it.each([
+    { relay: false, selectedAccount: null },
+    { relay: true, selectedAccount: null },
+    { relay: false, selectedAccount: 'saved-account' },
+    { relay: true, selectedAccount: 'saved-account' },
+  ])(
+    'keeps API Router visible regardless of account selection: %j',
+    async ({ relay, selectedAccount }) => {
+      const { AppManagerPanel } = await import('./AppManagerComponents');
+      const { ModelNexusContext } = await import('../ModelNexus/context');
+      const { ConfirmDialogProvider } = await import('../../components/ConfirmDialog');
+      const accounts = {
+        accounts: selectedAccount
+          ? [
+              {
+                id: selectedAccount,
+                email: 'saved@example.test',
+                plan: null,
+                fiveHour: null,
+                sevenDay: null,
+              },
+            ]
+          : [],
+        selectedId: selectedAccount,
+        busy: false,
+        remainingSeconds: 0,
+        refreshing: new Set(),
+        authorizationFailedIds: new Set(),
+        add: async () => {},
+        select: () => {},
+        refresh: async () => {},
+        remove: async () => {},
+      };
+      const context = {
+        selectedTool: client,
+        selectedToolData: { ...tool, id: client },
+        toolModelConfig: {},
+        userModels: [],
+        claudeDesktopRelayMode: relay,
+        claudeCodeRelayMode: relay,
+        claudeDesktop1mMode: true,
+        claude1mMode: true,
+        claudeCodeAccounts: accounts,
+        claudeDesktopAccounts: accounts,
+      } as unknown as AppManagerContextType;
+      const markup = renderToStaticMarkup(
+        <ConfirmDialogProvider>
+          <ModelNexusContext.Provider value={{} as React.ContextType<typeof ModelNexusContext>}>
+            <AppManagerContext.Provider value={context}>
+              <AppManagerPanel />
+            </AppManagerContext.Provider>
+          </ModelNexusContext.Provider>
+        </ConfirmDialogProvider>
+      );
+      expect(markup).toContain(`aria-checked="${relay}" aria-label="agent.codexRelayLabel"`);
+      if (client === 'claudedesktop' || relay) {
+        expect(markup).toMatch(/aria-checked="true" aria-label="1M"/);
+        expect(markup).toContain('agent.claude1mHint');
+      } else {
+        expect(markup).not.toContain('aria-label="1M"');
+      }
+      if (client === 'claudedesktop') expect(markup).toContain('Anthropic Official');
+      if (selectedAccount) expect(markup).toContain('<div role="radio" aria-checked="true"');
+    }
+  );
 });
 
 describe.each(['grokbot', 'cursor', 'manus'] as const)('%s account-only panel', (client) => {

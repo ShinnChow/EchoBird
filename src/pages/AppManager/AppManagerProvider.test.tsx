@@ -36,6 +36,7 @@ vi.mock('../../api/tauri', () => ({
   deleteZCodeAccount: vi.fn(),
 
   applyModelToTool: vi.fn(),
+  restoreToolToOfficial: vi.fn(),
   startTool: vi.fn().mockResolvedValue({ success: true }),
   listCodexAccounts: vi.fn(),
   cancelCodexLogin: vi.fn(),
@@ -70,6 +71,13 @@ vi.mock('../../api/tauri', () => ({
   deleteGrokAccount: vi.fn(),
   switchGrokAccount: vi.fn(),
   refreshGrokAccount: vi.fn(),
+  listClaudeDesktopAccounts: vi.fn().mockResolvedValue([]),
+  startClaudeDesktopLogin: vi.fn(),
+  pollClaudeDesktopLogin: vi.fn(),
+  cancelClaudeDesktopLogin: vi.fn(),
+  refreshClaudeDesktopAccount: vi.fn(),
+  switchClaudeDesktopAccount: vi.fn(),
+  deleteClaudeDesktopAccount: vi.fn(),
   listManusAccounts: vi.fn().mockRejectedValue(new Error('accountError.read')),
   startManusLogin: vi.fn(),
   pollManusLogin: vi.fn(),
@@ -78,6 +86,92 @@ vi.mock('../../api/tauri', () => ({
   switchManusAccount: vi.fn(),
   refreshManusAccount: vi.fn(),
 }));
+
+describe('Claude Desktop account apply', () => {
+  let renderer: ReactTestRenderer;
+  let context: ReturnType<typeof useAppManager>;
+  function Harness() {
+    const state = useAppManager();
+    useLayoutEffect(() => {
+      context = state;
+    });
+    return null;
+  }
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const storage = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+    });
+    const account = { id: 'desktop-saved', email: 'one@example.test', active: true };
+    vi.mocked(api.listClaudeDesktopAccounts).mockResolvedValue([account]);
+    vi.mocked(api.switchClaudeDesktopAccount).mockResolvedValue(account);
+    vi.mocked(api.restoreToolToOfficial).mockResolvedValue({ success: true, message: 'ok' });
+    useNavigationStore.getState().setActivePage('apps');
+    useToolsStore
+      .getState()
+      .setDetectedTools([
+        { id: 'claudedesktop', name: 'Claude', category: 'Desktop', installed: true },
+      ]);
+  });
+  afterEach(() => {
+    act(() => renderer?.unmount());
+    useToolsStore.getState().setDetectedTools([]);
+    vi.mocked(api.listClaudeDesktopAccounts).mockResolvedValue([]);
+  });
+  async function mount() {
+    await act(async () => {
+      renderer = create(
+        <AppManagerProvider>
+          <Harness />
+        </AppManagerProvider>
+      );
+    });
+    await act(async () => {
+      context.setSelectedTool('claudedesktop');
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+  it('requires explicit apply and respects the launch-after-apply preference', async () => {
+    await mount();
+    expect(context.claudeDesktopAccounts.selectedId).toBe('desktop-saved');
+    expect(api.switchClaudeDesktopAccount).not.toHaveBeenCalled();
+    expect(api.restoreToolToOfficial).not.toHaveBeenCalled();
+    act(() => context.setLaunchAfterApply(false));
+    await act(async () => {
+      await context.handleLaunch();
+    });
+    expect(api.switchClaudeDesktopAccount).toHaveBeenCalledWith('desktop-saved');
+    expect(api.restoreToolToOfficial).toHaveBeenCalledWith('claudedesktop');
+    expect(api.listClaudeDesktopAccounts).toHaveBeenCalledTimes(2);
+    expect(api.startTool).not.toHaveBeenCalled();
+    expect(api.refreshClaudeDesktopAccount).not.toHaveBeenCalled();
+    act(() => context.setLaunchAfterApply(true));
+    await act(async () => {
+      await context.handleLaunch();
+    });
+    expect(api.startTool).toHaveBeenCalledWith('claudedesktop', undefined);
+    expect(openDialog).not.toHaveBeenCalled();
+    expect(context.isLaunching).toBe(false);
+  });
+  it('does not restore provider settings or launch when normal exit is required', async () => {
+    await mount();
+    expect(context.claudeDesktopAccounts.selectedId).toBe('desktop-saved');
+    vi.mocked(api.switchClaudeDesktopAccount).mockRejectedValueOnce(
+      new Error('accountError.quitClaudeDesktop')
+    );
+    await act(async () => {
+      await context.handleLaunch();
+    });
+    expect(context.applyError).toBe('accountError.quitClaudeDesktop');
+    expect(context.isLaunching).toBe(false);
+    expect(api.restoreToolToOfficial).not.toHaveBeenCalled();
+    expect(api.startTool).not.toHaveBeenCalled();
+  });
+});
 
 describe.each(['codex', 'chatgptdesktop'])('%s Web Search preference', (tool) => {
   let renderer: ReactTestRenderer;

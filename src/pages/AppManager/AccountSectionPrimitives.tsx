@@ -201,7 +201,9 @@ export const AccountSectionRow: React.FC<{
             className={`${planPrefix ? 'flex items-center gap-2 ' : ''}whitespace-nowrap text-[12px] font-semibold text-cyber-text`}
           >
             {planPrefix}
-            {plan || '—'}
+            {(typeof plan === 'string'
+              ? plan.replace(/^[a-z]/, (letter) => letter.toUpperCase())
+              : plan) || '—'}
           </span>
         )}
         <span

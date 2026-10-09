@@ -3,19 +3,33 @@ import { useAppManager } from './context';
 import { ModelSwitchDivider } from './ModelSwitchDivider';
 import { AccountSectionButton, AccountSectionRow } from './AccountSectionPrimitives';
 import { QuotaCountdown } from './QuotaCountdown';
-export const ClaudeCodeAccountSection: React.FC<{ showDivider?: boolean }> = ({
+import { useI18n } from '../../hooks/useI18n';
+export const ClaudeCodeAccountSection: React.FC<{ showDivider?: boolean; desktop?: boolean }> = ({
   showDivider = true,
+  desktop = false,
 }) => {
-  const { claudeCodeAccounts } = useAppManager();
+  const { claudeCodeAccounts, claudeDesktopAccounts, isLaunching } = useAppManager();
+  const { t } = useI18n();
+  const group = desktop ? claudeDesktopAccounts : claudeCodeAccounts;
   const { accounts, selectedId, select, busy, remainingSeconds, refreshing, add, refresh, remove } =
-    claudeCodeAccounts;
+    group;
   return (
     <section>
       <AccountSectionButton
-        iconSrc="/icons/tools/claudecode.svg"
+        iconSrc={desktop ? '/icons/tools/claudedesktop.svg' : '/icons/tools/claudecode.svg'}
         colorClassName="claude-account-pill"
         busy={busy}
+        disabled={desktop && isLaunching}
         remainingSeconds={remainingSeconds}
+        waitingLabel={
+          desktop
+            ? t(
+                claudeDesktopAccounts.awaitingClientExit
+                  ? 'agent.claudeDesktopExitClient'
+                  : 'agent.claudeDesktopLoginClient'
+              )
+            : undefined
+        }
         onClick={() => void add()}
       />
       {accounts.length > 0 && (
@@ -28,21 +42,44 @@ export const ClaudeCodeAccountSection: React.FC<{ showDivider?: boolean }> = ({
               email={account.email}
               plan={account.plan}
               refreshing={refreshing.has(account.id)}
-              authorizationFailed={claudeCodeAccounts.authorizationFailedIds.has(account.id)}
+              authorizationFailed={group.authorizationFailedIds.has(account.id)}
               onSelect={() => select(account.id)}
               onRefresh={() => void refresh(account)}
               onDelete={() => void remove(account)}
               secondary={
-                <span className="flex h-[16px] items-center gap-2 whitespace-nowrap text-[12px] leading-[16px] text-cyber-text">
-                  <span>
-                    5h: {account.fiveHour == null ? '—' : `${account.fiveHour.remainingPercent}%`}{' '}
-                    <QuotaCountdown resetAt={account.fiveHour?.resetAt} />
+                account.fiveHour == null && account.sevenDay == null ? (
+                  <span className="truncate text-[11px]">{t('model.noUsageData')}</span>
+                ) : (
+                  <span className="flex h-[16px] min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap text-[11px] font-semibold leading-[16px] text-cyber-text">
+                    <span className="flex flex-shrink-0 items-center gap-0.5">
+                      {account.fiveHour == null ? '—' : `${account.fiveHour.remainingPercent}%`}
+                      {account.fiveHour?.resetAt ? (
+                        <QuotaCountdown
+                          resetAt={account.fiveHour?.resetAt}
+                          compact
+                          small
+                          parenthesized
+                        />
+                      ) : (
+                        <span className="text-[10px]">5h</span>
+                      )}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span className="flex flex-shrink-0 items-center gap-0.5">
+                      {account.sevenDay == null ? '—' : `${account.sevenDay.remainingPercent}%`}
+                      {account.sevenDay?.resetAt ? (
+                        <QuotaCountdown
+                          resetAt={account.sevenDay?.resetAt}
+                          compact
+                          small
+                          parenthesized
+                        />
+                      ) : (
+                        <span className="text-[10px]">7d</span>
+                      )}
+                    </span>
                   </span>
-                  <span>
-                    7d: {account.sevenDay == null ? '—' : `${account.sevenDay.remainingPercent}%`}{' '}
-                    <QuotaCountdown resetAt={account.sevenDay?.resetAt} />
-                  </span>
-                </span>
+                )
               }
             />
           ))}

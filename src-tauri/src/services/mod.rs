@@ -7,6 +7,7 @@ pub mod auto_fix;
 pub mod bundled_assets;
 pub mod claude_code_accounts;
 pub mod claude_code_oauth;
+pub mod claude_desktop_accounts;
 pub mod codex_accounts;
 pub mod codex_catalog;
 #[path = "codex_proxy/mod.rs"]

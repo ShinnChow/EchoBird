@@ -2,6 +2,7 @@
 import { Translations } from './types';
 const zhHans: Partial<Translations> = {
   'accountError.closeClient': '请保存工作并关闭客户端，然后重新切换账号。',
+  'accountError.quitClaudeDesktop': '请完全关闭 Claude 应用后重试。',
   'accountError.initializeClient': '请先打开一次客户端，再添加账号。',
   'accountError.failed': '账号操作失败，请重试。',
   'accountError.home': '无法获取用户目录。',
@@ -291,6 +292,8 @@ const zhHans: Partial<Translations> = {
   'agent.zcodeTrial': '体验',
   'agent.waitingForBrowser': '等待浏览器操作({seconds})',
   'agent.manusExitClient': '请手动退出 Manus({seconds})',
+  'agent.claudeDesktopLoginClient': '请在 Claude 中登录({seconds})',
+  'agent.claudeDesktopExitClient': '请完全关闭 Claude({seconds})',
   'agent.refreshAccount': '刷新账号额度',
   'agent.baseCredits': '套餐基础积分',
   'agent.baseCreditsReset': '下次刷新',

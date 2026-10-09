@@ -137,7 +137,16 @@ export function accountCenterProviders(
     busy: group.busy,
     loading: group.loading,
     remainingSeconds: group.remainingSeconds,
-    waitingLabel: group.awaitingClientExit ? t('agent.manusExitClient') : undefined,
+    waitingLabel:
+      id === 'claudedesktop' && group.busy
+        ? t(
+            group.awaitingClientExit
+              ? 'agent.claudeDesktopExitClient'
+              : 'agent.claudeDesktopLoginClient'
+          )
+        : group.awaitingClientExit
+          ? t('agent.manusExitClient')
+          : undefined,
     add: () => void group.add(),
     accounts: group.accounts.map((account) => ({
       id: account.id,
@@ -199,11 +208,31 @@ export function accountCenterProviders(
       (account) => ({
         identity: account.email,
         plan: account.plan,
-        subscriptionEndAt: null,
-        metrics: [
-          quota(account.fiveHour?.remainingPercent, account.fiveHour?.resetAt, '5h'),
-          quota(account.sevenDay?.remainingPercent, account.sevenDay?.resetAt, '7d'),
-        ],
+        metrics:
+          account.plan?.toLowerCase() === 'free' && !account.fiveHour && !account.sevenDay
+            ? []
+            : [
+                quota(account.fiveHour?.remainingPercent, account.fiveHour?.resetAt, '5h'),
+                quota(account.sevenDay?.remainingPercent, account.sevenDay?.resetAt, '7d'),
+              ],
+      })
+    ),
+    provider(
+      'claudedesktop',
+      context.detectedTools.find((tool) => tool.id === 'claudedesktop')?.name ?? 'Claude Desktop',
+      '/icons/tools/claudedesktop.svg',
+      ['claudedesktop'],
+      context.claudeDesktopAccounts,
+      (account) => ({
+        identity: account.email,
+        plan: account.plan,
+        metrics:
+          account.plan?.toLowerCase() === 'free' && !account.fiveHour && !account.sevenDay
+            ? []
+            : [
+                quota(account.fiveHour?.remainingPercent, account.fiveHour?.resetAt, '5h'),
+                quota(account.sevenDay?.remainingPercent, account.sevenDay?.resetAt, '7d'),
+              ],
       })
     ),
     provider(

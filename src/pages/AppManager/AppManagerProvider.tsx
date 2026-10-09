@@ -7,6 +7,7 @@ import { ClaudeCodeLoginDialog } from './ClaudeCodeLoginDialog';
 import { useWorkBuddyAccounts } from './useWorkBuddyAccounts';
 import { useZCodeAccounts } from './useZCodeAccounts';
 import { useClaudeCodeAccounts } from './useClaudeCodeAccounts';
+import { useClaudeDesktopAccounts } from './useClaudeDesktopAccounts';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useCodexAccounts } from './useCodexAccounts';
 import { EFFORT_PULSE_ONESHOT_MS } from '../../components';
@@ -289,6 +290,15 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     clearClaudeCodeModel,
     setApplyError
   );
+  const clearClaudeDesktopModel = useCallback(() => {
+    setToolModelConfig((prev) => ({ ...prev, claudedesktop: null }));
+  }, []);
+  const claudeDesktopAccounts = useClaudeDesktopAccounts(
+    accountGroupEnabled('claudedesktop'),
+    !!toolModelConfig.claudedesktop,
+    clearClaudeDesktopModel,
+    setApplyError
+  );
 
   const workBuddyEdition =
     selectedTool === 'workbuddy' || selectedTool === 'workbuddyai' ? selectedTool : null;
@@ -389,6 +399,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     if (toolId === 'grok') grokAccounts.select(null);
     if (toolId === 'manus') manusAccounts.select(null);
     if (toolId === 'claudecode') claudeCodeAccounts.setSelectedId(null);
+    if (toolId === 'claudedesktop') claudeDesktopAccounts.select(null);
     if (toolId === 'workbuddy' || toolId === 'workbuddyai') workBuddyAccounts.select(null);
     if (toolId === 'codex' || toolId === 'chatgptdesktop') {
       codexManaged.select(null);
@@ -642,8 +653,11 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const handleLaunch = async () => {
     if (!selectedTool || isLaunching) return;
     if (selectedTool === 'zcode' && zcodeAccounts.busy) return;
+    if (selectedTool === 'claudedesktop' && claudeDesktopAccounts.busy) return;
     setIsLaunching(true);
-    const switchingClaudeAccount = selectedTool === 'claudecode' && !!claudeCodeAccounts.selectedId;
+    const switchingClaudeAccount =
+      (selectedTool === 'claudecode' && !!claudeCodeAccounts.selectedId) ||
+      (selectedTool === 'claudedesktop' && !!claudeDesktopAccounts.selectedId);
     if (
       !switchingClaudeAccount &&
       !(workBuddyEdition && workBuddyAccounts.selectedId) &&
@@ -780,6 +794,20 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         setIsLaunching(false);
       }
       return;
+    } else if (selectedTool === 'claudedesktop' && claudeDesktopAccounts.selectedId) {
+      try {
+        await api.switchClaudeDesktopAccount(claudeDesktopAccounts.selectedId);
+        const restored = await applyRestore(selectedTool);
+        if (restored !== true)
+          throw new Error(typeof restored === 'string' ? restored : t('key.destroyed'));
+        await claudeDesktopAccounts.reload();
+        if (launchAfterApply) await api.startTool(selectedTool, toolData?.startCommand);
+      } catch (error) {
+        setApplyError(accountError(error, t));
+      } finally {
+        setIsLaunching(false);
+      }
+      return;
     } else if (selectedTool === 'claudecode' && claudeCodeAccounts.selectedId) {
       try {
         const restored = await applyRestore(selectedTool);
@@ -909,6 +937,10 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         claudeCodeAccounts: {
           ...claudeCodeAccounts,
           accounts: orderedAccounts('claudecode', claudeCodeAccounts.accounts),
+        },
+        claudeDesktopAccounts: {
+          ...claudeDesktopAccounts,
+          accounts: orderedAccounts('claudedesktop', claudeDesktopAccounts.accounts),
         },
         workBuddyAccounts: {
           ...workBuddyAccounts,

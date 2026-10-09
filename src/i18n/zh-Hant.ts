@@ -4,6 +4,7 @@
 import { Translations } from './types';
 const zhHant: Partial<Translations> = {
   'accountError.closeClient': '請儲存工作並關閉用戶端，然後重新切換帳號。',
+  'accountError.quitClaudeDesktop': '請完全關閉 Claude 應用程式後重試。',
   'accountError.initializeClient': '請先開啟一次用戶端，再新增帳號。',
   'accountError.failed': '帳號操作失敗，請重試。',
   'accountError.home': '無法取得使用者目錄。',
@@ -311,6 +312,8 @@ const zhHant: Partial<Translations> = {
   'agent.zcodeTrial': '體驗',
   'agent.waitingForBrowser': '等待瀏覽器操作({seconds})',
   'agent.manusExitClient': '請手動結束 Manus({seconds})',
+  'agent.claudeDesktopLoginClient': '請在 Claude 中登入({seconds})',
+  'agent.claudeDesktopExitClient': '請完全關閉 Claude({seconds})',
   'agent.refreshAccount': '重新整理帳號額度',
   'agent.baseCredits': '套餐基礎積分',
   'agent.baseCreditsReset': '下次刷新',

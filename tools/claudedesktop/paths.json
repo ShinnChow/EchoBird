@@ -22,7 +22,9 @@
         "darwin": [
             "/Applications/Claude.app/Contents/MacOS/Claude"
         ],
-        "linux": []
+        "linux": [
+            "/usr/bin/claude-desktop"
+        ]
     },
     "installHints": {
         "windowsDisplayNames": ["Claude"],

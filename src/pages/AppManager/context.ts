@@ -5,6 +5,7 @@ import type { useGrokAccounts } from './useGrokAccounts';
 import type { useWorkBuddyAccounts } from './useWorkBuddyAccounts';
 import type { useZCodeAccounts } from './useZCodeAccounts';
 import type { useClaudeCodeAccounts } from './useClaudeCodeAccounts';
+import type { useClaudeDesktopAccounts } from './useClaudeDesktopAccounts';
 import type { useCodexAccounts } from './useCodexAccounts';
 import { createContext, useContext } from 'react';
 import type { ModelConfig, LocalTool } from '../../api/types';
@@ -29,6 +30,7 @@ export interface AppManagerContextType {
   accountCardOrder: string[];
   setAccountCardOrder: (order: string[]) => void;
   claudeCodeAccounts: ReturnType<typeof useClaudeCodeAccounts>;
+  claudeDesktopAccounts: ReturnType<typeof useClaudeDesktopAccounts>;
   workBuddyAccounts: ReturnType<typeof useWorkBuddyAccounts>;
   workBuddyAccountGroups: Record<
     'workbuddy' | 'workbuddyai',

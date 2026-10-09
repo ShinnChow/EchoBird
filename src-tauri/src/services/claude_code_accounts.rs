@@ -330,7 +330,7 @@ pub async fn switch(id: &str) -> Result<ClaudeCodeAccount, String> {
     Ok(account.summary)
 }
 
-fn quota(window: &Value) -> Option<ClaudeCodeQuota> {
+pub(super) fn quota(window: &Value) -> Option<ClaudeCodeQuota> {
     let used = window.get("utilization")?.as_f64()?;
     let reset_at = text(window, "resets_at")
         .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())

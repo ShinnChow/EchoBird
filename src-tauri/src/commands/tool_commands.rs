@@ -847,6 +847,43 @@ pub async fn refresh_grok_account(
 }
 
 #[tauri::command]
+pub async fn list_claude_desktop_accounts(
+) -> Result<Vec<crate::services::claude_desktop_accounts::Account>, String> {
+    crate::services::claude_desktop_accounts::list().await
+}
+#[tauri::command]
+pub async fn start_claude_desktop_login(
+) -> Result<crate::services::claude_desktop_accounts::LoginStart, String> {
+    crate::services::claude_desktop_accounts::start_login().await
+}
+#[tauri::command]
+pub async fn poll_claude_desktop_login(
+    login_id: String,
+) -> Result<crate::services::claude_desktop_accounts::LoginPoll, String> {
+    crate::services::claude_desktop_accounts::poll_login(&login_id).await
+}
+#[tauri::command]
+pub async fn cancel_claude_desktop_login(login_id: String) -> Result<(), String> {
+    crate::services::claude_desktop_accounts::cancel_login(&login_id).await
+}
+#[tauri::command]
+pub async fn switch_claude_desktop_account(
+    account_id: String,
+) -> Result<crate::services::claude_desktop_accounts::Account, String> {
+    crate::services::claude_desktop_accounts::switch(&account_id).await
+}
+#[tauri::command]
+pub async fn refresh_claude_desktop_account(
+    account_id: String,
+) -> Result<crate::services::claude_desktop_accounts::Account, String> {
+    crate::services::claude_desktop_accounts::refresh(&account_id).await
+}
+#[tauri::command]
+pub async fn delete_claude_desktop_account(account_id: String) -> Result<(), String> {
+    crate::services::claude_desktop_accounts::delete(&account_id).await
+}
+
+#[tauri::command]
 pub async fn list_manus_accounts() -> Result<Vec<crate::services::manus_accounts::Account>, String>
 {
     crate::services::manus_accounts::list().await

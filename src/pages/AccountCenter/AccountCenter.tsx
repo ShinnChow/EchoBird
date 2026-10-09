@@ -110,7 +110,11 @@ export function AccountCard({
                   )}
                 </span>
               )}
-              {account.plan && <span className="min-w-0 truncate leading-3">{account.plan}</span>}
+              {account.plan && (
+                <span className="min-w-0 truncate leading-3">
+                  {account.plan.replace(/^[a-z]/, (letter) => letter.toUpperCase())}
+                </span>
+              )}
             </span>
           )}
         </div>
@@ -124,6 +128,10 @@ export function AccountCard({
           {account.authorizationFailed ? (
             <span role="status" className="text-sm font-semibold text-cyber-error">
               {t('accountCenter.authFailed')}
+            </span>
+          ) : account.metrics.length === 0 ? (
+            <span role="status" className="text-center text-sm text-cyber-text-secondary">
+              {t('model.noUsageData')}
             </span>
           ) : (
             account.metrics.map((metric, index) => {

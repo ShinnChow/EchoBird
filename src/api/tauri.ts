@@ -280,6 +280,37 @@ export async function deleteClaudeCodeAccount(accountId: string): Promise<void> 
   return invoke('delete_claude_code_account', { accountId });
 }
 
+export interface ClaudeDesktopLogin {
+  loginId: string;
+  expiresAt: number;
+}
+export interface ClaudeDesktopLoginPoll {
+  account: ClaudeCodeAccount | null;
+  awaitingClientExit: boolean;
+  expiresAt: number | null;
+}
+export function listClaudeDesktopAccounts(): Promise<ClaudeCodeAccount[]> {
+  return invoke('list_claude_desktop_accounts');
+}
+export function startClaudeDesktopLogin(): Promise<ClaudeDesktopLogin> {
+  return invoke('start_claude_desktop_login');
+}
+export function pollClaudeDesktopLogin(loginId: string): Promise<ClaudeDesktopLoginPoll> {
+  return invoke('poll_claude_desktop_login', { loginId });
+}
+export function cancelClaudeDesktopLogin(loginId: string): Promise<void> {
+  return invoke('cancel_claude_desktop_login', { loginId });
+}
+export function switchClaudeDesktopAccount(accountId: string): Promise<ClaudeCodeAccount> {
+  return invoke('switch_claude_desktop_account', { accountId });
+}
+export function refreshClaudeDesktopAccount(accountId: string): Promise<ClaudeCodeAccount> {
+  return invoke('refresh_claude_desktop_account', { accountId });
+}
+export function deleteClaudeDesktopAccount(accountId: string): Promise<void> {
+  return invoke('delete_claude_desktop_account', { accountId });
+}
+
 export type ZCodeProvider = 'bigmodel' | 'zai';
 export interface ZCodeAccount {
   id: string;

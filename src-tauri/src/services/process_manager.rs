@@ -71,6 +71,16 @@ impl ProcessManager {
         start_command: Option<&str>,
         cwd: Option<&str>,
     ) -> Result<(), String> {
+        self.launch_tool(tool_id, start_command, cwd, true).await
+    }
+
+    async fn launch_tool(
+        &mut self,
+        tool_id: &str,
+        start_command: Option<&str>,
+        cwd: Option<&str>,
+        restart: bool,
+    ) -> Result<(), String> {
         if self.cooldown.is_cooling(tool_id) {
             return Err("Please wait before launching again".to_string());
         }
@@ -94,7 +104,8 @@ impl ProcessManager {
         // invocation and are never touched. (A lone multi-open request once
         // removed this; the silent-switch failures it caused hit far more
         // users — so kill is the default, no toggle.)
-        if crate::services::tool_manager::is_managed_desktop_tool(tool_id)
+        if restart
+            && crate::services::tool_manager::is_managed_desktop_tool(tool_id)
             && self.kill_desktop_instances(tool_id)
         {
             // Let the OS release the app's single-instance lock so the relaunch
@@ -1231,6 +1242,93 @@ pub async fn start_tool(
     let mgr = get_manager().await;
     let mut mgr = mgr.lock().await;
     mgr.start_tool(tool_id, start_command, cwd).await
+}
+
+/// Open the native login surface without terminating an existing login or task.
+pub async fn open_tool_for_login(tool_id: &str) -> Result<(), String> {
+    let mgr = get_manager().await;
+    let mut mgr = mgr.lock().await;
+    mgr.launch_tool(tool_id, None, None, false).await
+}
+
+/// Account storage must not be replaced while its owning desktop app is alive.
+pub async fn desktop_tool_is_running(tool_id: &str) -> Result<bool, String> {
+    let path = super::tool_manager::get_tool_exe_path(tool_id).unwrap_or_default();
+    #[cfg(not(windows))]
+    if path.is_empty() {
+        return Err("accountError.unavailable".into());
+    }
+    #[cfg(windows)]
+    {
+        let script = "$ErrorActionPreference='Stop'; try { $root=$env:ECHOBIRD_DESKTOP_ROOT; $family=$env:ECHOBIRD_DESKTOP_FAMILY; $hits=Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object { $_.Name -eq $env:ECHOBIRD_DESKTOP_NAME -and $_.ExecutablePath -and (($root -and $_.ExecutablePath.StartsWith($root,[StringComparison]::OrdinalIgnoreCase)) -or ($family -and $_.ExecutablePath -match ('\\\\WindowsApps\\\\'+[regex]::Escape($family)+'_[^\\\\]+\\\\'))) }; if($hits){exit 0}else{exit 1} } catch { exit 2 }";
+        let root = std::path::Path::new(&path)
+            .parent()
+            .map(|p| format!("{}\\", p.display()))
+            .unwrap_or_default();
+        let family = super::tool_manager::get_tool_launch_uri(tool_id)
+            .and_then(|uri| {
+                uri.strip_prefix("shell:AppsFolder\\")
+                    .and_then(|s| s.split_once('_'))
+                    .map(|(s, _)| s.to_owned())
+            })
+            .unwrap_or_default();
+        let status = crate::utils::process::async_command("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", script])
+            .env(
+                "ECHOBIRD_DESKTOP_NAME",
+                std::path::Path::new(&path)
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("Claude.exe"),
+            )
+            .env("ECHOBIRD_DESKTOP_ROOT", root)
+            .env("ECHOBIRD_DESKTOP_FAMILY", family)
+            .status()
+            .await
+            .map_err(|_| "accountError.closeClient")?;
+        match status.code() {
+            Some(0) => Ok(true),
+            Some(1) => Ok(false),
+            _ => Err("accountError.closeClient".into()),
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let output = crate::utils::process::async_command("/bin/ps")
+            .args(["-A", "-o", "command="])
+            .output()
+            .await
+            .map_err(|_| "accountError.closeClient")?;
+        if !output.status.success() {
+            return Err("accountError.closeClient".into());
+        }
+        Ok(String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .any(|line| line.trim_start().starts_with(&path)))
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let executable = std::fs::canonicalize(&path).map_err(|_| "accountError.closeClient")?;
+        for entry in std::fs::read_dir("/proc")
+            .map_err(|_| "accountError.closeClient")?
+            .flatten()
+        {
+            if entry
+                .file_name()
+                .to_str()
+                .is_some_and(|s| s.bytes().all(|c| c.is_ascii_digit()))
+                && std::fs::read_link(entry.path().join("exe")).is_ok_and(|p| p == executable)
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+    #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
+    {
+        let _ = path;
+        Err("accountError.unavailable".into())
+    }
 }
 
 /// Release native desktop storage before an explicit model change. Uses the same

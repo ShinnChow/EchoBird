@@ -859,7 +859,6 @@ export const AppManagerPanel: React.FC = () => {
     claudeDesktopRelayMode,
     setClaudeDesktopRelayMode,
     claudeCodeRelayMode,
-    claudeCodeAccounts,
     setClaudeCodeRelayMode,
     claudeDesktop1mMode,
     setClaudeDesktop1mMode,
@@ -875,12 +874,10 @@ export const AppManagerPanel: React.FC = () => {
   const isClaudeDesktopApp = selectedTool === 'claudedesktop';
   const isClaudeCodeApp = selectedTool === 'claudecode';
   // Relay is shown for Claude Desktop + Claude Code, each binding its own flag.
-  const showRelayToggle = isClaudeDesktopApp || (isClaudeCodeApp && !claudeCodeAccounts.selectedId);
+  const showRelayToggle = isClaudeDesktopApp || isClaudeCodeApp;
   const relayModeValue = isClaudeDesktopApp ? claudeDesktopRelayMode : claudeCodeRelayMode;
   const setRelayModeValue = isClaudeDesktopApp ? setClaudeDesktopRelayMode : setClaudeCodeRelayMode;
-  const show1mToggle =
-    isClaudeDesktopApp ||
-    (isClaudeCodeApp && claudeCodeRelayMode && !claudeCodeAccounts.selectedId);
+  const show1mToggle = isClaudeDesktopApp || (isClaudeCodeApp && claudeCodeRelayMode);
   const showCodexAccounts = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
   const selectedToolProtocols = selectedToolData?.apiProtocol || ['openai', 'anthropic'];
   const hasVisibleModels = userModels.some(
@@ -1002,6 +999,12 @@ export const AppManagerPanel: React.FC = () => {
                   showDivider={hasVisibleModels || showRelayToggle || show1mToggle}
                 />
               )}
+              {isClaudeDesktopApp && (
+                <ClaudeCodeAccountSection
+                  desktop
+                  showDivider={hasVisibleModels || showRelayToggle || show1mToggle}
+                />
+              )}
               {routingControls}
               <div className="flex-1">
                 <ModelListSection
@@ -1059,6 +1062,7 @@ export const AppManagerBottom: React.FC = () => {
     toolModelConfig,
     selectedCodexAccountId,
     claudeCodeAccounts,
+    claudeDesktopAccounts,
     workBuddyAccounts,
     zcodeAccounts,
     deepSeekAccounts,
@@ -1089,6 +1093,7 @@ export const AppManagerBottom: React.FC = () => {
     (selectedTool === 'zcode' && !!zcodeAccounts.selectedId) ||
     ((selectedTool === 'codex' || selectedTool === 'chatgptdesktop') && !!selectedCodexAccountId) ||
     (selectedTool === 'claudecode' && !!claudeCodeAccounts.selectedId) ||
+    (selectedTool === 'claudedesktop' && !!claudeDesktopAccounts.selectedId) ||
     (selectedTool === 'dsh' && !!deepSeekAccounts.selectedId) ||
     (selectedTool === 'grok' && !!grokAccounts.selectedId) ||
     (selectedTool === 'manus' && !!manusAccounts.selectedId) ||
@@ -1112,6 +1117,7 @@ export const AppManagerBottom: React.FC = () => {
     (selectedTool === 'zcode' && zcodeAccounts.busy) ||
     (selectedTool === 'grok' && grokAccounts.busy) ||
     (selectedTool === 'manus' && manusAccounts.busy) ||
+    (selectedTool === 'claudedesktop' && claudeDesktopAccounts.busy) ||
     (selectedTool === 'grokbot' && grokBotAccounts.busy) ||
     (selectedTool === 'cursor' && cursorAccounts.busy) ||
     (!isUninstalled && !willApply && !willLaunch);
@@ -1270,14 +1276,15 @@ export const AppManagerBottom: React.FC = () => {
 // "应用桌面" and "我的AI项目" without duplicating the rest of the row.
 export const PageAwareHint: React.FC = () => {
   const { t } = useI18n();
-  const { viewMode, selectedTool, claudeCodeAccounts } = useAppManager();
+  const { viewMode, selectedTool, claudeCodeAccounts, claudeDesktopAccounts } = useAppManager();
   const activePage = useNavigationStore((s) => s.activePage);
   const key =
     activePage === 'myProjects'
       ? 'hint.myProjects'
       : viewMode === 'install'
         ? 'aiDesktop.installHint'
-        : selectedTool === 'claudecode' && claudeCodeAccounts.selectedId
+        : (selectedTool === 'claudecode' && claudeCodeAccounts.selectedId) ||
+            (selectedTool === 'claudedesktop' && claudeDesktopAccounts.selectedId)
           ? null
           : selectedTool === 'claudedesktop' || selectedTool === 'claudecode'
             ? 'hint.devInvite'

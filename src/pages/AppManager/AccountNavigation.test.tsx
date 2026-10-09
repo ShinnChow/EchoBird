@@ -28,7 +28,10 @@ vi.mock('../../hooks/useI18n', () => {
   return { useI18n: () => ({ t, locale: 'en' }) };
 });
 vi.mock('../../components/ConfirmDialog', () => ({ useConfirm: () => async () => true }));
-vi.mock('../../components', () => ({ EFFORT_PULSE_ONESHOT_MS: 0 }));
+vi.mock('../../components', () => ({
+  EFFORT_PULSE_ONESHOT_MS: 0,
+  getModelIcon: () => '/fixture.svg',
+}));
 vi.mock('../../pages/ModelNexus/context', () => {
   const userModels: never[] = [];
   return { useModelNexus: () => ({ userModels }) };
@@ -58,6 +61,7 @@ vi.mock('../../api/tauri', () => {
     'switchCodexAccount',
     'refreshCodexAccountQuota',
     'listClaudeCodeAccounts',
+    'listClaudeDesktopAccounts',
     'deleteClaudeCodeAccount',
     'startClaudeCodeLogin',
     'cancelClaudeCodeLogin',
@@ -85,6 +89,12 @@ vi.mock('../../api/tauri', () => {
     'refreshGrokAccount',
     'switchGrokAccount',
     'deleteGrokAccount',
+    'startClaudeDesktopLogin',
+    'cancelClaudeDesktopLogin',
+    'pollClaudeDesktopLogin',
+    'refreshClaudeDesktopAccount',
+    'switchClaudeDesktopAccount',
+    'deleteClaudeDesktopAccount',
     'listManusAccounts',
     'startManusLogin',
     'cancelManusLogin',
@@ -161,6 +171,7 @@ const listNames = [
   'listZCodeAccounts',
   'listCodexAccounts',
   'listClaudeCodeAccounts',
+  'listClaudeDesktopAccounts',
   'listWorkBuddyAccounts',
   'listDeepSeekAccounts',
   'listGrokAccounts',
@@ -174,6 +185,7 @@ const listFor = {
   codex: 'listCodexAccounts',
   chatgptdesktop: 'listCodexAccounts',
   claudecode: 'listClaudeCodeAccounts',
+  claudedesktop: 'listClaudeDesktopAccounts',
   workbuddy: 'listWorkBuddyAccounts',
   workbuddyai: 'listWorkBuddyAccounts',
   dsh: 'listDeepSeekAccounts',
@@ -633,6 +645,7 @@ const refreshFor = {
   codex: 'refreshCodexAccountQuota',
   chatgptdesktop: 'refreshCodexAccountQuota',
   claudecode: 'refreshClaudeCodeAccountQuota',
+  claudedesktop: 'refreshClaudeDesktopAccount',
   dsh: 'refreshDeepSeekAccountQuota',
   workbuddy: 'refreshWorkBuddyAccountQuota',
   workbuddyai: 'refreshWorkBuddyAccountQuota',
@@ -1697,7 +1710,7 @@ it.each(Object.keys(listFor) as Tool[])(
     for (const action of actions) expect(action).not.toHaveBeenCalled();
   }
 );
-it.each(['claudecode', 'workbuddy', 'dsh', 'chatgptdesktop'] as const)(
+it.each(['claudecode', 'claudedesktop', 'workbuddy', 'dsh', 'chatgptdesktop'] as const)(
   '%s: failed passive reload preserves cached accounts',
   async (tool) => {
     const row = { id: 'cached', active: true, edition: 'workbuddy' };
@@ -1706,6 +1719,7 @@ it.each(['claudecode', 'workbuddy', 'dsh', 'chatgptdesktop'] as const)(
     const rows = () =>
       ({
         claudecode: state.claudeCodeAccounts.accounts,
+        claudedesktop: state.claudeDesktopAccounts.accounts,
         workbuddy: state.workBuddyAccounts.accounts,
         dsh: state.deepSeekAccounts.accounts,
         chatgptdesktop: state.codexAccounts,
