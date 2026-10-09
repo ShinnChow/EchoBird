@@ -642,9 +642,11 @@ img[src*='/icons/tools/openscience.svg'] {
   transition: filter 0.2s ease;
 }
 
-/* Cue and Muse's official assets include transparent insets. */
+/* These official tool icons include transparent insets. */
 img[src$='/icons/tools/cue.png'],
-img[src$='/icons/tools/muse.png'] {
+img[src$='/icons/tools/muse.png'],
+img[src$='/icons/tools/antigravity.png'],
+img[src$='/icons/tools/antigravitydesktop.png'] {
   transform: scale(1.24);
 }
 
