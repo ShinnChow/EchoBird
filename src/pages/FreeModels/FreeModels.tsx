@@ -55,8 +55,9 @@ import { copyText } from '../../utils/copyText';
 import { useModelNexus } from '../ModelNexus/context';
 import './FreeModels.css';
 
-const NODE_COLUMN_GAP = 20;
+const NODE_COLUMN_GAP = 44;
 const NODE_ROW_GAP = 44;
+const NODE_SIDE_PADDING = 20;
 const HUB_TO_NODE_GAP = 64;
 const HUB_ARROW_GAP = 4;
 const HUB_ARROW_HEIGHT = 12;
@@ -764,7 +765,12 @@ export function FreeModelsMain() {
     setNodeColumns(
       Math.max(
         1,
-        Math.min(3, Math.floor((stageBox.width - 16 + NODE_COLUMN_GAP) / (160 + NODE_COLUMN_GAP)))
+        Math.min(
+          3,
+          Math.floor(
+            (stageBox.width - NODE_SIDE_PADDING * 2 + NODE_COLUMN_GAP) / (160 + NODE_COLUMN_GAP)
+          )
+        )
       )
     );
     const endX = hubBox.left - stageBox.left + hubBox.width / 2;
@@ -913,7 +919,7 @@ export function FreeModelsMain() {
   );
 
   return (
-    <div className="free-model-router h-full min-h-[620px] px-2 pb-1">
+    <div className="free-model-router h-full min-h-[620px] pb-1">
       <div
         ref={stageRef}
         className={`relative h-full overflow-hidden ${routerEnabled ? '' : 'is-disabled'}`}
@@ -1015,11 +1021,12 @@ export function FreeModelsMain() {
                 strategy={rectSortingStrategy}
               >
                 <div
-                  className="free-model-node-grid relative z-10 px-2"
+                  className="free-model-node-grid relative z-10"
                   style={{
-                    gridTemplateColumns: `repeat(${Math.min(selectedModels.length, nodeColumns)}, minmax(0, 240px))`,
+                    gridTemplateColumns: `repeat(${Math.min(selectedModels.length, nodeColumns)}, minmax(0, calc((100% - ${(nodeColumns - 1) * NODE_COLUMN_GAP}px) / ${nodeColumns})))`,
                     columnGap: NODE_COLUMN_GAP,
                     rowGap: NODE_ROW_GAP,
+                    paddingInline: NODE_SIDE_PADDING,
                     marginTop: HUB_TO_NODE_GAP,
                   }}
                 >

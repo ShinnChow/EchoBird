@@ -47,6 +47,10 @@
   fill: rgb(var(--free-model-route-rgb) / 0.75);
 }
 
+.is-disabled .free-model-route-arrow {
+  fill: rgb(var(--free-model-route-rgb) / 0.2);
+}
+
 .free-model-route-node {
   background: rgb(var(--bg-surface-rgb));
   border: 1px solid transparent;
