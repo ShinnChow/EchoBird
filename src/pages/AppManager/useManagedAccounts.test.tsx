@@ -76,6 +76,99 @@ afterEach(() => {
 });
 
 describe('shared account request boundaries', () => {
+  it('cancels immediately, preserves saved accounts and isolates a restarted login from old results and deadlines', async () => {
+    const first = deferred<Account | null>();
+    const second = deferred<Account | null>();
+    vi.mocked(client.start)
+      .mockResolvedValueOnce({ loginId: 'first', expiresAt: Date.now() / 1000 + 60 })
+      .mockImplementationOnce(async () => ({
+        loginId: 'second',
+        expiresAt: Date.now() / 1000 + 60,
+      }));
+    vi.mocked(client.poll!).mockImplementation((id) =>
+      id === 'first' ? first.promise : second.promise
+    );
+    await mount();
+    let firstTask!: Promise<void>;
+    await act(async () => {
+      firstTask = state.add();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+      state.cancelLogin();
+    });
+    expect(client.cancel).toHaveBeenCalledExactlyOnceWith('first');
+    expect(state.busy).toBe(false);
+    expect(state.remainingSeconds).toBe(0);
+    expect(state.accounts).toEqual([account]);
+    expect(state.selectedId).toBe(account.id);
+    expect(clearModel).not.toHaveBeenCalled();
+    let secondTask!: Promise<void>;
+    await act(async () => {
+      secondTask = state.add();
+      first.resolve({ id: 'cancelled-account' });
+      await firstTask;
+    });
+    expect(state.busy).toBe(true);
+    expect(state.remainingSeconds).toBe(60);
+    expect(state.accounts).toEqual([account]);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(55_000);
+    });
+    expect(state.busy).toBe(true);
+    expect(state.remainingSeconds).toBe(5);
+    expect(showError).not.toHaveBeenCalled();
+    const added = { id: 'new-account' };
+    vi.mocked(client.list).mockResolvedValue([account, added]);
+    await act(async () => {
+      second.resolve(added);
+      await secondTask;
+    });
+    expect(state.busy).toBe(false);
+    expect(state.accounts).toEqual([account, added]);
+    expect(state.selectedId).toBe(added.id);
+    expect(client.start).toHaveBeenCalledTimes(2);
+    expect(client.refresh).not.toHaveBeenCalled();
+    expect(client.remove).not.toHaveBeenCalled();
+  });
+
+  it('cancels a late login initialization without opening its browser or resetting the newer attempt', async () => {
+    const initialization = deferred<ManagedLogin>();
+    const poll = deferred<Account | null>();
+    vi.mocked(client.start)
+      .mockReturnValueOnce(initialization.promise)
+      .mockResolvedValueOnce({ loginId: 'new', expiresAt: Date.now() / 1000 + 60 });
+    vi.mocked(client.poll!).mockReturnValue(poll.promise);
+    await mount();
+    let oldTask!: Promise<void>;
+    act(() => {
+      oldTask = state.add();
+      state.cancelLogin();
+    });
+    expect(state.busy).toBe(false);
+    let newTask!: Promise<void>;
+    await act(async () => {
+      newTask = state.add();
+      initialization.resolve({ loginId: 'old', expiresAt: Date.now() / 1000 + 60 });
+      await oldTask;
+    });
+    expect(client.cancel).toHaveBeenCalledExactlyOnceWith('old');
+    expect(client.open).toHaveBeenCalledTimes(1);
+    expect(client.poll).toHaveBeenCalledExactlyOnceWith('new', expect.any(Function));
+    expect(state.busy).toBe(true);
+    expect(state.login?.loginId).toBe('new');
+    expect(state.remainingSeconds).toBe(60);
+    await act(async () => {
+      state.cancelLogin();
+      poll.resolve({ id: 'also-cancelled' });
+      await newTask;
+    });
+    expect(state.accounts).toEqual([account]);
+    expect(client.list).toHaveBeenCalledTimes(1);
+    expect(showError).not.toHaveBeenCalled();
+    expect(clearModel).not.toHaveBeenCalled();
+  });
+
   it('collects raw refresh errors per request without suppressing other individual errors', async () => {
     const rows = [account, { id: 'other', quota: 80 }];
     vi.mocked(client.list).mockResolvedValue(rows);

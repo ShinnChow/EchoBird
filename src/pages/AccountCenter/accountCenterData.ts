@@ -39,6 +39,7 @@ export interface AccountProvider {
   remainingSeconds: number;
   waitingLabel?: string;
   add: () => void;
+  cancelLogin: () => void;
   accounts: AccountCardData[];
 }
 
@@ -51,6 +52,7 @@ interface AccountGroup<A> {
   refreshing: Set<string>;
   authorizationFailedIds: Set<string>;
   add: () => Promise<void>;
+  cancelLogin: () => void;
   refresh: (
     account: A,
     operation?: (account: A) => Promise<A>,
@@ -151,6 +153,7 @@ export function accountCenterProviders(
             ? t('agent.manusExitClient')
             : undefined,
     add: () => void group.add(),
+    cancelLogin: group.cancelLogin,
     accounts: group.accounts.map((account) => {
       const summary = describe(account);
       const free = isFreePlan(summary.plan);
@@ -187,6 +190,7 @@ export function accountCenterProviders(
         refreshing: context.refreshingCodexAccountIds,
         authorizationFailedIds: context.codexAuthorizationFailedIds,
         add: context.addCodexAccount,
+        cancelLogin: context.cancelCodexLogin,
         refresh: context.refreshCodexAccountQuota,
         remove: context.deleteCodexAccount,
       },

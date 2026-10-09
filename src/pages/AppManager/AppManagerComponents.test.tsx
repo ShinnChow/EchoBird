@@ -608,6 +608,7 @@ describe.each(['grokbot', 'cursor', 'manus', 'cue'] as const)('%s account-only p
     expect(markup).not.toContain('Auto Router');
     expect(markup).not.toContain('agent.noModelConfig');
     expect(markup).toContain('btn.launchApp');
-    expect(markup.match(/<button[^>]*disabled=""/g)).toHaveLength(2);
+    expect(markup.match(/<button[^>]*disabled=""/g)).toHaveLength(1);
+    expect(markup).toContain('aria-label="btn.cancel"');
   });
 });

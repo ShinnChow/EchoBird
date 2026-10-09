@@ -799,6 +799,7 @@ export const CodexAccountSection: React.FC<{ showDivider?: boolean }> = ({
     refreshingCodexAccountIds,
     codexAuthorizationFailedIds,
     addCodexAccount,
+    cancelCodexLogin,
     refreshCodexAccountQuota,
     deleteCodexAccount,
   } = useAppManager();
@@ -811,6 +812,7 @@ export const CodexAccountSection: React.FC<{ showDivider?: boolean }> = ({
         disabled={isLoadingCodexAccounts}
         remainingSeconds={codexOAuthRemainingSeconds}
         onClick={() => void addCodexAccount()}
+        onCancel={cancelCodexLogin}
       />
       {codexAccounts.length > 0 && (
         <div className="space-y-2">

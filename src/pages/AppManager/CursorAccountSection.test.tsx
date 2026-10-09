@@ -11,6 +11,7 @@ describe.each(['grokbot', 'cursor'] as const)('%s account controls', (tool) => {
     const select = vi.fn();
     const remove = vi.fn();
     const refresh = vi.fn();
+    const cancelLogin = vi.fn();
     const context = {
       isLaunching: false,
       [tool === 'cursor' ? 'cursorAccounts' : 'grokBotAccounts']: {
@@ -22,6 +23,7 @@ describe.each(['grokbot', 'cursor'] as const)('%s account controls', (tool) => {
         refreshing: new Set(refreshing ? ['one'] : []),
         authorizationFailedIds: new Set(),
         add: vi.fn(),
+        cancelLogin,
         busy,
         remainingSeconds: 60,
       },
@@ -30,6 +32,7 @@ describe.each(['grokbot', 'cursor'] as const)('%s account controls', (tool) => {
       select,
       remove,
       refresh,
+      cancelLogin,
       element: (
         <AppManagerContext.Provider value={context}>
           <CursorAccountSection tool={tool} />
@@ -54,10 +57,12 @@ describe.each(['grokbot', 'cursor'] as const)('%s account controls', (tool) => {
     expect(markup).toContain('agent.refreshAccount');
     expect(markup).not.toContain('title=');
     expect(markup).not.toContain('cursor-');
-    act(() => {
-      renderer.update(fixture(true).element);
-    });
-    expect(renderer.root.findAllByType('button')[0].props.disabled).toBe(true);
+    const waiting = fixture(true);
+    act(() => renderer.update(waiting.element));
+    const cancelButton = renderer.root.findByProps({ 'aria-label': 'btn.cancel' });
+    expect(cancelButton.props.disabled).not.toBe(true);
+    act(() => cancelButton.props.onClick({ stopPropagation: vi.fn() }));
+    expect(waiting.cancelLogin).toHaveBeenCalledTimes(1);
     act(() => {
       renderer.unmount();
     });

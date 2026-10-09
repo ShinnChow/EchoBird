@@ -16,6 +16,7 @@ export const DeepSeekAccountSection: React.FC<{ showDivider?: boolean }> = ({
         busy={busy}
         remainingSeconds={remainingSeconds}
         onClick={() => void add()}
+        onCancel={deepSeekAccounts.cancelLogin}
       />
       {accounts.length > 0 && (
         <div className="space-y-2">

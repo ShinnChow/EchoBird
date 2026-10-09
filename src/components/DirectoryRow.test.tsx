@@ -31,6 +31,54 @@ it('keeps directory add and website actions separate', () => {
   }
 });
 
+it.each(['https://example.test', undefined])(
+  'only the close button cancels a pending login (website=%s)',
+  (url) => {
+    const add = vi.fn();
+    const cancel = vi.fn();
+    const open = vi.fn();
+    const row = (busy: boolean) => (
+      <DirectoryRow
+        name="Provider"
+        url={url}
+        onOpen={open}
+        openLabel="Open website"
+        secondary={busy ? 'Waiting for browser (58)' : undefined}
+        add={{ onClick: add, label: 'Add account', busy, onCancel: cancel, cancelLabel: 'Cancel' }}
+      />
+    );
+    const renderer = create(row(true));
+    try {
+      const [addButton, websiteButton, cancelButton] = renderer.root.findAllByType('button');
+      expect(addButton.props.disabled).toBe(true);
+      expect(websiteButton.props.disabled).toBe(!url);
+      expect(cancelButton.props.disabled).not.toBe(true);
+      expect(cancelButton.props['aria-label']).toBe('Cancel');
+      expect(cancelButton.parent!.findByType('span').children).toEqual([
+        'Waiting for browser (58)',
+      ]);
+      act(() => cancelButton.props.onClick({ stopPropagation: vi.fn() }));
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(add).not.toHaveBeenCalled();
+      expect(open).not.toHaveBeenCalled();
+      if (url) {
+        act(() => websiteButton.props.onClick());
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(cancel).toHaveBeenCalledTimes(1);
+        expect(add).not.toHaveBeenCalled();
+      }
+      act(() => renderer.update(row(false)));
+      expect(renderer.root.findAllByType('button')).toHaveLength(2);
+      expect(renderer.root.findAllByType('button')[1].props['aria-label']).toBe('Open website');
+      act(() => renderer.root.findAllByType('button')[0].props.onClick());
+      expect(add).toHaveBeenCalledTimes(1);
+      expect(cancel).toHaveBeenCalledTimes(1);
+    } finally {
+      act(() => renderer.unmount());
+    }
+  }
+);
+
 it('a subscription-service row has only its website action', () => {
   const open = vi.fn();
   let renderer!: ReactTestRenderer;

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Box, ExternalLink, LoaderCircle, Plus } from 'lucide-react';
+import { Box, ExternalLink, LoaderCircle, Plus, X } from 'lucide-react';
 
 export function DirectoryRow({
   name,
@@ -16,8 +16,16 @@ export function DirectoryRow({
   secondary?: ReactNode;
   onOpen: () => void;
   openLabel: string;
-  add?: { onClick: () => void; label: string; disabled?: boolean; busy?: boolean };
+  add?: {
+    onClick: () => void;
+    label: string;
+    disabled?: boolean;
+    busy?: boolean;
+    onCancel?: () => void;
+    cancelLabel?: string;
+  };
 }) {
+  const canCancel = !!(add?.busy && add.onCancel);
   const hostname = (() => {
     try {
       return new URL(url!).hostname;
@@ -77,8 +85,27 @@ export function DirectoryRow({
         </div>
         <div className="flex-1 min-w-0 flex flex-col justify-center">
           <div className="text-sm font-bold truncate leading-none">{name}</div>
-          <div className="text-[10px] text-cyber-text-secondary truncate leading-tight mt-1 opacity-70">
-            {secondary ?? hostname}
+          <div
+            className={`text-[10px] text-cyber-text-secondary leading-tight mt-1 ${canCancel ? 'flex min-w-0 items-center gap-1' : 'truncate opacity-70'}`}
+          >
+            {canCancel ? (
+              <>
+                <span className="min-w-0 truncate opacity-70">{secondary ?? hostname}</span>
+                <button
+                  type="button"
+                  aria-label={add?.cancelLabel}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    add?.onCancel?.();
+                  }}
+                  className="pointer-events-auto relative flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-cyber-text-muted hover:text-cyber-text focus-visible:outline focus-visible:outline-1"
+                >
+                  <X size={12} aria-hidden="true" />
+                </button>
+              </>
+            ) : (
+              (secondary ?? hostname)
+            )}
           </div>
         </div>
         <ExternalLink

@@ -24,6 +24,7 @@ export const ManusAccountSection: React.FC<{ tool?: 'manus' | 'cue' }> = ({ tool
               : undefined
         }
         onClick={() => void accounts.add()}
+        onCancel={accounts.cancelLogin}
       />
       {accounts.accounts.length > 0 && (
         <div className="space-y-2">

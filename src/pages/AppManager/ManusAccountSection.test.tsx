@@ -38,7 +38,7 @@ describe('Manus native login instruction', () => {
     expect(exit).toContain('Please quit Manus (30)');
     expect(exit).not.toContain('Waiting for browser');
     expect(exit).toContain('h-12');
-    expect(exit).toContain('disabled=""');
+    expect(exit).toContain(`aria-label="${en['btn.cancel']}"`);
     expect(exit).toContain('/icons/tools/manus.png');
     expect(exit).not.toContain('title=');
     expect(exit).not.toContain('cursor-');

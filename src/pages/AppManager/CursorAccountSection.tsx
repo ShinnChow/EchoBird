@@ -26,6 +26,7 @@ export const CursorAccountSection: React.FC<{ tool: 'cursor' | 'grokbot' }> = ({
         disabled={isLaunching}
         remainingSeconds={remainingSeconds}
         onClick={() => void add()}
+        onCancel={(tool === 'cursor' ? cursorAccounts : grokBotAccounts).cancelLogin}
       />
       <div className="space-y-2">
         {accounts.map((account) => (

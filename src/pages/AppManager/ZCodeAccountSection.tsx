@@ -36,6 +36,7 @@ export const ZCodeAccountButton: React.FC<{ disabled?: boolean }> = ({ disabled 
       disabled={disabled || isLaunching}
       remainingSeconds={remainingSeconds}
       onClick={() => void add()}
+      onCancel={zcodeAccounts.cancelLogin}
       secondary={<ZCodeAccountProviderChoice disabled={disabled} />}
     />
   );

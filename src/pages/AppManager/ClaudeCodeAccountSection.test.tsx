@@ -88,7 +88,7 @@ describe('Claude Code account card', () => {
 
   it('disables adding and shows the existing waiting label during OAuth', () => {
     const markup = renderAccount(37, true);
-    expect(markup).toContain('disabled=""');
+    expect(markup).toContain('aria-label="btn.cancel"');
     expect(markup).toContain('agent.waitingForBrowser');
     expect(markup).not.toContain('agent.addCurrentAccount');
   });

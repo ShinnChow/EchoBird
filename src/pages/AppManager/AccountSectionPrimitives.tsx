@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Gift, LoaderCircle, RefreshCw, Trash2 } from 'lucide-react';
+import { Check, Gift, LoaderCircle, RefreshCw, Trash2, X } from 'lucide-react';
 import { useI18n } from '../../hooks/useI18n';
 import { accountPlanLabel } from './accountPlanLabel';
 
@@ -8,6 +8,7 @@ export const AccountSectionButton: React.FC<{
   busy: boolean;
   remainingSeconds: number;
   onClick: () => void;
+  onCancel: () => void;
   disabled?: boolean;
   colorClassName?: string;
   secondary?: React.ReactNode;
@@ -17,6 +18,7 @@ export const AccountSectionButton: React.FC<{
   busy,
   remainingSeconds,
   onClick,
+  onCancel,
   disabled,
   colorClassName = '',
   secondary,
@@ -26,6 +28,38 @@ export const AccountSectionButton: React.FC<{
   const label = busy
     ? (waitingLabel ?? t('agent.waitingForBrowser')).replace('{seconds}', String(remainingSeconds))
     : t('agent.addCurrentAccount');
+  if (busy) {
+    return (
+      <div
+        className={`account-pill ${colorClassName} relative mb-2 flex h-12 w-full items-center justify-center rounded-full pl-3 pr-10`}
+      >
+        <span className="pointer-events-none flex min-w-0 items-center gap-2.5 opacity-50">
+          <img src={iconSrc} alt="" className="h-6 w-6 flex-shrink-0" />
+          <span className="flex min-w-0 flex-col items-center text-center">
+            <span className={`${secondary ? 'text-[14px]' : 'text-[17px]'} font-bold leading-5`}>
+              {label}
+            </span>
+            {secondary && (
+              <span className="flex h-4 items-center text-[12px] font-normal leading-4 text-cyber-text-secondary">
+                {secondary}
+              </span>
+            )}
+          </span>
+        </span>
+        <button
+          type="button"
+          aria-label={t('btn.cancel')}
+          onClick={(event) => {
+            event.stopPropagation();
+            onCancel();
+          }}
+          className="account-icon-button absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full hover:opacity-100 focus-visible:outline focus-visible:outline-1"
+        >
+          <X size={16} aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
   if (secondary) {
     return (
       <div

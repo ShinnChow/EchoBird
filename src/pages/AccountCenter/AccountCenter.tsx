@@ -495,6 +495,8 @@ export function AccountCenterPanel() {
                   openLabel={t('accountCenter.website').replace('{name}', provider.name)}
                   add={{
                     onClick: provider.add,
+                    onCancel: provider.cancelLogin,
+                    cancelLabel: t('btn.cancel'),
                     label: provider.busy
                       ? (provider.waitingLabel ?? t('agent.waitingForBrowser')).replace(
                           '{seconds}',

@@ -168,6 +168,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     authorizationFailedIds: codexAuthorizationFailedIds,
     reload: loadCodexAccounts,
     add: addCodexAccount,
+    cancelLogin: cancelCodexLogin,
     remove: deleteCodexAccount,
     refresh: refreshCodexAccountQuota,
   } = codexManaged;
@@ -1007,6 +1008,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         refreshingCodexAccountIds,
         codexAuthorizationFailedIds,
         addCodexAccount,
+        cancelCodexLogin,
         refreshCodexAccountQuota,
         deleteCodexAccount,
         selectedToolData,

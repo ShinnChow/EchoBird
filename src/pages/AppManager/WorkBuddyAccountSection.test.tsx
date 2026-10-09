@@ -129,7 +129,7 @@ describe('WorkBuddy account card', () => {
   });
   it('uses the existing authorization waiting state', () => {
     const markup = renderAccount({ edition: 'workbuddyai' }, undefined, true);
-    expect(markup).toContain('disabled=""');
+    expect(markup).toContain('aria-label="btn.cancel"');
     expect(markup).toContain('agent.waitingForBrowser');
     expect(markup).not.toContain('agent.addCurrentAccount');
   });

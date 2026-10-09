@@ -8,7 +8,8 @@ import { useNavigationStore } from '../../stores/navigationStore';
 import { AppManagerProvider } from '../../pages/AppManager/AppManagerProvider';
 import { useAppManager } from '../../pages/AppManager/context';
 import { AppManagerErrorModal, AppManagerPanel, CodexAccountSection } from './AppManagerComponents';
-import { AccountSectionRow } from './AccountSectionPrimitives';
+import { AccountSectionButton, AccountSectionRow } from './AccountSectionPrimitives';
+import { DirectoryRow } from '../../components/DirectoryRow';
 import {
   AccountCenterMain,
   AccountCenterPanel,
@@ -239,9 +240,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
   for (const name of listNames) vi.mocked(api[name]).mockResolvedValue([]);
-  vi.mocked(api.cancelClaudeCodeLogin).mockResolvedValue(undefined);
+  for (const [name, action] of Object.entries(api))
+    if (name.startsWith('cancel') && vi.isMockFunction(action)) action.mockResolvedValue(undefined);
   vi.mocked(api.startCodexLogin).mockResolvedValue('fixture-login');
-  vi.mocked(api.cancelCodexLogin).mockResolvedValue(undefined);
   vi.mocked(api.restoreToolToOfficial).mockResolvedValue({ success: true, message: '' });
   vi.mocked(api.startTool).mockResolvedValue(undefined);
   vi.mocked(folderPicker).mockResolvedValue('E:/fixture-project');
@@ -1677,6 +1678,119 @@ it.each(Object.keys(listFor) as Tool[])(
     expect(api[listFor[tool]]).not.toHaveBeenCalled();
   }
 );
+
+const cancelCases = [
+  ['codex', 'startCodexLogin', 'addCodexAccountViaOAuth', 'cancelCodexLogin'],
+  ['chatgptdesktop', 'startCodexLogin', 'addCodexAccountViaOAuth', 'cancelCodexLogin'],
+  ['claudecode', 'startClaudeCodeLogin', 'completeClaudeCodeLogin', 'cancelClaudeCodeLogin'],
+  [
+    'claudedesktop',
+    'startClaudeDesktopLogin',
+    'pollClaudeDesktopLogin',
+    'cancelClaudeDesktopLogin',
+  ],
+  ['workbuddy', 'startWorkBuddyLogin', 'pollWorkBuddyLogin', 'cancelWorkBuddyLogin'],
+  ['workbuddyai', 'startWorkBuddyLogin', 'pollWorkBuddyLogin', 'cancelWorkBuddyLogin'],
+  ['dsh', 'startDeepSeekLogin', 'pollDeepSeekLogin', 'cancelDeepSeekLogin'],
+  ['grok', 'startGrokLogin', 'pollGrokLogin', 'cancelGrokLogin'],
+  ['manus', 'startManusLogin', 'pollManusLogin', 'cancelManusLogin'],
+  ['cue', 'startCueLogin', 'pollCueLogin', 'cancelCueLogin'],
+  ['cursor', 'startCursorLogin', 'pollCursorLogin', 'cancelCursorLogin'],
+  ['grokbot', 'startGrokBotLogin', 'pollGrokBotLogin', 'cancelGrokBotLogin'],
+  ['antigravity', 'startAntigravityLogin', 'pollAntigravityLogin', 'cancelAntigravityLogin'],
+  ['antigravitydesktop', 'startAntigravityLogin', 'pollAntigravityLogin', 'cancelAntigravityLogin'],
+  ['zcode', 'startZCodeLogin', 'pollZCodeLogin', 'cancelZCodeLogin'],
+] as const;
+
+for (const page of ['apps', 'accounts'] as const) {
+  it.each(cancelCases)(
+    `${page}: %s cancel button ends the current native login and allows an immediate retry`,
+    async (tool, startName, pollName, cancelName) => {
+      let attempt = 0;
+      vi.mocked(api[startName]).mockImplementation(async () => {
+        const loginId = `login-${++attempt}`;
+        return (
+          startName === 'startCodexLogin'
+            ? loginId
+            : {
+                loginId,
+                authorizationUrl: 'https://example.test',
+                verificationUri: 'https://example.test',
+                expiresAt: Date.now() / 1000 + 60,
+                pollIntervalSeconds: 1,
+              }
+        ) as never;
+      });
+      vi.mocked(api[cancelName]).mockResolvedValue(undefined);
+      vi.mocked(api[pollName]).mockImplementation(() => new Promise<never>(() => {}));
+      const awaitingExit = ['cue', 'manus', 'claudedesktop'].includes(tool);
+      if (awaitingExit) {
+        vi.mocked(api[pollName]).mockResolvedValueOnce({
+          account: null,
+          awaitingClientExit: true,
+          expiresAt: Date.now() / 1000 + 60,
+        } as never);
+      }
+      try {
+        if (page === 'accounts') await showAccountCenter([tool]);
+        else {
+          await mount(tool);
+          act(() =>
+            renderer.update(
+              <AppManagerProvider>
+                <Harness panel />
+              </AppManagerProvider>
+            )
+          );
+        }
+        const clickAdd = () => {
+          if (page === 'apps') renderer.root.findByType(AccountSectionButton).props.onClick();
+          else
+            renderer.root
+              .findAllByType(DirectoryRow)
+              .find((row) => !row.props.add?.disabled)!
+              .props.add.onClick();
+        };
+        await act(async () => clickAdd());
+        await tick();
+        if (awaitingExit) {
+          const group = {
+            cue: state.cueAccounts,
+            manus: state.manusAccounts,
+            claudedesktop: state.claudeDesktopAccounts,
+          }[tool as 'cue' | 'manus' | 'claudedesktop'];
+          expect(group.awaitingClientExit).toBe(true);
+        }
+        const browserCalls = vi.mocked(api.openExternal).mock.calls.length;
+        const clickCancel = () => {
+          const button = renderer.root.findByProps({ 'aria-label': 'btn.cancel' });
+          expect(button.props.disabled).not.toBe(true);
+          button.props.onClick({ stopPropagation: vi.fn() });
+        };
+        await act(async () => clickCancel());
+        expect(api[cancelName]).toHaveBeenCalledExactlyOnceWith('login-1');
+        expect(renderer.root.findAllByProps({ 'aria-label': 'btn.cancel' })).toHaveLength(0);
+        await act(async () => clickAdd());
+        await tick();
+        expect(api[startName]).toHaveBeenCalledTimes(2);
+        await act(async () => clickCancel());
+        expect(api[cancelName]).toHaveBeenLastCalledWith('login-2');
+        expect(renderer.root.findAllByProps({ 'aria-label': 'btn.cancel' })).toHaveLength(0);
+        expect(state.applyError).toBeNull();
+        expect(api.startTool).not.toHaveBeenCalled();
+        expect(api.openExternal).toHaveBeenCalledTimes(browserCalls * 2);
+        for (const [key, action] of Object.entries(api))
+          if (/^(refresh|switch|delete)/.test(key) && vi.isMockFunction(action))
+            expect(action).not.toHaveBeenCalled();
+      } finally {
+        vi.mocked(api[startName]).mockReset();
+        vi.mocked(api[pollName]).mockReset();
+        vi.mocked(api[cancelName]).mockReset();
+      }
+    }
+  );
+}
+
 it.each(Object.keys(listFor) as Tool[])(
   '%s: installed navigation only reads accounts',
   async (tool) => {

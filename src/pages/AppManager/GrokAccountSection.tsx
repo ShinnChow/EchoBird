@@ -13,6 +13,7 @@ export const GrokAccountSection: React.FC<{ showDivider?: boolean }> = ({ showDi
         disabled={isLaunching}
         remainingSeconds={grokAccounts.remainingSeconds}
         onClick={() => void grokAccounts.add()}
+        onCancel={grokAccounts.cancelLogin}
       />
       {grokAccounts.accounts.length > 0 && (
         <div className="space-y-2">

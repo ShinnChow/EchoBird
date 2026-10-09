@@ -53,6 +53,7 @@ export interface AppManagerContextType {
   refreshingCodexAccountIds: Set<string>;
   codexAuthorizationFailedIds: Set<string>;
   addCodexAccount: () => Promise<void>;
+  cancelCodexLogin: () => void;
   refreshCodexAccountQuota: ReturnType<typeof useCodexAccounts>['refresh'];
   deleteCodexAccount: (account: CodexAccount) => Promise<void>;
   selectedToolData: LocalTool | undefined;

@@ -24,6 +24,7 @@ export const AntigravityAccountSection: React.FC = () => {
         disabled={isLaunching}
         remainingSeconds={remainingSeconds}
         onClick={() => void add()}
+        onCancel={antigravityAccounts.cancelLogin}
       />
       <div className="space-y-2">
         {accounts.map((account) => {

@@ -41,6 +41,7 @@ export const WorkBuddyAccountSection: React.FC<{ showDivider?: boolean }> = ({
         busy={busy}
         remainingSeconds={remainingSeconds}
         onClick={() => void add()}
+        onCancel={workBuddyAccounts.cancelLogin}
       />
       {accounts.length > 0 && (
         <div className="space-y-2">

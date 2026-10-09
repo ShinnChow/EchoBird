@@ -31,6 +31,7 @@ export const ClaudeCodeAccountSection: React.FC<{ showDivider?: boolean; desktop
             : undefined
         }
         onClick={() => void add()}
+        onCancel={group.cancelLogin}
       />
       {accounts.length > 0 && (
         <div className="space-y-2">
