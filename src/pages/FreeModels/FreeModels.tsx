@@ -122,6 +122,13 @@ interface RouteArrow {
   y: number;
 }
 
+function routeBranchToBus(x: number, top: number, busY: number, hubX: number): string {
+  const dx = hubX - x;
+  if (Math.abs(dx) < 1) return `V ${busY}`;
+  const radius = Math.min(12, (top - busY) / 2, Math.abs(dx) / 2);
+  return `V ${busY + radius} A ${radius} ${radius} 0 0 ${dx > 0 ? 1 : 0} ${x + Math.sign(dx) * radius} ${busY} H ${hubX}`;
+}
+
 const FreeModelsContext = createContext<FreeModelsContextValue | null>(null);
 const emptyCatalog: FreeModelDirectory = {
   version: 1,
@@ -781,14 +788,11 @@ function SuperRouterMain() {
       const nodes = [...grid.children].map(box);
       const firstRow = nodes.filter((node) => Math.abs(node.top - nodes[0].top) < 12);
       const busY = (Math.max(hubBox.bottom, leadBox.bottom) + firstRow[0].top) / 2;
-      const left = Math.min(firstRow[0].x, leadBox.x);
-      const right = Math.max(firstRow[firstRow.length - 1].x, leadBox.x);
       const stacked = leadBox.top >= hubBox.bottom;
       const paths = [
         stacked
           ? `M ${leadBox.x} ${leadBox.top - 3} V ${hubBox.bottom + 18}`
           : `M ${leadBox.left - 3} ${hubBox.y} H ${hubBox.right + 18}`,
-        `M ${left} ${busY} H ${right}`,
         `M ${leadBox.x} ${busY} V ${leadBox.bottom + 18}`,
       ];
       nodes.forEach((node, index) => {
@@ -796,7 +800,13 @@ function SuperRouterMain() {
           .slice(0, index)
           .reverse()
           .find((entry) => Math.abs(entry.x - node.x) < 1);
-        paths.push(`M ${node.x} ${node.top - 3} V ${parent ? parent.bottom + 3 : busY}`);
+        const outerBranch =
+          !parent &&
+          firstRow.length > 1 &&
+          (node === firstRow[0] || node === firstRow[firstRow.length - 1]);
+        paths.push(
+          `M ${node.x} ${node.top - 3} ${outerBranch ? routeBranchToBus(node.x, node.top - 3, busY, leadBox.x) : `V ${parent ? parent.bottom + 3 : busY}`}`
+        );
       });
       setDiagram({
         width: bounds.width,
@@ -1029,17 +1039,6 @@ function SmartRouterMain() {
       } else {
         const busY = endY + (firstRow[0].top - endY) / 2;
         routeBusY = busY;
-        const firstX = firstRow[0].x;
-        const lastX = firstRow[firstRow.length - 1].x;
-        const busSegments = [];
-        if (firstX < endX - 1) busSegments.push(`M ${firstX} ${busY} H ${endX}`);
-        if (lastX > endX + 1) busSegments.push(`M ${lastX} ${busY} H ${endX}`);
-        if (busSegments.length > 0) {
-          nextPaths.push({
-            id: 'hub-bus',
-            d: busSegments.join(' '),
-          });
-        }
         nextPaths.push({
           id: 'hub-trunk',
           d: `M ${endX} ${busY} V ${lineEndY}`,
@@ -1048,7 +1047,7 @@ function SmartRouterMain() {
         firstRow.forEach((entry) => {
           nextPaths.push({
             id: entry.id,
-            d: `M ${entry.x} ${entry.top - 3} V ${busY}`,
+            d: `M ${entry.x} ${entry.top - 3} ${routeBranchToBus(entry.x, entry.top - 3, busY, endX)}`,
           });
         });
       }
@@ -1090,7 +1089,7 @@ function SmartRouterMain() {
         if (firstRow.length === 1) {
           d += ` V ${routeLineEndY}`;
         } else if (routeBusY !== null) {
-          d += ` V ${routeBusY} H ${endX} V ${routeLineEndY}`;
+          d += ` ${routeBranchToBus(current.x, current.top - 3, routeBusY, endX)} V ${routeLineEndY}`;
         }
         nextActivityPaths.push({ id: entry.id, d });
       });

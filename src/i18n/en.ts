@@ -124,7 +124,7 @@ const en: Translations = {
   'freeModels.view.super': 'Super',
   'freeModels.super.title': 'Hands-Free Super Router',
   'freeModels.super.description':
-    'A main model connects to your AI app and delegates tasks to other models during routing. For example, after you submit a task in Claude Code or Codex, each model works on it independently. Once all models have finished, the main model brings together their results, evaluates them against one another, and integrates their strengths into a final plan to execute. On complex tasks, this collaboration could push beyond the capabilities of a single leading model, while significantly increasing token usage and cost.',
+    'A main model connects to your AI app and delegates tasks to other models during routing. For example, after you submit a task in Claude Code or Codex, each model works on it independently. Once all models have finished, the main model brings together their results, evaluates them against one another, and integrates their strengths into a final plan to execute. On complex tasks, this collaboration could push beyond the capabilities of a single leading model. Running multiple models in parallel also multiplies token usage and cost.',
   'freeModels.super.unavailable': '(In development and testing; currently unavailable)',
   'freeModels.router.disabled': 'Disabled',
   'freeModels.router.enabled': 'Enabled',
