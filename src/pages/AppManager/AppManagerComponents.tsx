@@ -11,7 +11,7 @@ import { isFreePlan } from './accountPlanLabel';
 import { WorkBuddyAccountSection } from './WorkBuddyAccountSection';
 import { ZCodeAccountSection } from './ZCodeAccountSection';
 import { ClaudeCodeAccountSection } from './ClaudeCodeAccountSection';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { RoutingToggle } from '../../components/RoutingToggle';
 import { ModelListCard } from '../../components/ModelListCard';
 import { ViewModeTabs } from '../../components/ViewModeTabs';
@@ -261,6 +261,8 @@ export const AppManagerMain: React.FC = () => {
   // Active category tab for the "未安装" section. 'ALL' shows every
   // uninstalled app; the other tabs filter by category.
   const [activeUninstalledCat, setActiveUninstalledCat] = useState('ALL');
+  const categoryTabsRef = useRef<HTMLDivElement>(null);
+  const categoryUnderlineRef = useRef<HTMLSpanElement>(null);
 
   // User-set order for installed icons, persisted across sessions. Tools not
   // in the saved order (newly installed) sink below the ordered ones.
@@ -341,6 +343,37 @@ export const AppManagerMain: React.FC = () => {
   if (activeUninstalledCat !== 'ALL' && !uninstalledCats.includes(activeUninstalledCat)) {
     setActiveUninstalledCat('ALL');
   }
+
+  useEffect(() => {
+    const tabs = categoryTabsRef.current;
+    const underline = categoryUnderlineRef.current;
+    if (!tabs || !underline) return;
+
+    let frame: number | undefined;
+    const updateUnderline = () => {
+      const active = tabs.querySelector<HTMLButtonElement>('[aria-pressed="true"]');
+      if (!active?.offsetWidth) return;
+      // Place the line immediately on entry; animate subsequent selections.
+      if (!underline.style.width) {
+        underline.style.transition = 'none';
+        frame = requestAnimationFrame(() => underline.style.removeProperty('transition'));
+      }
+      underline.style.width = `${active.offsetWidth}px`;
+      underline.style.transform = `translate(${active.offsetLeft}px, ${active.offsetTop + active.offsetHeight - 2}px)`;
+      underline.style.visibility = 'visible';
+    };
+    updateUnderline();
+    const observer = new ResizeObserver(updateUnderline);
+    observer.observe(tabs);
+    tabs.querySelectorAll('button').forEach((button) => observer.observe(button));
+    return () => {
+      observer.disconnect();
+      if (frame !== undefined) {
+        cancelAnimationFrame(frame);
+        underline.style.removeProperty('transition');
+      }
+    };
+  }, [activeUninstalledCat, uninstalledCats, viewMode, t]);
 
   // Apps shown under the active tab. AI-installable first, then the
   // within-category tiebreaker, then name.
@@ -425,12 +458,13 @@ export const AppManagerMain: React.FC = () => {
           {/* Install view — category tabs filter the uninstalled apps. */}
           {viewMode === 'install' && uninstalled.length > 0 && (
             <section>
-              <div className="mb-5 flex flex-wrap gap-1">
+              <div ref={categoryTabsRef} className="relative mb-5 flex flex-wrap gap-1">
                 <button
                   onClick={() => setActiveUninstalledCat('ALL')}
-                  className={`px-3 py-1.5 text-[13px] transition-colors outline-none ${
+                  aria-pressed={activeUninstalledCat === 'ALL'}
+                  className={`border-b-2 border-transparent px-3 py-1.5 text-[14px] font-bold transition-colors outline-none ${
                     activeUninstalledCat === 'ALL'
-                      ? 'text-cyber-text font-bold border-b-2 border-cyber-border'
+                      ? 'text-cyber-text'
                       : 'text-cyber-text-secondary hover:text-cyber-text'
                   }`}
                 >
@@ -440,15 +474,22 @@ export const AppManagerMain: React.FC = () => {
                   <button
                     key={cat}
                     onClick={() => setActiveUninstalledCat(cat)}
-                    className={`px-3 py-1.5 text-[13px] transition-colors outline-none ${
+                    aria-pressed={activeUninstalledCat === cat}
+                    className={`border-b-2 border-transparent px-3 py-1.5 text-[14px] font-bold transition-colors outline-none ${
                       activeUninstalledCat === cat
-                        ? 'text-cyber-text font-bold border-b-2 border-cyber-border'
+                        ? 'text-cyber-text'
                         : 'text-cyber-text-secondary hover:text-cyber-text'
                     }`}
                   >
                     {t(catLabelKey(cat))}
                   </button>
                 ))}
+                <span
+                  ref={categoryUnderlineRef}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-0 top-0 h-0.5 bg-cyber-border transition-[transform,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+                  style={{ visibility: 'hidden' }}
+                />
               </div>
               <div className={gridClass}>{visibleUninstalled.map(renderIcon)}</div>
             </section>
