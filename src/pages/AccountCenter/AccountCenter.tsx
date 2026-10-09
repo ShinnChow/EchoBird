@@ -189,7 +189,7 @@ export function AccountCard({
                       className={`relative h-0 flex-shrink-0 rounded-full border-t-4 ${colors.track}`}
                     >
                       <div
-                        className={`absolute bottom-0 left-0 h-0 rounded-full border-t-4 ${colors.fill}`}
+                        className={`quota-progress-fill absolute bottom-0 left-0 h-0 rounded-full border-t-4 ${colors.fill}`}
                         style={{ width: `${Math.max(0, Math.min(100, metric.percent))}%` }}
                       />
                     </div>

@@ -439,7 +439,7 @@ export const ModelCard = React.memo(
                           className={`relative h-0 flex-shrink-0 rounded-full border-t-[6px] ${colors.track}`}
                         >
                           <div
-                            className={`absolute bottom-0 left-0 h-0 rounded-full border-t-[length:inherit] border-transparent bg-origin-border bg-gradient-to-r ${colors.gradient} transition-all duration-300`}
+                            className={`quota-progress-fill absolute bottom-0 left-0 h-0 rounded-full border-t-[length:inherit] border-transparent bg-origin-border bg-gradient-to-r ${colors.gradient}`}
                             style={{ width: `${remaining ?? 0}%` }}
                           />
                         </div>

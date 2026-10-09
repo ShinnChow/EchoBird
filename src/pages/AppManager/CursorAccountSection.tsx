@@ -59,7 +59,7 @@ export const CursorAccountSection: React.FC<{ tool: 'cursor' | 'grokbot' }> = ({
                     className="h-1.5 min-w-[56px] max-w-[80px] flex-1 overflow-hidden rounded-full bg-cyber-border"
                   >
                     <span
-                      className="block h-full rounded-full bg-cyber-bg"
+                      className="quota-progress-fill block h-full rounded-full bg-cyber-bg"
                       style={{ width: `${account.usage?.remainingPercent ?? 0}%` }}
                     />
                   </span>

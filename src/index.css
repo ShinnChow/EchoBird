@@ -101,6 +101,16 @@
   color: rgb(var(--text-primary-rgb));
 }
 
+.quota-progress-fill {
+  transition: width 450ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quota-progress-fill {
+    transition: none;
+  }
+}
+
 .view-mode-tab[aria-pressed='true'] {
   background-color: color-mix(in srgb, rgb(var(--accent-rgb)) 30%, rgb(var(--bg-base-rgb)));
   --view-mode-wave-rgb: var(--accent-rgb);
