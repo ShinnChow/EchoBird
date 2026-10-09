@@ -63,6 +63,17 @@ pub struct MergeReport {
     pub dbs_locked: usize,
 }
 
+struct HistoryCoordinationLock(File);
+
+impl Drop for HistoryCoordinationLock {
+    fn drop(&mut self) {
+        // Closing one handle may leave a lock held by a clone or forked child.
+        if let Err(e) = fs2::FileExt::unlock(&self.0) {
+            log::warn!("[CodexMerge] could not release writer coordination: {e}");
+        }
+    }
+}
+
 /// Public entry — called from the Codex launch pre-flight in
 /// `process_manager::start_tool`, after `config.toml` is written
 /// and before Codex spawns. Never returns an error: everything is logged.
@@ -129,7 +140,9 @@ fn retag_all(codex_home: &Path, active: &str) -> MergeReport {
 /// here prevents new writers until migration ends; already-active writers
 /// keep their own locks and are excluded. fs2 uses flock/LockFileEx, as does
 /// Codex's std::fs::File locking, without raising our Rust MSRV.
-fn lock_history_writers(codex_home: &Path) -> io::Result<(File, HashSet<String>)> {
+fn lock_history_writers(
+    codex_home: &Path,
+) -> io::Result<(HistoryCoordinationLock, HashSet<String>)> {
     use fs2::FileExt;
     let dir = codex_home.join("thread-writer-locks");
     std::fs::create_dir_all(&dir)?;
@@ -140,6 +153,7 @@ fn lock_history_writers(codex_home: &Path) -> io::Result<(File, HashSet<String>)
         .truncate(false)
         .open(dir.join(".coordination.lock"))?;
     coordination.try_lock_exclusive()?;
+    let coordination = HistoryCoordinationLock(coordination);
     let mut active = HashSet::new();
     for entry in std::fs::read_dir(dir)? {
         let path = entry?.path();
@@ -153,7 +167,7 @@ fn lock_history_writers(codex_home: &Path) -> io::Result<(File, HashSet<String>)
         }
         let file = OpenOptions::new().read(true).write(true).open(&path)?;
         match file.try_lock_exclusive() {
-            Ok(()) => {}
+            Ok(()) => fs2::FileExt::unlock(&file)?,
             Err(e) if e.raw_os_error() == fs2::lock_contended_error().raw_os_error() => {
                 active.insert(id.to_string());
             }
@@ -808,6 +822,19 @@ mod tests {
     }
 
     #[test]
+    fn coordination_lock_is_released_with_a_duplicated_handle() {
+        let dir = tmp_dir("coordination_release");
+        let (coordination, _) = lock_history_writers(&dir).unwrap();
+        let inherited = coordination.0.try_clone().unwrap();
+        drop(coordination);
+
+        let (next, _) = lock_history_writers(&dir).unwrap();
+        drop(next);
+        drop(inherited);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn active_writer_is_skipped_in_both_stores_then_merged_after_release() {
         use fs2::FileExt;
         let dir = tmp_dir("active_writer");
@@ -828,6 +855,7 @@ mod tests {
         assert_eq!(std::fs::read(&path).unwrap(), before);
         assert_eq!(provider_count(&db, "openai"), 1);
 
+        fs2::FileExt::unlock(&writer).unwrap();
         drop(writer);
         let report = retag_all(&dir, "OpenAI");
         assert_eq!(report.threads_retagged, 1);
