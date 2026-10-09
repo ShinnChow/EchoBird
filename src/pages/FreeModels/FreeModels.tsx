@@ -544,7 +544,7 @@ function RouteModelCard({
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"
       >
-        <span className="free-model-route-priority absolute right-3 font-mono font-semibold">
+        <span className="free-model-route-priority absolute right-8 font-mono font-semibold">
           {priority}
         </span>
       </div>
