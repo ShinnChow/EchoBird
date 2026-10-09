@@ -162,6 +162,7 @@ pub const INSTALLABLE_TOOL_IDS: &[&str] = &[
     "grok",
     "grokbot",
     "manus",
+    "cue",
     "vibe-trading",
     "workbuddy",
     "workbuddyai",

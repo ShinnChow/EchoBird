@@ -557,7 +557,7 @@ describe.each(['claudedesktop', 'claudecode'])('%s routing controls', (client) =
   );
 });
 
-describe.each(['grokbot', 'cursor', 'manus'] as const)('%s account-only panel', (client) => {
+describe.each(['grokbot', 'cursor', 'manus', 'cue'] as const)('%s account-only panel', (client) => {
   it('shows accounts for a no-model-config tool without rendering API models', async () => {
     const { AppManagerPanel, AppManagerBottom } = await import('./AppManagerComponents');
     const { ModelNexusContext } = await import('../ModelNexus/context');
@@ -571,13 +571,15 @@ describe.each(['grokbot', 'cursor', 'manus'] as const)('%s account-only panel', 
         ? 'cursorAccounts'
         : client === 'manus'
           ? 'manusAccounts'
-          : 'grokBotAccounts']: {
+          : client === 'cue'
+            ? 'cueAccounts'
+            : 'grokBotAccounts']: {
         accounts: [
           {
             id: 'one',
             email: 'bot@example.test',
             active: true,
-            credits: client === 'manus' ? { total: 1300 } : undefined,
+            credits: client === 'manus' || client === 'cue' ? { total: 1300 } : undefined,
           },
         ],
         selectedId: 'one',
@@ -601,7 +603,7 @@ describe.each(['grokbot', 'cursor', 'manus'] as const)('%s account-only panel', 
       </ConfirmDialogProvider>
     );
     expect(markup).toContain('bot@example.test');
-    if (client === 'manus') expect(markup).toContain('1300 agent.credits');
+    if (client === 'manus' || client === 'cue') expect(markup).toContain('1300 agent.credits');
     expect(markup).not.toContain('Cloud Model');
     expect(markup).not.toContain('Auto Router');
     expect(markup).not.toContain('agent.noModelConfig');

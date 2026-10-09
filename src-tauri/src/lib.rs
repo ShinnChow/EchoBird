@@ -184,6 +184,7 @@ static BUNDLED: BundledAssets = BundledAssets {
             "manus",
             include_str!("../../docs/api/tools/install/manus.json"),
         ),
+        ("cue", include_str!("../../docs/api/tools/install/cue.json")),
     ],
 };
 
@@ -1067,6 +1068,13 @@ pub fn run() {
             tool_commands::switch_manus_account,
             tool_commands::refresh_manus_account,
             tool_commands::delete_manus_account,
+            tool_commands::list_cue_accounts,
+            tool_commands::start_cue_login,
+            tool_commands::poll_cue_login,
+            tool_commands::cancel_cue_login,
+            tool_commands::switch_cue_account,
+            tool_commands::refresh_cue_account,
+            tool_commands::delete_cue_account,
             tool_commands::list_workbuddy_accounts,
             tool_commands::list_zcode_accounts,
             tool_commands::start_zcode_login,

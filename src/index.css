@@ -640,6 +640,11 @@ img[src*='/icons/tools/openscience.svg'] {
   transition: filter 0.2s ease;
 }
 
+/* Cue's official 1024px asset has a 100px transparent inset on each side. */
+img[src$='/icons/tools/cue.png'] {
+  transform: scale(1.24);
+}
+
 /* Cyber arrow marquee animation */
 @keyframes arrow-appear-1 {
   0%,

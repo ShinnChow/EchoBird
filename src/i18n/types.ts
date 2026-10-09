@@ -271,6 +271,8 @@ export type TKey =
   | 'agent.zcodeTrial'
   | 'agent.waitingForBrowser'
   | 'agent.manusExitClient'
+  | 'agent.cueLoginClient'
+  | 'agent.cueExitClient'
   | 'agent.claudeDesktopLoginClient'
   | 'agent.claudeDesktopExitClient'
   | 'agent.refreshAccount'

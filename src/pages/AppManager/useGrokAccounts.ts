@@ -19,6 +19,14 @@ const clients = {
     switch: api.switchManusAccount,
     refresh: api.refreshManusAccount,
   },
+  cue: {
+    list: api.listCueAccounts,
+    start: api.startCueLogin,
+    cancel: api.cancelCueLogin,
+    remove: api.deleteCueAccount,
+    switch: api.switchCueAccount,
+    refresh: api.refreshCueAccount,
+  },
 };
 
 export function useGrokAccounts(
@@ -26,7 +34,7 @@ export function useGrokAccounts(
   hasModel: boolean,
   clearModel: () => void,
   showError: (error: string) => void,
-  tool: 'grok' | 'manus' = 'grok'
+  tool: 'grok' | 'manus' | 'cue' = 'grok'
 ) {
   const client = clients[tool];
   const currentAttempt = useRef<string | null>(null);
@@ -50,7 +58,7 @@ export function useGrokAccounts(
       'verificationUri' in login ? api.openExternal(login.verificationUri) : Promise.resolve(),
     poll: async (id, nextStage) => {
       if (tool === 'grok') return api.pollGrokLogin(id);
-      const result = await api.pollManusLogin(id);
+      const result = await (tool === 'cue' ? api.pollCueLogin(id) : api.pollManusLogin(id));
       if (currentAttempt.current === id) {
         setExitAttempt(result.awaitingClientExit ? id : null);
         if (result.awaitingClientExit && result.expiresAt !== null) nextStage(result.expiresAt);
@@ -76,7 +84,7 @@ export function useGrokAccounts(
   return {
     ...managed,
     awaitingClientExit:
-      tool === 'manus' && enabled && managed.busy && exitAttempt === managed.login?.loginId,
+      tool !== 'grok' && enabled && managed.busy && exitAttempt === managed.login?.loginId,
     switchAccount,
   };
 }

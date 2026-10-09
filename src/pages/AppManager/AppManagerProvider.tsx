@@ -351,6 +351,13 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     setApplyError,
     'manus'
   );
+  const cueAccounts = useGrokAccounts(
+    accountGroupEnabled('cue'),
+    false,
+    () => {},
+    setApplyError,
+    'cue'
+  );
 
   const clearGrokBotModel = useCallback(
     () => setToolModelConfig((prev) => ({ ...prev, grokbot: null })),
@@ -398,6 +405,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     if (toolId === 'dsh') deepSeekAccounts.select(null);
     if (toolId === 'grok') grokAccounts.select(null);
     if (toolId === 'manus') manusAccounts.select(null);
+    if (toolId === 'cue') cueAccounts.select(null);
     if (toolId === 'claudecode') claudeCodeAccounts.setSelectedId(null);
     if (toolId === 'claudedesktop') claudeDesktopAccounts.select(null);
     if (toolId === 'workbuddy' || toolId === 'workbuddyai') workBuddyAccounts.select(null);
@@ -654,6 +662,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     if (!selectedTool || isLaunching) return;
     if (selectedTool === 'zcode' && zcodeAccounts.busy) return;
     if (selectedTool === 'claudedesktop' && claudeDesktopAccounts.busy) return;
+    if (selectedTool === 'cue' && cueAccounts.busy) return;
     setIsLaunching(true);
     const switchingClaudeAccount =
       (selectedTool === 'claudecode' && !!claudeCodeAccounts.selectedId) ||
@@ -665,6 +674,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
       !(selectedTool === 'dsh' && deepSeekAccounts.selectedId) &&
       !(selectedTool === 'grok' && grokAccounts.selectedId) &&
       !(selectedTool === 'manus' && manusAccounts.selectedId) &&
+      !(selectedTool === 'cue' && cueAccounts.selectedId) &&
       !(selectedTool === 'cursor' && cursorAccounts.selectedId) &&
       !(selectedTool === 'grokbot' && grokBotAccounts.selectedId) &&
       !(
@@ -747,10 +757,13 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         setIsLaunching(false);
       }
       return;
-    } else if (selectedTool === 'manus' && manusAccounts.selectedId) {
+    } else if (
+      (selectedTool === 'manus' && manusAccounts.selectedId) ||
+      (selectedTool === 'cue' && cueAccounts.selectedId)
+    ) {
       try {
-        await manusAccounts.switchAccount();
-        await api.startTool('manus');
+        await (selectedTool === 'cue' ? cueAccounts : manusAccounts).switchAccount();
+        await api.startTool(selectedTool);
       } catch (error) {
         setApplyError(accountError(error, t));
       } finally {
@@ -968,6 +981,10 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         manusAccounts: {
           ...manusAccounts,
           accounts: orderedAccounts('manus', manusAccounts.accounts),
+        },
+        cueAccounts: {
+          ...cueAccounts,
+          accounts: orderedAccounts('cue', cueAccounts.accounts),
         },
         grokBotAccounts: {
           ...grokBotAccounts,

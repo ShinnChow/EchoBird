@@ -325,6 +325,8 @@ const ja: Partial<Translations> = {
   'agent.zcodeTrial': '体験',
   'agent.waitingForBrowser': 'ブラウザ操作を待機中({seconds})',
   'agent.manusExitClient': 'Manusを手動で終了({seconds})',
+  'agent.cueLoginClient': 'Cue にログインしてください({seconds})',
+  'agent.cueExitClient': 'Cueアプリを終了({seconds})',
   'agent.claudeDesktopLoginClient': 'Claude にログインしてください({seconds})',
   'agent.claudeDesktopExitClient': 'Claudeアプリを終了({seconds})',
   'agent.refreshAccount': 'アカウントの使用量を更新',

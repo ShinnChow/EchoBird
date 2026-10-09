@@ -517,6 +517,28 @@ export function refreshManusAccount(accountId: string): Promise<ManusAccount> {
   return invoke('refresh_manus_account', { accountId });
 }
 
+export function startCueLogin(): Promise<GrokLogin> {
+  return invoke('start_cue_login');
+}
+export function pollCueLogin(loginId: string): Promise<ManusLoginPoll> {
+  return invoke('poll_cue_login', { loginId });
+}
+export function cancelCueLogin(loginId: string): Promise<void> {
+  return invoke('cancel_cue_login', { loginId });
+}
+export function listCueAccounts(): Promise<ManusAccount[]> {
+  return invoke('list_cue_accounts');
+}
+export function switchCueAccount(accountId: string): Promise<ManusAccount> {
+  return invoke('switch_cue_account', { accountId });
+}
+export function deleteCueAccount(accountId: string): Promise<void> {
+  return invoke('delete_cue_account', { accountId });
+}
+export function refreshCueAccount(accountId: string): Promise<ManusAccount> {
+  return invoke('refresh_cue_account', { accountId });
+}
+
 export interface CursorUsage {
   plan: string | null;
   remainingPercent: number | null;

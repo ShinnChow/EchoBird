@@ -102,6 +102,13 @@ vi.mock('../../api/tauri', () => {
     'refreshManusAccount',
     'switchManusAccount',
     'deleteManusAccount',
+    'listCueAccounts',
+    'startCueLogin',
+    'cancelCueLogin',
+    'pollCueLogin',
+    'refreshCueAccount',
+    'switchCueAccount',
+    'deleteCueAccount',
     'listCursorAccounts',
     'startCursorLogin',
     'cancelCursorLogin',
@@ -176,6 +183,7 @@ const listNames = [
   'listDeepSeekAccounts',
   'listGrokAccounts',
   'listManusAccounts',
+  'listCueAccounts',
   'listCursorAccounts',
   'listGrokBotAccounts',
   'listAntigravityAccounts',
@@ -191,6 +199,7 @@ const listFor = {
   dsh: 'listDeepSeekAccounts',
   grok: 'listGrokAccounts',
   manus: 'listManusAccounts',
+  cue: 'listCueAccounts',
   cursor: 'listCursorAccounts',
   grokbot: 'listGrokBotAccounts',
   antigravity: 'listAntigravityAccounts',
@@ -656,6 +665,7 @@ const refreshFor = {
   zcode: 'refreshZCodeAccountQuota',
   grok: 'refreshGrokAccount',
   manus: 'refreshManusAccount',
+  cue: 'refreshCueAccount',
 } as const;
 
 it.each(Object.keys(listFor) as Tool[])(

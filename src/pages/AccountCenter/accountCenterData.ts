@@ -139,15 +139,17 @@ export function accountCenterProviders(
     loading: group.loading,
     remainingSeconds: group.remainingSeconds,
     waitingLabel:
-      id === 'claudedesktop' && group.busy
-        ? t(
-            group.awaitingClientExit
-              ? 'agent.claudeDesktopExitClient'
-              : 'agent.claudeDesktopLoginClient'
-          )
-        : group.awaitingClientExit
-          ? t('agent.manusExitClient')
-          : undefined,
+      id === 'cue' && group.busy
+        ? t(group.awaitingClientExit ? 'agent.cueExitClient' : 'agent.cueLoginClient')
+        : id === 'claudedesktop' && group.busy
+          ? t(
+              group.awaitingClientExit
+                ? 'agent.claudeDesktopExitClient'
+                : 'agent.claudeDesktopLoginClient'
+            )
+          : group.awaitingClientExit
+            ? t('agent.manusExitClient')
+            : undefined,
     add: () => void group.add(),
     accounts: group.accounts.map((account) => {
       const summary = describe(account);
@@ -364,22 +366,24 @@ export function accountCenterProviders(
         metrics: [quota(account.usage?.remainingPercent, account.usage?.resetAt)],
       })
     ),
-    provider(
-      'manus',
-      'Manus',
-      '/icons/tools/manus.png',
-      ['manus'],
-      context.manusAccounts,
-      (account) => ({
-        identity: account.email,
-        plan: account.plan,
-        metrics: [
-          {
-            label: t('agent.credits'),
-            value: number('credits' in account ? account.credits?.total : null),
-          },
-        ],
-      })
+    ...(['manus', 'cue'] as const).map((tool) =>
+      provider(
+        tool,
+        tool === 'cue' ? 'Cue' : 'Manus',
+        `/icons/tools/${tool}.png`,
+        [tool],
+        tool === 'cue' ? context.cueAccounts : context.manusAccounts,
+        (account) => ({
+          identity: account.email,
+          plan: account.plan,
+          metrics: [
+            {
+              label: t('agent.credits'),
+              value: number('credits' in account ? account.credits?.total : null),
+            },
+          ],
+        })
+      )
     ),
   ];
 }

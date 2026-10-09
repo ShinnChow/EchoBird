@@ -13,6 +13,7 @@ pub mod codex_catalog;
 #[path = "codex_proxy/mod.rs"]
 pub mod codex_runtime;
 pub mod codex_session_merge;
+pub mod cue_accounts;
 pub mod cursor_accounts;
 pub(crate) mod cursor_auth;
 pub(crate) mod cursor_usage;

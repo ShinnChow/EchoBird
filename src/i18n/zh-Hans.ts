@@ -292,6 +292,8 @@ const zhHans: Partial<Translations> = {
   'agent.zcodeTrial': '体验版',
   'agent.waitingForBrowser': '等待浏览器操作({seconds})',
   'agent.manusExitClient': '请手动退出 Manus({seconds})',
+  'agent.cueLoginClient': '请在 Cue 中登录({seconds})',
+  'agent.cueExitClient': '请完全关闭 Cue({seconds})',
   'agent.claudeDesktopLoginClient': '请在 Claude 中登录({seconds})',
   'agent.claudeDesktopExitClient': '请完全关闭 Claude({seconds})',
   'agent.refreshAccount': '刷新账号额度',

@@ -41,6 +41,7 @@ function context() {
     grokAccounts: group(),
     grokBotAccounts: group(),
     manusAccounts: group(),
+    cueAccounts: group(),
   } as unknown as AppManagerContextType;
 }
 
@@ -48,6 +49,30 @@ const providers = (state: AppManagerContextType) =>
   accountCenterProviders(state, (key) => key, 'en');
 
 describe('Account Center display data', () => {
+  it('keeps Cue sign-in stages and balance independent of Manus', () => {
+    const state = context();
+    state.cueAccounts.busy = true;
+    expect(providers(state).find((p) => p.id === 'cue')?.waitingLabel).toBe('agent.cueLoginClient');
+    state.cueAccounts.awaitingClientExit = true;
+    state.cueAccounts.accounts = [
+      {
+        id: 'cue',
+        email: 'cue@example.test',
+        active: true,
+        plan: 'Free',
+        credits: { total: 0, free: null, refresh: null, nextRefreshAt: null },
+      },
+    ];
+    const groups = providers(state);
+    expect(groups.find((p) => p.id === 'cue')).toMatchObject({
+      waitingLabel: 'agent.cueExitClient',
+      accounts: [{ plan: 'Free', metrics: [{ value: '0' }] }],
+    });
+    expect(groups.find((p) => p.id === 'manus')).toMatchObject({
+      waitingLabel: undefined,
+      accounts: [],
+    });
+  });
   it('shows native Claude sign-in and exit instructions in their respective stages', () => {
     const state = context();
     state.claudeDesktopAccounts.busy = true;

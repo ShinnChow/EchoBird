@@ -19,6 +19,13 @@ vi.mock('../../api/tauri', () => ({
   switchManusAccount: vi.fn(),
   deleteManusAccount: vi.fn(),
   refreshManusAccount: vi.fn(),
+  listCueAccounts: vi.fn(),
+  startCueLogin: vi.fn(),
+  pollCueLogin: vi.fn(),
+  cancelCueLogin: vi.fn(),
+  switchCueAccount: vi.fn(),
+  deleteCueAccount: vi.fn(),
+  refreshCueAccount: vi.fn(),
   openExternal: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../../hooks/useI18n', () => {
@@ -42,7 +49,7 @@ describe('Grok Build account lifecycle', () => {
     enabled = true,
     hasModel = false,
     tool = 'grok',
-  }: { enabled?: boolean; hasModel?: boolean; tool?: 'grok' | 'manus' } = {}) {
+  }: { enabled?: boolean; hasModel?: boolean; tool?: 'grok' | 'manus' | 'cue' } = {}) {
     const result = useGrokAccounts(enabled, hasModel, clearModel, showError, tool);
     useLayoutEffect(() => {
       state = result;
@@ -56,7 +63,7 @@ describe('Grok Build account lifecycle', () => {
     });
     return { promise, resolve };
   }
-  async function mount(tool: 'grok' | 'manus' = 'grok') {
+  async function mount(tool: 'grok' | 'manus' | 'cue' = 'grok') {
     act(() => {
       renderer = create(<Harness tool={tool} />);
     });
@@ -75,6 +82,12 @@ describe('Grok Build account lifecycle', () => {
     vi.mocked(api.pollGrokLogin).mockResolvedValue(account);
     vi.mocked(api.refreshGrokAccount).mockResolvedValue(account);
     vi.mocked(api.cancelManusLogin).mockResolvedValue(undefined);
+    vi.mocked(api.listCueAccounts).mockResolvedValue([]);
+    vi.mocked(api.cancelCueLogin).mockResolvedValue(undefined);
+    vi.mocked(api.startCueLogin).mockResolvedValue({
+      loginId: 'cue-login',
+      expiresAt: Date.now() / 1000 + 60,
+    });
     vi.mocked(api.startManusLogin).mockResolvedValue({
       loginId: 'manus-login',
       expiresAt: Date.now() / 1000 + 60,
@@ -547,4 +560,72 @@ describe('Grok Build account lifecycle', () => {
     expect(api.pollManusLogin).not.toHaveBeenCalled();
     expect(api.switchManusAccount).not.toHaveBeenCalled();
   });
+
+  it('captures Cue through its native client, resets the exit deadline once and keeps Manus isolated', async () => {
+    const cue = {
+      ...account,
+      credits: { total: 1300, free: null, refresh: null, nextRefreshAt: null },
+    };
+    const first = deferred<api.ManusLoginPoll>();
+    const exit = deferred<api.ManusLoginPoll>();
+    vi.mocked(api.pollCueLogin).mockReturnValueOnce(first.promise).mockReturnValue(exit.promise);
+    await mount('cue');
+    let operation!: Promise<void>;
+    await act(async () => {
+      operation = state.add();
+      await vi.advanceTimersByTimeAsync(45_000);
+      first.resolve({ account: null, awaitingClientExit: true, expiresAt: Date.now() / 1000 + 60 });
+    });
+    expect(state.awaitingClientExit).toBe(true);
+    expect(state.remainingSeconds).toBe(60);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(16_000);
+    });
+    expect(state.busy).toBe(true);
+    vi.mocked(api.listCueAccounts).mockResolvedValue([cue]);
+    await act(async () => {
+      exit.resolve({ account: cue, awaitingClientExit: false, expiresAt: null });
+      await operation;
+    });
+    expect(state.accounts).toEqual([cue]);
+    expect(state.busy).toBe(false);
+    expect(api.openExternal).not.toHaveBeenCalled();
+    expect(api.startManusLogin).not.toHaveBeenCalled();
+    expect(api.pollManusLogin).not.toHaveBeenCalled();
+    expect(api.refreshCueAccount).not.toHaveBeenCalled();
+    expect(api.switchCueAccount).not.toHaveBeenCalled();
+  });
+
+  it.each(['leave', 'timeout'] as const)(
+    'ignores a late Cue login result after %s',
+    async (end) => {
+      const waiting = deferred<api.ManusLoginPoll>();
+      vi.mocked(api.pollCueLogin).mockReturnValue(waiting.promise);
+      await mount('cue');
+      let operation!: Promise<void>;
+      await act(async () => {
+        operation = state.add();
+      });
+      if (end === 'leave') {
+        act(() => renderer.update(<Harness tool="cue" enabled={false} />));
+      } else {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(60_000);
+        });
+      }
+      await act(async () => {
+        waiting.resolve({
+          account: { ...account, credits: null },
+          awaitingClientExit: false,
+          expiresAt: null,
+        });
+        await operation;
+      });
+      expect(api.cancelCueLogin).toHaveBeenCalledWith('cue-login');
+      expect(state.accounts).toEqual([]);
+      expect(api.listCueAccounts).toHaveBeenCalledTimes(1);
+      expect(api.openExternal).not.toHaveBeenCalled();
+      expect(api.switchCueAccount).not.toHaveBeenCalled();
+    }
+  );
 });

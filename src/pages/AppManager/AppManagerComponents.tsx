@@ -975,8 +975,8 @@ export const AppManagerPanel: React.FC = () => {
                 </a>
               </div>
             )
-          ) : selectedTool === 'manus' ? (
-            <ManusAccountSection />
+          ) : selectedTool === 'manus' || selectedTool === 'cue' ? (
+            <ManusAccountSection tool={selectedTool} />
           ) : selectedTool === 'antigravity' || selectedTool === 'antigravitydesktop' ? (
             <AntigravityAccountSection />
           ) : selectedTool === 'grokbot' || selectedTool === 'cursor' ? (
@@ -1073,6 +1073,7 @@ export const AppManagerBottom: React.FC = () => {
     deepSeekAccounts,
     grokAccounts,
     manusAccounts,
+    cueAccounts,
     grokBotAccounts,
     cursorAccounts,
     antigravityAccounts,
@@ -1102,6 +1103,7 @@ export const AppManagerBottom: React.FC = () => {
     (selectedTool === 'dsh' && !!deepSeekAccounts.selectedId) ||
     (selectedTool === 'grok' && !!grokAccounts.selectedId) ||
     (selectedTool === 'manus' && !!manusAccounts.selectedId) ||
+    (selectedTool === 'cue' && !!cueAccounts.selectedId) ||
     (selectedTool === 'grokbot' && !!grokBotAccounts.selectedId) ||
     (selectedTool === 'cursor' && !!cursorAccounts.selectedId) ||
     ((selectedTool === 'antigravity' || selectedTool === 'antigravitydesktop') &&
@@ -1122,6 +1124,7 @@ export const AppManagerBottom: React.FC = () => {
     (selectedTool === 'zcode' && zcodeAccounts.busy) ||
     (selectedTool === 'grok' && grokAccounts.busy) ||
     (selectedTool === 'manus' && manusAccounts.busy) ||
+    (selectedTool === 'cue' && cueAccounts.busy) ||
     (selectedTool === 'claudedesktop' && claudeDesktopAccounts.busy) ||
     (selectedTool === 'grokbot' && grokBotAccounts.busy) ||
     (selectedTool === 'cursor' && cursorAccounts.busy) ||

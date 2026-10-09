@@ -40,6 +40,7 @@ export interface AppManagerContextType {
   deepSeekAccounts: ReturnType<typeof useDeepSeekAccounts>;
   grokAccounts: ReturnType<typeof useGrokAccounts>;
   manusAccounts: ReturnType<typeof useGrokAccounts>;
+  cueAccounts: ReturnType<typeof useGrokAccounts>;
   grokBotAccounts: ReturnType<typeof useCursorAccounts>;
   cursorAccounts: ReturnType<typeof useCursorAccounts>;
   antigravityAccounts: ReturnType<typeof useAntigravityAccounts>;

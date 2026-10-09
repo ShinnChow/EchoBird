@@ -312,6 +312,8 @@ const zhHant: Partial<Translations> = {
   'agent.zcodeTrial': '體驗版',
   'agent.waitingForBrowser': '等待瀏覽器操作({seconds})',
   'agent.manusExitClient': '請手動結束 Manus({seconds})',
+  'agent.cueLoginClient': '請在 Cue 中登入({seconds})',
+  'agent.cueExitClient': '請完全關閉 Cue({seconds})',
   'agent.claudeDesktopLoginClient': '請在 Claude 中登入({seconds})',
   'agent.claudeDesktopExitClient': '請完全關閉 Claude({seconds})',
   'agent.refreshAccount': '重新整理帳號額度',

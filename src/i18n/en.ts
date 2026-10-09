@@ -326,6 +326,8 @@ const en: Translations = {
   'agent.zcodeTrial': 'Trial',
   'agent.waitingForBrowser': 'Waiting for browser ({seconds})',
   'agent.manusExitClient': 'Please quit Manus ({seconds})',
+  'agent.cueLoginClient': 'Please sign in to Cue ({seconds})',
+  'agent.cueExitClient': 'Please quit the Cue app ({seconds})',
   'agent.claudeDesktopLoginClient': 'Please sign in to Claude ({seconds})',
   'agent.claudeDesktopExitClient': 'Please quit the Claude app ({seconds})',
   'agent.refreshAccount': 'Refresh account quota',

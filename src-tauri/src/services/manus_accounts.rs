@@ -117,8 +117,8 @@ fn load_store() -> Result<Store, String> {
     read(&path)
 }
 
-fn cookie_db(dir: &Path, writable: bool) -> Result<Connection, String> {
-    let path = dir.join("Network/Cookies");
+pub(super) fn cookie_db(dir: &Path, writable: bool) -> Result<Connection, String> {
+    let path = cookie_path(dir);
     let flags = if writable {
         OpenFlags::SQLITE_OPEN_READ_WRITE
     } else {
@@ -128,6 +128,14 @@ fn cookie_db(dir: &Path, writable: bool) -> Result<Connection, String> {
     db.busy_timeout(Duration::from_secs(2))
         .map_err(|_| "accountError.read")?;
     Ok(db)
+}
+
+fn cookie_path(dir: &Path) -> PathBuf {
+    ["Network/Cookies", "Cookies"]
+        .iter()
+        .map(|path| dir.join(path))
+        .find(|path| path.is_file())
+        .unwrap_or_else(|| dir.join("Network/Cookies"))
 }
 
 fn cookie_read_error(error: rusqlite::Error) -> String {
@@ -181,14 +189,14 @@ fn cookie_value(
         .map_err(|_| "accountError.format".into())
 }
 
-fn native_session(dir: &Path) -> Result<Option<String>, String> {
-    if !dir.join("Network/Cookies").exists() {
+pub(super) fn native_session(dir: &Path) -> Result<Option<String>, String> {
+    if !cookie_path(dir).exists() {
         return Ok(None);
     }
     cookie_value(&cookie_db(dir, false)?, dir, cipher)
 }
 
-fn set_cookie(
+pub(super) fn set_cookie(
     db: &Connection,
     dir: &Path,
     token: Option<&str>,
@@ -248,7 +256,7 @@ fn set_cookie(
 }
 
 fn write_native(dir: &Path, token: Option<&str>) -> Result<(), String> {
-    if token.is_none() && !dir.join("Network/Cookies").exists() {
+    if token.is_none() && !cookie_path(dir).exists() {
         return Ok(());
     }
     if native_session(dir)?.as_deref() != token {
@@ -299,7 +307,7 @@ async fn close_app() -> Result<(), String> {
     }
 }
 
-async fn profile(token: &str) -> Result<Account, String> {
+pub(super) async fn profile(token: &str) -> Result<Account, String> {
     let response = request(token, "UserInfo").await?;
     let id = response["userId"]
         .as_str()
@@ -652,6 +660,23 @@ pub async fn delete(id: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn electron_cookie_layout_supports_root_and_network_without_creating_a_database() {
+        let dir = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
+        std::fs::create_dir(&dir).unwrap();
+        assert!(native_session(&dir).unwrap().is_none());
+        assert!(!dir.join("Network/Cookies").exists());
+        let db = Connection::open(dir.join("Cookies")).unwrap();
+        db.execute_batch("CREATE TABLE cookies(host_key TEXT,name TEXT,path TEXT,value TEXT,encrypted_value BLOB); INSERT INTO cookies VALUES ('api.manus.im','session_id','/','fixture-session',x'');").unwrap();
+        assert_eq!(
+            native_session(&dir).unwrap().as_deref(),
+            Some("fixture-session")
+        );
+        assert_eq!(cookie_path(&dir), dir.join("Cookies"));
+        drop(db);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     fn login_fixture(token: Option<&str>) -> PathBuf {
         let dir = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());

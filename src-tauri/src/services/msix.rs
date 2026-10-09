@@ -105,6 +105,7 @@ mod tests {
     fn all_store_clients_use_registered_identity_and_application_id() {
         for (identity, app_id) in [
             ("ManusAI.Manus", "ManusApp"),
+            ("ManusAI.CuebyManus", "CueApp"),
             ("OpenAI.Codex", "App"),
             ("Claude", "Claude"),
         ] {

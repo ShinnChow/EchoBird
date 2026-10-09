@@ -65,6 +65,13 @@ vi.mock('../../api/tauri', () => ({
   refreshGrokBotAccount: vi.fn(),
   refreshCursorAccount: vi.fn(),
   listGrokAccounts: vi.fn().mockRejectedValue(new Error('accountError.read')),
+  listCueAccounts: vi.fn().mockRejectedValue(new Error('accountError.read')),
+  startCueLogin: vi.fn(),
+  pollCueLogin: vi.fn(),
+  cancelCueLogin: vi.fn(),
+  switchCueAccount: vi.fn(),
+  deleteCueAccount: vi.fn(),
+  refreshCueAccount: vi.fn(),
   startGrokLogin: vi.fn(),
   pollGrokLogin: vi.fn(),
   cancelGrokLogin: vi.fn(),
@@ -519,6 +526,7 @@ const accountTools = [
   'cursor',
   'grok',
   'manus',
+  'cue',
   'antigravity',
   'antigravitydesktop',
 ] as const;
@@ -530,6 +538,7 @@ describe.each(accountTools)('%s navigation account loading', (tool) => {
     cursor: api.listCursorAccounts,
     grok: api.listGrokAccounts,
     manus: api.listManusAccounts,
+    cue: api.listCueAccounts,
     antigravity: api.listAntigravityAccounts,
     antigravitydesktop: api.listAntigravityAccounts,
   }[tool];
@@ -598,9 +607,103 @@ describe.each(accountTools)('%s navigation account loading', (tool) => {
     expect(api.refreshManusAccount).not.toHaveBeenCalled();
     expect(api.startManusLogin).not.toHaveBeenCalled();
     expect(api.switchManusAccount).not.toHaveBeenCalled();
+    expect(api.refreshCueAccount).not.toHaveBeenCalled();
+    expect(api.startCueLogin).not.toHaveBeenCalled();
+    expect(api.switchCueAccount).not.toHaveBeenCalled();
     expect(api.refreshAntigravityAccount).not.toHaveBeenCalled();
     expect(api.startAntigravityLogin).not.toHaveBeenCalled();
     expect(api.switchAntigravityAccount).not.toHaveBeenCalled();
+  });
+});
+
+describe('Cue account apply', () => {
+  let renderer: ReactTestRenderer;
+  let context: ReturnType<typeof useAppManager>;
+  const account = {
+    id: 'cue-saved',
+    email: 'cue@example.test',
+    active: true,
+    plan: 'Free',
+    credits: null,
+  };
+  function Harness() {
+    const state = useAppManager();
+    useLayoutEffect(() => {
+      context = state;
+    });
+    return null;
+  }
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.mocked(api.listCueAccounts).mockResolvedValue([account]);
+    vi.mocked(api.switchCueAccount).mockResolvedValue(account);
+    vi.mocked(api.cancelCueLogin).mockResolvedValue(undefined);
+    useNavigationStore.getState().setActivePage('apps');
+    useToolsStore
+      .getState()
+      .setDetectedTools([
+        { id: 'cue', name: 'Cue', category: 'Cloud Agent', installed: true, noModelConfig: true },
+      ]);
+    await act(async () => {
+      renderer = create(
+        <AppManagerProvider>
+          <Harness />
+        </AppManagerProvider>
+      );
+    });
+    await act(async () => {
+      context.setSelectedTool('cue');
+    });
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+    expect(context.cueAccounts.selectedId).toBe('cue-saved');
+  });
+  afterEach(() => {
+    act(() => renderer?.unmount());
+    useToolsStore.getState().setDetectedTools([]);
+    vi.useRealTimers();
+  });
+  it('applies the selected Cue account before launch without touching Manus or API models', async () => {
+    expect(api.switchCueAccount).not.toHaveBeenCalled();
+    await act(async () => {
+      await context.handleLaunch();
+    });
+    expect(api.switchCueAccount).toHaveBeenCalledExactlyOnceWith('cue-saved');
+    expect(api.startTool).toHaveBeenCalledExactlyOnceWith('cue');
+    expect(vi.mocked(api.switchCueAccount).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(api.startTool).mock.invocationCallOrder[0]
+    );
+    expect(api.switchManusAccount).not.toHaveBeenCalled();
+    expect(api.applyModelToTool).not.toHaveBeenCalled();
+    expect(api.refreshCueAccount).not.toHaveBeenCalled();
+  });
+  it('preserves selection and does not launch after a failed switch', async () => {
+    vi.mocked(api.switchCueAccount).mockRejectedValueOnce(new Error('accountError.closeClient'));
+    await act(async () => {
+      await context.handleLaunch();
+    });
+    expect(api.startTool).not.toHaveBeenCalled();
+    expect(context.cueAccounts.selectedId).toBe('cue-saved');
+    expect(context.applyError).not.toBeNull();
+    expect(context.isLaunching).toBe(false);
+  });
+  it('blocks applying or launching while the Cue login is pending', async () => {
+    vi.mocked(api.startCueLogin).mockResolvedValue({
+      loginId: 'cue-pending',
+      expiresAt: Date.now() / 1000 + 60,
+    });
+    vi.mocked(api.pollCueLogin).mockReturnValue(new Promise(() => {}));
+    await act(async () => {
+      void context.cueAccounts.add();
+    });
+    expect(context.cueAccounts.busy).toBe(true);
+    await act(async () => {
+      await context.handleLaunch();
+    });
+    expect(api.switchCueAccount).not.toHaveBeenCalled();
+    expect(api.startTool).not.toHaveBeenCalled();
   });
 });
 

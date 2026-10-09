@@ -1,0 +1,26 @@
+{
+    "id": "cue",
+    "displayName": "Cue",
+    "homepage": "https://cue.im/",
+    "docs": "https://cue.im/",
+    "kind": "desktop",
+    "platforms": ["windows", "macos"],
+    "install": {
+        "windows_download": "On Windows x64, use EchoBird's bundled tools/cue/install-windows.ps1. It reuses the signed Manus package installer with official Store product 9PDXFBWZNTNJ, downloads from Microsoft's delivery service, validates package identity ManusAI.CuebyManus and publisher, then installs it with Add-AppxPackage. Package family is ManusAI.CuebyManus_vajzd2mq3s8wj. No Store UI is required.",
+        "macos_download": "For Apple Silicon, download the current official DMG from https://cue.im/ (currently https://download.cue.im/Cue-1.0.8-mac-arm64.dmg), verify the app's code signature, then install Cue.app in Applications. The current official download is ARM64; no Intel package is offered.",
+        "note": "Cue by Manus is a cloud agent. EchoBird detects and launches the desktop client and saves user-authorized official accounts. Cue accounts use their own membership and balance data. Third-party API models and cloud task management are excluded. No official Linux desktop client is offered."
+    },
+    "install_flow": {
+        "summary": "Check for an installed Cue client, install from the official download, refresh detection, and launch.",
+        "agent_steps": [
+            "Detect OS and architecture; check whether Cue is already installed. Windows Store identity is ManusAI.CuebyManus and application ID CueApp. macOS client is /Applications/Cue.app. Do not reinstall an existing client.",
+            "On Windows x64, locate EchoBird's bundled tools/cue/install-windows.ps1 beside the running executable (tools/cue or _up_/tools/cue, including parent directories in development). Run powershell.exe -NoProfile -ExecutionPolicy Bypass -File <absolute script path>. It validates Microsoft's downloaded signed package before Add-AppxPackage; it checks an existing installation first. Report exact installation errors rather than claiming success after opening a Store page. On Apple Silicon macOS, resolve the current DMG from cue.im, verify the Cue app's signature, and install it in Applications. Do not substitute a third-party mirror.",
+            "No vendor download is currently offered for Intel macOS or Linux. Report the platform limitation instead of attempting installation.",
+            "Refresh EchoBird detection and report success only if Cue is detected. Launch the official native client for the user to sign in. Installation must not read or modify account files, settings, or cloud tasks."
+        ]
+    },
+    "network_requirements": {
+        "test_urls": ["https://cue.im/", "https://apps.microsoft.com/detail/9pdxfbwzntnj", "https://download.cue.im/"],
+        "mirrors": {}
+    }
+}

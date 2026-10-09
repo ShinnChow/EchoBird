@@ -1272,6 +1272,7 @@ pub async fn desktop_tool_is_running(tool_id: &str) -> Result<bool, String> {
                     .map(|(s, _)| s.to_owned())
             })
             .unwrap_or_default();
+        let process_names = super::tool_manager::get_tool_process_names(tool_id);
         let status = crate::utils::process::async_command("powershell")
             .args(["-NoProfile", "-NonInteractive", "-Command", script])
             .env(
@@ -1279,7 +1280,8 @@ pub async fn desktop_tool_is_running(tool_id: &str) -> Result<bool, String> {
                 std::path::Path::new(&path)
                     .file_name()
                     .and_then(|s| s.to_str())
-                    .unwrap_or("Claude.exe"),
+                    .or_else(|| process_names.first().map(String::as_str))
+                    .ok_or("accountError.unavailable")?,
             )
             .env("ECHOBIRD_DESKTOP_ROOT", root)
             .env("ECHOBIRD_DESKTOP_FAMILY", family)
