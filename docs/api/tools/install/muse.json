@@ -1,0 +1,30 @@
+{
+    "id": "muse",
+    "displayName": "Muse",
+    "homepage": "https://muse.ai/",
+    "docs": "https://ai.meta.com/muse/download/",
+    "kind": "desktop",
+    "platforms": ["macos"],
+    "install": {
+        "macos_download": "Resolve the current official DMG from Muse's production Sparkle feed https://www.facebook.com/endo/release/appcast.xml?channel=production, using the first item's enclosure URL. Download it immediately: the official fbcdn.net URL is signed and expires. The inspected Muse 7.0 package supports Intel x86_64 and Apple Silicon arm64 and requires macOS 14.0 or later. Recheck the current package's requirements before installing.",
+        "note": "Meta Muse is a cloud agent. EchoBird supports macOS installation, detection and native launch only; account switching, quota access and third-party API model configuration are excluded. No native Windows or Linux desktop download is currently offered; use https://muse.ai/ on those platforms."
+    },
+    "install_flow": {
+        "summary": "Check the existing Muse installation and macOS compatibility, install the current official signed app, refresh detection, and launch.",
+        "agent_steps": [
+            "Detect OS and architecture first. On Windows or Linux, explain that no official native desktop package is offered and provide https://muse.ai/; do not run macOS commands or fabricate an installer. On macOS, check /Applications/Muse.app and ~/Applications/Muse.app plus EchoBird's detection. Reuse an existing client instead of overwriting it. For a new install, macOS older than 14 is unsupported by the currently inspected package.",
+            "Create a temporary directory. Fetch https://www.facebook.com/endo/release/appcast.xml?channel=production with curl -fL, saving the XML to a file; parse the fresh DMG URL with /usr/bin/xmllint --xpath 'string(/rss/channel/item[1]/enclosure/@url)' <feed-file>. Download that HTTPS enclosure URL with curl -fL into the temporary directory. If the feed is unavailable or no longer contains a DMG, obtain the current Mac download from https://ai.meta.com/muse/download/ instead. Do not hardcode an expiring CDN URL, guess a download filename, or use a third-party mirror.",
+            "Mount the downloaded DMG read-only with hdiutil attach -readonly -nobrowse, locate Muse.app, and inspect Contents/Info.plist. Require bundle ID com.meta.endo, verify the app with codesign --verify --deep --strict, and check codesign -dv --verbose=4 reports TeamIdentifier=V9WTTPBFK9. Check the current LSMinimumSystemVersion against sw_vers -productVersion and inspect Contents/MacOS/Muse with lipo -archs for the host architecture. Stop on incompatibility or signature failure. Preserve normal macOS Gatekeeper checks; do not clear quarantine or bypass security policy.",
+            "Install the verified Muse.app with ditto into /Applications when writable, otherwise ~/Applications. Do not replace an existing installation or read, modify, or remove user account/configuration files. Verify the copied app's signature and Gatekeeper assessment with spctl --assess --type execute before reporting success. Detach the mounted image and clean up only this attempt's temporary files, including on failure.",
+            "Refresh EchoBird tool detection. Report installation success only when Muse is detected at its native Contents/MacOS/Muse executable. Launch the detected application through EchoBird's normal tool launch action; the user signs in inside the official Muse client. Installation and passive navigation must not start account capture, fetch quota, or write model/account settings."
+        ]
+    },
+    "network_requirements": {
+        "test_urls": [
+            "https://muse.ai/",
+            "https://ai.meta.com/muse/download/",
+            "https://www.facebook.com/endo/release/appcast.xml?channel=production"
+        ],
+        "mirrors": {}
+    }
+}

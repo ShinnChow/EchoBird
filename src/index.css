@@ -642,8 +642,9 @@ img[src*='/icons/tools/openscience.svg'] {
   transition: filter 0.2s ease;
 }
 
-/* Cue's official 1024px asset has a 100px transparent inset on each side. */
-img[src$='/icons/tools/cue.png'] {
+/* Cue and Muse's official assets include transparent insets. */
+img[src$='/icons/tools/cue.png'],
+img[src$='/icons/tools/muse.png'] {
   transform: scale(1.24);
 }
 

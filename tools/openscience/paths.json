@@ -1,6 +1,6 @@
 {
     "name": "OpenScience",
-    "category": "Desktop",
+    "category": "Science",
     "apiProtocol": [
         "anthropic",
         "openai"

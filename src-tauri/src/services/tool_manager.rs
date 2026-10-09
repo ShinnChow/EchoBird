@@ -1730,7 +1730,8 @@ pub fn get_tool_declared_exe_path(tool_id: &str) -> Option<String> {
 }
 
 /// True if the tool is a GUI desktop app whose provider config EchoBird
-/// manages — paths.json `category: "Desktop"` AND not `noModelConfig`. These
+/// manages — the Desktop category plus OpenScience in Science, excluding
+/// `noModelConfig` tools. These
 /// load provider config at startup, so EchoBird kills + relaunches them on
 /// launch; otherwise switching the model while the app is open silently fails
 /// (the running instance keeps the old config). Deliberately excluded:
@@ -1743,7 +1744,7 @@ pub fn is_managed_desktop_tool(tool_id: &str) -> bool {
         .iter()
         .find(|d| d.id == tool_id)
         .map(|d| {
-            d.paths_config.category.eq_ignore_ascii_case("desktop")
+            (d.paths_config.category.eq_ignore_ascii_case("desktop") || d.id == "openscience")
                 && !d.paths_config.no_model_config
         })
         .unwrap_or(false)
@@ -2078,6 +2079,52 @@ mod tests {
             super::parse_category("Cloud Agent"),
             ToolCategory::CloudAgent
         );
+    }
+
+    #[test]
+    fn openscience_keeps_desktop_model_restart_in_science_category() {
+        let config: PathsConfig =
+            serde_json::from_str(include_str!("../../../tools/openscience/paths.json")).unwrap();
+        assert_eq!(
+            super::parse_category(&config.category),
+            ToolCategory::Science
+        );
+        assert!(super::is_managed_desktop_tool("openscience"));
+        assert!(!super::is_managed_desktop_tool("claudescience"));
+    }
+
+    #[test]
+    fn muse_is_install_only_and_resolves_its_native_mac_bundle() {
+        use std::fs;
+
+        let config: PathsConfig =
+            serde_json::from_str(include_str!("../../../tools/muse/paths.json")).unwrap();
+        let mapping: super::ConfigMapping =
+            serde_json::from_str(include_str!("../../../tools/muse/config.json")).unwrap();
+        assert_eq!(
+            super::parse_category(&config.category),
+            ToolCategory::CloudAgent
+        );
+        assert!(config.no_model_config && config.api_protocol.is_empty());
+        assert!(config.config_dir.is_empty() && mapping.config_file.is_empty());
+        assert!(mapping.read.is_none() && mapping.write.is_none());
+        assert!(config.paths.win32.as_ref().unwrap().is_empty());
+        assert!(config.paths.linux.as_ref().unwrap().is_empty());
+
+        let root = std::env::temp_dir().join(format!("muse-path-{}", uuid::Uuid::new_v4()));
+        let bundle = root.join("User Applications/Muse.app");
+        let binary = bundle.join("Contents/MacOS/Muse");
+        fs::create_dir_all(binary.parent().unwrap()).unwrap();
+        fs::write(&binary, b"fixture").unwrap();
+        let paths = config.paths.darwin.as_ref().unwrap();
+        let resolved = super::resolve_install_directory(&bundle, paths).unwrap();
+        assert_eq!(
+            fs::canonicalize(resolved).unwrap(),
+            fs::canonicalize(&binary).unwrap()
+        );
+        fs::remove_file(&binary).unwrap();
+        assert!(super::resolve_install_directory(&bundle, paths).is_none());
+        fs::remove_dir_all(root).unwrap();
     }
 
     fn v(items: &[&str]) -> Vec<String> {

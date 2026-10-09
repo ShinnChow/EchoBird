@@ -185,6 +185,10 @@ static BUNDLED: BundledAssets = BundledAssets {
             include_str!("../../docs/api/tools/install/manus.json"),
         ),
         ("cue", include_str!("../../docs/api/tools/install/cue.json")),
+        (
+            "muse",
+            include_str!("../../docs/api/tools/install/muse.json"),
+        ),
     ],
 };
 

@@ -117,7 +117,6 @@ const DESKTOP_ORDER: Record<string, number> = {
   chatgptdesktop: 1,
   geminidesktop: 2,
   kimidesktop: 3,
-  openscience: 4,
   coffeecli: 99,
 };
 
