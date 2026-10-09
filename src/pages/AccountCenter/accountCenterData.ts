@@ -36,6 +36,7 @@ export interface AccountProvider {
   busy: boolean;
   loading: boolean;
   remainingSeconds: number;
+  waitingLabel?: string;
   add: () => void;
   accounts: AccountCardData[];
 }
@@ -45,6 +46,7 @@ interface AccountGroup<A> {
   busy: boolean;
   loading: boolean;
   remainingSeconds: number;
+  awaitingClientExit?: boolean;
   refreshing: Set<string>;
   authorizationFailedIds: Set<string>;
   add: () => Promise<void>;
@@ -135,6 +137,7 @@ export function accountCenterProviders(
     busy: group.busy,
     loading: group.loading,
     remainingSeconds: group.remainingSeconds,
+    waitingLabel: group.awaitingClientExit ? t('agent.manusExitClient') : undefined,
     add: () => void group.add(),
     accounts: group.accounts.map((account) => ({
       id: account.id,

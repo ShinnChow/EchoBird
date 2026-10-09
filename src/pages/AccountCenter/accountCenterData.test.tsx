@@ -47,6 +47,25 @@ const providers = (state: AppManagerContextType) =>
   accountCenterProviders(state, (key) => key, 'en');
 
 describe('Account Center display data', () => {
+  it('shows the Manus exit instruction only during its native login capture stage', () => {
+    const state = context();
+    expect(providers(state).every((provider) => provider.waitingLabel === undefined)).toBe(true);
+    state.manusAccounts.awaitingClientExit = true;
+    state.manusAccounts.busy = true;
+    state.manusAccounts.remainingSeconds = 30;
+    const groups = providers(state);
+    expect(groups.find((provider) => provider.id === 'manus')).toMatchObject({
+      waitingLabel: 'agent.manusExitClient',
+      busy: true,
+      remainingSeconds: 30,
+    });
+    expect(
+      groups
+        .filter((provider) => provider.id !== 'manus')
+        .every((provider) => provider.waitingLabel === undefined)
+    ).toBe(true);
+  });
+
   it('replaces failed account quotas and balances with a short status while keeping identity and actions', () => {
     const state = context();
     state.codexAccounts = [

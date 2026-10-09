@@ -458,12 +458,16 @@ export interface ManusAccount extends GrokAccount {
 }
 export interface ManusLogin extends GrokLogin {
   verificationUri: string;
+}
+export interface ManusLoginPoll {
   account: ManusAccount | null;
+  awaitingClientExit: boolean;
+  expiresAt: number | null;
 }
 export function startManusLogin(): Promise<ManusLogin> {
   return invoke('start_manus_login');
 }
-export function pollManusLogin(loginId: string): Promise<ManusAccount | null> {
+export function pollManusLogin(loginId: string): Promise<ManusLoginPoll> {
   return invoke('poll_manus_login', { loginId });
 }
 export function cancelManusLogin(loginId: string): Promise<void> {

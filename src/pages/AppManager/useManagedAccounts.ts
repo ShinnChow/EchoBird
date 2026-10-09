@@ -18,7 +18,7 @@ export interface AccountClient<A extends ManagedAccount, L extends ManagedLogin>
   list: () => Promise<A[]>;
   start: () => Promise<L>;
   cancel: (id: string) => Promise<unknown>;
-  poll?: (id: string) => Promise<A | null>;
+  poll?: (id: string, nextStage: (expiresAt: number) => void) => Promise<A | null>;
   complete?: (id: string, code: string) => Promise<A>;
   open?: (login: L) => Promise<unknown>;
   captured?: (login: L) => A | null | undefined;
@@ -219,6 +219,8 @@ export function useManagedAccounts<A extends ManagedAccount, L extends ManagedLo
     setLoginError(null);
     setRemainingSeconds(60);
     let started: L | null = null;
+    let expires = Date.now() / 1000 + 60;
+    let continued = false;
     let ticker: ReturnType<typeof setInterval> | undefined;
     const expire = () => {
       if (!active()) return;
@@ -228,7 +230,16 @@ export function useManagedAccounts<A extends ManagedAccount, L extends ManagedLo
         void previous.client.cancel(previous.login.loginId).catch(() => {});
       showError(t('accountError.expired'));
     };
-    const deadline = setTimeout(expire, 60_000);
+    let deadline = setTimeout(expire, 60_000);
+    // A native handoff can start one new stage; repeated progress must not extend it.
+    const nextStage = (expiresAt: number) => {
+      if (!active() || continued) return;
+      continued = true;
+      expires = Math.min(expiresAt, Date.now() / 1000 + 60);
+      clearTimeout(deadline);
+      deadline = setTimeout(expire, Math.max(0, (expires - Date.now() / 1000) * 1000));
+      setRemainingSeconds(Math.max(0, Math.ceil(expires - Date.now() / 1000)));
+    };
     clearTimers.current = () => {
       clearTimeout(deadline);
       clearInterval(ticker);
@@ -246,7 +257,7 @@ export function useManagedAccounts<A extends ManagedAccount, L extends ManagedLo
         return;
       }
       setLogin(started);
-      const expires = Math.min(started.expiresAt, Date.now() / 1000 + 60);
+      expires = Math.min(started.expiresAt, expires);
       ticker = setInterval(() => {
         if (!active()) return;
         const seconds = Math.max(0, Math.ceil(expires - Date.now() / 1000));
@@ -256,7 +267,7 @@ export function useManagedAccounts<A extends ManagedAccount, L extends ManagedLo
       await adapter.open?.(started);
       if (adapter.complete) return; // Manual authorization code uses the same pending session.
       while (active() && Date.now() / 1000 < expires) {
-        const account = await adapter.poll!(started.loginId);
+        const account = await adapter.poll!(started.loginId, nextStage);
         if (!active()) return;
         if (account) {
           await finishLogin(account);

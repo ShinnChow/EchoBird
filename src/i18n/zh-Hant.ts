@@ -310,6 +310,7 @@ const zhHant: Partial<Translations> = {
   'agent.zcodeSwitchProvider': '切換登入平台（目前為 {provider}）',
   'agent.zcodeTrial': '體驗',
   'agent.waitingForBrowser': '等待瀏覽器操作({seconds})',
+  'agent.manusExitClient': '請手動結束 Manus({seconds})',
   'agent.refreshAccount': '重新整理帳號額度',
   'agent.baseCredits': '套餐基礎積分',
   'agent.baseCreditsReset': '下次刷新',

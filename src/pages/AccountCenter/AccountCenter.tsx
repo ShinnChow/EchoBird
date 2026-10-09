@@ -489,7 +489,7 @@ export function AccountCenterPanel() {
                   add={{
                     onClick: provider.add,
                     label: provider.busy
-                      ? t('agent.waitingForBrowser').replace(
+                      ? (provider.waitingLabel ?? t('agent.waitingForBrowser')).replace(
                           '{seconds}',
                           String(provider.remainingSeconds)
                         )
@@ -499,7 +499,7 @@ export function AccountCenterPanel() {
                   }}
                   secondary={
                     provider.busy ? (
-                      t('agent.waitingForBrowser').replace(
+                      (provider.waitingLabel ?? t('agent.waitingForBrowser')).replace(
                         '{seconds}',
                         String(provider.remainingSeconds)
                       )

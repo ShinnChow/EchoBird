@@ -323,6 +323,7 @@ const ja: Partial<Translations> = {
   'agent.zcodeSwitchProvider': 'ログイン先を切り替え（現在は {provider}）',
   'agent.zcodeTrial': '体験',
   'agent.waitingForBrowser': 'ブラウザ操作を待機中({seconds})',
+  'agent.manusExitClient': 'Manusを手動で終了({seconds})',
   'agent.refreshAccount': 'アカウントの使用量を更新',
   'agent.baseCredits': '基本クレジット',
   'agent.baseCreditsReset': '次回更新',

@@ -290,6 +290,7 @@ const zhHans: Partial<Translations> = {
   'agent.zcodeSwitchProvider': '切换登录平台（当前为 {provider}）',
   'agent.zcodeTrial': '体验',
   'agent.waitingForBrowser': '等待浏览器操作({seconds})',
+  'agent.manusExitClient': '请手动退出 Manus({seconds})',
   'agent.refreshAccount': '刷新账号额度',
   'agent.baseCredits': '套餐基础积分',
   'agent.baseCreditsReset': '下次刷新',

@@ -324,6 +324,7 @@ const en: Translations = {
   'agent.zcodeSwitchProvider': 'Switch login provider (currently {provider})',
   'agent.zcodeTrial': 'Trial',
   'agent.waitingForBrowser': 'Waiting for browser ({seconds})',
+  'agent.manusExitClient': 'Please quit Manus ({seconds})',
   'agent.refreshAccount': 'Refresh account quota',
   'agent.baseCredits': 'Base credits',
   'agent.baseCreditsReset': 'Next reset',

@@ -269,6 +269,7 @@ export type TKey =
   | 'agent.zcodeSwitchProvider'
   | 'agent.zcodeTrial'
   | 'agent.waitingForBrowser'
+  | 'agent.manusExitClient'
   | 'agent.refreshAccount'
   | 'agent.baseCredits'
   | 'agent.baseCreditsReset'

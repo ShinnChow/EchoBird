@@ -858,7 +858,7 @@ pub async fn start_manus_login() -> Result<crate::services::manus_accounts::Logi
 #[tauri::command]
 pub async fn poll_manus_login(
     login_id: String,
-) -> Result<Option<crate::services::manus_accounts::Account>, String> {
+) -> Result<crate::services::manus_accounts::LoginPoll, String> {
     crate::services::manus_accounts::poll_login(&login_id).await
 }
 #[tauri::command]

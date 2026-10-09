@@ -13,6 +13,7 @@ export const ManusAccountSection: React.FC = () => {
         busy={manusAccounts.busy}
         disabled={isLaunching}
         remainingSeconds={manusAccounts.remainingSeconds}
+        waitingLabel={manusAccounts.awaitingClientExit ? t('agent.manusExitClient') : undefined}
         onClick={() => void manusAccounts.add()}
       />
       {manusAccounts.accounts.length > 0 && (

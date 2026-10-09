@@ -10,10 +10,20 @@ export const AccountSectionButton: React.FC<{
   disabled?: boolean;
   colorClassName?: string;
   secondary?: React.ReactNode;
-}> = ({ iconSrc, busy, remainingSeconds, onClick, disabled, colorClassName = '', secondary }) => {
+  waitingLabel?: string;
+}> = ({
+  iconSrc,
+  busy,
+  remainingSeconds,
+  onClick,
+  disabled,
+  colorClassName = '',
+  secondary,
+  waitingLabel,
+}) => {
   const { t } = useI18n();
   const label = busy
-    ? t('agent.waitingForBrowser').replace('{seconds}', String(remainingSeconds))
+    ? (waitingLabel ?? t('agent.waitingForBrowser')).replace('{seconds}', String(remainingSeconds))
     : t('agent.addCurrentAccount');
   if (secondary) {
     return (
@@ -48,11 +58,7 @@ export const AccountSectionButton: React.FC<{
     >
       <span className="flex translate-y-px items-center gap-2.5">
         <img src={iconSrc} alt="" className="h-6 w-6" />
-        <span>
-          {busy
-            ? t('agent.waitingForBrowser').replace('{seconds}', String(remainingSeconds))
-            : t('agent.addCurrentAccount')}
-        </span>
+        <span>{label}</span>
       </span>
     </button>
   );
