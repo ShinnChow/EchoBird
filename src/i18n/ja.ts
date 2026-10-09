@@ -121,6 +121,12 @@ const ja: Partial<Translations> = {
   'freeModels.disclaimer':
     '無料枠や利用条件は変更される場合があります。利用前にプロバイダーの最新条件をご確認ください。',
   'freeModels.router.title': '切替不要ルーター',
+  'freeModels.view.smart': 'スマート',
+  'freeModels.view.super': 'スーパー',
+  'freeModels.super.title': '切替不要スーパールーター',
+  'freeModels.super.description':
+    '主モデルが AI アプリに接続し、ルーティング時に他のモデルへタスクを割り当てます。例えば Claude Code や Codex でタスクを送信すると、各モデルが独立してタスクに取り組みます。すべてのモデルの処理が完了すると、主モデルが結果を集約し、相互に検証して各モデルの長所を組み合わせ、最終的な計画をまとめて実行します。複雑なタスクでは、こうした協働によって単一の最先端モデルの能力を超える可能性がありますが、Token の消費量と利用コストも大幅に増加します。',
+  'freeModels.super.unavailable': '（開発・検証中のため、現在は利用できません）',
   'freeModels.router.disabled': '無効',
   'freeModels.router.enabled': '有効',
   'freeModels.router.waiting': 'モデルの追加待ち',

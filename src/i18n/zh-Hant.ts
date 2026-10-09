@@ -113,6 +113,12 @@ const zhHant: Partial<Translations> = {
   'freeModels.updated': '目錄更新',
   'freeModels.disclaimer': '免費額度與使用條件可能隨時變更，正式使用前請確認服務商最新規則。',
   'freeModels.router.title': '免切換智能路由',
+  'freeModels.view.smart': '智能',
+  'freeModels.view.super': '超級',
+  'freeModels.super.title': '免切換超級路由',
+  'freeModels.super.description':
+    '由一個主模型對接 AI 應用，並在路由階段將任務分配給其他模型。例如，在 Claude Code 或 Codex 中提交任務後，各模型將獨立完成任務。待所有模型完成後，主模型會彙總所有結果，交叉評估並整合各方優勢，形成並執行最終方案。多模型協作有望在複雜任務中突破單一頂尖模型的能力邊界，但也會顯著增加 Token 消耗和使用成本。',
+  'freeModels.super.unavailable': '（開發調試中，暫不可用）',
   'freeModels.router.disabled': '未啟用',
   'freeModels.router.enabled': '已啟用',
   'freeModels.router.waiting': '等待新增模型',

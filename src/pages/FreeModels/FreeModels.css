@@ -11,6 +11,62 @@
   border: 1px solid rgb(var(--border-rgb) / 0.7);
 }
 
+.super-router {
+  container-type: inline-size;
+  padding-inline: 20px;
+}
+
+.super-router-header {
+  display: grid;
+  grid-template-columns: minmax(0, 380px) minmax(0, 250px);
+  justify-content: center;
+  align-items: center;
+  column-gap: 70px;
+}
+
+.super-router-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 44px;
+  margin-top: 64px;
+}
+
+.super-router .free-model-route-node {
+  animation: none;
+}
+
+.super-router .free-model-route-node:hover {
+  background: rgb(var(--bg-surface-rgb));
+}
+
+@container (max-width: 700px) {
+  .super-router-header {
+    column-gap: 32px;
+    grid-template-columns: minmax(0, 1.52fr) minmax(0, 1fr);
+  }
+}
+
+@container (max-width: 580px) {
+  .super-router-header {
+    column-gap: 24px;
+  }
+
+  .super-router-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (max-width: 380px) {
+  .super-router-header {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 32px;
+  }
+
+  .super-router-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .free-model-route-path {
   fill: none;
   stroke: rgb(var(--free-model-route-rgb));
