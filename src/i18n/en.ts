@@ -52,7 +52,7 @@ const en: Translations = {
   'accountCenter.empty': 'No saved accounts',
   'accountCenter.loading': 'Loading accounts',
   'accountCenter.website': 'Open {name} website',
-  'accountCenter.subscriptionProviders': 'Top-up services',
+  'accountCenter.subscriptionProviders': 'Account & subscription providers',
   'accountCenter.noSubscriptionProviders': 'No providers listed yet',
   'accountCenter.claimAll': 'Claim all rewards',
   'accountCenter.refreshAll': 'Refresh quotas',

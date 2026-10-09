@@ -47,7 +47,7 @@ const zhHant: Partial<Translations> = {
   'accountCenter.empty': '暫無已儲存帳號',
   'accountCenter.loading': '正在載入帳號',
   'accountCenter.website': '開啟 {name} 官網',
-  'accountCenter.subscriptionProviders': '代儲值服務商',
+  'accountCenter.subscriptionProviders': '帳號及訂閱服務商',
   'accountCenter.noSubscriptionProviders': '暫未收錄',
   'accountCenter.claimAll': '一鍵領取獎勵',
   'accountCenter.refreshAll': '重新整理額度',

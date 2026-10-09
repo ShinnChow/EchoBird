@@ -45,7 +45,7 @@ const zhHans: Partial<Translations> = {
   'accountCenter.empty': '暂无已保存账号',
   'accountCenter.loading': '正在加载账号',
   'accountCenter.website': '打开 {name} 官网',
-  'accountCenter.subscriptionProviders': '代充值服务商',
+  'accountCenter.subscriptionProviders': '账号及订阅服务商',
   'accountCenter.noSubscriptionProviders': '暂未收录',
   'accountCenter.claimAll': '一键领取奖励',
   'accountCenter.refreshAll': '刷新额度',

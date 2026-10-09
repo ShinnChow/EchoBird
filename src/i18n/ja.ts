@@ -54,7 +54,7 @@ const ja: Partial<Translations> = {
   'accountCenter.empty': '保存済みアカウントはありません',
   'accountCenter.loading': 'アカウントを読み込み中',
   'accountCenter.website': '{name} の公式サイトを開く',
-  'accountCenter.subscriptionProviders': 'チャージ代行',
+  'accountCenter.subscriptionProviders': 'アカウント・サブスク事業者',
   'accountCenter.noSubscriptionProviders': '未掲載',
   'accountCenter.claimAll': '報酬を一括受取',
   'accountCenter.refreshAll': '利用枠を更新',
