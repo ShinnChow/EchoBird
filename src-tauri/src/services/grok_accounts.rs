@@ -10,7 +10,10 @@ use std::{
 
 static PENDING: OnceLock<Mutex<Option<Pending>>> = OnceLock::new();
 static ACCOUNT_LOCK: Mutex<()> = Mutex::new(());
+static REFRESH_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 const LOGIN_TIMEOUT: i64 = 60;
+const SETTINGS_URL: &str = "https://cli-chat-proxy.grok.com/v1/settings";
+const TOKEN_URL: &str = "https://auth.x.ai/oauth2/token";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -109,12 +112,17 @@ fn save_at(dir: &std::path::Path, key: &str, auth: &Value) -> Result<Account, St
             a.id = legacy_id;
         }
     }
+    let path = dir.join(format!("{}.json", a.id));
+    if path.exists() {
+        let previous: Saved = super::cursor_auth::read(&path)?;
+        a.plan = previous.summary.plan;
+    }
     let saved = Saved {
         summary: a.clone(),
         key: key.into(),
         auth: auth[key].clone(),
     };
-    super::cursor_auth::write(&dir.join(format!("{}.json", a.id)), &saved)?;
+    super::cursor_auth::write(&path, &saved)?;
     Ok(a)
 }
 fn sync_native(saved: &mut Saved, current: &Value) -> Result<bool, String> {
@@ -124,11 +132,27 @@ fn sync_native(saved: &mut Saved, current: &Value) -> Result<bool, String> {
     let snapshot = serde_json::json!({saved.key.clone(): saved.auth});
     let active =
         summary(&saved.key, current, false)?.id == summary(&saved.key, &snapshot, false)?.id;
-    if active {
+    let timestamp = |auth: &Value, field: &str| {
+        auth[field]
+            .as_str()
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+    };
+    // A stale native file must not roll back a refresh token rotated by EchoBird.
+    let native_is_older = timestamp(&saved.auth, "create_time")
+        .zip(timestamp(&current[&saved.key], "create_time"))
+        .or_else(|| {
+            timestamp(&saved.auth, "expires_at").zip(timestamp(&current[&saved.key], "expires_at"))
+        })
+        .is_some_and(|(saved_time, native_time)| saved_time > native_time);
+    if active && !native_is_older {
         saved.auth = current[&saved.key].clone();
     }
     Ok(active)
 }
+
+#[cfg(test)]
+#[path = "grok_account_grade_tests.rs"]
+mod grade_tests;
 
 pub async fn start_login() -> Result<(String, i64), String> {
     let mut guard = PENDING
@@ -199,22 +223,15 @@ pub fn cancel_login(id: &str) -> Result<(), String> {
 }
 pub fn list() -> Result<Vec<Account>, String> {
     let _guard = ACCOUNT_LOCK.lock().map_err(|_| "accountError.busy")?;
-    let dir = store()?;
+    list_at(&store()?, &auth_path()?)
+}
+fn list_at(dir: &Path, native_path: &Path) -> Result<Vec<Account>, String> {
     if !dir.exists() {
         return Ok(Vec::new());
     }
     let mut out = Vec::new();
-    let current = read_auth().unwrap_or_else(|_| serde_json::json!({}));
-    let active_plan = home()
-        .ok()
-        .and_then(|h| fs::read_to_string(h.join(".grok/settings_cache.json")).ok())
-        .and_then(|s| serde_json::from_str::<Value>(&s).ok())
-        .and_then(|v| serde_json::from_str::<Value>(v.get("payload")?.as_str()?).ok())
-        .and_then(|v| {
-            v["settings"]["subscription_tier_display"]
-                .as_str()
-                .map(String::from)
-        });
+    let current: Value =
+        super::cursor_auth::read(native_path).unwrap_or_else(|_| serde_json::json!({}));
     for e in fs::read_dir(dir).map_err(|_| "accountError.read")? {
         let p = e.map_err(|_| "accountError.read")?.path();
         if p.extension().and_then(|x| x.to_str()) != Some("json") {
@@ -229,9 +246,6 @@ pub fn list() -> Result<Vec<Account>, String> {
         }
         let mut a = saved.summary;
         a.active = active;
-        if a.active {
-            a.plan = active_plan.clone();
-        }
         out.push(a)
     }
     out.sort_by(|a, b| a.email.cmp(&b.email));
@@ -258,10 +272,171 @@ pub async fn delete(id: &str) -> Result<(), String> {
 }
 
 pub async fn refresh(id: &str) -> Result<Account, String> {
-    list()?
-        .into_iter()
-        .find(|account| account.id == id)
-        .ok_or("accountError.invalidAccount".into())
+    let _refresh_guard = REFRESH_LOCK.lock().await;
+    refresh_at(&saved_path(id)?, &auth_path()?, SETTINGS_URL, TOKEN_URL).await
+}
+
+async fn request_settings(
+    client: &reqwest::Client,
+    url: &str,
+    auth: &Value,
+) -> Result<reqwest::Response, String> {
+    // Match GrokBuild's official GET /settings user-token authentication.
+    let mut request = client
+        .get(url)
+        .bearer_auth(auth["key"].as_str().ok_or("accountError.auth")?)
+        .header("X-XAI-Token-Auth", "xai-grok-cli")
+        .header(
+            "x-userid",
+            auth["user_id"].as_str().ok_or("accountError.auth")?,
+        )
+        .header("x-grok-client-identifier", "echobird")
+        .header("x-grok-client-mode", "headless");
+    if let Some(email) = auth["email"].as_str() {
+        request = request.header("x-email", email);
+    }
+    request
+        .send()
+        .await
+        .map_err(|_| "accountError.network".into())
+}
+
+async fn renew_auth(client: &reqwest::Client, url: &str, auth: &Value) -> Result<Value, String> {
+    // This integration captures the official xAI OAuth login, not custom issuers.
+    if auth["oidc_issuer"].as_str() != Some("https://auth.x.ai") {
+        return Err("accountError.auth".into());
+    }
+    let mut form = vec![
+        ("grant_type", "refresh_token"),
+        (
+            "refresh_token",
+            auth["refresh_token"].as_str().ok_or("accountError.auth")?,
+        ),
+        (
+            "client_id",
+            auth["oidc_client_id"].as_str().ok_or("accountError.auth")?,
+        ),
+    ];
+    for field in ["principal_type", "principal_id"] {
+        if let Some(value) = auth[field].as_str() {
+            form.push((field, value));
+        }
+    }
+    let response = client
+        .post(url)
+        .form(&form)
+        .send()
+        .await
+        .map_err(|_| "accountError.network")?;
+    let status = response.status();
+    let body = response.json::<Value>().await;
+    if !status.is_success() {
+        return Err(if matches!(status.as_u16(), 401 | 403)
+            || (status.as_u16() == 400
+                && body.as_ref().is_ok_and(|value| {
+                    matches!(
+                        value["error"].as_str(),
+                        Some("invalid_grant" | "invalid_client")
+                    )
+                })) {
+            "accountError.auth"
+        } else {
+            "accountError.network"
+        }
+        .into());
+    }
+    let body = body.map_err(|_| "accountError.format")?;
+    let mut renewed = auth.clone();
+    renewed["key"] = body["access_token"]
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .ok_or("accountError.format")?
+        .into();
+    if let Some(token) = body["refresh_token"].as_str().filter(|s| !s.is_empty()) {
+        renewed["refresh_token"] = token.into();
+    }
+    let now = chrono::Utc::now();
+    renewed["create_time"] = now.to_rfc3339().into();
+    renewed["expires_at"] = if let Some(seconds) = body["expires_in"].as_i64() {
+        now.checked_add_signed(chrono::Duration::try_seconds(seconds).ok_or("accountError.format")?)
+            .ok_or("accountError.format")?
+            .to_rfc3339()
+            .into()
+    } else {
+        Value::Null
+    };
+    Ok(renewed)
+}
+
+async fn refresh_at(
+    path: &Path,
+    native_path: &Path,
+    settings_url: &str,
+    token_url: &str,
+) -> Result<Account, String> {
+    let mut saved: Saved = {
+        let _guard = ACCOUNT_LOCK.lock().map_err(|_| "accountError.busy")?;
+        let mut saved: Saved = super::cursor_auth::read(path)?;
+        if let Ok(current) = super::cursor_auth::read(native_path) {
+            if sync_native(&mut saved, &current)? {
+                super::cursor_auth::write(path, &saved)?;
+            }
+        }
+        saved
+    };
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|_| "accountError.network")?;
+    let mut response = request_settings(&client, settings_url, &saved.auth).await?;
+    if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+        let renewed = renew_auth(&client, token_url, &saved.auth).await?;
+        {
+            let _guard = ACCOUNT_LOCK.lock().map_err(|_| "accountError.busy")?;
+            let latest: Saved = super::cursor_auth::read(path)?;
+            if latest.auth != saved.auth {
+                return Err("accountError.cancelled".into());
+            }
+            let old_token = saved.auth["key"].clone();
+            saved.auth = renewed;
+            // Persist rotation before querying settings, even if that query later fails.
+            super::cursor_auth::write(path, &saved)?;
+            if let Ok(mut current) = super::cursor_auth::read::<Value>(native_path) {
+                let mut original = saved.clone();
+                original.auth = latest.auth;
+                if sync_native(&mut original, &current)? && current[&saved.key]["key"] == old_token
+                {
+                    current[&saved.key] = saved.auth.clone();
+                    super::cursor_auth::write(native_path, &current)?;
+                }
+            }
+        }
+        response = request_settings(&client, settings_url, &saved.auth).await?;
+    }
+    if matches!(response.status().as_u16(), 401 | 403) {
+        return Err("accountError.auth".into());
+    }
+    if !response.status().is_success() {
+        return Err("accountError.network".into());
+    }
+    let settings: Value = response.json().await.map_err(|_| "accountError.format")?;
+    let plan = settings["subscription_tier_display"]
+        .as_str()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or("accountError.format")?;
+    let _guard = ACCOUNT_LOCK.lock().map_err(|_| "accountError.busy")?;
+    let mut latest: Saved = super::cursor_auth::read(path)?;
+    latest.summary.plan = Some(plan.into());
+    super::cursor_auth::write(path, &latest)?;
+    let active = super::cursor_auth::read::<Value>(native_path)
+        .ok()
+        .map(|current| sync_native(&mut latest, &current))
+        .transpose()?
+        .unwrap_or(false);
+    latest.summary.active = active;
+    Ok(latest.summary)
 }
 
 #[cfg(test)]

@@ -92,6 +92,24 @@ describe('Grok Build account lifecycle', () => {
     vi.mocked(api.switchGrokAccount).mockRejectedValue(new Error('accountError.write'));
     await expect(state.switchAccount()).rejects.toThrow('accountError.write');
   });
+  it('refreshes only the requested tier and preserves it when a later refresh fails', async () => {
+    const unknown = { ...account, plan: null };
+    const other = { ...account, id: 'two', email: 'two@example.test', active: false };
+    vi.mocked(api.listGrokAccounts).mockResolvedValue([unknown, other]);
+    await mount();
+    expect(api.refreshGrokAccount).not.toHaveBeenCalled();
+    const selected = state.selectedId;
+    vi.mocked(api.refreshGrokAccount).mockResolvedValueOnce({ ...unknown, plan: 'Free' });
+    await act(async () => state.refresh(unknown));
+    expect(api.refreshGrokAccount).toHaveBeenCalledWith(unknown.id);
+    expect(state.accounts).toEqual([{ ...unknown, plan: 'Free' }, other]);
+    expect(state.selectedId).toBe(selected);
+    expect(api.switchGrokAccount).not.toHaveBeenCalled();
+    vi.mocked(api.refreshGrokAccount).mockRejectedValueOnce(new Error('accountError.network'));
+    await act(async () => state.refresh(state.accounts[0]));
+    expect(state.accounts).toEqual([{ ...unknown, plan: 'Free' }, other]);
+    expect(showError).toHaveBeenCalledWith('accountError.network');
+  });
   it('keeps cached accounts without a dialog when returning to unreadable local state', async () => {
     await mount();
     act(() => renderer.update(<Harness enabled={false} />));
