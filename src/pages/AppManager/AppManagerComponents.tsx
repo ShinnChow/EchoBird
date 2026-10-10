@@ -33,7 +33,7 @@ import {
   sortableKeyboardCoordinates,
   arrayMove,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { useIsomorphicLayoutEffect } from '@dnd-kit/utilities';
 import { Box as BoxIcon, ExternalLink, RefreshCw, Settings } from 'lucide-react';
 import { getModelIcon, EffortPulse } from '../../components';
 import { useConfirm } from '../../components/ConfirmDialog';
@@ -225,7 +225,7 @@ const DesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick, drag
   );
 };
 
-// Sortable wrapper for installed icons — drag to rearrange the desktop.
+// Sortable wrapper shared by My and Store icons.
 // The wrapper is the grid item; the tile inside fills it (w-full) so the
 // drag handles and the click-to-select behavior stay aligned.
 const SortableDesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onClick }) => {
@@ -233,7 +233,8 @@ const SortableDesktopIcon: React.FC<DesktopIconProps> = ({ tool, selected, onCli
     id: tool.id,
   });
   const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
+    // Keep fractional grid coordinates so committing the order does not nudge icons.
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     transition,
     // While dragging, fade the item at its sort position into a translucent
     // placeholder — that's the insertion indicator — while the DragOverlay
@@ -263,20 +264,26 @@ export const AppManagerMain: React.FC = () => {
   const categoryTabsRef = useRef<HTMLDivElement>(null);
   const categoryUnderlineRef = useRef<HTMLSpanElement>(null);
 
-  // User-set order for installed icons, persisted across sessions. Tools not
-  // in the saved order (newly installed) sink below the ordered ones.
-  const [toolOrder, setToolOrder] = useState<string[]>(() => {
-    try {
-      const v = localStorage.getItem('echobird_appmgr_tool_order');
-      return v ? (JSON.parse(v) as string[]) : [];
-    } catch {
-      return [];
-    }
+  // Persist My and Store orders separately; retain the existing My key.
+  const orderKeys = {
+    desktop: 'echobird_appmgr_tool_order',
+    install: 'echobird_appmgr_store_order',
+  };
+  const [toolOrders, setToolOrders] = useState(() => {
+    const readOrder = (key: string): string[] => {
+      try {
+        const v = localStorage.getItem(key);
+        return v ? (JSON.parse(v) as string[]) : [];
+      } catch {
+        return [];
+      }
+    };
+    return { desktop: readOrder(orderKeys.desktop), install: readOrder(orderKeys.install) };
   });
   const saveToolOrder = (ids: string[]) => {
-    setToolOrder(ids);
+    setToolOrders((prev) => ({ ...prev, [viewMode]: ids }));
     try {
-      localStorage.setItem('echobird_appmgr_tool_order', JSON.stringify(ids));
+      localStorage.setItem(orderKeys[viewMode], JSON.stringify(ids));
     } catch {
       /* private mode */
     }
@@ -294,39 +301,32 @@ export const AppManagerMain: React.FC = () => {
   // Apply the saved order on top of the default sort: known ids first in
   // saved order, then any freshly-detected tools in default order.
   const installedOrdered = useMemo(() => {
-    const orderIndex = new Map(toolOrder.map((id, i) => [id, i]));
+    const orderIndex = new Map(toolOrders.desktop.map((id, i) => [id, i]));
     const known = installed.filter((t) => orderIndex.has(t.id));
     const unknown = installed.filter((t) => !orderIndex.has(t.id));
     known.sort((a, b) => orderIndex.get(a.id)! - orderIndex.get(b.id)!);
     return [...known, ...unknown];
-  }, [installed, toolOrder]);
+  }, [installed, toolOrders.desktop]);
 
-  // Drag-reorder for installed icons — pointer with a 5px activation so
+  // Shared drag-reorder — pointer with a 5px activation so
   // plain clicks still select; keyboard for a11y. On drop, reorder in place
-  // and persist the full visible order (best-effort; a failed write just
+  // and persist the full view order (best-effort; a failed write just
   // reverts on next reload).
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const dropPositions = useRef<Map<string, DOMRect> | null>(null);
+  const dropAnimations = useRef<Animation[]>([]);
 
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveDragId(String(event.active.id));
-  };
-  const handleDragEnd = (event: DragEndEvent) => {
+  const dragScope = `${viewMode}:${activeUninstalledCat}`;
+  const [previousDragScope, setPreviousDragScope] = useState(dragScope);
+  if (previousDragScope !== dragScope) {
+    setPreviousDragScope(dragScope);
     setActiveDragId(null);
-    const activeId = String(event.active.id);
-    const overId = String(event.over?.id ?? '');
-    if (!overId || activeId === overId) return;
-    const oldIndex = installedOrdered.findIndex((t) => t.id === activeId);
-    const newIndex = installedOrdered.findIndex((t) => t.id === overId);
-    if (oldIndex < 0 || newIndex < 0) return;
-    saveToolOrder(arrayMove(installedOrdered, oldIndex, newIndex).map((t) => t.id));
-  };
-  const handleDragCancel = () => setActiveDragId(null);
-
-  const activeDragTool = activeDragId ? installed.find((t) => t.id === activeDragId) : undefined;
+  }
 
   // Category tabs present among the uninstalled apps: the canonical order
   // first, then any unknown categories alphabetically.
@@ -374,14 +374,13 @@ export const AppManagerMain: React.FC = () => {
     };
   }, [activeUninstalledCat, uninstalledCats, viewMode, t]);
 
-  // Apps shown under the active tab. AI-installable first, then the
-  // within-category tiebreaker, then name.
-  const visibleUninstalled = useMemo(() => {
-    const list =
-      activeUninstalledCat === 'ALL'
-        ? uninstalled
-        : uninstalled.filter((t) => t.category === activeUninstalledCat);
-    return [...list].sort((a, b) => {
+  // Saved Store order first; otherwise keep the existing default sort.
+  const uninstalledOrdered = useMemo(() => {
+    const orderIndex = new Map(toolOrders.install.map((id, i) => [id, i]));
+    return [...uninstalled].sort((a, b) => {
+      const aOrder = orderIndex.get(a.id) ?? Infinity;
+      const bOrder = orderIndex.get(b.id) ?? Infinity;
+      if (aOrder !== bOrder) return aOrder - bOrder;
       const aAi = aiInstallableIds.includes(a.id) ? 0 : 1;
       const bAi = aiInstallableIds.includes(b.id) ? 0 : 1;
       if (aAi !== bAi) return aAi - bAi;
@@ -389,18 +388,108 @@ export const AppManagerMain: React.FC = () => {
       if (rankDiff !== 0) return rankDiff;
       return a.name.localeCompare(b.name);
     });
-  }, [uninstalled, activeUninstalledCat, aiInstallableIds]);
+  }, [uninstalled, aiInstallableIds, toolOrders.install]);
 
-  const renderIcon = (tool: LocalTool) => (
-    <DesktopIcon
-      key={tool.id}
-      tool={tool}
-      selected={selectedTool === tool.id}
-      onClick={() => setSelectedTool(tool.id)}
-    />
+  const visibleUninstalled =
+    activeUninstalledCat === 'ALL'
+      ? uninstalledOrdered
+      : uninstalledOrdered.filter((tool) => tool.category === activeUninstalledCat);
+  const orderedTools = viewMode === 'desktop' ? installedOrdered : uninstalledOrdered;
+  const visibleTools = viewMode === 'desktop' ? installedOrdered : visibleUninstalled;
+  const activeDragTool = visibleTools.find((tool) => tool.id === activeDragId);
+
+  useEffect(
+    () => () => {
+      dropPositions.current = null;
+      dropAnimations.current.forEach((animation) => animation.cancel());
+      dropAnimations.current = [];
+    },
+    [dragScope]
   );
 
+  useIsomorphicLayoutEffect(() => {
+    const positions = dropPositions.current;
+    dropPositions.current = null;
+    if (!positions || !gridRef.current) return;
+    dropAnimations.current.forEach((animation) => animation.cancel());
+    dropAnimations.current = [];
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    Array.from(gridRef.current.children).forEach((element, index) => {
+      const before = positions.get(visibleTools[index].id);
+      if (!before) return;
+      const after = element.getBoundingClientRect();
+      const x = before.left - after.left;
+      const y = before.top - after.top;
+      if (Math.abs(x) < 0.01 && Math.abs(y) < 0.01) return;
+      // Finish an in-flight insertion from its visible position, not its old grid cell.
+      dropAnimations.current.push(
+        element.animate(
+          [{ transform: `translate3d(${x}px, ${y}px, 0)` }, { transform: 'translate3d(0, 0, 0)' }],
+          { duration: 200, easing: 'ease' }
+        )
+      );
+    });
+  }, [visibleTools]);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    dropAnimations.current.forEach((animation) => animation.cancel());
+    dropAnimations.current = [];
+    setActiveDragId(String(event.active.id));
+  };
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragId(null);
+    const activeId = String(event.active.id);
+    const overId = String(event.over?.id ?? '');
+    if (!overId || activeId === overId) return;
+    const oldIndex = visibleTools.findIndex((tool) => tool.id === activeId);
+    const newIndex = visibleTools.findIndex((tool) => tool.id === overId);
+    if (oldIndex < 0 || newIndex < 0) return;
+    dropPositions.current = new Map(
+      Array.from(gridRef.current?.children ?? []).flatMap((element, index) =>
+        index === oldIndex ? [] : [[visibleTools[index].id, element.getBoundingClientRect()]]
+      )
+    );
+    const reordered = arrayMove(visibleTools, oldIndex, newIndex).map((tool) => tool.id);
+    const visibleIds = new Set(reordered);
+    let index = 0;
+    // A category drag replaces only its visible slots in the full Store order.
+    saveToolOrder(
+      orderedTools.map((tool) => (visibleIds.has(tool.id) ? reordered[index++] : tool.id))
+    );
+  };
+  const handleDragCancel = () => setActiveDragId(null);
+
   const gridClass = 'grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-2 gap-y-4';
+  const sortableGrid = (
+    <DndContext
+      key={dragScope}
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <SortableContext items={visibleTools.map((tool) => tool.id)} strategy={rectSortingStrategy}>
+        <div ref={gridRef} className={gridClass}>
+          {visibleTools.map((tool) => (
+            <SortableDesktopIcon
+              key={tool.id}
+              tool={tool}
+              selected={selectedTool === tool.id}
+              onClick={() => setSelectedTool(tool.id)}
+            />
+          ))}
+        </div>
+      </SortableContext>
+      <DragOverlay>
+        {activeDragTool && (
+          <div className="pointer-events-none opacity-70 scale-105 drop-shadow-lg">
+            <DesktopIcon tool={activeDragTool} selected={false} onClick={() => {}} />
+          </div>
+        )}
+      </DragOverlay>
+    </DndContext>
+  );
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -419,40 +508,7 @@ export const AppManagerMain: React.FC = () => {
       ) : (
         <div key={viewMode} className="flex-1 overflow-y-auto">
           {/* Installed — flat draggable grid, no section header (per spec) */}
-          {viewMode === 'desktop' && installedOrdered.length > 0 && (
-            <div>
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-                onDragCancel={handleDragCancel}
-              >
-                <SortableContext
-                  items={installedOrdered.map((t) => t.id)}
-                  strategy={rectSortingStrategy}
-                >
-                  <div className={gridClass}>
-                    {installedOrdered.map((tool) => (
-                      <SortableDesktopIcon
-                        key={tool.id}
-                        tool={tool}
-                        selected={selectedTool === tool.id}
-                        onClick={() => setSelectedTool(tool.id)}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
-                <DragOverlay>
-                  {activeDragTool && (
-                    <div className="pointer-events-none opacity-70 scale-105 drop-shadow-lg">
-                      <DesktopIcon tool={activeDragTool} selected={false} onClick={() => {}} />
-                    </div>
-                  )}
-                </DragOverlay>
-              </DndContext>
-            </div>
-          )}
+          {viewMode === 'desktop' && installedOrdered.length > 0 && <div>{sortableGrid}</div>}
 
           {/* Install view — category tabs filter the uninstalled apps. */}
           {viewMode === 'install' && uninstalled.length > 0 && (
@@ -490,7 +546,7 @@ export const AppManagerMain: React.FC = () => {
                   style={{ visibility: 'hidden' }}
                 />
               </div>
-              <div className={gridClass}>{visibleUninstalled.map(renderIcon)}</div>
+              {sortableGrid}
             </section>
           )}
           {(viewMode === 'desktop' ? installed.length === 0 : uninstalled.length === 0) && (
