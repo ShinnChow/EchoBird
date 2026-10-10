@@ -1010,7 +1010,7 @@ export const AppManagerPanel: React.FC = () => {
                   }}
                   className="inline-flex max-w-full items-center gap-2 rounded-md border border-cyber-border/50 bg-cyber-surface px-3 py-2 text-xs text-cyber-text-secondary transition-colors hover:border-cyber-accent/40 hover:bg-cyber-accent/5 hover:text-cyber-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyber-accent"
                 >
-                  <span className="min-w-0 break-all">
+                  <span className="min-w-0 truncate">
                     {selectedToolData.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}
                   </span>
                   <ExternalLink size={13} className="flex-shrink-0" aria-hidden="true" />
