@@ -1,6 +1,6 @@
 {
-  "version": "5.9.0",
-  "releaseDate": "2026-10-09",
+  "version": "5.9.1",
+  "releaseDate": "2026-10-10",
   "releaseNotes": "迎接云端 AI 时代，EchoBird 已支持全球五款主流云端 Agent：Grok Bot、Manus、Cue、Muse、Dot（ChatGPT 内置）！\n\n## 本次更新\n\n- 以用户体验为第一，大幅优化 UI 设计，增加丰富而精致的交互动画。\n- 修复 WorkBuddy 在 macOS 上的应用识别与启动问题。",
   "releaseNotesI18n": {
     "zh-cn": "迎接云端 AI 时代，EchoBird 已支持全球五款主流云端 Agent：Grok Bot、Manus、Cue、Muse、Dot（ChatGPT 内置）！\n\n## 本次更新\n\n- 以用户体验为第一，大幅优化 UI 设计，增加丰富而精致的交互动画。\n- 修复 WorkBuddy 在 macOS 上的应用识别与启动问题。",
