@@ -6,6 +6,21 @@ use std::process::Command;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+#[cfg(any(not(windows), test))]
+fn executable_process_pattern(path: &str) -> String {
+    let escaped: String = path
+        .chars()
+        .flat_map(|c| {
+            if "\\.^$|?*+()[]{}".contains(c) {
+                vec!['\\', c]
+            } else {
+                vec![c]
+            }
+        })
+        .collect();
+    format!("^{escaped}($| )")
+}
+
 /// Process info for a running tool
 #[derive(Debug, Clone)]
 struct ProcessInfo {
@@ -934,7 +949,7 @@ impl ProcessManager {
         Ok(())
     }
 
-    /// Kill every running instance of a desktop tool — by process image name
+    /// Kill every running instance of a desktop tool — by process image name or path
     /// (so it also catches an instance the USER launched, which we have no
     /// tracked PID for) and by dropping our own tracked PID. Returns true if
     /// anything was killed. Desktop-only: callers gate on
@@ -946,11 +961,23 @@ impl ProcessManager {
         // kill below terminates that process anyway.
         self.processes.remove(tool_id);
 
-        // The CN and Global builds have the same process name, so restarting
-        // one edition must match its executable path rather than killing both.
-        if tool_id == "minimaxdesktop" {
+        // MiniMax editions share a process name; macOS WorkBuddy shares Electron
+        // with unrelated apps. Match these clients by their executable path.
+        if tool_id == "minimaxdesktop"
+            || (cfg!(target_os = "macos") && matches!(tool_id, "workbuddy" | "workbuddyai"))
+        {
             let Some(path) = crate::services::tool_manager::get_tool_exe_path(tool_id) else {
                 return false;
+            };
+            #[cfg(target_os = "macos")]
+            let path = if matches!(tool_id, "workbuddy" | "workbuddyai") {
+                // Also handle the legacy WorkBuddy -> Electron symlink workaround.
+                let Ok(path) = std::fs::canonicalize(path) else {
+                    return false;
+                };
+                path.to_string_lossy().into_owned()
+            } else {
+                path
             };
             #[cfg(windows)]
             {
@@ -961,18 +988,8 @@ impl ProcessManager {
             }
             #[cfg(not(windows))]
             {
-                let escaped: String = path
-                    .chars()
-                    .flat_map(|c| {
-                        if "\\.^$|?*+()[]{}".contains(c) {
-                            vec!['\\', c]
-                        } else {
-                            vec![c]
-                        }
-                    })
-                    .collect();
                 return crate::utils::process::command("pkill")
-                    .args(["-f", &format!("^{escaped}($| )")])
+                    .args(["-f", &executable_process_pattern(&path)])
                     .output()
                     .is_ok_and(|out| out.status.success());
             }
@@ -1351,6 +1368,35 @@ mod tests {
 
     #[cfg(windows)]
     use super::openscience_windows_data_dir_for;
+
+    #[test]
+    fn workbuddy_process_matching_is_scoped_to_the_resolved_executable() {
+        for path in [
+            "/Applications/WorkBuddy.app/Contents/MacOS/Electron",
+            "/Applications/WorkBuddy AI.app/Contents/MacOS/Electron",
+            "/Users/alice/Apps/WorkBuddy (test)+[1].app/Contents/MacOS/Electron",
+        ] {
+            let pattern = regex::Regex::new(&super::executable_process_pattern(path)).unwrap();
+            assert!(pattern.is_match(path));
+            assert!(pattern.is_match(&format!("{path} --remote-debugging-port=9222")));
+            for other in [
+                "Electron",
+                "/Applications/Other.app/Contents/MacOS/Electron",
+                "/Applications/WorkBuddy.app/Contents/MacOS/Electron",
+                "/Applications/WorkBuddy AI.app/Contents/MacOS/Electron",
+            ] {
+                if other != path {
+                    assert!(
+                        !pattern.is_match(other),
+                        "matched unrelated client: {other}"
+                    );
+                }
+            }
+            assert!(!pattern.is_match(&format!("{path}-other")));
+            assert!(!pattern.is_match(&format!("/other{path}")));
+            assert!(!pattern.is_match(&path.replace(".app", "Xapp")));
+        }
+    }
 
     #[test]
     fn codex_provider_classification_uses_domain_boundaries() {

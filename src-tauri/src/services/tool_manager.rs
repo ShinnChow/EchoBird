@@ -1666,6 +1666,23 @@ fn resolve_install_directory(hit_path: &Path, platform_paths: &[String]) -> Opti
         };
         let mut names = filenames_of(platform_paths);
         if hit_path.extension().is_some_and(|ext| ext == "app") {
+            // Electron bundles may use a different executable name than the app.
+            if let Some(name) = plist::Value::from_file(hit_path.join("Contents/Info.plist"))
+                .ok()
+                .and_then(|info| {
+                    info.as_dictionary()?
+                        .get("CFBundleExecutable")?
+                        .as_string()
+                        .map(str::to_owned)
+                })
+            {
+                let mut components = Path::new(&name).components();
+                if matches!(components.next(), Some(std::path::Component::Normal(_)))
+                    && components.next().is_none()
+                {
+                    names.insert(0, name);
+                }
+            }
             if let Some(name) = hit_path.file_stem().and_then(|s| s.to_str()) {
                 names.push(name.to_owned());
             }
@@ -1992,6 +2009,96 @@ mod tests {
     #[cfg(windows)]
     use super::is_windows_exe;
     use crate::models::tool::{PathsConfig, ToolCategory};
+
+    #[tokio::test]
+    async fn workbuddy_bundle_metadata_drives_detection_and_launch() {
+        let root = std::env::temp_dir().join(format!("workbuddy-bundle-{}", uuid::Uuid::new_v4()));
+        for (catalog, binary_plist) in [
+            (include_str!("../../../tools/workbuddy/paths.json"), false),
+            (include_str!("../../../tools/workbuddyai/paths.json"), true),
+        ] {
+            let mut definition: PathsConfig = serde_json::from_str(catalog).unwrap();
+            let bundle = root.join(format!("User Applications/{}.app", definition.name));
+            let executable = bundle.join("Contents/MacOS").join("Electron");
+            std::fs::create_dir_all(executable.parent().unwrap()).unwrap();
+            std::fs::write(&executable, b"fixture").unwrap();
+            let mut info = plist::Dictionary::new();
+            info.insert("CFBundleExecutable".into(), "Electron".into());
+            let info = plist::Value::Dictionary(info);
+            let metadata = bundle.join("Contents/Info.plist");
+            if binary_plist {
+                info.to_file_binary(&metadata).unwrap();
+            } else {
+                info.to_file_xml(&metadata).unwrap();
+            }
+            let declared = definition.paths.darwin.as_ref().unwrap();
+            assert_eq!(
+                super::resolve_install_directory(&bundle, declared),
+                Some(executable.to_string_lossy().into_owned())
+            );
+            // The gear accepts a custom bundle path, including user Applications.
+            let paths = vec![bundle.to_string_lossy().into_owned()];
+            definition.paths.win32 = Some(paths.clone());
+            definition.paths.darwin = Some(paths.clone());
+            definition.paths.linux = Some(paths);
+            definition.install_hints = None;
+            definition.config_dir = bundle.to_string_lossy().into_owned();
+            let expected = Some(executable.to_string_lossy().into_owned());
+            assert_eq!(super::find_tool_executable(&definition, false), expected);
+            assert_eq!(super::find_tool_executable(&definition, true), expected);
+            assert_eq!(super::detect_tool(&definition).await, expected);
+            // A leftover bundle/config directory does not count as installed.
+            std::fs::remove_file(executable).unwrap();
+            assert!(super::find_tool_executable(&definition, true).is_none());
+            assert!(super::detect_tool(&definition).await.is_none());
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn bundle_metadata_preserves_legacy_fallback_and_rejects_path_traversal() {
+        let root = std::env::temp_dir().join(format!("bundle-metadata-{}", uuid::Uuid::new_v4()));
+        let bundle = root.join("Renamed.app");
+        let executable = bundle.join("Contents/MacOS").join("WorkBuddy");
+        std::fs::create_dir_all(executable.parent().unwrap()).unwrap();
+        std::fs::write(&executable, b"fixture").unwrap();
+        let metadata = bundle.join("Contents/Info.plist");
+        let declared = vec!["/Applications/WorkBuddy.app/Contents/MacOS/WorkBuddy".into()];
+        let electron = bundle.join("Contents/MacOS").join("Electron");
+        std::fs::write(&electron, b"fixture").unwrap();
+        let mut info = plist::Dictionary::new();
+        info.insert("CFBundleExecutable".into(), "Electron".into());
+        plist::Value::Dictionary(info)
+            .to_file_xml(&metadata)
+            .unwrap();
+        assert_eq!(
+            super::resolve_install_directory(&bundle, &declared),
+            Some(electron.to_string_lossy().into_owned())
+        );
+        std::fs::remove_file(electron).unwrap();
+        for name in ["Electron", "../outside", "/outside"] {
+            let mut info = plist::Dictionary::new();
+            info.insert("CFBundleExecutable".into(), name.into());
+            plist::Value::Dictionary(info)
+                .to_file_xml(&metadata)
+                .unwrap();
+            assert_eq!(
+                super::resolve_install_directory(&bundle, &declared),
+                Some(executable.to_string_lossy().into_owned())
+            );
+        }
+        std::fs::write(&metadata, b"malformed plist").unwrap();
+        assert!(super::resolve_install_directory(&bundle, &declared).is_some());
+        std::fs::write(bundle.join("Contents/outside"), b"fixture").unwrap();
+        let mut info = plist::Dictionary::new();
+        info.insert("CFBundleExecutable".into(), "../outside".into());
+        plist::Value::Dictionary(info)
+            .to_file_binary(&metadata)
+            .unwrap();
+        std::fs::remove_file(executable).unwrap();
+        assert!(super::resolve_install_directory(&bundle, &declared).is_none());
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     #[tokio::test]
     async fn detection_and_launch_share_custom_paths_and_reject_leftover_directories() {

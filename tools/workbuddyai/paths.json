@@ -16,6 +16,7 @@
             "%LOCALAPPDATA%\\Programs\\WorkBuddyAI\\WorkBuddyAI.exe"
         ],
         "darwin": [
+            "/Applications/WorkBuddy AI.app",
             "/Applications/WorkBuddy AI.app/Contents/MacOS/WorkBuddy AI"
         ],
         "linux": []

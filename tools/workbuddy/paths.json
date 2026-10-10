@@ -16,6 +16,7 @@
             "%LOCALAPPDATA%\\Programs\\WorkBuddy\\WorkBuddy.exe"
         ],
         "darwin": [
+            "/Applications/WorkBuddy.app",
             "/Applications/WorkBuddy.app/Contents/MacOS/WorkBuddy"
         ],
         "linux": []

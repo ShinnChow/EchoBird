@@ -43,6 +43,7 @@ tauri-plugin-window-state = "2"
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
+plist = "1"
 jsonc-parser = { version = "0.33.1", features = ["serde"] }
 # YAML read-merge-write for DeepSeek Harness (`~/.dsh/settings.yaml` +
 # `.credentials.yaml`). serde_yaml is archived; this is the maintained fork.
@@ -108,6 +109,9 @@ which = "8"
 # decompresses them to read the event log. Decode-only use, but the crate's
 # libzstd (zstd-sys, bundled C) is the standard multi-frame streaming decoder.
 zstd = "0.13.3"
+
+[dev-dependencies]
+regex = "1"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
