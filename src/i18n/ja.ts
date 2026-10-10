@@ -64,7 +64,7 @@ const ja: Partial<Translations> = {
   'nav.aiCareer': 'マイ AI キャリア',
   'nav.localServer': 'ローカル LLM',
   'nav.smartRouter': 'スマートルーター',
-  'nav.motherAgent': 'アシスタント',
+  'nav.motherAgent': 'AI アシスタント',
   'nav.feedback': 'アプリを提案',
   'nav.changelog': '更新履歴',
   'changelog.loading': '読み込み中…',
@@ -123,8 +123,8 @@ const ja: Partial<Translations> = {
     '無料枠や利用条件は変更される場合があります。利用前にプロバイダーの最新条件をご確認ください。',
   'freeModels.router.title': '切替不要ルーター',
   'freeModels.view.smart': 'スマート',
-  'freeModels.view.super': 'スーパー',
-  'freeModels.super.title': 'スーパールーター',
+  'freeModels.view.super': '編成',
+  'freeModels.super.title': 'モデル編成ルーター',
   'freeModels.super.description':
     '主モデルが AI アプリに接続し、ルーティング時に他のモデルへタスクを割り当てます。例えば Claude Code や Codex でタスクを送信すると、各モデルが独立してタスクに取り組みます。すべてのモデルの処理が完了すると、主モデルが結果を集約し、相互に検証して各モデルの長所を組み合わせ、最終的な計画をまとめて実行します。複雑なタスクでは、こうした協働によって単一の最先端モデルの能力を超える可能性がありますが、複数モデルの並列実行は Token の消費量と利用コストも何倍にも押し上げます。',
   'freeModels.super.unavailable': '（開発・検証中のため、現在は利用できません）',
@@ -485,7 +485,7 @@ const ja: Partial<Translations> = {
   'mother.contextUsage': 'コンテキスト使用量 {used}KB / {total}KB（{pct}%）',
   'terminal.thinking': '思考中',
   'ssh.winNote':
-    'Windows での SSH 展開は Linux / macOS より複雑です。サーバー側に EchoBird を先にインストールし、「インストール & 修復」から SSH を設定するのを推奨します。',
+    'Windows での SSH 展開は Linux / macOS より複雑です。サーバー側に EchoBird を先にインストールし、「AI アシスタント」から SSH を設定するのを推奨します。',
   'status.running': '実行中',
   'status.complete': '完了',
   'status.failed': '失敗',

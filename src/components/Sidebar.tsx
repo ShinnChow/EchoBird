@@ -7,7 +7,7 @@ import {
   Trophy,
   Monitor,
   Waypoints,
-  Download,
+  Sparkles,
   RefreshCw,
   Users,
 } from 'lucide-react';
@@ -123,7 +123,7 @@ export const Sidebar = ({
           onClick={() => onPageChange('freeModels')}
         />
         <NavItem
-          icon={<Download size={20} />}
+          icon={<Sparkles size={20} />}
           label={t('nav.motherAgent')}
           active={activePage === 'mother'}
           onClick={() => onPageChange('mother')}

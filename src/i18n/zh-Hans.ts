@@ -54,7 +54,7 @@ const zhHans: Partial<Translations> = {
   'nav.myProjects': '我的AI项目',
   'nav.localServer': '本地大模型',
   'nav.smartRouter': '智能路由',
-  'nav.motherAgent': '智能助手',
+  'nav.motherAgent': 'AI 助手',
   'nav.feedback': '推荐应用',
   'nav.changelog': '更新日志',
   'changelog.loading': '加载中…',
@@ -113,8 +113,8 @@ const zhHans: Partial<Translations> = {
   'freeModels.disclaimer': '免费额度和使用条件可能随时变化，正式使用前请确认服务商最新规则。',
   'freeModels.router.title': '免切换智能路由',
   'freeModels.view.smart': '智能',
-  'freeModels.view.super': '超级',
-  'freeModels.super.title': '超级路由',
+  'freeModels.view.super': '编排',
+  'freeModels.super.title': '多模型编排路由',
   'freeModels.super.description':
     '由一个主模型对接 AI 应用，并在路由阶段将任务分配给其他模型。例如，在 Claude Code 或 Codex 中提交任务后，各模型将独立完成任务。待所有模型完成后，主模型会汇总所有结果，交叉评估并整合各方优势，形成并执行最终方案。多模型协作有望在复杂任务中突破单一顶尖模型的能力边界，但多模型并行也会成倍放大 Token 消耗与使用成本。',
   'freeModels.super.unavailable': '（开发调试中，暂不可用）',
@@ -144,7 +144,7 @@ const zhHans: Partial<Translations> = {
   'myProjects.deleteTitle': '从列表移除',
   'myProjects.deleteConfirm': '仅从「我的AI项目」列表移除该项目，本机上的项目文件不会被删除。',
   'page.localServer': '本地大模型',
-  'page.motherAgent': '智能助手',
+  'page.motherAgent': 'AI 助手',
   'page.feedback': '推荐应用',
   'feedback.title': '告诉我们，你想让 EchoBird 支持什么 AI 应用',
   'feedback.intro':
@@ -451,7 +451,7 @@ const zhHans: Partial<Translations> = {
   'mother.contextUsage': '上下文用量 {used}KB / {total}KB（{pct}%）',
   'terminal.thinking': '思考中',
   'ssh.winNote':
-    'Windows 部署 SSH 较为复杂。建议在服务器端下载安装 EchoBird，然后通过“智能助手”部署本机 SSH。',
+    'Windows 部署 SSH 较为复杂。建议在服务器端下载安装 EchoBird，然后通过“AI 助手”部署本机 SSH。',
   'status.running': '运行中',
   'status.notInstalled': '未安装',
   // 我的AI生涯

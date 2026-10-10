@@ -61,7 +61,7 @@ const en: Translations = {
   'nav.myProjects': 'My AI Projects',
   'nav.localServer': 'Local LLM',
   'nav.smartRouter': 'Smart Router',
-  'nav.motherAgent': 'Assistant',
+  'nav.motherAgent': 'AI Assistant',
   'nav.feedback': 'Suggest an app',
   'nav.changelog': 'Changelog',
   'changelog.loading': 'Loading…',
@@ -122,8 +122,8 @@ const en: Translations = {
     'Free quotas and eligibility can change at any time. Check the provider terms before relying on a model.',
   'freeModels.router.title': 'Hands-Free Smart Router',
   'freeModels.view.smart': 'Smart',
-  'freeModels.view.super': 'Super',
-  'freeModels.super.title': 'Super Router',
+  'freeModels.view.super': 'Orchestration',
+  'freeModels.super.title': 'Orchestration Router',
   'freeModels.super.description':
     'A main model connects to your AI app and delegates tasks to other models during routing. For example, after you submit a task in Claude Code or Codex, each model works on it independently. Once all models have finished, the main model brings together their results, evaluates them against one another, and integrates their strengths into a final plan to execute. On complex tasks, this collaboration could push beyond the capabilities of a single leading model. Running multiple models in parallel also multiplies token usage and cost.',
   'freeModels.super.unavailable': '(In development and testing; currently unavailable)',
@@ -508,7 +508,7 @@ const en: Translations = {
   'mother.contextUsage': 'Context usage {used}KB / {total}KB ({pct}%)',
   'terminal.thinking': 'thinking',
   'ssh.winNote':
-    'Windows SSH deployment is more complex than Linux/macOS. Recommended: install EchoBird on the Windows machine first, then use Assistant to set up local SSH access for you.',
+    'Windows SSH deployment is more complex than Linux/macOS. Recommended: install EchoBird on the Windows machine first, then use AI Assistant to set up local SSH access for you.',
   'status.running': 'Running',
   'status.complete': 'Complete',
   'status.failed': 'Failed',

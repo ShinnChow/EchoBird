@@ -1,13 +1,13 @@
 // RemoteModelSelector — Minimal model dropdown for Mother Agent
 // Text + arrow, no background/border, hover shows soft bg, dropdown opens upward
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Loader2, Check, Server } from 'lucide-react';
+import { ChevronDown, Loader2, Check, Waypoints } from 'lucide-react';
 
 export interface ModelOption {
   id: string;
   name: string;
   icon?: string | null; // icon path from getModelIcon()
-  iconKind?: 'server';
+  iconKind?: 'router';
 }
 
 /** A non-model option appended below the models list (after a divider).
@@ -83,8 +83,8 @@ export const RemoteModelSelector: React.FC<RemoteModelSelectorProps> = ({
   const checkClass = 'flex-shrink-0 ml-1 text-cyber-text';
 
   const renderIcon = (option: ModelOption, sizeClass: string, iconSize: number) => {
-    if (option.iconKind === 'server') {
-      return <Server size={iconSize} className="flex-shrink-0 text-cyber-accent" />;
+    if (option.iconKind === 'router') {
+      return <Waypoints size={iconSize} className="flex-shrink-0 text-cyber-accent" />;
     }
     if (!option.icon) return null;
     return (

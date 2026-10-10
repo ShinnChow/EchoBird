@@ -57,7 +57,7 @@ const zhHant: Partial<Translations> = {
   'nav.aiCareer': '我的AI生涯',
   'nav.localServer': '本地大模型',
   'nav.smartRouter': '智能路由',
-  'nav.motherAgent': '智慧助理',
+  'nav.motherAgent': 'AI 助理',
   'nav.feedback': '推薦應用',
   'nav.changelog': '更新日誌',
   'changelog.loading': '載入中…',
@@ -115,8 +115,8 @@ const zhHant: Partial<Translations> = {
   'freeModels.disclaimer': '免費額度與使用條件可能隨時變更，正式使用前請確認服務商最新規則。',
   'freeModels.router.title': '免切換智能路由',
   'freeModels.view.smart': '智能',
-  'freeModels.view.super': '超級',
-  'freeModels.super.title': '超級路由',
+  'freeModels.view.super': '編排',
+  'freeModels.super.title': '多模型編排路由',
   'freeModels.super.description':
     '由一個主模型對接 AI 應用，並在路由階段將任務分配給其他模型。例如，在 Claude Code 或 Codex 中提交任務後，各模型將獨立完成任務。待所有模型完成後，主模型會彙總所有結果，交叉評估並整合各方優勢，形成並執行最終方案。多模型協作有望在複雜任務中突破單一頂尖模型的能力邊界，但多模型並行也會成倍放大 Token 消耗與使用成本。',
   'freeModels.super.unavailable': '（開發調試中，暫不可用）',
@@ -164,7 +164,7 @@ const zhHant: Partial<Translations> = {
   'aiCareer.timeDaysAgo': '{days} 天前',
   'aiCareer.noActivity': '無活動',
   'page.localServer': '本地大模型',
-  'page.motherAgent': '智慧助理',
+  'page.motherAgent': 'AI 助理',
   'page.feedback': '推薦應用',
   'feedback.title': '告訴我們，你想讓 EchoBird 支援什麼 AI 應用',
   'feedback.intro':
@@ -470,7 +470,7 @@ const zhHant: Partial<Translations> = {
   'mother.contextUsage': '上下文用量 {used}KB / {total}KB（{pct}%）',
   'terminal.thinking': '思考中',
   'ssh.winNote':
-    'Windows 部署 SSH 較為複雜。建議在伺服器端下載安裝 EchoBird，然後透過「安裝與修復」部署本機 SSH。',
+    'Windows 部署 SSH 較為複雜。建議在伺服器端下載安裝 EchoBird，然後透過「AI 助理」部署本機 SSH。',
   'status.running': '執行中',
   'status.notInstalled': '未安裝',
 };
