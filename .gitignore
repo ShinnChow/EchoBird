@@ -64,8 +64,12 @@ lint-output.txt
 # One-off / scratch files (do not commit)
 tmp/
 .agent/
-# Local scratch scripts (no longer used by CI).
+# Local scratch scripts, except the scheduled free-model maintainer.
 scripts/*
+!scripts/refresh_free_models.py
+!scripts/tests/
+scripts/tests/*
+!scripts/tests/test_refresh_free_models.py
 
 # llama-server binaries (downloaded during CI build)
 electron/tools/llama-server/bin/
