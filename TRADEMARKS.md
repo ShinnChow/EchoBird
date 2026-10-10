@@ -78,7 +78,7 @@ The "trade dress" and "brand" protections discussed in this document
 are **not** waived by either license — they govern brand identity
 and product format, which are outside the scope of any code license.
 
-### 3. The four UI surfaces — timeline and relationships
+### 3. The four original UI surfaces and later additions — timeline and relationships
 
 **Project existence anchor — 2026-02-15.** The GitHub repository
 `edison7009/EchoBird` was created on **2026-02-15 (UTC)** —
@@ -119,7 +119,7 @@ shipped:
 
 | **2026-05-20** | `05a35d13` | **My AI Projects / 我的AI项目** (`src/pages/MyProjects/`) — bundled with two complete reference applications (Reversi + AI Translator) as user-tutorial templates | — |
 
-**Relationship diagram:**
+**Original four-surface relationship diagram:**
 
 ```
                             ┌─────────────────────┐
@@ -167,6 +167,42 @@ ToolCard component, same model-apply flow), is the product-level
 originality being claimed. The asymmetric placement of Local Server
 above the pool (producer) and the other three surfaces below it
 (consumers) is part of the trade dress, not an incidental layout.
+
+**Later additions — Smart Router and Account Management.** Two further
+pages extend this architecture: **Smart Router / 智能路由** and **Account
+Management / 账号管理**. **Super Router / 超级路由** is a view within the
+Smart Router page. These later milestones are recorded separately from
+the original four-surface combination referenced in §5 and [NOTICE](NOTICE).
+Dates below use Git committer timestamps in **UTC+08:00** and record
+source-history milestones.
+
+| Date | Commit | Page / milestone | Evidence |
+|---|---|---|---|
+| **2026-08-28** | [`6036387c`](https://github.com/edison7009/EchoBird/commit/6036387ce0f6e9581e6e15000dd1597216a1cc7c) | **Smart Router — concept and initial UI** | The name and intended single-API aggregation / automatic failover appear in `src/i18n/zh-Hans.ts`; `src/pages/FreeModels/FreeModels.tsx` adds the catalog and router hub mockup. The API address is still a placeholder at this stage. |
+| **2026-08-30** | [`bf28470d`](https://github.com/edison7009/EchoBird/commit/bf28470d7ece010cbe5aee24bca7125987467c2e) | **Smart Router — routing backend** | Adds `src-tauri/src/services/smart_router/` and `src/api/smartRouter.ts`, with candidate configuration, local routing and a selectable router model for the existing model consumers. |
+| **2026-09-11** | [`e024d5d5`](https://github.com/edison7009/EchoBird/commit/e024d5d5cfea6600e139766c2d1456a9eef32ca7) | **Smart Router — ordered routing and saved models** | Numbered model cards, drag-to-reorder with saved priority, ordered failover and saved-model management establish the priority-based interaction. |
+| **2026-10-08** | [`bb0b5755`](https://github.com/edison7009/EchoBird/commit/bb0b5755505c7ad073bce97aa0a08fdde157c6e3) | **Account Management — dedicated page** | Adds `src/pages/AccountCenter/AccountCenter.tsx`: a cross-provider account-card grid, saved display order, right-hand provider directory, shared login lifecycle and explicit batch quota refresh. |
+| **2026-10-08** | [`deffe277`](https://github.com/edison7009/EchoBird/commit/deffe2771f5aba33df51010db754e3539a87b92e) | **Smart Router — visual routing graph update** | Refines the hub / numbered-card layout, connecting paths, enabled state and active-route animation in `src/pages/FreeModels/FreeModels.tsx` and `FreeModels.css`. |
+| **2026-10-09** | [`80ca3baf`](https://github.com/edison7009/EchoBird/commit/80ca3baf919fbf0508d72357f9472a67f6c304f9) | **Super Router — static preview view** | Adds Smart / Super view switching, a disabled router hub, a primary model numbered **0** and six supplemental model cards numbered **1–6**. This commit records the preview composition; Super Router execution is not implemented. |
+
+**Relationships of the later pages:**
+
+- **Smart Router ↔ shared model configuration.** The page selects and
+  orders candidate models, reuses the Model Nexus model editor, and
+  exposes a local proxy with OpenAI / Anthropic-compatible endpoints through the
+  selectable `smart-router` model. Its hub, numbered draggable cards
+  and connecting paths visualize the candidate order and active route.
+- **Super Router within Smart Router.** The preview reuses the router
+  hub and model-card components, arranging the hub beside or above the
+  primary model, with supplemental cards below it. The view switch
+  preserves Smart Router's saved configuration; the preview has no
+  separate routing backend.
+- **Account Management ↔ App Manager.** Both use the same saved-account
+  state and `useManagedAccounts.ts` lifecycle. The dedicated page
+  combines accounts from multiple providers in one sortable card grid
+  showing identity, plan and quota, with refresh / delete actions and
+  a right-hand provider directory for adding accounts. Quota refresh
+  remains an explicit action; applying an account remains in App Manager.
 
 ### 4. The reference-app pattern — the most unprecedented piece
 
@@ -538,7 +574,7 @@ EchoBird 的公开 GitHub 仓库**只是项目的源码归档** —— 不是分
 本文档讨论的「商业外观」与「品牌」保护**不**因任何代码协议而放弃 ——
 它们管理品牌身份与产品形态,超出任何代码协议的范畴。
 
-### 3. 四个 UI 界面 —— 时间线与关系
+### 3. 最初四个 UI 界面及后续扩展 —— 时间线与关系
 
 **项目存续起点 —— 2026-02-15。** GitHub 仓库 `edison7009/EchoBird`
 创建于 **2026-02-15(UTC)** —— 这是 GitHub 服务器侧的 `createdAt`
@@ -573,7 +609,7 @@ rewrite to Tauri + Rust architecture」)在同一个 Tauri 桌面二进制里
 
 | **2026-05-20** | `05a35d13` | **我的AI项目 / My AI Projects**(`src/pages/MyProjects/`) —— 内置两个完整可运行的参考应用(黑白棋 + AI 翻译)作为用户教程模板 | — |
 
-**关系示意图:**
+**最初四个界面的关系示意图:**
 
 ```
                             ┌─────────────────────┐
@@ -619,6 +655,35 @@ rewrite to Tauri + Rust architecture」)在同一个 Tauri 桌面二进制里
 构成我们主张的**产品级原创**。**本地大模型在池子上方(生产者)+
 其他三个界面在池子下方(消费者)**的非对称布局,是 trade dress 的
 一部分,不是偶然排版。
+
+**后续扩展 —— 智能路由与账号管理。** 这套架构后来增加了**智能路由 /
+Smart Router**和**账号管理 / Account Management**两个页面。**超级路由 /
+Super Router**是智能路由页面内的一个视图。以下里程碑单独记录这些后续
+扩展;§5 与 [NOTICE](NOTICE) 中的原始四界面组合仍指前述四个界面。
+下表日期按 Git 提交者时间戳的 **UTC+08:00** 日期记录,作为源码历史证据。
+
+| 日期 | Commit | 页面 / 里程碑 | 证据 |
+|---|---|---|---|
+| **2026-08-28** | [`6036387c`](https://github.com/edison7009/EchoBird/commit/6036387ce0f6e9581e6e15000dd1597216a1cc7c) | **智能路由 —— 概念与初始界面** | `src/i18n/zh-Hans.ts` 已记录名称及「单一本地 API 汇总模型、自动切换」的设计说明;`src/pages/FreeModels/FreeModels.tsx` 加入目录与路由枢纽示意。此时 API 地址仍为占位显示。 |
+| **2026-08-30** | [`bf28470d`](https://github.com/edison7009/EchoBird/commit/bf28470d7ece010cbe5aee24bca7125987467c2e) | **智能路由 —— 路由后端** | 新增 `src-tauri/src/services/smart_router/` 与 `src/api/smartRouter.ts`,实现候选模型配置、本地路由,并向既有模型消费界面提供可选择的路由模型。 |
+| **2026-09-11** | [`e024d5d5`](https://github.com/edison7009/EchoBird/commit/e024d5d5cfea6600e139766c2d1456a9eef32ca7) | **智能路由 —— 顺序路由与已存模型管理** | 编号模型卡片、拖动排序并保存优先级、按顺序故障切换及已存模型管理,形成按优先级路由的交互。 |
+| **2026-10-08** | [`bb0b5755`](https://github.com/edison7009/EchoBird/commit/bb0b5755505c7ad073bce97aa0a08fdde157c6e3) | **账号管理 —— 独立页面** | 新增 `src/pages/AccountCenter/AccountCenter.tsx`:跨厂商账号卡片网格、持久化显示顺序、右侧厂商目录、共享登录生命周期与显式批量额度刷新。 |
+| **2026-10-08** | [`deffe277`](https://github.com/edison7009/EchoBird/commit/deffe2771f5aba33df51010db754e3539a87b92e) | **智能路由 —— 可视化路由图更新** | 在 `src/pages/FreeModels/FreeModels.tsx` 与 `FreeModels.css` 中调整枢纽 / 编号卡片布局、连接路径、启用状态与当前路由动画。 |
+| **2026-10-09** | [`80ca3baf`](https://github.com/edison7009/EchoBird/commit/80ca3baf919fbf0508d72357f9472a67f6c304f9) | **超级路由 —— 静态预览视图** | 新增智能 / 超级视图切换、禁用的路由枢纽、编号 **0** 的主模型与编号 **1–6** 的六张辅助模型卡片。该提交记录预览界面构图,尚未实现超级路由执行。 |
+
+**后续页面的关系:**
+
+- **智能路由 ↔ 共享模型配置。** 页面选择并排列候选模型,复用模型中心的
+  模型编辑器,通过可选择的 `smart-router` 模型提供统一的本地 OpenAI /
+  Anthropic 兼容端点。枢纽、可拖动的编号卡片和连接路径共同展示候选顺序
+  与当前请求路由。
+- **智能路由内的超级路由视图。** 预览复用路由枢纽与模型卡片组件,枢纽位于
+  主模型旁边或上方,辅助模型卡片排列在主模型下方。切换视图保留智能路由
+  已存配置;该预览没有独立的路由后端。
+- **账号管理 ↔ 应用管理。** 两者共享已存账号状态与 `useManagedAccounts.ts`
+  生命周期。独立页面将多家厂商账号汇总在可排序卡片网格中,展示身份、套餐
+  与额度,提供刷新 / 删除操作,并在右侧厂商目录中添加账号。额度刷新保持为
+  显式操作;应用账号仍由应用管理页面执行。
 
 ### 4. 参考应用模板模式 —— 最前无古人的一笔
 
