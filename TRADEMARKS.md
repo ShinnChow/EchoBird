@@ -170,8 +170,8 @@ above the pool (producer) and the other three surfaces below it
 
 **Later additions — Smart Router and Account Management.** Two further
 pages extend this architecture: **Smart Router / 智能路由** and **Account
-Management / 账号管理**. **Super Router / 超级路由** is a view within the
-Smart Router page. These later milestones are recorded separately from
+Management / 账号管理**. **Orchestration Router / 多模型编排路由** is a view
+within the Smart Router page. These later milestones are recorded separately from
 the original four-surface combination referenced in §5 and [NOTICE](NOTICE).
 Dates below use Git committer timestamps in **UTC+08:00** and record
 source-history milestones.
@@ -183,7 +183,7 @@ source-history milestones.
 | **2026-09-11** | [`e024d5d5`](https://github.com/edison7009/EchoBird/commit/e024d5d5cfea6600e139766c2d1456a9eef32ca7) | **Smart Router — ordered routing and saved models** | Numbered model cards, drag-to-reorder with saved priority, ordered failover and saved-model management establish the priority-based interaction. |
 | **2026-10-08** | [`bb0b5755`](https://github.com/edison7009/EchoBird/commit/bb0b5755505c7ad073bce97aa0a08fdde157c6e3) | **Account Management — dedicated page** | Adds `src/pages/AccountCenter/AccountCenter.tsx`: a cross-provider account-card grid, saved display order, right-hand provider directory, shared login lifecycle and explicit batch quota refresh. |
 | **2026-10-08** | [`deffe277`](https://github.com/edison7009/EchoBird/commit/deffe2771f5aba33df51010db754e3539a87b92e) | **Smart Router — visual routing graph update** | Refines the hub / numbered-card layout, connecting paths, enabled state and active-route animation in `src/pages/FreeModels/FreeModels.tsx` and `FreeModels.css`. |
-| **2026-10-09** | [`80ca3baf`](https://github.com/edison7009/EchoBird/commit/80ca3baf919fbf0508d72357f9472a67f6c304f9) | **Super Router — static preview view** | Adds Smart / Super view switching, a disabled router hub, a primary model numbered **0** and six supplemental model cards numbered **1–6**. This commit records the preview composition; Super Router execution is not implemented. |
+| **2026-10-09** | [`80ca3baf`](https://github.com/edison7009/EchoBird/commit/80ca3baf919fbf0508d72357f9472a67f6c304f9) | **Orchestration Router — static preview view (then named Super Router)** | Adds Smart / Super view switching, a disabled router hub, a primary model numbered **0** and six supplemental model cards numbered **1–6**. This commit records the preview composition; Orchestration Router execution is not implemented. |
 
 **Relationships of the later pages:**
 
@@ -192,7 +192,7 @@ source-history milestones.
   exposes a local proxy with OpenAI / Anthropic-compatible endpoints through the
   selectable `smart-router` model. Its hub, numbered draggable cards
   and connecting paths visualize the candidate order and active route.
-- **Super Router within Smart Router.** The preview reuses the router
+- **Orchestration Router within Smart Router.** The preview reuses the router
   hub and model-card components, arranging the hub beside or above the
   primary model, with supplemental cards below it. The view switch
   preserves Smart Router's saved configuration; the preview has no
@@ -657,8 +657,8 @@ rewrite to Tauri + Rust architecture」)在同一个 Tauri 桌面二进制里
 一部分,不是偶然排版。
 
 **后续扩展 —— 智能路由与账号管理。** 这套架构后来增加了**智能路由 /
-Smart Router**和**账号管理 / Account Management**两个页面。**超级路由 /
-Super Router**是智能路由页面内的一个视图。以下里程碑单独记录这些后续
+Smart Router**和**账号管理 / Account Management**两个页面。**多模型编排路由 /
+Orchestration Router**是智能路由页面内的一个视图。以下里程碑单独记录这些后续
 扩展;§5 与 [NOTICE](NOTICE) 中的原始四界面组合仍指前述四个界面。
 下表日期按 Git 提交者时间戳的 **UTC+08:00** 日期记录,作为源码历史证据。
 
@@ -669,7 +669,7 @@ Super Router**是智能路由页面内的一个视图。以下里程碑单独记
 | **2026-09-11** | [`e024d5d5`](https://github.com/edison7009/EchoBird/commit/e024d5d5cfea6600e139766c2d1456a9eef32ca7) | **智能路由 —— 顺序路由与已存模型管理** | 编号模型卡片、拖动排序并保存优先级、按顺序故障切换及已存模型管理,形成按优先级路由的交互。 |
 | **2026-10-08** | [`bb0b5755`](https://github.com/edison7009/EchoBird/commit/bb0b5755505c7ad073bce97aa0a08fdde157c6e3) | **账号管理 —— 独立页面** | 新增 `src/pages/AccountCenter/AccountCenter.tsx`:跨厂商账号卡片网格、持久化显示顺序、右侧厂商目录、共享登录生命周期与显式批量额度刷新。 |
 | **2026-10-08** | [`deffe277`](https://github.com/edison7009/EchoBird/commit/deffe2771f5aba33df51010db754e3539a87b92e) | **智能路由 —— 可视化路由图更新** | 在 `src/pages/FreeModels/FreeModels.tsx` 与 `FreeModels.css` 中调整枢纽 / 编号卡片布局、连接路径、启用状态与当前路由动画。 |
-| **2026-10-09** | [`80ca3baf`](https://github.com/edison7009/EchoBird/commit/80ca3baf919fbf0508d72357f9472a67f6c304f9) | **超级路由 —— 静态预览视图** | 新增智能 / 超级视图切换、禁用的路由枢纽、编号 **0** 的主模型与编号 **1–6** 的六张辅助模型卡片。该提交记录预览界面构图,尚未实现超级路由执行。 |
+| **2026-10-09** | [`80ca3baf`](https://github.com/edison7009/EchoBird/commit/80ca3baf919fbf0508d72357f9472a67f6c304f9) | **多模型编排路由 —— 静态预览视图（当时名为超级路由）** | 新增智能 / 超级视图切换、禁用的路由枢纽、编号 **0** 的主模型与编号 **1–6** 的六张辅助模型卡片。该提交记录预览界面构图,尚未实现多模型编排路由执行。 |
 
 **后续页面的关系:**
 
@@ -677,7 +677,7 @@ Super Router**是智能路由页面内的一个视图。以下里程碑单独记
   模型编辑器,通过可选择的 `smart-router` 模型提供统一的本地 OpenAI /
   Anthropic 兼容端点。枢纽、可拖动的编号卡片和连接路径共同展示候选顺序
   与当前请求路由。
-- **智能路由内的超级路由视图。** 预览复用路由枢纽与模型卡片组件,枢纽位于
+- **智能路由内的多模型编排路由视图。** 预览复用路由枢纽与模型卡片组件,枢纽位于
   主模型旁边或上方,辅助模型卡片排列在主模型下方。切换视图保留智能路由
   已存配置;该预览没有独立的路由后端。
 - **账号管理 ↔ 应用管理。** 两者共享已存账号状态与 `useManagedAccounts.ts`
