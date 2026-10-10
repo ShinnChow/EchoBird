@@ -21,13 +21,6 @@ jobs:
         with:
           ref: main
 
-      - name: Preserve existing repository bytes
-        # API-maintained files can contain raw CRLF blobs. Disable conversion
-        # only in this disposable checkout so untouched files stay clean.
-        run: |
-          echo '* -text' > .git/info/attributes
-          git checkout-index --all --force
-
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -69,5 +62,5 @@ jobs:
             exit 0
           fi
           git commit -m "chore(catalog): refresh verified model directory"
-          git pull --rebase origin main
+          # A concurrent edit rejects this push; the next run merges from latest main.
           git push origin HEAD:main
