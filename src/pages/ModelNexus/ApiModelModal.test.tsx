@@ -8,6 +8,10 @@ import { ModelIdCombobox } from '../../components/ModelIdCombobox';
 import type { ModelConfig } from '../../api/types';
 import { AddModelModal, ModelNexusProvider } from './ModelNexus';
 import { useModelNexus, type NewModelForm } from './context';
+import { useVoiceInputStore } from '../../stores/voiceInputStore';
+import { useNavigationStore } from '../../stores/navigationStore';
+import { voiceSnapshot } from '../VoiceInput/testFixtures';
+import { saveVoiceConfig } from '../../api/voiceInput';
 
 const { showToast, addSelectedModel, updateSelectedModel, selectedIds, t } = vi.hoisted(() => ({
   showToast: vi.fn(),
@@ -43,8 +47,14 @@ vi.mock('../../api/tauri', () => ({
   testModel: vi.fn(),
 }));
 vi.mock('../../api/models', () => ({
+  addModel: vi.fn(),
+  deleteModel: vi.fn(),
   getCachedUpstreamModelCatalog: vi.fn(),
   fetchUpstreamModelCatalog: vi.fn(),
+}));
+vi.mock('../../api/voiceInput', async (original) => ({
+  ...(await original<typeof import('../../api/voiceInput')>()),
+  saveVoiceConfig: vi.fn(),
 }));
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(() => {
@@ -141,7 +151,50 @@ afterEach(() => {
   act(() => renderer?.unmount());
   vi.clearAllMocks();
   vi.useRealTimers();
+  useVoiceInputStore.setState(useVoiceInputStore.getInitialState());
 });
+
+it.each(['mimo', 'doubao'] as const)(
+  'uses the same single-address fields for %s and attaches a voice model',
+  async (protocol) => {
+    useNavigationStore.setState({ activePage: 'voice' });
+    useVoiceInputStore.setState({ snapshot: voiceSnapshot() });
+    const speech = { ...saved, internalId: 'speech-fixture', scope: 'voiceInput' as const };
+    vi.mocked(catalogApi.addModel).mockResolvedValue(speech);
+    vi.mocked(saveVoiceConfig).mockImplementation(async (config) =>
+      voiceSnapshot({ config, revision: 2 })
+    );
+    await mount();
+    await act(async () => context.setModelModalDestination('voiceInput'));
+    await openAdd({ voiceOptions: { protocol } });
+    expect(renderer!.root.findByProps({ id: 'model-config-dialog-title' }).children).toEqual([
+      'voice.addModel',
+    ]);
+    expect(renderer!.root.findAllByType('input')).toHaveLength(3);
+    expect(
+      renderer!.root.findAllByType('input').filter((node) => node.props.value === saved.baseUrl)
+    ).toHaveLength(1);
+    expect(
+      renderer!.root
+        .findAllByType('label')
+        .some((node) => node.children.includes('model.anthropicUrl'))
+    ).toBe(false);
+    expect(catalogApi.fetchUpstreamModelCatalog).not.toHaveBeenCalled();
+    await act(async () => button('model.enterSave').props.onClick());
+    expect(catalogApi.addModel).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: 'voiceInput', baseUrl: saved.baseUrl })
+    );
+    expect(api.addModel).not.toHaveBeenCalled();
+    expect(addSelectedModel).not.toHaveBeenCalled();
+    expect(useVoiceInputStore.getState().snapshot?.config.channels).toEqual([
+      { kind: 'model', id: 'speech-fixture' },
+    ]);
+    expect(useVoiceInputStore.getState().snapshot?.config.apiOptions).toEqual({
+      'speech-fixture': { protocol },
+    });
+    expect(context.showAddModelModal).toBe(false);
+  }
+);
 
 it('adds an API model when Smart Router already has more than twenty candidates', async () => {
   for (let index = 0; index < 25; index++) selectedIds.add(`existing-${index}`);

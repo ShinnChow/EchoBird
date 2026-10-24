@@ -76,7 +76,7 @@ export interface ModelConfig {
   anthropicTested?: boolean;
   openaiLatency?: number;
   anthropicLatency?: number;
-  scope?: 'modelCenter' | 'smartRouter';
+  scope?: 'modelCenter' | 'smartRouter' | 'voiceInput';
 }
 
 export interface ModelTestResult {

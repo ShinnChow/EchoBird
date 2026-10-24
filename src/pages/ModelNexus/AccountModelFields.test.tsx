@@ -35,11 +35,13 @@ function Harness({
   modelId = '',
   active = true,
   provider = 'codex',
+  voice = false,
 }: {
   accountId?: string;
   modelId?: string;
   active?: boolean;
   provider?: AccountProvider;
+  voice?: boolean;
 }) {
   const [form, setForm] = useState<NewModelForm>({
     name: 'Codex',
@@ -59,9 +61,26 @@ function Harness({
       modelIdOptions={form.modelIdOptions}
       setForm={setForm}
       active={active}
+      voice={voice}
     />
   );
 }
+
+it('uses the saved WorkBuddy speech ID without fetching chat models or querying quota', async () => {
+  const accountId = 'a'.repeat(64);
+  vi.mocked(api.listProxyAccounts).mockResolvedValue([
+    { source: { provider: 'workBuddy', accountId }, label: 'Speech account' },
+  ]);
+  await act(async () => {
+    renderer = create(<Harness provider="workBuddy" voice />);
+  });
+  expect(current.accountSource).toEqual({ provider: 'workBuddy', accountId });
+  expect(current.modelId).toBe(`workbuddy:${accountId}`);
+  expect(field('accountProxy.provider').props.options).toEqual(['workBuddy']);
+  expect(field('model.modelId').props.onRefresh).toBeUndefined();
+  expect(api.getAccountProxyModels).not.toHaveBeenCalled();
+  expect(setItem).not.toHaveBeenCalled();
+});
 async function open(accountId = '', modelId = '', provider: AccountProvider = 'codex') {
   await act(async () => {
     renderer = create(<Harness accountId={accountId} modelId={modelId} provider={provider} />, {

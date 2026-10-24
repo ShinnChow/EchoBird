@@ -1,6 +1,7 @@
 // Theme store — light / dark / system, persisted to AppSettings.themeMode.
 // Missing settings file defaults to dark; an unset saved themeMode means follow system.
 import { create } from 'zustand';
+import { emit } from '@tauri-apps/api/event';
 import * as api from '../api/tauri';
 import {
   getColorTheme,
@@ -10,6 +11,11 @@ import {
 } from '../data/colorThemes';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
+export const THEME_CHANGED_EVENT = 'echobird-theme-changed';
+export interface ThemeSelection {
+  mode: ThemeMode;
+  colorTheme: ColorThemeId;
+}
 type Resolved = 'light' | 'dark';
 
 const mql = window.matchMedia('(prefers-color-scheme: dark)');
@@ -61,9 +67,9 @@ const applyColorTheme = (id: ColorThemeId, resolved: Resolved) => {
 const apply = (resolved: Resolved, colorTheme: ColorThemeId, instant: boolean) => {
   if (instant) {
     const kill = document.createElement('style');
-    // Preserve the shared tab background's movement while theme colors swap instantly.
+    // Preserve the shared flowing backgrounds while theme colors swap instantly.
     kill.textContent =
-      '*, *:not(.view-mode-tabs[data-sliding="true"])::before, *::after { transition: none !important; animation: none !important; }';
+      '*:not(.voice-island.voice-theme-auto), *:not(.view-mode-tabs[data-sliding="true"])::before, *::after { transition: none !important; animation: none !important; }';
     document.head.appendChild(kill);
     document.documentElement.dataset.theme = resolved;
     applyColorTheme(colorTheme, resolved);
@@ -89,6 +95,7 @@ interface ThemeStore {
   colorTheme: ColorThemeId;
   setMode: (mode: ThemeMode) => void;
   setColorTheme: (colorTheme: ColorThemeId) => void;
+  sync: (selection: ThemeSelection) => void;
   init: () => Promise<void>;
 }
 
@@ -100,6 +107,7 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
     const resolved = resolve(mode);
     apply(resolved, get().colorTheme, true);
     set({ mode, resolved });
+    void emit(THEME_CHANGED_EVENT, { mode, colorTheme: get().colorTheme }).catch(() => {});
     api
       .getSettings()
       .then((s) => {
@@ -115,6 +123,7 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
   setColorTheme: (colorTheme) => {
     apply(get().resolved, colorTheme, true);
     set({ colorTheme });
+    void emit(THEME_CHANGED_EVENT, { mode: get().mode, colorTheme }).catch(() => {});
     api
       .getSettings()
       .then((s) => {
@@ -126,6 +135,12 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
         });
       })
       .catch(() => {});
+  },
+  sync: ({ mode, colorTheme }) => {
+    if (get().mode === mode && get().colorTheme === colorTheme) return;
+    const resolved = resolve(mode);
+    apply(resolved, colorTheme, true);
+    set({ mode, resolved, colorTheme });
   },
   init: async () => {
     let mode: ThemeMode = 'system';

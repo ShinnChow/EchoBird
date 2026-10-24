@@ -5,6 +5,7 @@ import { AccountProxyPanel } from './AccountProxyPanel';
 import * as api from '../../api/accountProxy';
 import type { AccountProvider } from '../../api/types';
 import { useNavigationStore } from '../../stores/navigationStore';
+import { useAccountAccessRiskStore } from '../../stores/accountAccessRiskStore';
 import { loadLocale, translate, type TKey } from '../../i18n';
 
 const { context, confirm } = vi.hoisted(() => ({
@@ -40,7 +41,7 @@ function accounts(provider: AccountProvider, count: number): api.ProxyAccount[] 
 }
 async function open() {
   await act(async () => {
-    renderer = create(<AccountProxyPanel acknowledged onAcknowledgedChange={vi.fn()} />);
+    renderer = create(<AccountProxyPanel />);
   });
 }
 async function navigate(page: 'accounts' | 'freeModels') {
@@ -59,6 +60,7 @@ function count(provider: AccountProvider) {
     .children.join('');
 }
 beforeEach(async () => {
+  useAccountAccessRiskStore.setState({ acknowledged: true, hydrated: true });
   locale = 'zh-Hans';
   await loadLocale(locale);
   useNavigationStore.setState({ activePage: 'freeModels' });
@@ -84,9 +86,7 @@ it('updates zero, singular, plural and unknown account counts across all languag
   ] as const) {
     locale = language;
     await loadLocale(locale);
-    await act(async () =>
-      renderer.update(<AccountProxyPanel acknowledged onAcknowledgedChange={vi.fn()} />)
-    );
+    await act(async () => renderer.update(<AccountProxyPanel />));
     expect([count('claudeCode'), count('kilo'), count('codex'), count('copilot')]).toEqual([
       ...expected,
       '—',

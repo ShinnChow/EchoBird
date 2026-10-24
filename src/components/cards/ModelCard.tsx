@@ -86,6 +86,7 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
     // win. The vendor logo only matches when the modelId has no recognized
     // brand — such as provider rows, which pass modelId=''. Model ID and vendor
     // are separate concerns; do not move resellers above model brands.
+    [['siliconflow', 'siliconcloud', '硅基流动'], 'siliconcloud'],
     [['ccvibe', 'cc vibe', 'cc-vibe'], 'ccvibe'],
     // 88API — token aggregation relay hosting many model brands; matches on
     // its own name only, so it never outranks a recognized model brand above.

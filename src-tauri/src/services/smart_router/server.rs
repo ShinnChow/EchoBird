@@ -42,6 +42,9 @@ mod switch_tests;
 mod probe;
 pub(crate) use probe::{cancel_probe, probe_candidate, ProbeResult};
 
+#[path = "voice.rs"]
+mod voice;
+
 const MAX_REQUEST_BODY_BYTES: usize = 64 * 1024 * 1024;
 const MAX_STREAM_PREFLIGHT_BYTES: usize = 1024 * 1024;
 const MAX_RESPONSE_BINDINGS: usize = 512;
@@ -653,6 +656,8 @@ pub(super) fn start(
         .route("/responses", post(handle_responses))
         .route("/v1/messages", post(handle_messages))
         .route("/messages", post(handle_messages))
+        .route("/v1/audio/transcriptions", post(voice::handle))
+        .route("/audio/transcriptions", post(voice::handle))
         .layer(DefaultBodyLimit::max(MAX_REQUEST_BODY_BYTES))
         .with_state(state);
     let listener = tokio::net::TcpListener::from_std(listener).map_err(|e| e.to_string())?;

@@ -96,9 +96,9 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
 
   // Modal state
   const [showAddModelModal, setShowAddModelModal] = useState(false);
-  const [modelModalDestination, setModelModalDestination] = useState<'modelNexus' | 'freeRouter'>(
-    'modelNexus'
-  );
+  const [modelModalDestination, setModelModalDestination] = useState<
+    'modelNexus' | 'freeRouter' | 'voiceInput'
+  >('modelNexus');
   const [modelModalAnimatingOut, setModelModalAnimatingOut] = useState(false);
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);

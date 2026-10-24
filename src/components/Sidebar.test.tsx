@@ -2,8 +2,21 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useVoiceInputStore as voice } from '../stores/voiceInputStore';
+import { voiceSnapshot } from '../pages/VoiceInput/testFixtures';
+import * as voiceApi from '../api/voiceInput';
 
 vi.mock('./BirdEasterEgg', () => ({ BirdEasterEgg: () => null }));
+const showToast = vi.hoisted(() => vi.fn());
+vi.mock('./Toast', () => ({ useToast: () => ({ showToast }) }));
+vi.mock('../api/voiceInput', () => ({
+  saveVoiceConfig: vi.fn(),
+  recordVoice: vi.fn(),
+  startVoice: vi.fn(),
+  stopVoice: vi.fn(),
+  getVoiceState: vi.fn(),
+}));
+
 let Sidebar: typeof import('./Sidebar').Sidebar;
 let renderer: ReactTestRenderer;
 
@@ -14,6 +27,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  voice.setState(voice.getInitialState());
 });
 
 afterEach(() => act(() => renderer?.unmount()));
@@ -24,6 +38,10 @@ const baseProps = {
   smartRouterEnabled: false,
   smartRouterTogglePending: false,
   onSmartRouterChange: vi.fn(),
+};
+const sourceConfig = {
+  ...voiceSnapshot().config,
+  channels: [{ kind: 'model' as const, id: 'speech-model' }],
 };
 const routerGroups = [{ candidateIds: ['one'], groupEnabled: true }];
 
@@ -38,14 +56,19 @@ describe('Sidebar', () => {
     const markup = renderToStaticMarkup(<Sidebar {...baseProps} smartRouterGroups={[]} />);
 
     expect(markup).not.toContain('aria-label="nav.smartRouter"');
+    expect(markup).not.toContain('aria-label="voice.enableInput"');
   });
 
   it('shows the smart router switch when a model is connected', () => {
+    voice.setState({ snapshot: voiceSnapshot({ config: sourceConfig }) });
     const markup = renderToStaticMarkup(
       <Sidebar {...baseProps} smartRouterGroups={routerGroups} />
     );
 
     expect(markup).toContain('aria-label="nav.smartRouter"');
+    expect(markup.indexOf('aria-label="voice.enableInput"')).toBeLessThan(
+      markup.indexOf('aria-label="nav.smartRouter"')
+    );
   });
 
   it.each([true, false])(
@@ -77,7 +100,7 @@ describe('Sidebar', () => {
         expect(toggles()).toHaveLength(1);
         expect(toggles()[0].props['aria-checked']).toBe(masterEnabled);
       }
-      for (const activePage of ['freeModels', 'apps', 'models'] as const) {
+      for (const activePage of ['freeModels', 'voice', 'models'] as const) {
         act(() =>
           renderer.update(
             <Sidebar
@@ -91,6 +114,10 @@ describe('Sidebar', () => {
         expect(toggles()[0].props['aria-checked']).toBe(masterEnabled);
       }
       expect(baseProps.onSmartRouterChange).not.toHaveBeenCalled();
+      expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
+      expect(voiceApi.getVoiceState).not.toHaveBeenCalled();
+      expect(voiceApi.startVoice).not.toHaveBeenCalled();
+      expect(voiceApi.recordVoice).not.toHaveBeenCalled();
       await act(async () => toggles()[0].props.onClick());
       expect(baseProps.onSmartRouterChange).toHaveBeenCalledExactlyOnceWith(!masterEnabled);
     }
@@ -106,5 +133,114 @@ describe('Sidebar', () => {
     );
     expect(markup).not.toContain('aria-label="nav.smartRouter"');
     expect(baseProps.onSmartRouterChange).not.toHaveBeenCalled();
+  });
+
+  it('waits for saved state, saves explicit toggles globally and blocks repeated clicks while pending', async () => {
+    act(() => {
+      renderer = create(<Sidebar {...baseProps} smartRouterGroups={[]} />);
+    });
+    const toggle = () =>
+      renderer.root.findByProps({ role: 'switch', 'aria-label': 'voice.enableInput' });
+    expect(renderer.root.findAllByProps({ 'aria-label': 'voice.enableInput' })).toHaveLength(0);
+    expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
+    act(() => voice.setState({ snapshot: voiceSnapshot({ config: sourceConfig }) }));
+    expect(toggle().props.disabled).toBe(false);
+    let finish!: (snapshot: ReturnType<typeof voiceSnapshot>) => void;
+    vi.mocked(voiceApi.saveVoiceConfig).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+    );
+    act(() => toggle().props.onClick());
+    const enabled = { ...sourceConfig, shortcutEnabled: true };
+    expect(voiceApi.saveVoiceConfig).toHaveBeenCalledExactlyOnceWith(enabled);
+    expect(toggle().props['aria-busy']).toBe(true);
+    expect(toggle().props.disabled).toBe(true);
+    act(() => toggle().props.onClick());
+    expect(voiceApi.saveVoiceConfig).toHaveBeenCalledTimes(1);
+    await act(async () => finish(voiceSnapshot({ config: enabled, revision: 2 })));
+    expect(toggle().props['aria-checked']).toBe(true);
+    vi.mocked(voiceApi.saveVoiceConfig).mockResolvedValueOnce(
+      voiceSnapshot({ config: sourceConfig, revision: 3 })
+    );
+    await act(async () => toggle().props.onClick());
+    expect(voiceApi.saveVoiceConfig).toHaveBeenLastCalledWith(sourceConfig);
+    expect(toggle().props['aria-checked']).toBe(false);
+    expect(voiceApi.recordVoice).not.toHaveBeenCalled();
+    expect(voiceApi.startVoice).not.toHaveBeenCalled();
+    expect(voiceApi.stopVoice).not.toHaveBeenCalled();
+    expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it('preserves the checked state when saving fails and stays available across pages', async () => {
+    const config = { ...sourceConfig, shortcutEnabled: true };
+    voice.setState({ snapshot: voiceSnapshot({ config }) });
+    vi.mocked(voiceApi.saveVoiceConfig).mockRejectedValueOnce('voice.error.shortcut');
+    act(() => {
+      renderer = create(<Sidebar {...baseProps} smartRouterGroups={routerGroups} />);
+    });
+    const toggle = () =>
+      renderer.root.findByProps({ role: 'switch', 'aria-label': 'voice.enableInput' });
+    await act(async () => toggle().props.onClick());
+    expect(toggle().props['aria-checked']).toBe(true);
+    expect(toggle().props.disabled).toBe(false);
+    expect(voice.getState().error).toBe('voice.error.shortcut');
+    expect(showToast).toHaveBeenCalledExactlyOnceWith('error', 'voice.error.shortcut');
+    for (const activePage of ['voice', 'models', 'apps'] as const) {
+      act(() =>
+        renderer.update(
+          <Sidebar {...baseProps} activePage={activePage} smartRouterGroups={routerGroups} />
+        )
+      );
+      expect(toggle().props['aria-checked']).toBe(true);
+    }
+    expect(voiceApi.saveVoiceConfig).toHaveBeenCalledTimes(1);
+    expect(voiceApi.getVoiceState).not.toHaveBeenCalled();
+    expect(voiceApi.recordVoice).not.toHaveBeenCalled();
+    expect(voiceApi.startVoice).not.toHaveBeenCalled();
+    expect(baseProps.onSmartRouterChange).not.toHaveBeenCalled();
+  });
+
+  it.each(['starting', 'testing', 'recording', 'transcribing', 'optimizing', 'inserting'] as const)(
+    'blocks the global toggle while %s without writing or interrupting audio',
+    async (phase) => {
+      voice.setState({ snapshot: voiceSnapshot({ phase, config: sourceConfig }) });
+      act(() => {
+        renderer = create(<Sidebar {...baseProps} smartRouterGroups={routerGroups} />);
+      });
+      const toggle = renderer.root.findByProps({
+        role: 'switch',
+        'aria-label': 'voice.enableInput',
+      });
+      expect(toggle.props.disabled).toBe(true);
+      await act(async () => toggle.props.onClick());
+      expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
+      expect(voiceApi.recordVoice).not.toHaveBeenCalled();
+      expect(voiceApi.startVoice).not.toHaveBeenCalled();
+      expect(voiceApi.stopVoice).not.toHaveBeenCalled();
+      expect(showToast).not.toHaveBeenCalled();
+    }
+  );
+
+  it('hides source-less voice input and restores its switch when a source is added without enabling it', () => {
+    voice.setState({ snapshot: voiceSnapshot() });
+    act(() => {
+      renderer = create(<Sidebar {...baseProps} smartRouterGroups={routerGroups} />);
+    });
+    expect(renderer.root.findAllByProps({ 'aria-label': 'voice.enableInput' })).toHaveLength(0);
+    expect(renderer.root.findByProps({ 'aria-label': 'nav.smartRouter' })).toBeDefined();
+    act(() => voice.getState().accept(voiceSnapshot({ config: sourceConfig, revision: 2 })));
+    expect(
+      renderer.root.findByProps({ role: 'switch', 'aria-label': 'voice.enableInput' }).props[
+        'aria-checked'
+      ]
+    ).toBe(false);
+    act(() => voice.getState().accept(voiceSnapshot({ revision: 3 })));
+    expect(renderer.root.findAllByProps({ 'aria-label': 'voice.enableInput' })).toHaveLength(0);
+    expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
+    expect(voiceApi.getVoiceState).not.toHaveBeenCalled();
+    expect(voiceApi.recordVoice).not.toHaveBeenCalled();
+    expect(voiceApi.startVoice).not.toHaveBeenCalled();
+    expect(showToast).not.toHaveBeenCalled();
   });
 });

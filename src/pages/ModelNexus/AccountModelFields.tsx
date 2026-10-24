@@ -21,12 +21,14 @@ export function AccountModelFields({
   modelIdOptions,
   setForm,
   active = true,
+  voice = false,
 }: {
   source: AccountSource;
   modelId: string;
   modelIdOptions?: string[];
   setForm: React.Dispatch<React.SetStateAction<NewModelForm>>;
   active?: boolean;
+  voice?: boolean;
 }) {
   const { t } = useI18n();
   const { showToast } = useToast();
@@ -109,6 +111,10 @@ export function AccountModelFields({
   );
   const fetchModels = useCallback(async () => {
     if (!active || !accountId || fetchingRef.current) return;
+    if (voice) {
+      applyModels([`workbuddy:${accountId}`]);
+      return;
+    }
     const attempt = ++revision.current;
     fetchingRef.current = true;
     setFetching(true);
@@ -148,7 +154,7 @@ export function AccountModelFields({
         setFetching(false);
       }
     }
-  }, [provider, accountId, active, applyModels, showToast]);
+  }, [provider, accountId, active, applyModels, showToast, voice]);
 
   useEffect(() => {
     const attempt = ++revision.current;
@@ -157,6 +163,10 @@ export function AccountModelFields({
       if (attempt !== revision.current) return;
       setFetching(false);
       if (active && accountId && !waitingForLabels) {
+        if (voice) {
+          applyModels([`workbuddy:${accountId}`]);
+          return;
+        }
         const cached = getCachedAccountProxyModels({ provider, accountId });
         if (cached !== undefined) applyModels(cached);
         else void fetchModels();
@@ -166,7 +176,7 @@ export function AccountModelFields({
       revision.current += 1;
       fetchingRef.current = false;
     };
-  }, [provider, accountId, active, waitingForLabels, applyModels, fetchModels]);
+  }, [provider, accountId, active, waitingForLabels, applyModels, fetchModels, voice]);
 
   const selectSource = (next: AccountSource) => {
     if (!active) return;
@@ -191,6 +201,9 @@ export function AccountModelFields({
   const savedAccounts = accounts.filter((account) => account.source.provider === provider);
   const selectedAccount = savedAccounts.find((account) => account.source.accountId === accountId);
   const modelLabels = selectedAccount?.modelLabels;
+  const providers = voice
+    ? accountProxyProviders.filter((entry) => entry.id === 'workBuddy')
+    : accountProxyProviders;
   return (
     <>
       <div>
@@ -203,10 +216,8 @@ export function AccountModelFields({
           inferFreeFromId={false}
           disabled={!active}
           value={provider}
-          options={accountProxyProviders.map((entry) => entry.id)}
-          optionLabels={Object.fromEntries(
-            accountProxyProviders.map((entry) => [entry.id, entry.name])
-          )}
+          options={providers.map((entry) => entry.id)}
+          optionLabels={Object.fromEntries(providers.map((entry) => [entry.id, entry.name]))}
           onChange={(value) => selectSource({ provider: value as AccountProvider, accountId: '' })}
         />
       </div>
@@ -257,7 +268,7 @@ export function AccountModelFields({
                 : form
             );
           }}
-          onRefresh={() => void fetchModels()}
+          onRefresh={voice ? undefined : () => void fetchModels()}
           refreshLabel={t('btn.refresh')}
           refreshing={fetching}
         />

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import * as api from '../../api/tauri';
 import * as accountApi from '../../api/accountProxy';
 import { useNavigationStore } from '../../stores/navigationStore';
+import { useAccountAccessRiskStore } from '../../stores/accountAccessRiskStore';
 import { loadLocale, translate, type TKey } from '../../i18n';
 import { FreeModelsPanel, FreeModelsProvider } from './FreeModels';
 
@@ -128,6 +129,7 @@ function expectPassive() {
 }
 
 beforeEach(async () => {
+  useAccountAccessRiskStore.setState({ acknowledged: false, hydrated: false });
   language.locale = 'zh-Hans';
   await loadLocale(language.locale);
   stored = new Map();
@@ -163,6 +165,7 @@ afterEach(() => {
 
 it('locks both account entry points for missing, damaged or unreadable acknowledgement without rewriting storage', async () => {
   for (const value of [null, 'false', 'TRUE', '1', 'damaged']) {
+    useAccountAccessRiskStore.setState({ acknowledged: false, hydrated: false });
     stored.clear();
     if (value !== null) stored.set(storageKey, value);
     await openAccountTab();
@@ -174,6 +177,7 @@ it('locks both account entry points for missing, damaged or unreadable acknowled
     expect(context.setShowAddModelModal).not.toHaveBeenCalled();
     act(() => renderer.unmount());
   }
+  useAccountAccessRiskStore.setState({ acknowledged: false, hydrated: false });
   getItem.mockImplementation(() => {
     throw new Error('Storage read unavailable');
   });

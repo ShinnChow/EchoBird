@@ -879,6 +879,9 @@ pub fn run() {
             // bypasses the WebView's clipboard-read permission prompt.
             app.handle()
                 .plugin(tauri_plugin_clipboard_manager::init())?;
+            app.handle()
+                .plugin(tauri_plugin_global_shortcut::Builder::new().build())?;
+            services::voice_input::init(app.handle());
 
             // Register dialog plugin (native file pickers, used by the
             // "我的AI项目" Add dialog for icon / launcher / models.json paths)
@@ -1408,6 +1411,18 @@ pub fn run() {
             pulse_commands::pulse_load_all,
             settings_commands::set_avatar,
             settings_commands::get_avatar,
+            commands::voice_input_commands::voice_input_state,
+            commands::voice_input_commands::voice_input_models,
+            commands::voice_input_commands::voice_input_devices,
+            commands::voice_input_commands::voice_input_save,
+            commands::voice_input_commands::voice_input_start,
+            commands::voice_input_commands::voice_input_record,
+            commands::voice_input_commands::voice_input_stop,
+            commands::voice_input_commands::voice_input_cancel,
+            commands::voice_input_commands::voice_input_suspend,
+            commands::voice_input_commands::voice_input_island_ready,
+            commands::voice_input_commands::voice_input_copy_result,
+            commands::voice_input_commands::voice_input_show_main,
         ])
         .build(context)
         .expect("error while building tauri application")
@@ -1433,6 +1448,7 @@ pub fn run() {
                     // Otherwise, let it close normally
                 }
                 tauri::RunEvent::Exit => {
+                    services::voice_input::shutdown(app_handle);
                     // Clean up llama-server (our spawned local LLM). The
                     // codex launcher we don't touch — if it's still running
                     // when EchoBird exits, that's fine; the user keeps

@@ -2,10 +2,12 @@
 import React, { createContext, useContext } from 'react';
 import type { AccountSource, ModelConfig } from '../../api/types';
 import type { ModelUsageData } from '../../api/tauri';
+import type { VoiceApiOptions } from '../../api/voiceInput';
 
 // ===== Types =====
 
 export interface NewModelForm {
+  voiceOptions?: VoiceApiOptions;
   name: string;
   baseUrl: string;
   anthropicUrl: string;
@@ -20,7 +22,7 @@ export interface NewModelForm {
   accountSource?: AccountSource;
 }
 
-export type ModelModalDestination = 'modelNexus' | 'freeRouter';
+export type ModelModalDestination = 'modelNexus' | 'freeRouter' | 'voiceInput';
 
 export interface ModelNexusCtx {
   // Models

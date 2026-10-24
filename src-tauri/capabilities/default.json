@@ -4,6 +4,7 @@
   "description": "enables the default permissions",
   "windows": [
     "main",
+    "voice-island",
     "tool-*"
   ],
   "permissions": [

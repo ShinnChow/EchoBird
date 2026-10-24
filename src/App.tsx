@@ -33,6 +33,13 @@ import { MotherAgentProvider } from './pages/MotherAgent/MotherAgentProvider';
 import { AiPulseProvider } from './pages/AiPulse/provider';
 import { FreeModelsProvider, useFreeModels } from './pages/FreeModels/provider';
 import { useMyProjectsStore } from './stores/myProjectsStore';
+import { VoiceInputProvider } from './pages/VoiceInput/provider';
+const VoiceInputMain = lazy(() =>
+  import('./pages/VoiceInput/VoiceInput').then((module) => ({ default: module.VoiceInputMain }))
+);
+const VoiceInputPanel = lazy(() =>
+  import('./pages/VoiceInput/VoiceInput').then((module) => ({ default: module.VoiceInputPanel }))
+);
 const ModelNexusTitleActions = lazy(() =>
   import('./pages/ModelNexus/ModelNexus').then((module) => ({
     default: module.ModelNexusTitleActions,
@@ -357,238 +364,254 @@ function AppContent() {
               <ModelNexusProvider>
                 <AppManagerProvider>
                   <LocalServerProvider>
-                    <div
-                      className={`relative isolate flex flex-col h-screen w-full bg-cyber-bg overflow-hidden ${isMaximized || IS_MACOS ? '' : 'rounded-xl'}`}
-                    >
-                      <AppBackground />
-                      {/* Title bar */}
-                      <TitleBar
-                        onSettingsClick={() => setShowSettings(true)}
-                        onFeedbackClick={() => setActivePage('feedback')}
-                        onChangelogClick={() => setShowChangelog(true)}
-                      />
-                      <div className="flex flex-1 overflow-hidden text-cyber-text font-sans p-4 gap-0 relative isolate">
-                        {/* Sidebar */}
-                        <SidebarConnected onSettingsClick={() => setShowSettings(true)} />
+                    <VoiceInputProvider>
+                      <div
+                        className={`relative isolate flex flex-col h-screen w-full bg-cyber-bg overflow-hidden ${isMaximized || IS_MACOS ? '' : 'rounded-xl'}`}
+                      >
+                        <AppBackground />
+                        {/* Title bar */}
+                        <TitleBar
+                          onSettingsClick={() => setShowSettings(true)}
+                          onFeedbackClick={() => setActivePage('feedback')}
+                          onChangelogClick={() => setShowChangelog(true)}
+                        />
+                        <div className="flex flex-1 overflow-hidden text-cyber-text font-sans p-4 gap-0 relative isolate">
+                          {/* Sidebar */}
+                          <SidebarConnected onSettingsClick={() => setShowSettings(true)} />
 
-                        {/* Main content wrapper — transparent against page bg, Claude-style */}
-                        <div className="flex-1 flex flex-col overflow-hidden">
-                          {/* Main + Right panel row */}
-                          <div className="flex-1 flex gap-3 overflow-hidden">
-                            <main className="flex-1 flex flex-col overflow-hidden">
-                              <section className="flex-1 flex flex-col overflow-hidden pr-2">
-                                {/* Shared page title bar — fixed-height row so the title sits at the same baseline whether the page has tall action buttons or none */}
-                                <div className="page-title-bar mb-5 flex-shrink-0 flex items-center gap-3 h-10">
-                                  <div className="flex items-baseline gap-3 flex-1 min-w-0">
-                                    <h2 className="cjk-title flex-shrink-0">
-                                      {is('models') && t('page.modelNexus')}
-                                      {is('accounts') && t('page.accountCenter')}
-                                      {is('freeModels') && t('page.freeModels')}
+                          {/* Main content wrapper — transparent against page bg, Claude-style */}
+                          <div className="flex-1 flex flex-col overflow-hidden">
+                            {/* Main + Right panel row */}
+                            <div className="flex-1 flex gap-3 overflow-hidden">
+                              <main className="flex-1 flex flex-col overflow-hidden">
+                                <section className="flex-1 flex flex-col overflow-hidden pr-2">
+                                  {/* Shared page title bar — fixed-height row so the title sits at the same baseline whether the page has tall action buttons or none */}
+                                  <div className="page-title-bar mb-5 flex-shrink-0 flex items-center gap-3 h-10">
+                                    <div className="flex items-baseline gap-3 flex-1 min-w-0">
+                                      <h2 className="cjk-title flex-shrink-0">
+                                        {is('models') && t('page.modelNexus')}
+                                        {is('accounts') && t('page.accountCenter')}
+                                        {is('freeModels') && t('page.freeModels')}
 
-                                      {is('apps') && t('page.appManager')}
-                                      {is('myProjects') && t('page.myProjects')}
-                                      {is('aiCareer') && t('page.aiCareer')}
-                                      {is('aiNews') && t('page.aiNews')}
-                                      {is('localLlm') && t('page.localServer')}
-                                      {is('mother') && t('page.motherAgent')}
-                                      {is('feedback') && t('page.feedback')}
-                                    </h2>
-                                    <div className="page-kicker truncate" aria-hidden="true">
-                                      {is('models') && 'MODELS'}
-                                      {is('accounts') && 'ACCOUNTS'}
-                                      {is('freeModels') &&
-                                        (locale.startsWith('zh') ? 'ACCESS' : 'ROUTER')}
-                                      {is('apps') && 'DESKTOP'}
-                                      {is('myProjects') && 'VIBE CODING'}
-                                      {is('aiCareer') && 'CAREER'}
-                                      {is('aiNews') && 'NEWS'}
-                                      {is('localLlm') && 'RUNTIME'}
-                                      {is('mother') && 'AGENT'}
-                                      {is('feedback') && 'SUPPORT'}
+                                        {is('apps') && t('page.appManager')}
+                                        {is('myProjects') && t('page.myProjects')}
+                                        {is('aiCareer') && t('page.aiCareer')}
+                                        {is('voice') && t('voice.input')}
+                                        {is('aiNews') && t('page.aiNews')}
+                                        {is('localLlm') && t('page.localServer')}
+                                        {is('mother') && t('page.motherAgent')}
+                                        {is('feedback') && t('page.feedback')}
+                                      </h2>
+                                      <div className="page-kicker truncate" aria-hidden="true">
+                                        {is('models') && 'MODELS'}
+                                        {is('accounts') && 'ACCOUNTS'}
+                                        {is('freeModels') &&
+                                          (locale.startsWith('zh') ? 'ACCESS' : 'ROUTER')}
+                                        {is('apps') && 'DESKTOP'}
+                                        {is('myProjects') && 'VIBE CODING'}
+                                        {is('aiCareer') && 'CAREER'}
+                                        {is('voice') && 'VOICE'}
+                                        {is('aiNews') && 'NEWS'}
+                                        {is('localLlm') && 'RUNTIME'}
+                                        {is('mother') && 'AGENT'}
+                                        {is('feedback') && 'SUPPORT'}
+                                      </div>
                                     </div>
+                                    {/* Title actions — always mounted but hidden */}
+                                    <span className={page(is('models'))}>
+                                      <OnFirstVisit active={is('models')}>
+                                        <ModelNexusTitleActions />
+                                      </OnFirstVisit>
+                                    </span>
+                                    <span className={page(is('accounts'))}>
+                                      <OnFirstVisit active={is('accounts')}>
+                                        <AccountCenterTitleActions />
+                                      </OnFirstVisit>
+                                    </span>
+                                    <span className={page(is('freeModels'))}>
+                                      <OnFirstVisit active={is('freeModels')}>
+                                        <FreeModelsTitleActions />
+                                      </OnFirstVisit>
+                                    </span>
+                                    <span className={page(is('aiCareer'))}>
+                                      <OnFirstVisit active={is('aiCareer')}>
+                                        <AiCareerTitleActions />
+                                      </OnFirstVisit>
+                                    </span>
+                                    <span className={page(is('aiNews'))}>
+                                      <OnFirstVisit active={is('aiNews')}>
+                                        <AiPulseTitleActions />
+                                      </OnFirstVisit>
+                                    </span>
+                                    <span className={page(is('apps'))}>
+                                      <OnFirstVisit active={is('apps') || is('myProjects')}>
+                                        <AppManagerTitleActions />
+                                      </OnFirstVisit>
+                                    </span>
                                   </div>
-                                  {/* Title actions — always mounted but hidden */}
-                                  <span className={page(is('models'))}>
+
+                                  {/* Page content — always mounted, CSS hidden */}
+                                  <div className={pageScroll(is('models'))}>
                                     <OnFirstVisit active={is('models')}>
-                                      <ModelNexusTitleActions />
+                                      <ModelNexusMain />
                                     </OnFirstVisit>
-                                  </span>
-                                  <span className={page(is('accounts'))}>
+                                  </div>
+                                  <div
+                                    className={
+                                      is('accounts')
+                                        ? 'flex-1 overflow-y-auto overflow-x-hidden cursor-default'
+                                        : 'hidden'
+                                    }
+                                  >
                                     <OnFirstVisit active={is('accounts')}>
-                                      <AccountCenterTitleActions />
+                                      <AccountCenterMain />
                                     </OnFirstVisit>
-                                  </span>
-                                  <span className={page(is('freeModels'))}>
+                                  </div>
+                                  <div
+                                    className={
+                                      is('freeModels') ? 'flex-1 overflow-y-auto' : 'hidden'
+                                    }
+                                  >
                                     <OnFirstVisit active={is('freeModels')}>
-                                      <FreeModelsTitleActions />
+                                      <FreeModelsMain />
                                     </OnFirstVisit>
-                                  </span>
-                                  <span className={page(is('aiCareer'))}>
-                                    <OnFirstVisit active={is('aiCareer')}>
-                                      <AiCareerTitleActions />
-                                    </OnFirstVisit>
-                                  </span>
-                                  <span className={page(is('aiNews'))}>
-                                    <OnFirstVisit active={is('aiNews')}>
-                                      <AiPulseTitleActions />
-                                    </OnFirstVisit>
-                                  </span>
-                                  <span className={page(is('apps'))}>
+                                  </div>
+
+                                  <div className={pageBlock(is('apps'))}>
                                     <OnFirstVisit active={is('apps') || is('myProjects')}>
-                                      <AppManagerTitleActions />
+                                      <AppManagerMain />
                                     </OnFirstVisit>
-                                  </span>
-                                </div>
+                                  </div>
+                                  <div className={pageBlock(is('myProjects'))}>
+                                    <OnFirstVisit active={is('myProjects')}>
+                                      <MyProjectsMain />
+                                    </OnFirstVisit>
+                                  </div>
+                                  <div className={pageBlock(is('localLlm'))}>
+                                    <OnFirstVisit active={is('localLlm')}>
+                                      <LocalServerMain />
+                                    </OnFirstVisit>
+                                  </div>
+                                  <div className={pageBlock(is('aiCareer'))}>
+                                    <OnFirstVisit active={is('aiCareer')}>
+                                      <AiCareerMain />
+                                    </OnFirstVisit>
+                                  </div>
+                                  <div className={pageBlock(is('voice'))}>
+                                    <OnFirstVisit active={is('voice')}>
+                                      <VoiceInputMain />
+                                    </OnFirstVisit>
+                                  </div>
+                                  <div className={pageBlock(is('aiNews'))}>
+                                    <OnFirstVisit active={is('aiNews')}>
+                                      <AiNewsMain />
+                                    </OnFirstVisit>
+                                  </div>
+                                  {/* MotherAgent: always mounted, hidden via CSS to preserve chat state */}
+                                  <div
+                                    className={`flex-1 flex flex-col overflow-hidden ${is('mother') ? '' : 'hidden'}`}
+                                  >
+                                    <OnFirstVisit active={is('mother')}>
+                                      <MotherAgentMain />
+                                    </OnFirstVisit>
+                                  </div>
+                                  <div className={pageScroll(is('feedback'))}>
+                                    <OnFirstVisit active={is('feedback')}>
+                                      <FeedbackMain />
+                                    </OnFirstVisit>
+                                  </div>
+                                </section>
+                              </main>
 
-                                {/* Page content — always mounted, CSS hidden */}
-                                <div className={pageScroll(is('models'))}>
+                              <aside className="w-80 flex flex-col">
+                                <div className={page(is('voice'))}>
+                                  <OnFirstVisit active={is('voice')}>
+                                    <VoiceInputPanel />
+                                  </OnFirstVisit>
+                                </div>
+                                <div className={page(is('models'))}>
                                   <OnFirstVisit active={is('models')}>
-                                    <ModelNexusMain />
+                                    <ModelNexusPanel />
                                   </OnFirstVisit>
                                 </div>
-                                <div
-                                  className={
-                                    is('accounts')
-                                      ? 'flex-1 overflow-y-auto overflow-x-hidden cursor-default'
-                                      : 'hidden'
-                                  }
-                                >
+                                <div className={page(is('accounts'))}>
                                   <OnFirstVisit active={is('accounts')}>
-                                    <AccountCenterMain />
+                                    <AccountCenterPanel />
                                   </OnFirstVisit>
                                 </div>
-                                <div
-                                  className={is('freeModels') ? 'flex-1 overflow-y-auto' : 'hidden'}
-                                >
+                                <div className={page(is('freeModels'))}>
                                   <OnFirstVisit active={is('freeModels')}>
-                                    <FreeModelsMain />
+                                    <FreeModelsPanel />
                                   </OnFirstVisit>
                                 </div>
 
-                                <div className={pageBlock(is('apps'))}>
-                                  <OnFirstVisit active={is('apps') || is('myProjects')}>
-                                    <AppManagerMain />
-                                  </OnFirstVisit>
+                                <div className={page(is('apps') || is('myProjects'))}>
+                                  {useMyProjectsPanel ? (
+                                    <OnFirstVisit active={is('myProjects')}>
+                                      <MyProjectsPanel />
+                                    </OnFirstVisit>
+                                  ) : (
+                                    <OnFirstVisit active={is('apps') || is('myProjects')}>
+                                      <AppManagerPanel />
+                                    </OnFirstVisit>
+                                  )}
                                 </div>
-                                <div className={pageBlock(is('myProjects'))}>
-                                  <OnFirstVisit active={is('myProjects')}>
-                                    <MyProjectsMain />
-                                  </OnFirstVisit>
-                                </div>
-                                <div className={pageBlock(is('localLlm'))}>
+                                <div className={page(is('localLlm'))}>
                                   <OnFirstVisit active={is('localLlm')}>
-                                    <LocalServerMain />
+                                    <LocalServerPanel />
                                   </OnFirstVisit>
                                 </div>
-                                <div className={pageBlock(is('aiCareer'))}>
+                                <div className={page(is('aiCareer'))}>
                                   <OnFirstVisit active={is('aiCareer')}>
-                                    <AiCareerMain />
+                                    <AiCareerFamilyPanel />
                                   </OnFirstVisit>
                                 </div>
-                                <div className={pageBlock(is('aiNews'))}>
+                                <div className={page(is('aiNews'))}>
                                   <OnFirstVisit active={is('aiNews')}>
-                                    <AiNewsMain />
+                                    <AiPulsePanel />
                                   </OnFirstVisit>
                                 </div>
-                                {/* MotherAgent: always mounted, hidden via CSS to preserve chat state */}
-                                <div
-                                  className={`flex-1 flex flex-col overflow-hidden ${is('mother') ? '' : 'hidden'}`}
-                                >
+                                {/* MotherAgent panel: always mounted, hidden via CSS */}
+                                <div className={!is('mother') ? 'hidden' : 'contents'}>
                                   <OnFirstVisit active={is('mother')}>
-                                    <MotherAgentMain />
+                                    <MotherAgentPanel />
                                   </OnFirstVisit>
                                 </div>
-                                <div className={pageScroll(is('feedback'))}>
-                                  <OnFirstVisit active={is('feedback')}>
-                                    <FeedbackMain />
-                                  </OnFirstVisit>
-                                </div>
-                              </section>
-                            </main>
+                              </aside>
+                            </div>
 
-                            <aside className="w-80 flex flex-col">
-                              <div className={page(is('models'))}>
-                                <OnFirstVisit active={is('models')}>
-                                  <ModelNexusPanel />
+                            {/* Bottom bars — always mounted, CSS hidden */}
+                            <div className={page(is('apps') || is('myProjects'))}>
+                              {useMyProjectsPanel ? (
+                                <OnFirstVisit active={is('myProjects')}>
+                                  <MyProjectsBottom />
                                 </OnFirstVisit>
-                              </div>
-                              <div className={page(is('accounts'))}>
-                                <OnFirstVisit active={is('accounts')}>
-                                  <AccountCenterPanel />
+                              ) : (
+                                <OnFirstVisit active={is('apps') || is('myProjects')}>
+                                  <AppManagerBottom />
                                 </OnFirstVisit>
-                              </div>
-                              <div className={page(is('freeModels'))}>
-                                <OnFirstVisit active={is('freeModels')}>
-                                  <FreeModelsPanel />
-                                </OnFirstVisit>
-                              </div>
-
-                              <div className={page(is('apps') || is('myProjects'))}>
-                                {useMyProjectsPanel ? (
-                                  <OnFirstVisit active={is('myProjects')}>
-                                    <MyProjectsPanel />
-                                  </OnFirstVisit>
-                                ) : (
-                                  <OnFirstVisit active={is('apps') || is('myProjects')}>
-                                    <AppManagerPanel />
-                                  </OnFirstVisit>
-                                )}
-                              </div>
-                              <div className={page(is('localLlm'))}>
-                                <OnFirstVisit active={is('localLlm')}>
-                                  <LocalServerPanel />
-                                </OnFirstVisit>
-                              </div>
-                              <div className={page(is('aiCareer'))}>
-                                <OnFirstVisit active={is('aiCareer')}>
-                                  <AiCareerFamilyPanel />
-                                </OnFirstVisit>
-                              </div>
-                              <div className={page(is('aiNews'))}>
-                                <OnFirstVisit active={is('aiNews')}>
-                                  <AiPulsePanel />
-                                </OnFirstVisit>
-                              </div>
-                              {/* MotherAgent panel: always mounted, hidden via CSS */}
-                              <div className={!is('mother') ? 'hidden' : 'contents'}>
-                                <OnFirstVisit active={is('mother')}>
-                                  <MotherAgentPanel />
-                                </OnFirstVisit>
-                              </div>
-                            </aside>
-                          </div>
-
-                          {/* Bottom bars — always mounted, CSS hidden */}
-                          <div className={page(is('apps') || is('myProjects'))}>
-                            {useMyProjectsPanel ? (
-                              <OnFirstVisit active={is('myProjects')}>
-                                <MyProjectsBottom />
+                              )}
+                            </div>
+                            <div className={page(is('localLlm'))}>
+                              <OnFirstVisit active={is('localLlm')}>
+                                <LocalServerBottom />
                               </OnFirstVisit>
-                            ) : (
-                              <OnFirstVisit active={is('apps') || is('myProjects')}>
-                                <AppManagerBottom />
-                              </OnFirstVisit>
-                            )}
-                          </div>
-                          <div className={page(is('localLlm'))}>
-                            <OnFirstVisit active={is('localLlm')}>
-                              <LocalServerBottom />
-                            </OnFirstVisit>
-                          </div>
+                            </div>
 
-                          {/* Download bar */}
-                          <div className="flex-shrink-0 pt-2">
-                            <DownloadBar />
+                            {/* Download bar */}
+                            <div className="flex-shrink-0 pt-2">
+                              <DownloadBar />
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Modals */}
-                    <ModelDialogs />
-                    <OnFirstVisit active={is('apps') || is('myProjects')}>
-                      <AppManagerErrorModal />
-                    </OnFirstVisit>
+                      {/* Modals */}
+                      <ModelDialogs />
+                      <OnFirstVisit active={is('apps') || is('myProjects')}>
+                        <AppManagerErrorModal />
+                      </OnFirstVisit>
+                    </VoiceInputProvider>
                   </LocalServerProvider>
                 </AppManagerProvider>
               </ModelNexusProvider>

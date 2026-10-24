@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 interface MiniSelectProps {
@@ -22,7 +22,29 @@ export const MiniSelect: React.FC<MiniSelectProps> = ({
   accent = 'green',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [menuMaxHeight, setMenuMaxHeight] = useState(360);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!isOpen || !dropUp) return;
+    const resizeMenu = () => {
+      const container = containerRef.current;
+      if (!container) return;
+      const anchor = container.getBoundingClientRect();
+      const boundary = container
+        .closest('.overflow-y-auto, .overflow-hidden')
+        ?.getBoundingClientRect();
+      const top = Math.max(0, boundary?.top ?? 0) + 8;
+      setMenuMaxHeight(Math.max(0, Math.min(360, anchor.top - top - 1)));
+    };
+    resizeMenu();
+    window.addEventListener('resize', resizeMenu);
+    window.addEventListener('scroll', resizeMenu, true);
+    return () => {
+      window.removeEventListener('resize', resizeMenu);
+      window.removeEventListener('scroll', resizeMenu, true);
+    };
+  }, [isOpen, dropUp]);
 
   // Close on click outside
   useEffect(() => {
@@ -72,7 +94,8 @@ export const MiniSelect: React.FC<MiniSelectProps> = ({
 
       {isOpen && (
         <div
-          className={`absolute ${dropUp ? 'bottom-full mb-px' : 'top-full mt-px'} left-0 right-0 bg-cyber-surface/90 border ${accentDropdownBorder} max-h-80 overflow-y-auto z-50 rounded-button shadow-lg`}
+          style={dropUp ? { maxHeight: menuMaxHeight, overscrollBehavior: 'contain' } : undefined}
+          className={`absolute ${dropUp ? 'bottom-full mb-px bg-cyber-surface' : 'top-full mt-px bg-cyber-surface/90'} left-0 right-0 border ${accentDropdownBorder} max-h-80 overflow-y-auto z-50 rounded-button shadow-lg`}
         >
           {options.map((option) => (
             <div

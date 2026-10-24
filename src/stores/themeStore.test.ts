@@ -3,6 +3,8 @@ import startupHtml from '../../index.html?raw';
 
 const api = vi.hoisted(() => ({ getSettings: vi.fn(), saveSettings: vi.fn() }));
 vi.mock('../api/tauri', () => api);
+const events = vi.hoisted(() => ({ emit: vi.fn() }));
+vi.mock('@tauri-apps/api/event', () => events);
 
 let store: typeof import('./themeStore').useThemeStore;
 let storage: Map<string, string>;
@@ -29,6 +31,7 @@ beforeEach(async () => {
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => callback(0));
   api.getSettings.mockResolvedValue({ themeMode: 'dark' });
   api.saveSettings.mockResolvedValue(undefined);
+  events.emit.mockResolvedValue(undefined);
   store = (await import('./themeStore')).useThemeStore;
 });
 
@@ -78,6 +81,10 @@ describe('default theme and saved preferences', () => {
   it('persists an explicit system choice and restores it after restart', async () => {
     await store.getState().init();
     store.getState().setMode('system');
+    expect(events.emit).toHaveBeenCalledWith('echobird-theme-changed', {
+      mode: 'system',
+      colorTheme: 'oatgray',
+    });
     await vi.waitFor(() => expect(api.saveSettings).toHaveBeenCalledOnce());
     const saved = api.saveSettings.mock.calls[0][0];
     expect(saved.themeMode).toBeUndefined();
@@ -87,6 +94,46 @@ describe('default theme and saved preferences', () => {
     store = (await import('./themeStore')).useThemeStore;
     await store.getState().init();
     expect(store.getState()).toMatchObject({ mode: 'system', resolved: 'light' });
+  });
+
+  it('broadcasts an explicit palette change with the current appearance mode', async () => {
+    await store.getState().init();
+    store.getState().setColorTheme('aurora');
+    expect(events.emit).toHaveBeenCalledExactlyOnceWith('echobird-theme-changed', {
+      mode: 'dark',
+      colorTheme: 'aurora',
+    });
+    await vi.waitFor(() => expect(api.saveSettings).toHaveBeenCalledOnce());
+    expect(api.saveSettings.mock.calls[0][0]).toMatchObject({
+      themeMode: 'dark',
+      colorTheme: 'aurora',
+    });
+  });
+
+  it('syncs another window without rereading, saving or rebroadcasting settings', async () => {
+    await store.getState().init();
+    api.getSettings.mockClear();
+    store.getState().sync({ mode: 'light', colorTheme: 'aurora' });
+    expect(store.getState()).toMatchObject({
+      mode: 'light',
+      resolved: 'light',
+      colorTheme: 'aurora',
+    });
+    expect(root.dataset.theme).toBe('light');
+    expect(root.style.setProperty).toHaveBeenCalledWith('--bg-base-rgb', '243 249 247');
+    expect(api.getSettings).not.toHaveBeenCalled();
+    expect(api.saveSettings).not.toHaveBeenCalled();
+    expect(events.emit).not.toHaveBeenCalled();
+    store.getState().sync({ mode: 'system', colorTheme: 'forest' });
+    media.matches = true;
+    media.addEventListener.mock.calls[0][1]();
+    expect(store.getState()).toMatchObject({
+      mode: 'system',
+      resolved: 'dark',
+      colorTheme: 'forest',
+    });
+    expect(api.saveSettings).not.toHaveBeenCalled();
+    expect(events.emit).not.toHaveBeenCalled();
   });
 });
 

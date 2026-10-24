@@ -18,6 +18,7 @@ pub enum ModelScope {
     #[default]
     ModelCenter,
     SmartRouter,
+    VoiceInput,
 }
 
 impl ModelScope {

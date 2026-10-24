@@ -1,6 +1,6 @@
 // Model Nexus Page — Model cards, debug console, add/edit modal
 // Extracted from App.tsx with Provider pattern for shared state
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { readText as readClipboardText } from '@tauri-apps/plugin-clipboard-manager';
 import {
@@ -36,6 +36,11 @@ import { useFreeModels } from '../FreeModels/provider';
 import { AccountModelFields } from './AccountModelFields';
 import { ApiModelFields } from './ApiModelFields';
 import { isVolcengineUrl } from './provider';
+import { VoiceApiFields } from '../VoiceInput/VoiceApiFields';
+import { saveVoiceSource } from '../VoiceInput/sources';
+import { useVoiceInputStore, voiceBusy } from '../../stores/voiceInputStore';
+import { useNavigationStore } from '../../stores/navigationStore';
+import type { TKey } from '../../i18n/types';
 export { ModelNexusProvider } from './provider';
 
 const isZhipuCnUrl = (baseUrl: string, anthropicUrl?: string | null) => {
@@ -454,6 +459,9 @@ export function AddModelModal() {
   const { t } = useI18n();
   const { showToast } = useToast();
   const [isSavingModel, setIsSavingModel] = useState(false);
+  const voiceState = useVoiceInputStore();
+  const activePage = useNavigationStore((state) => state.activePage);
+  const voiceAttempt = useRef(0);
   const { addSelectedModel, updateSelectedModel } = useFreeModels();
   const {
     showAddModelModal,
@@ -471,7 +479,22 @@ export function AddModelModal() {
     setModelModalDestination,
   } = useModelNexus();
 
+  useLayoutEffect(() => {
+    voiceAttempt.current += 1;
+  }, [showAddModelModal, modelModalAnimatingOut, modelModalDestination, activePage]);
+  useEffect(() => {
+    if (showAddModelModal && modelModalDestination === 'voiceInput' && activePage !== 'voice')
+      closeModelModal();
+  }, [showAddModelModal, modelModalDestination, activePage, closeModelModal]);
+
   if (!showAddModelModal) return null;
+  const voiceForm = modelModalDestination === 'voiceInput';
+  const voiceDisabled =
+    voiceForm &&
+    (!voiceState.snapshot ||
+      voiceState.saving ||
+      voiceState.pending ||
+      voiceBusy(voiceState.snapshot.phase));
 
   // One-click paste affordance for the modal's free-text fields. Plain text,
   // no button styling / hover effect — the label never changes. The `normalize`
@@ -533,13 +556,15 @@ export function AddModelModal() {
                 ? newModelForm.accountSource
                   ? '编辑账号配置'
                   : t('model.editConfig')
-                : modelModalDestination === 'freeRouter'
-                  ? t(
-                      newModelForm.accountSource
-                        ? 'freeModels.addAccountToRouter'
-                        : 'freeModels.addToRouter'
-                    )
-                  : t('btn.addModel')}
+                : voiceForm
+                  ? t(newModelForm.accountSource ? 'voice.accountInput' : 'voice.addModel')
+                  : modelModalDestination === 'freeRouter'
+                    ? t(
+                        newModelForm.accountSource
+                          ? 'freeModels.addAccountToRouter'
+                          : 'freeModels.addToRouter'
+                      )
+                    : t('btn.addModel')}
             </span>
           </div>
           <button
@@ -574,13 +599,14 @@ export function AddModelModal() {
                 modelId={newModelForm.modelId}
                 modelIdOptions={newModelForm.modelIdOptions}
                 setForm={setNewModelForm}
-                active={!modelModalAnimatingOut}
+                active={!modelModalAnimatingOut && (!voiceForm || activePage === 'voice')}
+                voice={voiceForm}
               />
             ) : (
               <>
                 <div>
                   <label className="block text-xs text-cyber-text-secondary mb-1">
-                    {t('model.openaiUrl')}
+                    {t(voiceForm ? 'voice.apiUrl' : 'model.openaiUrl')}
                   </label>
                   <div className="relative">
                     <input
@@ -590,45 +616,57 @@ export function AddModelModal() {
                       onChange={(e) =>
                         setNewModelForm((prev) => ({
                           ...prev,
-                          baseUrl: normalizeOpenaiUrl(e.target.value),
+                          baseUrl: voiceForm ? e.target.value : normalizeOpenaiUrl(e.target.value),
                         }))
                       }
                       className="w-full bg-cyber-input border border-cyber-border px-2 py-1.5 pr-16 text-xs text-cyber-text font-mono focus:border-cyber-border focus:outline-none rounded-button"
                     />
-                    {pasteButton('baseUrl', normalizeOpenaiUrl)}
+                    {pasteButton(
+                      'baseUrl',
+                      voiceForm ? (value) => value.trim() : normalizeOpenaiUrl
+                    )}
                   </div>
                 </div>
-                <div>
-                  <label className="block text-xs text-cyber-text-secondary mb-1">
-                    {t('model.anthropicUrl')}
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="https://x.x.com/anthropic"
-                      value={newModelForm.anthropicUrl}
-                      onChange={(e) =>
-                        setNewModelForm((prev) => ({
-                          ...prev,
-                          anthropicUrl: normalizeAnthropicUrl(e.target.value),
-                        }))
-                      }
-                      className="w-full bg-cyber-input border border-cyber-border px-2 py-1.5 pr-16 text-xs text-cyber-text font-mono focus:border-cyber-border focus:outline-none rounded-button"
-                    />
-                    {pasteButton('anthropicUrl', normalizeAnthropicUrl)}
+                {!voiceForm && (
+                  <div>
+                    <label className="block text-xs text-cyber-text-secondary mb-1">
+                      {t('model.anthropicUrl')}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="https://x.x.com/anthropic"
+                        value={newModelForm.anthropicUrl}
+                        onChange={(e) =>
+                          setNewModelForm((prev) => ({
+                            ...prev,
+                            anthropicUrl: normalizeAnthropicUrl(e.target.value),
+                          }))
+                        }
+                        className="w-full bg-cyber-input border border-cyber-border px-2 py-1.5 pr-16 text-xs text-cyber-text font-mono focus:border-cyber-border focus:outline-none rounded-button"
+                      />
+                      {pasteButton('anthropicUrl', normalizeAnthropicUrl)}
+                    </div>
                   </div>
-                </div>
+                )}
               </>
             )}
-            {!newModelForm.accountSource && (
-              <ApiModelFields
-                key={editingModelId ?? 'new'}
-                form={newModelForm}
-                setForm={setNewModelForm}
-                editing={!!editingModelId}
-                active={!modelModalAnimatingOut && !isSavingModel}
-              />
-            )}
+            {!newModelForm.accountSource &&
+              (voiceForm ? (
+                <VoiceApiFields
+                  form={newModelForm}
+                  setForm={setNewModelForm}
+                  active={!modelModalAnimatingOut && !isSavingModel && !voiceDisabled}
+                />
+              ) : (
+                <ApiModelFields
+                  key={editingModelId ?? 'new'}
+                  form={newModelForm}
+                  setForm={setNewModelForm}
+                  editing={!!editingModelId}
+                  active={!modelModalAnimatingOut && !isSavingModel}
+                />
+              ))}
             {!newModelForm.accountSource && (
               <div>
                 <label className="block text-xs text-cyber-text-secondary mb-1">
@@ -744,9 +782,9 @@ export function AddModelModal() {
           </button>
           <button
             type="button"
-            disabled={isSavingModel}
+            disabled={isSavingModel || voiceDisabled}
             onClick={async () => {
-              if (isSavingModel) return;
+              if (isSavingModel || voiceDisabled) return;
               if (
                 !newModelForm.accountSource &&
                 newModelForm.baseUrl.trim() &&
@@ -763,8 +801,13 @@ export function AddModelModal() {
                 return;
               }
               setIsSavingModel(true);
+              const attempt = voiceAttempt.current;
+              const isCurrent = () => voiceAttempt.current === attempt;
               try {
-                if (editingModelId) {
+                if (voiceForm) {
+                  await saveVoiceSource(newModelForm, isCurrent);
+                  if (!isCurrent()) return;
+                } else if (editingModelId) {
                   const updatedModel = await api.updateModel(editingModelId, {
                     name: newModelForm.name,
                     baseUrl: newModelForm.baseUrl,
@@ -830,8 +873,17 @@ export function AddModelModal() {
                 setShowAddModelModal(false);
                 setModelModalDestination('modelNexus');
               } catch (error) {
+                if (voiceForm && !isCurrent()) return;
                 console.error('Save model failed:', error);
-                showToast('error', t('error.requestFailed'));
+                const message = error instanceof Error ? error.message : String(error);
+                showToast(
+                  'error',
+                  t(
+                    voiceForm && message.startsWith('voice.error.')
+                      ? (message as TKey)
+                      : 'error.requestFailed'
+                  )
+                );
               } finally {
                 setIsSavingModel(false);
               }

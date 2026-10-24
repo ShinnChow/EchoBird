@@ -1,6 +1,7 @@
 // Model APIs — CRUD, test, ping, encryption
 import { invoke } from '@tauri-apps/api/core';
 import type { AccountSource, ModelConfig, ModelTestResult, PingResult } from './types';
+import type { VoiceDirectoryEntry } from './voiceInput';
 
 export async function getModels(): Promise<ModelConfig[]> {
   return invoke('get_models');
@@ -42,7 +43,7 @@ export async function addModel(input: {
   accountSource?: AccountSource;
   anthropicUrl?: string;
   modelId?: string;
-  scope?: 'modelCenter' | 'smartRouter';
+  scope?: 'modelCenter' | 'smartRouter' | 'voiceInput';
 }): Promise<ModelConfig> {
   const result = await invoke<ModelConfig>('add_model', { input });
   window.dispatchEvent(new Event('models-changed'));
@@ -180,6 +181,7 @@ export interface ModelDirectoryEntry {
 
 /** Full directory payload — what `getModelDirectory` resolves to on success. */
 export interface ModelDirectory {
+  speechProviders?: VoiceDirectoryEntry[];
   providers: ModelDirectoryEntry[];
   relays: ModelDirectoryEntry[];
 }

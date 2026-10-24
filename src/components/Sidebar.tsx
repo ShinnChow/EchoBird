@@ -11,12 +11,16 @@ import {
   Sparkles,
   RefreshCw,
   Users,
+  Mic,
 } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { RoutingToggle } from './RoutingToggle';
+import { useToast } from './Toast';
 import { useI18n } from '../hooks/useI18n';
+import type { TKey } from '../i18n';
 import type { SmartRouterConfig } from '../api/smartRouter';
 import { useLocalServerStatusStore } from '../stores/localServerStatusStore';
+import { useVoiceInputStore, voiceBusy } from '../stores/voiceInputStore';
 import { BirdEasterEgg } from './BirdEasterEgg';
 
 declare const __APP_EDITION__: string;
@@ -29,6 +33,7 @@ export type PageType =
   | 'apps'
   | 'aiNews'
   | 'aiCareer'
+  | 'voice'
   | 'myProjects'
   | 'localLlm'
   | 'mother'
@@ -58,9 +63,21 @@ export const Sidebar = ({
   onSettingsClick,
 }: SidebarProps) => {
   const { t } = useI18n();
+  const { showToast } = useToast();
   const sidebarRef = useRef<HTMLElement>(null);
   const perchRef = useRef<HTMLDivElement>(null);
   const serverRunning = useLocalServerStatusStore((state) => state.running);
+  const voiceEnabled = useVoiceInputStore(
+    (state) => state.snapshot?.config.shortcutEnabled ?? false
+  );
+  const hasVoiceChannels = useVoiceInputStore(
+    (state) => (state.snapshot?.config.channels.length ?? 0) > 0
+  );
+  const voicePending = useVoiceInputStore((state) => state.saving || state.pending);
+  const voiceDisabled = useVoiceInputStore(
+    (state) => !state.snapshot || voiceBusy(state.snapshot.phase)
+  );
+  const saveVoice = useVoiceInputStore((state) => state.save);
   const showSmartRouterToggle = smartRouterGroups.some((router) => router.candidateIds.length > 0);
 
   return (
@@ -101,6 +118,12 @@ export const Sidebar = ({
           label={t('nav.freeModels')}
           active={activePage === 'freeModels'}
           onClick={() => onPageChange('freeModels')}
+        />
+        <NavItem
+          icon={<Mic size={20} />}
+          label={t('voice.input')}
+          active={activePage === 'voice'}
+          onClick={() => onPageChange('voice')}
         />
         <NavItem
           icon={<Sparkles size={20} />}
@@ -144,18 +167,39 @@ export const Sidebar = ({
       </div>
 
       <div className="flex-shrink-0 pt-4 text-[14px] text-cyber-text-secondary">
-        {showSmartRouterToggle && (
-          <div className="flex h-5 items-center gap-2">
-            <span className="whitespace-nowrap leading-5">{t('nav.smartRouter')}</span>
-            <RoutingToggle
-              label={t('nav.smartRouter')}
-              hideLabel
-              checked={smartRouterEnabled}
-              pending={smartRouterTogglePending}
-              onChange={onSmartRouterChange}
-            />
-          </div>
-        )}
+        <div className="space-y-2 text-[15px] font-medium">
+          {hasVoiceChannels && (
+            <div className="flex items-center gap-4 p-2">
+              <span className="whitespace-nowrap">{t('voice.input')}</span>
+              <RoutingToggle
+                label={t('voice.enableInput')}
+                hideLabel
+                checked={voiceEnabled}
+                disabled={voiceDisabled}
+                pending={voicePending}
+                onChange={async (enabled) => {
+                  if (voiceDisabled || voicePending) return;
+                  if (await saveVoice({ shortcutEnabled: enabled })) return;
+                  const error = useVoiceInputStore.getState().error;
+                  if (error)
+                    showToast('error', error.startsWith('voice.') ? t(error as TKey) : error);
+                }}
+              />
+            </div>
+          )}
+          {showSmartRouterToggle && (
+            <div className="flex items-center gap-4 p-2">
+              <span className="whitespace-nowrap">{t('nav.smartRouter')}</span>
+              <RoutingToggle
+                label={t('nav.smartRouter')}
+                hideLabel
+                checked={smartRouterEnabled}
+                pending={smartRouterTogglePending}
+                onChange={onSmartRouterChange}
+              />
+            </div>
+          )}
+        </div>
         {isFullEdition && serverRunning && (
           <div className="mt-1">
             {t('nav.localServer')}:{' '}

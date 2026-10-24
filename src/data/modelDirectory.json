@@ -1,5 +1,115 @@
 {
   "$schema-comment": "Right-panel model directory. Each entry: name (display + matched against getModelIcon), url (website opened by ↗), baseUrl (OpenAI-protocol API base, prefilled into Add-Model when + is clicked), anthropicUrl (Anthropic-protocol API base — only filled if vendor natively serves /v1/messages, not via gateway adaptation), modelId (default model id; empty = leave blank in form), modelIds (optional string[]; when a vendor serves several model ids on the same endpoint, list them here — clicking the row then shows a quick-pick dropdown in the Add-Model modal, defaulting to modelId or the first listed id; the model id input stays free-editable), region ('cn' | 'global', controls locale-aware sort: zh locales surface 'cn' first, others surface 'global' first). URLs sourced from songquanpeng/one-api channeltype/url.go (2026-05) and vendor docs; some legacy URLs in one-api have been replaced with the current OpenAI-compatible v2 endpoint. Edit this file to fill in URLs / model IDs for each vendor.",
+  "speechProviders": [
+    {
+      "name": "Doubao 豆包 ASR",
+      "url": "https://console.volcengine.com/speech/app",
+      "baseUrl": "https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash",
+      "modelId": "volc.bigasr.auc_turbo",
+      "modelIds": ["volc.bigasr.auc_turbo"],
+      "protocol": "doubao",
+      "region": "cn"
+    },
+    {
+      "name": "千问 ASR",
+      "url": "https://bailian.console.aliyun.com/",
+      "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "modelId": "qwen3-asr-flash",
+      "modelIds": ["qwen3-asr-flash"],
+      "protocol": "chatAudio",
+      "region": "cn"
+    },
+    {
+      "name": "千问 ASR (International)",
+      "url": "https://modelstudio.console.alibabacloud.com/",
+      "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+      "modelId": "qwen3-asr-flash",
+      "modelIds": ["qwen3-asr-flash"],
+      "protocol": "chatAudio",
+      "region": "global"
+    },
+    {
+      "name": "Xiaomi 小米 MiMo ASR",
+      "url": "https://platform.xiaomimimo.com/",
+      "baseUrl": "https://api.xiaomimimo.com/v1",
+      "modelId": "mimo-v2.5-asr",
+      "modelIds": ["mimo-v2.5-asr"],
+      "protocol": "mimo",
+      "region": "cn"
+    },
+    {
+      "name": "Groq Whisper",
+      "url": "https://console.groq.com/",
+      "baseUrl": "https://api.groq.com/openai/v1",
+      "modelId": "whisper-large-v3-turbo",
+      "modelIds": ["whisper-large-v3-turbo", "whisper-large-v3"],
+      "protocol": "openai",
+      "region": "global"
+    },
+    {
+      "name": "OpenAI",
+      "url": "https://platform.openai.com/",
+      "baseUrl": "https://api.openai.com/v1",
+      "modelId": "gpt-4o-mini-transcribe",
+      "modelIds": ["gpt-4o-mini-transcribe", "gpt-4o-transcribe", "whisper-1"],
+      "protocol": "openai",
+      "region": "global"
+    },
+    {
+      "name": "Google Gemini",
+      "url": "https://aistudio.google.com/",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+      "modelId": "gemini-2.5-flash",
+      "modelIds": ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
+      "protocol": "gemini",
+      "region": "global"
+    },
+    {
+      "name": "OpenRouter",
+      "url": "https://openrouter.ai/",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "modelId": "google/gemini-2.5-flash",
+      "modelIds": ["google/gemini-2.5-flash"],
+      "protocol": "openrouter",
+      "region": "global"
+    },
+    {
+      "name": "SiliconFlow 硅基流动",
+      "url": "https://cloud.siliconflow.cn/",
+      "baseUrl": "https://api.siliconflow.cn/v1",
+      "modelId": "FunAudioLLM/SenseVoiceSmall",
+      "modelIds": ["FunAudioLLM/SenseVoiceSmall", "TeleAI/TeleSpeechASR"],
+      "protocol": "openai",
+      "region": "cn"
+    },
+    {
+      "name": "Zhipu 智谱 ASR",
+      "url": "https://open.bigmodel.cn/",
+      "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+      "modelId": "glm-asr-2512",
+      "modelIds": ["glm-asr-2512"],
+      "protocol": "openai",
+      "region": "cn"
+    },
+    {
+      "name": "MiniMax ASR",
+      "url": "https://platform.minimax.cn/",
+      "baseUrl": "https://api.minimax.cn/v1/speech_to_text",
+      "modelId": "asr-1.0",
+      "modelIds": ["asr-1.0"],
+      "protocol": "minimax",
+      "region": "cn"
+    },
+    {
+      "name": "MiniMax ASR (International)",
+      "url": "https://platform.minimax.io/",
+      "baseUrl": "https://api.minimax.io/v1/speech_to_text",
+      "modelId": "asr-1.0",
+      "modelIds": ["asr-1.0"],
+      "protocol": "minimax",
+      "region": "global"
+    }
+  ],
   "providers": [
     {
       "name": "Xiaomi 小米",

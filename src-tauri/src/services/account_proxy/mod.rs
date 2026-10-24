@@ -15,6 +15,7 @@ mod responses;
 mod signatures;
 mod tools;
 mod trae;
+pub(crate) mod workbuddy_voice;
 mod zcode;
 
 use axum::{
