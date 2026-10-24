@@ -129,6 +129,7 @@ fn apply_at(dir: &Path, preferences: Option<&Path>, info: &ModelInfo) -> Result<
             "modalities": {"input": model_input_modalities_for(model), "output": ["text"]}
         }}
     });
+    super::switching::model_map(info, &mut config["provider"][PROVIDER]["models"])?;
     if let Some(prefs) = prefs.as_mut() {
         select_desktop_model(prefs, PROVIDER, model)?;
     } else {
@@ -354,6 +355,26 @@ fn account_selection_at(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn smart_switch_native_catalog_regression() {
+        crate::services::smart_router::catalog::with_test_models(|| {
+            let info = super::super::switching::test_info();
+            let dir = super::super::switching::TestDir::new();
+            let prefs = dir.path().join("preferences.json");
+            for preferences in [None, Some(prefs.as_path())] {
+                apply_at(dir.path(), preferences, &info).unwrap();
+                let value = load_object(&write_path(dir.path())).unwrap();
+                assert_eq!(
+                    value["provider"][PROVIDER]["models"]
+                        .as_object()
+                        .unwrap()
+                        .len(),
+                    3
+                );
+            }
+        });
+    }
+
     use super::*;
 
     #[test]

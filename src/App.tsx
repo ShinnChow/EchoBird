@@ -179,7 +179,7 @@ function SidebarConnected({ onSettingsClick }: { onSettingsClick: () => void }) 
       activePage={activePage}
       onPageChange={setActivePage}
       agentRunning={agentRunning}
-      hasSmartRouterModels={routers.length > 0}
+      smartRouterGroups={routers}
       smartRouterEnabled={routerEnabled}
       smartRouterTogglePending={routerTogglePending}
       onSmartRouterChange={(enabled) => void setRouterEnabled(enabled)}

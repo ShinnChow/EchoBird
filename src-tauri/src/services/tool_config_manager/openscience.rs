@@ -200,6 +200,14 @@ pub(super) fn apply_openscience(model_info: &ModelInfo) -> ApplyResult {
     // in State.create keyed by Instance.directory and only re-reads on restart
     // / dispose, so the new model takes effect the next time the server starts
     // — not on an already-running one.
+    if let Err(message) =
+        super::switching::model_map(model_info, &mut config["provider"][provider_id]["models"])
+    {
+        return ApplyResult {
+            success: false,
+            message,
+        };
+    }
     config["model"] = serde_json::Value::String(format!("{}/{}", provider_id, model_id));
     config["small_model"] = serde_json::Value::String(format!("{}/{}", provider_id, model_id));
 

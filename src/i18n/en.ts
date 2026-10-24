@@ -333,6 +333,7 @@ const en: Translations = {
   'aiDesktop.emptyDesktop': 'No apps installed yet. Browse the Store to add apps.',
   'aiDesktop.emptyInstall': 'All apps are installed.',
   'agent.badge.smart': 'Smart',
+  'agent.badge.switch': 'Switch',
   'agent.badge.local': 'Local',
   'agent.selectTool': 'Select a tool to configure',
   'agent.noModelsHint': 'Add models in {modelNexus}',

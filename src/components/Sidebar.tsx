@@ -15,6 +15,7 @@ import {
 import { NavItem } from './NavItem';
 import { RoutingToggle } from './RoutingToggle';
 import { useI18n } from '../hooks/useI18n';
+import type { SmartRouterConfig } from '../api/smartRouter';
 import { useLocalServerStatusStore } from '../stores/localServerStatusStore';
 import { BirdEasterEgg } from './BirdEasterEgg';
 
@@ -37,7 +38,7 @@ interface SidebarProps {
   activePage: PageType;
   onPageChange: (page: PageType) => void;
   agentRunning?: boolean;
-  hasSmartRouterModels: boolean;
+  smartRouterGroups: ReadonlyArray<Pick<SmartRouterConfig, 'candidateIds' | 'groupEnabled'>>;
   smartRouterEnabled: boolean;
   smartRouterTogglePending: boolean;
   onSmartRouterChange: (enabled: boolean) => void;
@@ -49,7 +50,7 @@ export const Sidebar = ({
   activePage,
   onPageChange,
   agentRunning = false,
-  hasSmartRouterModels,
+  smartRouterGroups,
   smartRouterEnabled,
   smartRouterTogglePending,
   onSmartRouterChange,
@@ -60,6 +61,7 @@ export const Sidebar = ({
   const sidebarRef = useRef<HTMLElement>(null);
   const perchRef = useRef<HTMLDivElement>(null);
   const serverRunning = useLocalServerStatusStore((state) => state.running);
+  const showSmartRouterToggle = smartRouterGroups.some((router) => router.candidateIds.length > 0);
 
   return (
     <nav ref={sidebarRef} className="relative w-64 flex flex-col px-6 pb-6">
@@ -142,7 +144,7 @@ export const Sidebar = ({
       </div>
 
       <div className="flex-shrink-0 pt-4 text-[14px] text-cyber-text-secondary">
-        {hasSmartRouterModels && (
+        {showSmartRouterToggle && (
           <div className="flex h-5 items-center gap-2">
             <span className="whitespace-nowrap leading-5">{t('nav.smartRouter')}</span>
             <RoutingToggle

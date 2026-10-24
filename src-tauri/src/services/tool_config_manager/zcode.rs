@@ -246,7 +246,15 @@ fn apply_zcode_at(model_info: &ModelInfo, dir: &Path) -> ApplyResult {
     config["model"] = serde_json::Value::String(format!("{}/{}", provider_id, model_id));
     config["small_model"] = serde_json::Value::String(format!("{}/{}", provider_id, model_id));
 
-    let personal = match prepare_zcode_personal_config(
+    if let Err(message) =
+        super::switching::model_map(model_info, &mut config["provider"][provider_id]["models"])
+    {
+        return ApplyResult {
+            success: false,
+            message,
+        };
+    }
+    let mut personal = match prepare_zcode_personal_config(
         &personal_path,
         model_id,
         display_name,
@@ -264,6 +272,14 @@ fn apply_zcode_at(model_info: &ModelInfo, dir: &Path) -> ApplyResult {
         }
     };
 
+    if let Some(personal) = personal.as_mut() {
+        if let Err(message) = expand_personal_models(personal, model_info) {
+            return ApplyResult {
+                success: false,
+                message,
+            };
+        }
+    }
     match write_json_file(&config_path, &config) {
         Ok(_) => {
             if let Some(personal) = personal {
@@ -296,6 +312,41 @@ fn apply_zcode_at(model_info: &ModelInfo, dir: &Path) -> ApplyResult {
             message: e,
         },
     }
+}
+
+fn expand_personal_models(root: &mut serde_json::Value, info: &ModelInfo) -> Result<(), String> {
+    let models = super::switching::models(info)?;
+    if models.is_empty() {
+        return Ok(());
+    }
+    let config = &mut root["config"];
+    let provider = config["providerConfigRules"]["providerRules"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|entry| entry["providerId"] == "echobird")
+        .unwrap();
+    let ids: Vec<_> = models.iter().map(|model| model.id.as_str()).collect();
+    provider["config"]["personalModelIds"] = serde_json::json!(ids);
+    provider["config"]["modelOrder"] = serde_json::json!(ids);
+    let rules = config["modelConfigRules"]["providerModelRules"]
+        .as_array_mut()
+        .unwrap();
+    let template = rules
+        .iter()
+        .find(|entry| entry["providerId"] == "echobird")
+        .unwrap()
+        .clone();
+    for model in models
+        .into_iter()
+        .filter(|model| Some(model.id.as_str()) != info.model.as_deref())
+    {
+        let mut entry = template.clone();
+        entry["modelId"] = serde_json::json!(model.id);
+        entry["config"]["properties"]["displayName"] = serde_json::json!(model.name);
+        rules.push(entry);
+    }
+    Ok(())
 }
 
 fn read_zcode_personal_config(path: &std::path::Path) -> Option<ModelInfo> {

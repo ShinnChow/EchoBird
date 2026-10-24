@@ -136,6 +136,31 @@ fn apply_kimi_at(
     );
     content = toml_write_table_value_raw(&content, &models_table, "adaptive_thinking", "true");
 
+    content = remove_switch_models(&content);
+    let models = match super::switching::models(model_info) {
+        Ok(models) => models,
+        Err(message) => {
+            return ApplyResult {
+                success: false,
+                message,
+            }
+        }
+    };
+    for model in models.into_iter().filter(|model| model.id != model_id) {
+        let table = format!("models.echobird-{}", model.id);
+        content = toml_write_table_value(&content, &table, "provider", provider);
+        content = toml_write_table_value(&content, &table, "model", &model.id);
+        content = toml_write_table_value(&content, &table, "display_name", &model.name);
+        content =
+            toml_write_table_value_raw(&content, &table, "max_context_size", DEFAULT_CONTEXT_SIZE);
+        content = toml_write_table_value_raw(
+            &content,
+            &table,
+            "capabilities",
+            "[\"tool_use\", \"thinking\"]",
+        );
+        content = toml_write_table_value_raw(&content, &table, "adaptive_thinking", "true");
+    }
     if let Err(e) = fs::write(config_path, &content) {
         return ApplyResult {
             success: false,
@@ -217,12 +242,19 @@ fn read_kimi_at(config_path: &std::path::Path) -> Option<ModelInfo> {
     // user switched to a managed/native model via /model, return None so the
     // model-picker shows nothing selected (correct — not an EchoBird model).
     let alias = top_default_model?;
-    if alias != "echobird" {
+    if alias != "echobird"
+        && !alias.starts_with(&format!(
+            "echobird-{}",
+            crate::services::smart_router::catalog::SELECTOR_PREFIX
+        ))
+    {
         return None;
     }
 
     let prov = tables.iter().find(|(h, _)| h == "providers.echobird")?;
-    let model = tables.iter().find(|(h, _)| h == "models.echobird")?;
+    let model = tables
+        .iter()
+        .find(|(h, _)| h == &format!("models.{alias}"))?;
     let model_id = model
         .1
         .iter()
@@ -300,7 +332,7 @@ fn restore_kimi_at(config_path: &std::path::Path, surface: &str) -> ApplyResult 
     // default_model line we set. Preserve everything else (user providers,
     // managed:kimi-code OAuth entry, thinking, hooks, permission, …). On next
     // launch Kimi Code falls back to /login (OAuth or Moonshot platform key).
-    let new_content = remove_toml_table(&content, "providers.echobird");
+    let new_content = remove_toml_table(&remove_switch_models(&content), "providers.echobird");
     let new_content = remove_toml_table(&new_content, "models.echobird");
     let new_content = remove_toml_top_key_if_value(&new_content, "default_model", "echobird");
 
@@ -321,6 +353,27 @@ fn restore_kimi_at(config_path: &std::path::Path, surface: &str) -> ApplyResult 
 
 /// Remove a `[table]` block (header + its key=value lines, up to the next
 /// section header or EOF). Returns content unchanged if the table is absent.
+fn remove_switch_models(content: &str) -> String {
+    let prefix = format!(
+        "models.echobird-{}",
+        crate::services::smart_router::catalog::SELECTOR_PREFIX
+    );
+    let mut next = content.to_string();
+    for table in content
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix('[')?.strip_suffix(']'))
+        .filter(|table| table.starts_with(&prefix))
+    {
+        next = remove_toml_table(&next, table);
+        next = remove_toml_top_key_if_value(
+            &next,
+            "default_model",
+            table.strip_prefix("models.").unwrap(),
+        );
+    }
+    next
+}
+
 fn remove_toml_table(content: &str, table: &str) -> String {
     let header = format!("[{}]", table);
     let mut lines: Vec<String> = content.lines().map(String::from).collect();
@@ -380,6 +433,37 @@ fn remove_toml_top_key_if_value(content: &str, key: &str, expected: &str) -> Str
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn smart_switch_native_catalog_regression() {
+        crate::services::smart_router::catalog::with_test_models(|| {
+            let info = super::super::switching::test_info();
+            let dir = super::super::switching::TestDir::new();
+            let path = dir.path().join("config.toml");
+            assert!(apply_kimi_at(&path, &info, "Kimi").success);
+            let content = fs::read_to_string(&path).unwrap();
+            let document = content.parse::<toml_edit::DocumentMut>().unwrap();
+            assert_eq!(document["models"].as_table().unwrap().len(), 3);
+            let alias = format!(
+                "echobird-{}",
+                crate::services::smart_router::catalog::selector("first")
+            );
+            assert_eq!(
+                document["models"][&alias]["display_name"].as_str(),
+                Some("First model")
+            );
+            fs::write(
+                &path,
+                super::super::toml_write_top(&content, "default_model", &alias),
+            )
+            .unwrap();
+            assert!(read_kimi_at(&path).is_some());
+            assert!(restore_kimi_at(&path, "Kimi").success);
+            assert!(!fs::read_to_string(path)
+                .unwrap()
+                .contains(crate::services::smart_router::catalog::SELECTOR_PREFIX));
+        });
+    }
+
     use super::*;
 
     struct Fixture(PathBuf);

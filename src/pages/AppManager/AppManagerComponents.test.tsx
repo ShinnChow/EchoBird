@@ -6,6 +6,7 @@ import * as api from '../../api/tauri';
 import type { LocalTool, ModelConfig } from '../../api/types';
 import type { TKey } from '../../i18n';
 import { ModelListCard } from '../../components/ModelListCard';
+import { SMART_ROUTER_SWITCH_TOOLS } from '../../utils/smartRouter';
 import vscodeDefinition from '../../../tools/vscode/paths.json';
 import qoderDefinition from '../../../tools/qoder/paths.json';
 import qoderCnDefinition from '../../../tools/qodercn/paths.json';
@@ -54,6 +55,7 @@ const models: ModelConfig[] = [
 
 const labels: Partial<Record<TKey, string>> = {
   'agent.badge.smart': '智能',
+  'agent.badge.switch': '可切换',
   'agent.badge.local': '本地',
 };
 
@@ -266,7 +268,7 @@ describe('ModelListSection', () => {
     }
   );
 
-  it.each(['codex', 'chatgptdesktop'])(
+  it.each([...SMART_ROUTER_SWITCH_TOOLS])(
     'selects the exact router card for %s without applying configuration',
     async (toolId) => {
       vi.stubGlobal('__APP_EDITION__', 'full');
@@ -293,12 +295,52 @@ describe('ModelListSection', () => {
         const card = renderer!.root.findByType(ModelListCard);
         expect(card.props.model).toEqual(router);
         expect(card.props.subtitle).toBe('127.0.0.1:53683/v1');
+        const badges = renderToStaticMarkup([card.props.badge, card.props.secondaryBadge]);
+        expect(badges).toContain('agent.badge.smart');
+        expect(badges).toContain('agent.badge.switch');
         act(() => card.findByType('button').props.onClick());
         expect(selectModel).toHaveBeenCalledExactlyOnceWith(toolId, 'smart-router');
         expect(applyModel).not.toHaveBeenCalled();
       } finally {
         act(() => renderer?.unmount());
         applyModel.mockRestore();
+      }
+    }
+  );
+
+  it.each(['codex', 'claudecode', 'grok', 'test-tool'])(
+    'only labels Smart Access cards with implemented switching for %s',
+    async (toolId) => {
+      vi.stubGlobal('__APP_EDITION__', 'full');
+      const { ModelListSection } = await import('./AppManagerComponents');
+      let renderer: ReactTestRenderer | undefined;
+      try {
+        act(() => {
+          renderer = create(
+            <ModelListSection
+              selectedToolData={{ ...tool, id: toolId }}
+              userModels={models}
+              toolModelConfig={{ [toolId]: 'smart-router' }}
+              selectedTool={toolId}
+              handleSelectModel={vi.fn()}
+              t={(key) => labels[key] ?? key}
+            />
+          );
+        });
+        for (const card of renderer!.root.findAllByType(ModelListCard)) {
+          const badge = renderToStaticMarkup([
+            card.props.badge ?? null,
+            card.props.secondaryBadge ?? null,
+          ]);
+          expect(badge).not.toContain('title=');
+          const supportsSwitch =
+            card.props.model.internalId === 'smart-router' && SMART_ROUTER_SWITCH_TOOLS.has(toolId);
+          expect(badge.includes('可切换')).toBe(supportsSwitch);
+          if (card.props.model.internalId === 'smart-router')
+            expect(card.props.selected).toBe(true);
+        }
+      } finally {
+        act(() => renderer?.unmount());
       }
     }
   );
@@ -624,14 +666,16 @@ describe('PageAwareHint', () => {
 });
 
 describe.each(['codex', 'chatgptdesktop'])('%s Web Search control', (client) => {
-  it.each([
-    { installed: true, account: null, pending: false, hasModels: true },
-    { installed: true, account: null, pending: true, hasModels: true },
-    { installed: true, account: 'account', pending: false, hasModels: false },
-    { installed: false, account: null, pending: false, hasModels: false },
-  ])(
+  it.each(
+    [
+      { installed: true, account: null, pending: false, hasModels: true },
+      { installed: true, account: null, pending: true, hasModels: true },
+      { installed: true, account: 'account', pending: false, hasModels: false },
+      { installed: false, account: null, pending: false, hasModels: false },
+    ].flatMap((state) => [false, true].map((webSearch) => ({ ...state, webSearch })))
+  )(
     'restores visibility for the selected tool and disables pending changes: %j',
-    async ({ installed, account, pending, hasModels }) => {
+    async ({ installed, account, pending, hasModels, webSearch }) => {
       const { AppManagerPanel } = await import('./AppManagerComponents');
       const { ModelNexusContext } = await import('../ModelNexus/context');
       const { ConfirmDialogProvider } = await import('../../components/ConfirmDialog');
@@ -639,12 +683,12 @@ describe.each(['codex', 'chatgptdesktop'])('%s Web Search control', (client) => 
         selectedTool: client,
         selectedToolData: { ...tool, id: client, installed },
         userModels: hasModels ? models : [],
-        toolModelConfig: {},
+        toolModelConfig: hasModels ? { [client]: 'smart-router' } : {},
         codexAccounts: [],
         selectedCodexAccountId: account,
         refreshingCodexAccountIds: new Set(),
         codexAuthorizationFailedIds: new Set(),
-        codexWebSearch: false,
+        codexWebSearch: webSearch,
         isLaunching: pending,
       } as unknown as AppManagerContextType;
       const markup = renderToStaticMarkup(
@@ -659,7 +703,7 @@ describe.each(['codex', 'chatgptdesktop'])('%s Web Search control', (client) => 
       const toggle = markup.match(/<button[^>]*role="switch"[^>]*>/)?.[0];
       if (installed) {
         expect(toggle).toContain('aria-label="agent.codexWebSearchLabel"');
-        expect(toggle).toContain('aria-checked="false"');
+        expect(toggle).toContain(`aria-checked="${webSearch}"`);
         expect(toggle?.includes('disabled=""')).toBe(pending);
         expect(markup).toContain('aria-label="agent.codexWebSearchHint"');
         expect(markup.indexOf('agent.modelSwitch')).toBeLessThan(markup.indexOf('role="switch"'));

@@ -203,7 +203,16 @@ fn prepare_models(config_path: &Path, model_info: &ModelInfo) -> Result<Vec<Valu
     model["reasoning"]["supportedEfforts"] = json!(["low", "medium", "high", "xhigh", "max"]);
     // The native catalog merges duplicate IDs in order, with the last entry winning.
     models.push(model);
-    Ok(models)
+    let mut entries = json!(models);
+    super::switching::model_array(model_info, &mut entries, "id", "name")?;
+    let entries = entries.as_array_mut().unwrap();
+    let selected = entries
+        .iter()
+        .rposition(|entry| entry["id"] == model_id)
+        .unwrap();
+    let selected = entries.remove(selected);
+    entries.push(selected);
+    Ok(entries.clone())
 }
 
 fn apply_workbuddy_at(
@@ -300,6 +309,23 @@ fn read_workbuddy_at(path: &Path, user_id: Option<&str>) -> Option<ModelInfo> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn smart_switch_native_catalog_regression() {
+        crate::services::smart_router::catalog::with_test_models(|| {
+            let info = super::super::switching::test_info();
+            let dir = super::super::switching::TestDir::new();
+            for tool in ["workbuddy", "workbuddyai"] {
+                let path = config_path(dir.path(), tool);
+                let models = prepare_models(&path, &info).unwrap();
+                assert_eq!(models.len(), 3);
+                assert_eq!(models.last().unwrap()["id"], "auto");
+                assert_eq!(models[0]["name"], "First model");
+                write_json_file(&path, &json!(models)).unwrap();
+                assert_eq!(prepare_models(&path, &info).unwrap().len(), 3);
+            }
+        });
+    }
+
     use super::super::write_json_file;
     use super::*;
 

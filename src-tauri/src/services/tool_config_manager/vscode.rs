@@ -427,7 +427,7 @@ fn provider(info: &ModelInfo) -> Result<Value, String> {
             headers["Authorization"] = json!(format!("Bearer {key}"));
         }
     }
-    Ok(json!({
+    let mut group = json!({
         "name": GROUP,
         "vendor": VENDOR,
         "apiType": api_type,
@@ -441,7 +441,9 @@ fn provider(info: &ModelInfo) -> Result<Value, String> {
             "maxOutputTokens": max_output_tokens,
             "requestHeaders": headers,
         }],
-    }))
+    });
+    super::switching::model_array(info, &mut group["models"], "id", "name")?;
+    Ok(group)
 }
 
 fn apply_changes(dir: &Path, group: &Value) -> Result<Vec<Change>, String> {
@@ -694,6 +696,19 @@ pub(super) fn restore() -> ApplyResult {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn smart_switch_native_catalog_regression() {
+        crate::services::smart_router::catalog::with_test_models(|| {
+            let info = super::super::switching::test_info();
+            let group = provider(&info).unwrap();
+            let models = group["models"].as_array().unwrap();
+            assert_eq!(models.len(), 3);
+            assert_eq!(models[0]["id"], "auto");
+            assert_eq!(models[1]["name"], "First model");
+            assert_eq!(models[0]["requestHeaders"], models[1]["requestHeaders"]);
+        });
+    }
+
     use super::*;
 
     struct Fixture(PathBuf);

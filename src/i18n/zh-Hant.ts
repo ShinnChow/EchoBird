@@ -313,6 +313,7 @@ const zhHant: Partial<Translations> = {
   'model.deleteTitle': '刪除模型',
   'model.deleteConfirm': '此模型設定將被永久刪除，操作無法復原。',
   'agent.badge.smart': '智能',
+  'agent.badge.switch': '可切換',
   'agent.badge.local': '本地',
   'agent.selectTool': '選擇要設定的工具',
   'agent.noModelsHint': '在 {modelNexus} 新增模型',

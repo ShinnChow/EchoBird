@@ -143,6 +143,37 @@ pub fn template_for_model(base_url: &str, model_id: &str) -> Option<Value> {
     template_for_url(base_url).and_then(|s| serde_json::from_str(s).ok())
 }
 
+pub(crate) fn build_router_catalog(
+    models: &[crate::services::smart_router::catalog::SwitchModel],
+    web_search: bool,
+) -> Value {
+    // Reuse the established Codex prompt and wire capability schema. Upstream
+    // capabilities are heterogeneous, so do not advertise images or Responses Lite.
+    let mut template: Value =
+        serde_json::from_str(MINIMAX_TEMPLATE).expect("bundled Codex template");
+    template["input_modalities"] = json!(["text"]);
+    template["supports_reasoning_summaries"] = json!(false);
+    template["supports_search_tool"] = json!(web_search);
+    template["supports_parallel_tool_calls"] = json!(false);
+    template["use_responses_lite"] = json!(false);
+    template["supported_reasoning_levels"] = json!([
+        {"effort":"low","description":"Low"},
+        {"effort":"medium","description":"Medium"},
+        {"effort":"high","description":"High"}
+    ]);
+    let entries: Vec<_> = models
+        .iter()
+        .enumerate()
+        .map(|(index, model)| {
+            let mut entry =
+                build_catalog(&template, &model.id, &model.name, 1_000_000)["models"][0].clone();
+            entry["priority"] = json!(index);
+            entry
+        })
+        .collect();
+    json!({"models":entries})
+}
+
 /// Build a single-entry model catalog for the SELECTED model from a vendor
 /// capability template. The template's model-agnostic fields (base_instructions
 /// framework, tool types, reasoning levels, truncation policy) are preserved;

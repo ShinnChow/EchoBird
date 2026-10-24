@@ -1,4 +1,4 @@
-import { isSmartRouterId } from '../../utils/smartRouter';
+import { isSmartRouterId, SMART_ROUTER_SWITCH_TOOLS } from '../../utils/smartRouter';
 import { CursorAccountSection } from './CursorAccountSection';
 import { AntigravityAccountSection } from './AntigravityAccountSection';
 import { AccountSectionButton, AccountSectionRow } from './AccountSectionPrimitives';
@@ -694,6 +694,15 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
             </span>
           )
         }
+        secondaryBadge={
+          badge === 'smart' &&
+          selectedTool &&
+          SMART_ROUTER_SWITCH_TOOLS.has(selectedTool) && (
+            <span className="model-switch-badge shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none bg-emerald-500/10 text-emerald-700">
+              {t('agent.badge.switch')}
+            </span>
+          )
+        }
         usage={modelUsageData?.[model.internalId]}
         refreshing={isRefreshingUsage || refreshingUsageIds?.has(model.internalId)}
         onRefreshUsage={onRefreshUsage}
@@ -996,9 +1005,7 @@ export const AppManagerPanel: React.FC = () => {
       ? claudeCodeWebSearch
       : isZCodeApp
         ? zcodeWebSearch
-        : isSmartRouterId(toolModelConfig[selectedTool ?? ''])
-          ? false
-          : codexWebSearch;
+        : codexWebSearch;
   const routingControls = (show1mToggle || showWebSearchToggle || showImageToggle) && (
     <div className="px-3 flex flex-wrap items-center gap-2">
       {showWebSearchToggle && (
@@ -1007,10 +1014,7 @@ export const AppManagerPanel: React.FC = () => {
           label={t('agent.codexWebSearchLabel')}
           hint={t('agent.codexWebSearchHint')}
           checked={webSearchValue}
-          disabled={
-            isLaunching ||
-            (showCodexAccounts && isSmartRouterId(toolModelConfig[selectedTool ?? '']))
-          }
+          disabled={isLaunching}
           onChange={
             showCodexAccounts
               ? setCodexWebSearch

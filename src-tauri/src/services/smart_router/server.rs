@@ -34,6 +34,9 @@ mod standby_probe;
 #[cfg(test)]
 #[path = "standby_route_tests.rs"]
 mod standby_route_tests;
+#[cfg(test)]
+#[path = "switch_tests.rs"]
+mod switch_tests;
 
 #[path = "probe.rs"]
 mod probe;
@@ -691,14 +694,28 @@ async fn handle_models(State(state): State<AppState>, headers: HeaderMap) -> Res
         return openai_error(StatusCode::UNAUTHORIZED, "Invalid EchoBird router API key");
     }
 
+    let candidates = resolve_candidates(config.candidate_ids);
+    let mut data = vec![json!({"id":config.model_id,"object":"model","created":0,
+        "owned_by":"echobird","display_name":"Auto","type":"model",
+        "created_at":"1970-01-01T00:00:00Z"})];
+    let stored_models = model_manager::get_user_models();
+    data.extend(candidates.iter().map(|candidate| {
+        let name = stored_models
+            .iter()
+            .find(|m| m.internal_id == candidate.internal_id)
+            .map(|m| m.name.as_str())
+            .unwrap_or(&candidate.model_id);
+        let name = super::catalog::display_name(&candidate.model_id, name);
+        json!({"id":super::catalog::selector(&candidate.internal_id),"object":"model",
+            "created":0,"owned_by":"echobird","display_name":name,"name":name,
+            "type":"model","created_at":"1970-01-01T00:00:00Z"})
+    }));
     Json(json!({
         "object": "list",
-        "data": [{
-            "id": config.model_id,
-            "object": "model",
-            "created": 0,
-            "owned_by": "echobird"
-        }]
+        "data": data,
+        "has_more": false,
+        "first_id": data.first().map(|model| &model["id"]),
+        "last_id": data.last().map(|model| &model["id"])
     }))
     .into_response()
 }
@@ -729,14 +746,17 @@ async fn handle_chat(
         .and_then(Value::as_str)
         .unwrap_or_default();
     state.model_id = request_config.model_id;
-    if !state.supports_model(requested_model) {
-        return openai_error(
-            StatusCode::NOT_FOUND,
-            &format!("Unknown router model: {requested_model}"),
-        );
-    }
-
-    let candidates = resolve_candidates(request_config.candidate_ids);
+    let candidates = match select_candidates(
+        &mut state,
+        requested_model,
+        resolve_candidates(request_config.candidate_ids),
+        false,
+    ) {
+        Ok(candidates) => candidates,
+        Err(error) => {
+            return openai_error(StatusCode::NOT_FOUND, &error);
+        }
+    };
     route_chat_with_candidates(&state, &headers, body, candidates).await
 }
 
@@ -745,6 +765,35 @@ fn is_supported_router_model(model_id: &str) -> bool {
         model_id,
         SMART_ROUTER_MODEL_ID | "echobird/auto" | "echobird-auto" | SMART_ROUTER_INTERNAL_ID
     )
+}
+
+fn select_candidates(
+    state: &mut AppState,
+    requested: &str,
+    candidates: Vec<Candidate>,
+    anthropic_alias: bool,
+) -> Result<Vec<Candidate>, String> {
+    let requested = requested
+        .strip_suffix("[1m]")
+        .or_else(|| requested.strip_suffix("[1M]"))
+        .unwrap_or(requested);
+    if requested.starts_with(super::catalog::SELECTOR_PREFIX) {
+        let selected: Vec<_> = candidates
+            .into_iter()
+            .filter(|candidate| super::catalog::selector(&candidate.internal_id) == requested)
+            .collect();
+        if selected.is_empty() {
+            return Err(
+                "Selected router model is unavailable. Refresh the client model list.".into(),
+            );
+        }
+        state.model_id = requested.into();
+        Ok(selected)
+    } else if state.supports_model(requested) || anthropic_alias {
+        Ok(candidates)
+    } else {
+        Err(format!("Unknown router model: {requested}"))
+    }
 }
 
 async fn handle_responses(
@@ -768,16 +817,16 @@ async fn handle_responses(
         return openai_error(StatusCode::UNAUTHORIZED, "Invalid EchoBird router API key");
     }
     state.model_id = request_config.model_id;
-    if !state.supports_model(body["model"].as_str().unwrap_or_default()) {
-        return openai_error(StatusCode::NOT_FOUND, "Unknown router model");
-    }
-    route_responses_with_candidates(
-        &state,
-        &headers,
-        body,
+    let candidates = match select_candidates(
+        &mut state,
+        body["model"].as_str().unwrap_or_default(),
         resolve_candidates(request_config.candidate_ids),
-    )
-    .await
+        false,
+    ) {
+        Ok(candidates) => candidates,
+        Err(error) => return openai_error(StatusCode::NOT_FOUND, &error),
+    };
+    route_responses_with_candidates(&state, &headers, body, candidates).await
 }
 
 async fn handle_messages(
@@ -802,13 +851,16 @@ async fn handle_messages(
     }
 
     state.model_id = request_config.model_id;
-    route_messages_with_candidates(
-        &state,
-        &headers,
-        body,
+    let candidates = match select_candidates(
+        &mut state,
+        body["model"].as_str().unwrap_or_default(),
         resolve_candidates(request_config.candidate_ids),
-    )
-    .await
+        true,
+    ) {
+        Ok(candidates) => candidates,
+        Err(error) => return anthropic_error(StatusCode::NOT_FOUND, &error),
+    };
+    route_messages_with_candidates(&state, &headers, body, candidates).await
 }
 
 async fn route_messages_with_candidates(

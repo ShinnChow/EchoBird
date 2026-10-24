@@ -315,6 +315,7 @@ export type TKey =
   | 'aiDesktop.emptyDesktop'
   | 'aiDesktop.emptyInstall'
   | 'agent.badge.smart'
+  | 'agent.badge.switch'
   | 'agent.badge.local'
   | 'agent.selectTool'
   | 'agent.noModelsHint'

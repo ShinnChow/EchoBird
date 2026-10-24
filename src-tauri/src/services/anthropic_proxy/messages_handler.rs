@@ -62,15 +62,35 @@ fn science_models_response(relay: &Relay) -> Response {
     let Some(id) = relay.real_model_id.as_deref() else {
         return StatusCode::SERVICE_UNAVAILABLE.into_response();
     };
+    let models = match crate::services::smart_router::catalog::models_for_url(&relay.base_url) {
+        Ok(models) => models,
+        Err(error) => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({"error":{"message":error}})),
+            )
+                .into_response()
+        }
+    };
+    let mut data = vec![json!({
+        "type": "model",
+        "id": id,
+        "display_name": relay.model_name.as_deref().unwrap_or(id),
+        "created_at": "1970-01-01T00:00:00Z"
+    })];
+    if !models.is_empty() {
+        data = models
+            .into_iter()
+            .map(|model| {
+                json!({"type":"model","id":model.id,
+            "display_name":model.name,"created_at":"1970-01-01T00:00:00Z"})
+            })
+            .collect();
+    }
     Json(json!({
-        "data": [{
-            "type": "model",
-            "id": id,
-            "display_name": relay.model_name.as_deref().unwrap_or(id),
-            "created_at": "1970-01-01T00:00:00Z"
-        }],
+        "data": data,
         "first_id": id,
-        "last_id": id,
+        "last_id": data.last().map(|model| &model["id"]),
         "has_more": false
     }))
     .into_response()
@@ -120,7 +140,10 @@ async fn handle_messages_with(
     // real id. Smart upstreams ignore this and use their own.
     if let Some(real) = relay.real_model_id.as_deref() {
         let current = req_body.get("model").and_then(|v| v.as_str()).unwrap_or("");
-        if !real.is_empty() && real != current {
+        let router_pick = relay_filename == RELAY_FILENAME_CLAUDESCIENCE
+            && crate::services::smart_router::is_router_url(&relay.base_url)
+            && current.starts_with(crate::services::smart_router::catalog::SELECTOR_PREFIX);
+        if !real.is_empty() && real != current && !router_pick {
             log::info!("[AnthropicProxy] Model ID rewrite: {} → {}", current, real);
             req_body["model"] = Value::String(real.to_string());
         }
@@ -266,6 +289,29 @@ fn relay_path(filename: &str) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn smart_switch_science_catalog_exposes_native_picker_names() {
+        let relay = Relay {
+            base_url: "http://127.0.0.1:53683/v1".into(),
+            api_key: "fixture".into(),
+            model_name: Some("Auto Router".into()),
+            real_model_id: Some("auto".into()),
+        };
+        let response = crate::services::smart_router::catalog::with_test_models(|| {
+            science_models_response(&relay)
+        });
+        let bytes = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let catalog: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(catalog["data"].as_array().unwrap().len(), 3);
+        assert_eq!(catalog["data"][1]["display_name"], "First model");
+        assert_eq!(
+            catalog["last_id"],
+            crate::services::smart_router::catalog::selector("second")
+        );
+    }
 
     #[tokio::test]
     async fn science_catalog_exposes_the_applied_model() {

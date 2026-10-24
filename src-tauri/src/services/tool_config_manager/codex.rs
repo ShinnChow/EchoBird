@@ -59,13 +59,12 @@ fn codex_compact_limit_for(context_window: u64) -> u64 {
 }
 
 fn codex_web_search_mode(base_url: &str, enabled: Option<bool>) -> &'static str {
-    if crate::services::smart_router::is_router_url(base_url)
-        || codex_catalog::is_step_plan_url(base_url)
-    {
+    if codex_catalog::is_step_plan_url(base_url) {
         return "disabled";
     }
     if enabled.unwrap_or_else(|| {
-        !codex_catalog::url_matches_domain(base_url, "deepseek.com")
+        !crate::services::smart_router::is_router_url(base_url)
+            && !codex_catalog::url_matches_domain(base_url, "deepseek.com")
             && !codex_catalog::url_matches_domain(base_url, "xiaomimimo.com")
     }) {
         "live"
@@ -203,6 +202,14 @@ fn write_codex_canonical_fields(
     c = toml_write_table_value(&c, &table, "wire_api", "responses");
     // [model_providers.OpenAI] raw (bool).
     c = toml_write_table_value_raw(&c, &table, "requires_openai_auth", "true");
+    if crate::services::smart_router::is_router_url(codex_base_url) {
+        c = toml_write_table_value_raw(&c, &table, "supports_websockets", "false");
+    } else if crate::services::smart_router::is_router_url(&toml_read_table_value(
+        content, &table, "base_url",
+    )) && toml_read_table_value(content, &table, "supports_websockets") == "false"
+    {
+        c = toml_delete_table_value(&c, &table, "supports_websockets");
+    }
 
     if trailing_nl && !c.ends_with('\n') {
         c.push('\n');
@@ -350,18 +357,32 @@ pub(crate) fn apply_codex_at(
     // The stale line is evicted by `write_codex_canonical_fields` on every
     // canonicalize, so switching to a non-catalog vendor cannot leave a
     // dangling pointer.
-    if let Some(template) = catalog_template {
+    let switch_models = match super::switching::models(model_info) {
+        Ok(models) => models,
+        Err(message) => {
+            return ApplyResult {
+                success: false,
+                message,
+            }
+        }
+    };
+    if !switch_models.is_empty() || catalog_template.is_some() {
         let catalog_path = codex_catalog::models_json_path(codex_dir);
-        // Stamp the SELECTED model onto the vendor capability template and
-        // write a single-entry catalog. Unknown model versions remain usable
-        // with conservative capabilities; vendor-documented image models are
-        // opted in by `build_catalog`.
-        let catalog = codex_catalog::build_catalog(
-            &template,
-            model_id,
-            model_info.name.as_deref().unwrap_or(model_id),
-            context_window,
-        );
+        // Direct providers keep their single-model catalog. Smart Access adds
+        // the enabled candidates beside the automatic selection.
+        let catalog = if switch_models.is_empty() {
+            codex_catalog::build_catalog(
+                &catalog_template.unwrap(),
+                model_id,
+                model_info.name.as_deref().unwrap_or(model_id),
+                context_window,
+            )
+        } else {
+            codex_catalog::build_router_catalog(
+                &switch_models,
+                codex_web_search_mode(&base_url, model_info.web_search) == "live",
+            )
+        };
         // Abort before changing config/auth if the required capability
         // catalog cannot be written.
         if let Err(error) = write_json_file(&catalog_path, &catalog) {
@@ -548,6 +569,12 @@ fn official_codex_config_from(content: &str) -> Result<String, String> {
     next = toml_write_table_value(&next, provider, "wire_api", "responses");
     next = toml_write_table_value_raw(&next, provider, "requires_openai_auth", "true");
     next = toml_delete_table_value(&next, provider, "base_url");
+    if crate::services::smart_router::is_router_url(&toml_read_table_value(
+        content, provider, "base_url",
+    )) && toml_read_table_value(content, provider, "supports_websockets") == "false"
+    {
+        next = toml_delete_table_value(&next, provider, "supports_websockets");
+    }
 
     if toml_read_table_value(&next, "desktop", "enabled-reasoning-efforts")
         == DEEPSEEK_DESKTOP_EFFORTS
@@ -699,7 +726,7 @@ mod tests {
     }
 
     #[test]
-    fn auto_router_disables_hosted_search_without_changing_other_local_providers() {
+    fn auto_router_honors_explicit_search_choices_and_preserves_its_default() {
         for enabled in [None, Some(true), Some(false)] {
             let out = write_codex_canonical_fields(
                 "",
@@ -708,7 +735,14 @@ mod tests {
                 DEFAULT_CODEX_CONTEXT_WINDOW,
                 enabled,
             );
-            assert_eq!(toml_read_top(&out, "web_search"), "disabled");
+            assert_eq!(
+                toml_read_top(&out, "web_search"),
+                if enabled == Some(true) {
+                    "live"
+                } else {
+                    "disabled"
+                }
+            );
         }
         assert_eq!(
             codex_web_search_mode("http://127.0.0.1:1234/v1", Some(true)),
@@ -1529,5 +1563,61 @@ command = "files-server"
         assert!(error.contains("not valid TOML"));
         assert_eq!(fs::read_to_string(&path).unwrap(), content);
         fs::remove_dir_all(fixture).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod switch_tests {
+    use super::*;
+    #[test]
+    fn smart_access_writes_responses_and_a_complete_picker_then_cleans_it_on_direct_apply() {
+        crate::services::smart_router::catalog::with_test_models(|| {
+            let root = super::super::switching::TestDir::new();
+            let dir = root.path().join("codex");
+            let state = root.path().join("state");
+            let mut info = super::super::switching::test_info();
+            for tool in ["codex", "chatgptdesktop"] {
+                for enabled in [false, true, false] {
+                    info.web_search = Some(enabled);
+                    let result = apply_codex_at(tool, &info, &dir, &state);
+                    assert!(result.success, "{}", result.message);
+                    let content = fs::read_to_string(dir.join("config.toml")).unwrap();
+                    assert_eq!(
+                        toml_read_table_value(&content, "model_providers.OpenAI", "wire_api"),
+                        "responses"
+                    );
+                    assert_eq!(toml_read_top(&content, "model"), "auto");
+                    assert_eq!(
+                        toml_read_top(&content, "web_search"),
+                        if enabled { "live" } else { "disabled" }
+                    );
+                    let catalog: serde_json::Value = serde_json::from_slice(
+                        &fs::read(codex_catalog::models_json_path(&dir)).unwrap(),
+                    )
+                    .unwrap();
+                    assert_eq!(catalog["models"].as_array().unwrap().len(), 3);
+                    assert_eq!(catalog["models"][1]["display_name"], "First model");
+                    assert_eq!(
+                        catalog["models"][1]["slug"],
+                        crate::services::smart_router::catalog::selector("first")
+                    );
+                    assert_eq!(catalog["models"][0]["use_responses_lite"], false);
+                    for entry in catalog["models"].as_array().unwrap() {
+                        assert_eq!(entry["supports_search_tool"], enabled);
+                    }
+                }
+            }
+            info.base_url = Some("https://direct.invalid/v1".into());
+            info.model = Some("single".into());
+            assert!(apply_codex_at("codex", &info, &dir, &state).success);
+            assert!(!codex_catalog::models_json_path(&dir).exists());
+            assert_eq!(
+                toml_read_top(
+                    &fs::read_to_string(dir.join("config.toml")).unwrap(),
+                    "model_catalog_json"
+                ),
+                ""
+            );
+        });
     }
 }

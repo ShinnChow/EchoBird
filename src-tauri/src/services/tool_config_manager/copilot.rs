@@ -132,6 +132,14 @@ fn apply_at(
         "id":MODEL,"provider":PROVIDER,"wireModel":model_id,
         "name":model.name.as_deref().unwrap_or(model_id)
     }));
+    for entry in super::switching::models(model)?
+        .into_iter()
+        .filter(|entry| entry.id != model_id)
+    {
+        registry["models"].as_array_mut().unwrap().push(json!({
+            "id":entry.id,"provider":PROVIDER,"wireModel":entry.id,"name":entry.name
+        }));
+    }
     if snapshot.get("previousModel").is_none() {
         snapshot["previousModel"] = settings.get("model").cloned().unwrap_or(Value::Null);
     }
@@ -183,7 +191,14 @@ fn restore_at(
     let mut registry = read_object(registry_path)?;
     let mut settings = read_object(settings_path)?;
     owned_entries(&mut registry)?;
-    if settings["model"] == SELECTION {
+    if settings["model"] == SELECTION
+        || settings["model"].as_str().is_some_and(|id| {
+            id.starts_with(&format!(
+                "{PROVIDER}/{}",
+                crate::services::smart_router::catalog::SELECTOR_PREFIX
+            ))
+        })
+    {
         if snapshot["previousModel"].is_null() {
             settings.as_object_mut().unwrap().remove("model");
         } else {
@@ -235,7 +250,15 @@ pub(super) fn read_copilot() -> Option<ModelInfo> {
 }
 
 fn read_copilot_at(settings_path: &Path, snapshot_path: &Path) -> Option<ModelInfo> {
-    if read_object(settings_path).ok()?["model"] != SELECTION {
+    let selected = read_object(settings_path).ok()?["model"]
+        .as_str()?
+        .to_string();
+    if selected != SELECTION
+        && !selected.starts_with(&format!(
+            "{PROVIDER}/{}",
+            crate::services::smart_router::catalog::SELECTOR_PREFIX
+        ))
+    {
         return None;
     }
     let snapshot = read_object(snapshot_path).ok()?;

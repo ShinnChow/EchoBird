@@ -127,6 +127,7 @@ fn apply_at(dir: &Path, model: &ModelInfo) -> Result<(), String> {
         provider["apiKey"] = api_key.into();
     }
 
+    super::switching::model_array(model, &mut provider["models"], "id", "name")?;
     // Parse both files before writing either; invalid user YAML is never replaced.
     let (models_path, mut models) = load_config(dir, "models")?;
     let (config_path, mut config) = load_config(dir, "config")?;

@@ -1,4 +1,3 @@
-import { isSmartRouterId } from '../../utils/smartRouter';
 import { useCursorAccounts } from './useCursorAccounts';
 import { useAntigravityAccounts } from './useAntigravityAccounts';
 import { useDeepSeekAccounts } from './useDeepSeekAccounts';
@@ -741,9 +740,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
           : {}),
         ...(['codex', 'chatgptdesktop'].includes(toolId)
           ? {
-              webSearch: isSmartRouterId(model.internalId)
-                ? false
-                : (webSearchOverride ?? codexWebSearch),
+              webSearch: webSearchOverride ?? codexWebSearch,
             }
           : {}),
         ...(toolId === 'zcode'
@@ -815,7 +812,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
 
   // Restore the shared Web Search preference and apply it on an explicit flip.
   const setCodexWebSearch = (value: boolean) => {
-    if (isLaunching || (selectedTool && isSmartRouterId(toolModelConfig[selectedTool]))) return;
+    if (isLaunching) return;
     setCodexWebSearchRaw(value);
     writeBool('echobird_codex_web_search', value);
     if (!isCodexTool || !selectedTool || !selectedToolData?.installed || selectedCodexAccountId)

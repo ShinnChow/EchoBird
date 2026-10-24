@@ -112,6 +112,7 @@ fn write_opencode_native_config(
             }
         }
     });
+    super::switching::model_map(model_info, &mut config["provider"][provider_id]["models"])?;
     config["model"] = serde_json::Value::String(format!("{}/{}", provider_id, model_id));
     config["small_model"] = serde_json::Value::String(format!("{}/{}", provider_id, model_id));
 

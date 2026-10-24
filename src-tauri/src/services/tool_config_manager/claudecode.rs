@@ -214,6 +214,10 @@ struct ManagedSettings {
     applied_env: Map<String, Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     web_search: Option<WebSearchPolicy>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    original_model_picker: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    applied_model_picker: Option<Value>,
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     relay: Map<String, Value>,
 }
@@ -464,6 +468,8 @@ fn apply_claudecode_with_environment(
             original_env: managed_env(&original_env),
             applied_env: managed_env(env),
             web_search: None,
+            original_model_picker: None,
+            applied_model_picker: None,
             relay: if legacy_relay {
                 relay_fields(&previous_relay)
             } else {
@@ -548,6 +554,39 @@ fn apply_claudecode_with_environment(
     }
 
     saved.applied_env = managed_env(env);
+    let switch_models = match super::switching::models(model_info) {
+        Ok(models) => models,
+        Err(message) => return config_error(message),
+    };
+    if !switch_models.is_empty() {
+        if saved.applied_model_picker.is_none()
+            || config.get("modelPicker") != saved.applied_model_picker.as_ref()
+        {
+            saved.original_model_picker = config.get("modelPicker").cloned();
+        }
+        let options: Vec<_> = switch_models
+            .into_iter()
+            .map(|model| {
+                serde_json::json!({
+                    "model": claudecode_env_model_id(&model.id, "ANTHROPIC_MODEL", one_m),
+                    "label": model.name,
+                    "description": "EchoBird"
+                })
+            })
+            .collect();
+        let picker = serde_json::json!({"options":options});
+        config["modelPicker"] = picker.clone();
+        saved.applied_model_picker = Some(picker);
+    } else if let Some(applied) = saved.applied_model_picker.take() {
+        if config.get("modelPicker") == Some(&applied) {
+            match saved.original_model_picker.take() {
+                Some(original) => config["modelPicker"] = original,
+                None => {
+                    config.as_object_mut().unwrap().remove("modelPicker");
+                }
+            }
+        }
+    }
     if let Some(enabled) = model_info.web_search {
         saved.web_search =
             match WebSearchPolicy::apply(&mut config, enabled, saved.web_search.take()) {
@@ -749,6 +788,18 @@ fn restore_claudecode_at(
         }
         if let Some(policy) = saved.as_ref().and_then(|saved| saved.web_search.as_ref()) {
             policy.restore(&mut config);
+        }
+        if let Some(saved) = &saved {
+            if saved.applied_model_picker.is_some()
+                && config.get("modelPicker") == saved.applied_model_picker.as_ref()
+            {
+                match &saved.original_model_picker {
+                    Some(original) => config["modelPicker"] = original.clone(),
+                    None => {
+                        config.as_object_mut().unwrap().remove("modelPicker");
+                    }
+                }
+            }
         }
         let next_settings = if settings_raw.is_none()
             || (saved.as_ref().is_some_and(|saved| !saved.settings_existed)
@@ -1221,5 +1272,41 @@ mod tests {
                 var
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod switch_tests {
+    use super::*;
+    #[test]
+    fn smart_picker_roundtrips_original_settings_and_preserves_manual_edits() {
+        crate::services::smart_router::catalog::with_test_models(|| {
+            let root = super::super::switching::TestDir::new();
+            let settings = root.path().join("settings.json");
+            let relay = root.path().join("relay.json");
+            let original = serde_json::json!({"modelPicker":{"options":[{"model":"personal","label":"Keep"}]},"custom":true});
+            write_json_file(&settings, &original).unwrap();
+            let mut info = super::super::switching::test_info();
+            info.one_m_context = Some(true);
+            for _ in 0..2 {
+                let result = apply_claudecode_at(&info, &settings, &relay);
+                assert!(result.success, "{}", result.message);
+                let value = read_json_file(&settings).unwrap();
+                assert_eq!(value["modelPicker"]["options"].as_array().unwrap().len(), 3);
+                assert!(value["modelPicker"]["options"][1]["model"]
+                    .as_str()
+                    .unwrap()
+                    .ends_with("[1m]"));
+            }
+            assert!(restore_claudecode_at(&settings, &relay).success);
+            assert_eq!(read_json_file(&settings).unwrap(), original);
+            assert!(apply_claudecode_at(&info, &settings, &relay).success);
+            let manual = serde_json::json!({"modelPicker":{"options":[]},"custom":true});
+            let mut value = read_json_file(&settings).unwrap();
+            value["modelPicker"] = manual["modelPicker"].clone();
+            write_json_file(&settings, &value).unwrap();
+            assert!(restore_claudecode_at(&settings, &relay).success);
+            assert_eq!(read_json_file(&settings).unwrap(), manual);
+        });
     }
 }

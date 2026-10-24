@@ -62,12 +62,15 @@ async fn models(State(state): State<AppState>, headers: HeaderMap) -> Response {
         return failure(StatusCode::FORBIDDEN, "Browser requests are not accepted");
     }
     match read_relay(&state.relay_path) {
-        Ok(relay) => Json(catalog(&relay)).into_response(),
+        Ok(relay) => match catalog(&relay) {
+            Ok(catalog) => Json(catalog).into_response(),
+            Err(error) => failure(StatusCode::SERVICE_UNAVAILABLE, &error),
+        },
         Err(error) => failure(StatusCode::SERVICE_UNAVAILABLE, &error),
     }
 }
 
-fn catalog(relay: &ModelInfo) -> Value {
+fn catalog(relay: &ModelInfo) -> Result<Value, String> {
     let model = relay.model.as_deref().unwrap_or("");
     let template =
         codex_catalog::template_for_model(relay.base_url.as_deref().unwrap_or(""), model);
@@ -88,7 +91,7 @@ fn catalog(relay: &ModelInfo) -> Value {
         })
         .filter(|modalities: &Vec<Value>| !modalities.is_empty())
         .unwrap_or_else(|| vec![json!("text")]);
-    json!({
+    let mut catalog = json!({
         "object": "list",
         "data": [{
             "id": model,
@@ -109,7 +112,23 @@ fn catalog(relay: &ModelInfo) -> Value {
                 "variants": {}
             } }
         }]
-    })
+    });
+    let models = crate::services::smart_router::catalog::models_for_url(
+        relay.base_url.as_deref().unwrap_or(""),
+    )?;
+    if !models.is_empty() {
+        let template = catalog["data"][0].clone();
+        catalog["data"] = json!(models
+            .into_iter()
+            .map(|model| {
+                let mut entry = template.clone();
+                entry["id"] = json!(model.id);
+                entry["metadata"]["muse-code"]["name"] = json!(model.name);
+                entry
+            })
+            .collect::<Vec<_>>());
+    }
+    Ok(catalog)
 }
 
 fn upstream_url(base: &str) -> Result<url::Url, String> {
@@ -161,7 +180,15 @@ async fn responses(State(state): State<AppState>, headers: HeaderMap, body: Byte
         Ok(chat) => chat,
         Err(error) => return failure(StatusCode::BAD_REQUEST, &error),
     };
-    let model = relay.model.as_deref().unwrap_or("");
+    let requested_model = request["model"].as_str().unwrap_or("");
+    let model =
+        if crate::services::smart_router::is_router_url(relay.base_url.as_deref().unwrap_or(""))
+            && requested_model.starts_with(crate::services::smart_router::catalog::SELECTOR_PREFIX)
+        {
+            requested_model
+        } else {
+            relay.model.as_deref().unwrap_or("")
+        };
     chat["model"] = json!(model);
     let url = match upstream_url(relay.base_url.as_deref().unwrap_or("")) {
         Ok(url) => url,
@@ -284,6 +311,25 @@ fn failure(status: StatusCode, message: &str) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn smart_switch_muse_catalog_keeps_the_native_metadata_contract() {
+        crate::services::smart_router::catalog::with_test_models(|| {
+            let info = serde_json::from_value(json!({"model":"auto","name":"Auto Router",
+                "baseUrl":"http://127.0.0.1:53683/v1","apiKey":"fixture"}))
+            .unwrap();
+            let catalog = catalog(&info).unwrap();
+            assert_eq!(catalog["data"].as_array().unwrap().len(), 3);
+            assert_eq!(
+                catalog["data"][1]["metadata"]["muse-code"]["name"],
+                "First model"
+            );
+            assert_eq!(
+                catalog["data"][1]["metadata"]["muse-code"]["tool_call"],
+                true
+            );
+        });
+    }
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex};
 

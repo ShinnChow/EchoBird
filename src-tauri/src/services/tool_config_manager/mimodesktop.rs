@@ -99,6 +99,7 @@ fn apply_at(dir: &Path, prefs_path: &Path, info: &ModelInfo) -> Result<(), Strin
         }
     });
     // Do not change model/small_model here: those also control the MiMo Code CLI.
+    super::switching::model_map(info, &mut config["provider"][PROVIDER]["models"])?;
     prefs["model"] = json!(format!("{PROVIDER}/{model}"));
     write_json_file(&path, &config)?;
     write_json_file(prefs_path, &prefs)
@@ -201,6 +202,26 @@ pub(super) fn restore() -> ApplyResult {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn smart_switch_native_catalog_regression() {
+        crate::services::smart_router::catalog::with_test_models(|| {
+            let info = super::super::switching::test_info();
+            let dir = super::super::switching::TestDir::new();
+            let prefs = dir.path().join("preferences.json");
+            apply_at(dir.path(), &prefs, &info).unwrap();
+            let value: Value =
+                serde_json::from_slice(&std::fs::read(dir.path().join(CONFIG_NAMES[0])).unwrap())
+                    .unwrap();
+            assert_eq!(
+                value["provider"][PROVIDER]["models"]
+                    .as_object()
+                    .unwrap()
+                    .len(),
+                3
+            );
+        });
+    }
+
     use super::*;
     use std::fs;
 

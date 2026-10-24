@@ -277,6 +277,7 @@ const zhHans: Partial<Translations> = {
   'model.deleteTitle': '删除模型',
   'model.deleteConfirm': '此模型配置将被永久删除，操作不可撤销。',
   'agent.badge.smart': '智能',
+  'agent.badge.switch': '可切换',
   'agent.badge.local': '本地',
   'agent.selectTool': '选择要配置的工具',
   'agent.noModelsHint': '在 {modelNexus} 添加模型',

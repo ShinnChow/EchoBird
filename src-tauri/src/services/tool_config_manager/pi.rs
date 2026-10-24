@@ -69,6 +69,17 @@ pub(super) fn apply_pi(model_info: &ModelInfo) -> ApplyResult {
         "apiKey": model_info.api_key.as_deref().unwrap_or(""),
         "models": [{ "id": model_id }]
     });
+    if let Err(message) = super::switching::model_array(
+        model_info,
+        &mut models_config["providers"][provider_id]["models"],
+        "id",
+        "name",
+    ) {
+        return ApplyResult {
+            success: false,
+            message,
+        };
+    }
     if let Err(e) = write_json_file(&models_path, &models_config) {
         return ApplyResult {
             success: false,

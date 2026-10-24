@@ -61,6 +61,17 @@ pub(super) fn apply_qwen_code(model_info: &ModelInfo) -> ApplyResult {
 
     // Write modelProviders — replace the protocol array with single entry
     config["modelProviders"][selected_type] = serde_json::json!([provider_entry]);
+    if let Err(message) = super::switching::model_array(
+        model_info,
+        &mut config["modelProviders"][selected_type],
+        "id",
+        "name",
+    ) {
+        return ApplyResult {
+            success: false,
+            message,
+        };
+    }
 
     // Write env — set the API key
     config["env"][&env_key] = serde_json::Value::String(api_key.to_string());

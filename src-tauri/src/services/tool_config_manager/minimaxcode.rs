@@ -236,6 +236,7 @@ fn apply_at(home: &Path, model: &ModelInfo) -> Result<(), String> {
     let mut models = provider["models"].as_object().cloned().unwrap_or_default();
     models.insert(id.into(), entry);
     provider["models"] = json!(models);
+    super::switching::model_map(model, &mut provider["models"])?;
     config["custom_provider"]["echobird"] = provider;
     config["defaultModel"] = json!(format!("custom_provider:echobird/{id}"));
     config["defaultLightModel"] = config["defaultModel"].clone();
@@ -291,6 +292,24 @@ fn read_at(home: &Path) -> Option<ModelInfo> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn smart_switch_native_catalog_regression() {
+        crate::services::smart_router::catalog::with_test_models(|| {
+            let info = super::super::switching::test_info();
+            let dir = super::super::switching::TestDir::new();
+            apply_at(dir.path(), &info).unwrap();
+            let value = config_at(dir.path()).unwrap();
+            assert_eq!(
+                value["custom_provider"]["echobird"]["models"]
+                    .as_object()
+                    .unwrap()
+                    .len(),
+                3
+            );
+            assert_eq!(value["defaultModel"], "custom_provider:echobird/auto");
+        });
+    }
+
     use super::*;
     #[test]
     fn capabilities_roundtrip_preserves_output_and_manual_models() {

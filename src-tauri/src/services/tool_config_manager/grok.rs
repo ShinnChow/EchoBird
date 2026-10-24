@@ -76,6 +76,32 @@ fn toml_strip_section(content: &str, section_header: &str) -> String {
     out.join("\n")
 }
 
+fn strip_switch_models(content: &str) -> String {
+    let prefix = format!(
+        "[model.{}",
+        crate::services::smart_router::catalog::SELECTOR_PREFIX
+    );
+    content
+        .lines()
+        .filter(|line| line.trim().starts_with(&prefix) && line.trim().ends_with(']'))
+        .fold(content.to_string(), |content, header| {
+            toml_strip_section(&content, header.trim())
+        })
+}
+
+fn switch_model_tables(content: &str, info: &ModelInfo) -> Result<String, String> {
+    let mut content = strip_switch_models(content);
+    for model in super::switching::models(info)?
+        .into_iter()
+        .filter(|model| Some(model.id.as_str()) != info.model.as_deref())
+    {
+        content.push_str(&format!("\n\n[model.{}]\nmodel = \"{}\"\nname = \"{}\"\nbase_url = \"{}\"\napi_key = \"{}\"\napi_backend = \"chat_completions\"\n",
+            model.id, toml_escape(&model.id), toml_escape(&model.name),
+            toml_escape(info.base_url.as_deref().unwrap_or("")), toml_escape(info.api_key.as_deref().unwrap_or(""))));
+    }
+    Ok(content)
+}
+
 pub(super) fn apply_grok(model_info: &ModelInfo) -> ApplyResult {
     let model_id = model_info
         .model
@@ -122,7 +148,18 @@ pub(super) fn apply_grok(model_info: &ModelInfo) -> ApplyResult {
         display = toml_escape(display_name),
         key = toml_escape(&api_key),
     );
-    let final_content = format!("{}{}", stripped.trim_end(), new_section);
+    let final_content = match switch_model_tables(
+        &format!("{}{}", stripped.trim_end(), new_section),
+        model_info,
+    ) {
+        Ok(content) => content,
+        Err(message) => {
+            return ApplyResult {
+                success: false,
+                message,
+            }
+        }
+    };
 
     ensure_parent(&config_path);
     if let Err(e) = fs::write(&config_path, &final_content) {
@@ -165,7 +202,7 @@ pub(super) fn restore_grok_to_official() -> ApplyResult {
     let mut stripped = toml_strip_section(&existing, &our_model_header);
     stripped = toml_strip_section(&stripped, "[models]");
 
-    let final_content = stripped.trim_end().to_string() + "\n";
+    let final_content = strip_switch_models(&stripped).trim_end().to_string() + "\n";
 
     if existing.is_empty() && final_content.trim().is_empty() {
         // Nothing to do — config was empty, no echobird block to remove.
@@ -225,4 +262,27 @@ pub(super) fn read_grok() -> Option<ModelInfo> {
         image_input: None,
         one_m_context: None,
     })
+}
+
+#[cfg(test)]
+mod switch_tests {
+    use super::*;
+    #[test]
+    fn smart_switch_tables_preserve_user_models_and_can_be_removed() {
+        crate::services::smart_router::catalog::with_test_models(|| {
+            let original = "# keep\n[model.personal]\nmodel = \"mine\"\n";
+            let info = super::super::switching::test_info();
+            let content = switch_model_tables(original, &info).unwrap();
+            let document = content.parse::<toml_edit::DocumentMut>().unwrap();
+            assert_eq!(document["model"].as_table().unwrap().len(), 3);
+            let id = crate::services::smart_router::catalog::selector("first");
+            assert_eq!(document["model"][&id]["model"].as_str(), Some(id.as_str()));
+            assert_eq!(document["model"][&id]["name"].as_str(), Some("First model"));
+            assert_eq!(
+                document["model"][&id]["api_backend"].as_str(),
+                Some("chat_completions")
+            );
+            assert_eq!(strip_switch_models(&content), original.trim_end());
+        });
+    }
 }

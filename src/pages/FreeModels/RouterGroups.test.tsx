@@ -13,6 +13,7 @@ const { confirm, showToast } = vi.hoisted(() => ({ confirm: vi.fn(), showToast: 
 vi.mock('../../hooks/useI18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 vi.mock('../../components/ConfirmDialog', () => ({ useConfirm: () => confirm }));
 vi.mock('../../components/Toast', () => ({ useToast: () => ({ showToast }) }));
+vi.mock('../../components/BirdEasterEgg', () => ({ BirdEasterEgg: () => null }));
 vi.mock('react-dom', () => ({ createPortal: (children: ReactNode) => children }));
 vi.mock('../../utils/copyText', () => ({ copyText: vi.fn() }));
 vi.mock('@tauri-apps/plugin-clipboard-manager', () => ({ readText: vi.fn() }));
@@ -263,6 +264,87 @@ describe('Independent smart router groups', () => {
       expect(context.routers.map((group) => group.groupEnabled)).toEqual([true, true]);
       expect(context.customModels).toBe(displayedModels);
       expect(api.getSmartRouterCandidates).toHaveBeenCalledTimes(candidateReads);
+    }
+  );
+
+  it.each(['cards', 'list'] as const)(
+    'recovers closed %s groups through the visible master switch after a failed enable',
+    async (layout) => {
+      vi.stubGlobal('__APP_EDITION__', 'full');
+      const { Sidebar } = await import('../../components/Sidebar');
+      groups = groups.map((group) => ({
+        ...group,
+        masterEnabled: false,
+        groupEnabled: false,
+        enabled: false,
+        running: false,
+      }));
+      vi.stubGlobal('localStorage', {
+        getItem: (key: string) => (key === 'echobird-router-layout' ? layout : null),
+        setItem: vi.fn(),
+      });
+      function RecoveryHarness() {
+        const value = useFreeModels();
+        return (
+          <>
+            <Sidebar
+              activePage="freeModels"
+              onPageChange={(activePage) => useNavigationStore.setState({ activePage })}
+              smartRouterGroups={value.routers}
+              smartRouterEnabled={value.routerEnabled}
+              smartRouterTogglePending={value.routerTogglePending}
+              onSmartRouterChange={(enabled) => void value.setRouterEnabled(enabled)}
+            />
+            <Harness />
+          </>
+        );
+      }
+      await act(async () => {
+        renderer = create(
+          <FreeModelsProvider>
+            <RecoveryHarness />
+          </FreeModelsProvider>
+        );
+      });
+      const master = () =>
+        renderer.root.findByProps({ role: 'switch', 'aria-label': 'nav.smartRouter' });
+      const group = () => renderer.root.findByProps({ role: 'switch', 'aria-label': 'First' });
+      const displayedModels = context.customModels;
+      expect(master().props['aria-checked']).toBe(false);
+      expect(master().props.disabled).toBe(false);
+      expect(group().props.disabled).toBe(true);
+      expect(api.setSmartRouterEnabled).not.toHaveBeenCalled();
+      expect(api.setSmartRouterGroupEnabled).not.toHaveBeenCalled();
+      let reject!: (error: Error) => void;
+      vi.mocked(api.setSmartRouterEnabled).mockImplementationOnce(
+        () => new Promise((_, fail) => (reject = fail))
+      );
+      await act(async () => master().props.onClick());
+      expect(master().props.disabled).toBe(true);
+      expect(master().props['aria-busy']).toBe(true);
+      await act(async () => master().props.onClick());
+      expect(api.setSmartRouterEnabled).toHaveBeenCalledTimes(1);
+      await act(async () => reject(new Error('Fixture enable failed')));
+      expect(master().props.disabled).toBe(false);
+      expect(master().props['aria-checked']).toBe(false);
+      expect(group().props.disabled).toBe(true);
+      expect(showToast).toHaveBeenCalledExactlyOnceWith('error', 'error.requestFailed');
+      await act(async () => master().props.onClick());
+      expect(api.setSmartRouterEnabled).toHaveBeenLastCalledWith(true);
+      expect(master().props['aria-checked']).toBe(true);
+      expect(group().props.disabled).toBe(false);
+      expect(context.routers.map((router) => router.groupEnabled)).toEqual([false, false]);
+      await act(async () => group().props.onClick());
+      expect(api.setSmartRouterGroupEnabled).toHaveBeenCalledExactlyOnceWith('smart-router', true);
+      expect(context.activeRouterEnabled).toBe(true);
+      expect(context.activeRouterId).toBe('smart-router');
+      expect(context.customModels).toBe(displayedModels);
+      expect(context.routers[1].groupEnabled).toBe(false);
+      expect(context.routers[1].disabledCandidateIds).toEqual(['two']);
+      expect(api.saveSmartRouter).not.toHaveBeenCalled();
+      expect(api.updateModel).not.toHaveBeenCalled();
+      expect(api.setSmartRouterCandidates).not.toHaveBeenCalled();
+      expect(confirm).not.toHaveBeenCalled();
     }
   );
 

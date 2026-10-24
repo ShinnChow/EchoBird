@@ -167,6 +167,15 @@ fn apply_claudedesktop_at(
     paths: &ClaudeDesktopLayout,
     relay_path: &Path,
 ) -> ApplyResult {
+    let switch_models = match super::switching::models(model_info) {
+        Ok(models) => models,
+        Err(message) => {
+            return ApplyResult {
+                success: false,
+                message,
+            }
+        }
+    };
     // The frontend's AppManagerProvider.applyModel collapses the chosen
     // protocol's URL into `base_url` when sending to the backend (the
     // long-standing claudecode convention — see line `const apiUrl =
@@ -326,12 +335,23 @@ fn apply_claudedesktop_at(
         serde_json::Value::Bool(model_info.one_m_context.unwrap_or(false)),
     );
     let model_entry = serde_json::Value::Object(model_entry);
+    let mut inference_models = serde_json::json!([model_entry]);
+    // The auto row uses Desktop's Claude alias; concrete rows keep their stable selectors.
+    for model in switch_models
+        .into_iter()
+        .filter(|model| model.id != real_model_id)
+    {
+        let mut entry = inference_models[0].clone();
+        entry["name"] = serde_json::json!(model.id);
+        entry["labelOverride"] = serde_json::json!(model.name);
+        inference_models.as_array_mut().unwrap().push(entry);
+    }
     let updates = serde_json::json!({
         "disableDeploymentModeChooser": true,
         "inferenceGatewayApiKey": api_key,
         "inferenceGatewayAuthScheme": "bearer",
         "inferenceGatewayBaseUrl": anthropic_url,
-        "inferenceModels": [model_entry],
+        "inferenceModels": inference_models,
         "inferenceProvider": "gateway",
         // Claude Desktop 3P mode derives the built-in web_fetch egress policy
         // from this field. Without it, egress falls back to the gateway host
@@ -754,5 +774,41 @@ mod tests {
         }
         assert_eq!(read_json_file(&cli_path).unwrap(), cli_config);
         fs::remove_dir_all(dir).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod switch_tests {
+    use super::*;
+    #[test]
+    fn smart_profile_lists_concrete_models_and_direct_apply_returns_to_one() {
+        crate::services::smart_router::catalog::with_test_models(|| {
+            let root = super::super::switching::TestDir::new();
+            let paths = claudedesktop_paths_at(root.path());
+            let relay = root.path().join("relay.json");
+            let mut info = super::super::switching::test_info();
+            let profile = paths
+                .lib_dir
+                .join(format!("{CLAUDE_DESKTOP_PROFILE_ID}.json"));
+            let result = apply_claudedesktop_at(&info, &paths, &relay);
+            assert!(result.success, "{}", result.message);
+            let value = read_json_file(&profile).unwrap();
+            assert_eq!(value["inferenceModels"].as_array().unwrap().len(), 3);
+            assert_eq!(value["inferenceModels"][1]["labelOverride"], "First model");
+            assert_eq!(
+                value["inferenceModels"][1]["name"],
+                crate::services::smart_router::catalog::selector("first")
+            );
+            info.base_url = Some("https://direct.invalid".into());
+            assert!(apply_claudedesktop_at(&info, &paths, &relay).success);
+            assert_eq!(
+                read_json_file(&profile).unwrap()["inferenceModels"]
+                    .as_array()
+                    .unwrap()
+                    .len(),
+                1
+            );
+            assert!(restore_claudedesktop_at(&paths, &relay).success);
+        });
     }
 }

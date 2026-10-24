@@ -401,7 +401,16 @@ fn apply_at(home: &Path, model_info: &ModelInfo) -> Result<(), String> {
             } else {
                 models.push(Value::Mapping(model));
             }
-            route.insert(yaml_str("models"), Value::Sequence(models));
+            if super::switching::models(model_info)?.is_empty() {
+                route.insert(yaml_str("models"), Value::Sequence(models));
+            } else {
+                let mut entries = serde_json::to_value(models).map_err(|e| e.to_string())?;
+                super::switching::model_array(model_info, &mut entries, "id", "name")?;
+                route.insert(
+                    yaml_str("models"),
+                    serde_yaml_ng::to_value(entries).map_err(|e| e.to_string())?,
+                );
+            }
             providers.insert(yaml_str(DSH_PROVIDER), serde_yaml_ng::Value::Mapping(route));
         }
 

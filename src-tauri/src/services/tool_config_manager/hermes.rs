@@ -106,6 +106,10 @@ fn apply_at(path: &Path, info: &ModelInfo) -> Result<(), String> {
     let mut document = load(path)?;
     let root = document.as_mapping_mut().unwrap();
     let route = map(map(root, "providers")?, PROVIDER)?;
+    let previous_router = route
+        .get(yaml_str("base_url"))
+        .and_then(Value::as_str)
+        .is_some_and(crate::services::smart_router::is_router_url);
     // Credentials from an earlier route must not override the selected API key.
     for field in ["key_cmd", "key_env", "api_key_env"] {
         route.remove(yaml_str(field));
@@ -119,6 +123,25 @@ fn apply_at(path: &Path, info: &ModelInfo) -> Result<(), String> {
         route.insert(yaml_str(field), yaml_str(value));
     }
     route.insert(yaml_str("enabled"), Value::Bool(true));
+    let models = super::switching::models(info)?;
+    if !models.is_empty() {
+        route.insert(
+            yaml_str("models"),
+            serde_yaml_ng::to_value(models.iter().map(|model| &model.id).collect::<Vec<_>>())
+                .map_err(|e| e.to_string())?,
+        );
+    } else if previous_router {
+        route.remove(yaml_str("models"));
+    } else if let Some(models) = route
+        .get_mut(yaml_str("models"))
+        .and_then(Value::as_sequence_mut)
+    {
+        models.retain(|model| {
+            !model.as_str().is_some_and(|id| {
+                id.starts_with(crate::services::smart_router::catalog::SELECTOR_PREFIX)
+            })
+        });
+    }
     if root.get("model").is_some_and(Value::is_string) {
         root.insert(yaml_str("model"), Value::Mapping(Mapping::new()));
     }
@@ -207,6 +230,30 @@ pub(super) fn read() -> Option<ModelInfo> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn smart_switch_native_catalog_regression() {
+        crate::services::smart_router::catalog::with_test_models(|| {
+            let info = super::super::switching::test_info();
+            let dir = super::super::switching::TestDir::new();
+            let path = dir.path().join("config.yaml");
+            apply_at(&path, &info).unwrap();
+            let saved = load(&path).unwrap();
+            assert_eq!(
+                saved["providers"][PROVIDER]["models"]
+                    .as_sequence()
+                    .unwrap()
+                    .len(),
+                3
+            );
+            let mut direct = info;
+            direct.base_url = Some("https://direct.invalid/v1".into());
+            apply_at(&path, &direct).unwrap();
+            assert!(load(&path).unwrap()["providers"][PROVIDER]
+                .get("models")
+                .is_none());
+        });
+    }
+
     use super::*;
     use std::fs;
 

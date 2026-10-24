@@ -17,6 +17,7 @@ interface ModelListCardProps {
   disabled?: boolean;
   subtitle?: string;
   badge?: ReactNode;
+  secondaryBadge?: ReactNode;
   usage?: ModelUsageData;
   refreshing?: boolean;
   onRefreshUsage?: (modelId: string) => void;
@@ -35,6 +36,7 @@ export function ModelListCard({
   disabled = false,
   subtitle = model.modelId || '',
   badge,
+  secondaryBadge,
   usage,
   refreshing = false,
   onRefreshUsage,
@@ -96,6 +98,7 @@ export function ModelListCard({
         </div>
         <div className="flex items-center gap-2 mt-1 text-[10px] leading-tight">
           <span className="flex-1 min-w-0 truncate text-cyber-text-secondary/70">{subtitle}</span>
+          {secondaryBadge}
           {!isLocalModel && (onRefreshUsage || (canManage && (onDeleteModel || onEditModel))) && (
             <div className="pointer-events-auto flex items-center gap-1 shrink-0">
               {onRefreshUsage && (

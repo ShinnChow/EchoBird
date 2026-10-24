@@ -330,6 +330,7 @@ const ja: Partial<Translations> = {
   'model.deleteTitle': 'モデルを削除',
   'model.deleteConfirm': 'このモデル設定は完全に削除されます。この操作は取り消せません。',
   'agent.badge.smart': 'スマート',
+  'agent.badge.switch': '切替対応',
   'agent.badge.local': 'ローカル',
   'agent.selectTool': '設定するツールを選択',
   'agent.noModelsHint': '{modelNexus}でモデルを追加',

@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod account_cleanup_tests;
+pub(crate) mod catalog;
 pub(crate) mod profiles;
 mod runtime;
 mod server;

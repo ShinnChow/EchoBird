@@ -211,6 +211,7 @@ fn settings_bytes(path: &Path, info: &ModelInfo) -> Result<(Vec<u8>, String), St
             entry["models"][0] = json!(fields);
         }
     }
+    super::switching::model_array(info, &mut entry["models"], "model", "displayName")?;
     set(&providers, PROVIDER, &entry);
     let model_settings = match settings.get("model") {
         Some(value) => value
@@ -324,6 +325,30 @@ pub(super) async fn apply(tool_id: &str, info: &ModelInfo) -> ApplyResult {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn smart_switch_native_catalog_regression() {
+        crate::services::smart_router::catalog::with_test_models(|| {
+            let info = super::super::switching::test_info();
+            let dir = super::super::switching::TestDir::new();
+            fs::write(dir.path().join("settings.json"), "{}").unwrap();
+            let (bytes, selected) =
+                settings_bytes(&dir.path().join("settings.json"), &info).unwrap();
+            let value: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(selected, "auto");
+            assert_eq!(
+                value["providers"][PROVIDER]["models"]
+                    .as_array()
+                    .unwrap()
+                    .len(),
+                3
+            );
+            assert_eq!(
+                value["providers"][PROVIDER]["models"][1]["displayName"],
+                "First model"
+            );
+        });
+    }
+
     use super::*;
     use std::io::Write;
 

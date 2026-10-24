@@ -105,6 +105,14 @@ fn apply_at(config_path: &Path, model_info: &ModelInfo) -> ApplyResult {
     config["model"] = serde_json::Value::String(format!("{}/{}", provider_id, model_id));
     config["small_model"] = serde_json::Value::String(format!("{}/{}", provider_id, model_id));
 
+    if let Err(message) =
+        super::switching::model_map(model_info, &mut config["provider"][provider_id]["models"])
+    {
+        return ApplyResult {
+            success: false,
+            message,
+        };
+    }
     match write_json_file(config_path, &config) {
         Ok(_) => {
             log::info!(
@@ -226,6 +234,26 @@ pub(super) fn restore_mimocode_to_official() -> ApplyResult {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn smart_switch_native_catalog_regression() {
+        crate::services::smart_router::catalog::with_test_models(|| {
+            let info = super::super::switching::test_info();
+            let dir = super::super::switching::TestDir::new();
+            let path = dir.path().join("mimocode.jsonc");
+            let result = apply_at(&path, &info);
+            assert!(result.success, "{}", result.message);
+            let value = read_jsonc_file(&path).unwrap();
+            assert_eq!(
+                value["provider"]["echobird"]["models"]
+                    .as_object()
+                    .unwrap()
+                    .len(),
+                3
+            );
+            assert_eq!(value["model"], "echobird/auto");
+        });
+    }
+
     use super::*;
 
     #[test]

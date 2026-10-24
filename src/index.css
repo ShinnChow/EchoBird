@@ -824,6 +824,10 @@ html.is-macos .page-scroll::-webkit-scrollbar {
   filter: invert(1) brightness(0.88);
 }
 
+[data-theme='dark'] .model-switch-badge {
+  color: rgb(52 211 153);
+}
+
 /* Account pills use a compact inverse black/white treatment. Keep every
    child tied to the pill's current color so icons remain visible on hover. */
 [data-theme='light'] .account-pill {

@@ -35,6 +35,7 @@ mod proxy_ports;
 mod qoder;
 mod qwencode;
 mod relay;
+mod switching;
 mod toml;
 mod vibe_trading;
 pub(crate) mod vscode;
@@ -310,6 +311,12 @@ fn model_input_modalities_for(model_id: &str) -> &'static [&'static str] {
 pub async fn apply_model_to_tool(tool_id: &str, model_info: ModelInfo) -> ApplyResult {
     log::info!("[ToolConfigManager] Applying model to {}", tool_id);
     let model_info = normalize_model_info_for_tool(tool_id, model_info);
+    if let Err(message) = switching::models(&model_info) {
+        return ApplyResult {
+            success: false,
+            message,
+        };
+    }
 
     // Dispatch custom tools to their own handlers
     match tool_id {

@@ -830,7 +830,7 @@ describe.each(['codex', 'chatgptdesktop'])('%s Web Search preference', (tool) =>
     }
   });
 
-  it('disables hosted search for auto without changing the saved preference for ordinary models', async () => {
+  it('uses the saved search choice for Smart Access and saves explicit changes for both router and direct models', async () => {
     await mount();
     act(() => context.handleSelectModel(tool, 'smart-router'));
     await act(async () => {
@@ -839,13 +839,17 @@ describe.each(['codex', 'chatgptdesktop'])('%s Web Search preference', (tool) =>
     });
     expect(api.applyModelToTool).toHaveBeenLastCalledWith(
       tool,
-      expect.objectContaining({ model: 'auto', webSearch: false })
+      expect.objectContaining({ model: 'auto', webSearch: true })
     );
-    const calls = vi.mocked(api.applyModelToTool).mock.calls.length;
-    act(() => context.setCodexWebSearch(true));
-    expect(api.applyModelToTool).toHaveBeenCalledTimes(calls);
-    expect(context.codexWebSearch).toBe(true);
-    expect(storage.has('echobird_codex_web_search')).toBe(false);
+    for (const enabled of [false, true]) {
+      await act(async () => context.setCodexWebSearch(enabled));
+      expect(context.codexWebSearch).toBe(enabled);
+      expect(storage.get('echobird_codex_web_search')).toBe(String(enabled));
+      expect(api.applyModelToTool).toHaveBeenLastCalledWith(
+        tool,
+        expect.objectContaining({ model: 'auto', webSearch: enabled })
+      );
+    }
     act(() => context.handleSelectModel(tool, 'fixture'));
     await act(async () => {
       await context.handleLaunch();
