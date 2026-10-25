@@ -1546,7 +1546,7 @@ const RandomAppTip: React.FC = () => {
     const timer = setInterval(() => {
       const offset = 1 + Math.floor(Math.random() * (APP_TIP_KEYS.length - 1));
       setTipIndex((current) => (current + offset) % APP_TIP_KEYS.length);
-    }, 30_000);
+    }, 600_000);
     return () => clearInterval(timer);
   }, []);
 

@@ -691,7 +691,7 @@ describe('PageAwareHint', () => {
     expect(await renderHint('test-tool')).toContain(hint);
   });
 
-  it('rotates every 30 seconds without repeating and stops when hidden or unmounted', async () => {
+  it('rotates every 10 minutes without repeating and stops when hidden or unmounted', async () => {
     vi.useFakeTimers();
     vi.stubGlobal('__APP_EDITION__', 'full');
     useNavigationStore.setState({ activePage: 'apps' });
@@ -708,12 +708,12 @@ describe('PageAwareHint', () => {
     expect(text()).toBe('hint.appReorder');
     expect(vi.getTimerCount()).toBe(1);
     act(() => {
-      vi.advanceTimersByTime(29_999);
+      vi.advanceTimersByTime(599_999);
     });
     expect(text()).toBe('hint.appReorder');
     for (const hint of ['hint.cliRecommendation', 'hint.smartAccess', 'hint.appReorder']) {
       act(() => {
-        vi.advanceTimersByTime(hint === 'hint.cliRecommendation' ? 1 : 30_000);
+        vi.advanceTimersByTime(hint === 'hint.cliRecommendation' ? 1 : 600_000);
       });
       expect(text()).toBe(hint);
     }

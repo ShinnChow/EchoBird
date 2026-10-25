@@ -570,9 +570,9 @@ const zhHans: Partial<Translations> = {
     'ChatGPT / Codex CLI 切换模型时，第三方模型必须支持 Responses 才能成功接入。',
   'hint.localHistoryPreserved': '切换账号或模型，本地对话记录自动保留。',
   'hint.cliRecommendation':
-    '小技巧：应用的桌面端往往因界面调度、界面识别等，比 CLI 版消耗更多 Token、等待更久。（推荐使用 Coffee CLI 启动 CLI 版，还原桌面端的体验。）',
-  'hint.appReorder': '小技巧：在应用桌面页面，长按拖动应用图标，可调整排列顺序。',
-  'hint.smartAccess': '小技巧：使用智能接入功能，可在应用中直接切换你自定义的模型列表。',
+    '小技巧：桌面版应用往往因界面调度、界面识别等，比 CLI 版消耗更多 Token、等待更久。（推荐使用 Coffee CLI 启动 CLI 版，还原桌面端的体验。）',
+  'hint.appReorder': '小技巧：在应用桌面，长按拖动应用图标，可调整排列顺序。',
+  'hint.smartAccess': '小技巧：使用智能接入，可在应用中直接切换你自定义的模型列表。',
   'hint.myProjects':
     '给你 Vibe Coding 的应用或游戏切换模型，参考黑白棋和 AI 翻译的 models.json 或复制它到你的项目。',
   'mother.selectModel': '选择模型',
