@@ -619,7 +619,7 @@ describe('PageAwareHint', () => {
   let renderer: ReactTestRenderer | undefined;
 
   beforeEach(() => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    vi.spyOn(Math, 'random').mockReturnValue(0.25);
   });
 
   afterEach(() => {
@@ -684,8 +684,10 @@ describe('PageAwareHint', () => {
 
   it.each([
     [0, 'hint.cliRecommendation'],
-    [0.5, 'hint.appReorder'],
-    [0.99, 'hint.smartAccess'],
+    [0.25, 'hint.appReorder'],
+    [0.5, 'hint.smartAccess'],
+    [0.75, 'hint.voiceInput'],
+    [0.99, 'hint.voiceSelection'],
   ] as const)('randomly selects %s on opening', async (random, hint) => {
     vi.mocked(Math.random).mockReturnValue(random);
     expect(await renderHint('test-tool')).toContain(hint);
@@ -711,9 +713,15 @@ describe('PageAwareHint', () => {
       vi.advanceTimersByTime(599_999);
     });
     expect(text()).toBe('hint.appReorder');
-    for (const hint of ['hint.cliRecommendation', 'hint.smartAccess', 'hint.appReorder']) {
+    for (const [index, hint] of [
+      'hint.voiceInput',
+      'hint.cliRecommendation',
+      'hint.smartAccess',
+      'hint.voiceSelection',
+      'hint.appReorder',
+    ].entries()) {
       act(() => {
-        vi.advanceTimersByTime(hint === 'hint.cliRecommendation' ? 1 : 600_000);
+        vi.advanceTimersByTime(index === 0 ? 1 : 600_000);
       });
       expect(text()).toBe(hint);
     }
@@ -739,7 +747,7 @@ describe('PageAwareHint', () => {
 
     vi.mocked(Math.random).mockReturnValue(0.99);
     act(() => useNavigationStore.setState({ activePage: 'apps' }));
-    expect(text()).toBe('hint.smartAccess');
+    expect(text()).toBe('hint.voiceSelection');
     expect(vi.getTimerCount()).toBe(1);
     act(() => renderer!.unmount());
     renderer = undefined;

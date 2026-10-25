@@ -580,6 +580,8 @@ export type TKey =
   | 'hint.cliRecommendation'
   | 'hint.appReorder'
   | 'hint.smartAccess'
+  | 'hint.voiceInput'
+  | 'hint.voiceSelection'
   // Mother Agent
   | 'mother.selectModel'
   | 'mother.reasoning.title'

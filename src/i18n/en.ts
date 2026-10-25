@@ -627,6 +627,10 @@ const en: Translations = {
     'Tip: On App Desktop, press and hold, then drag app icons to change their order.',
   'hint.smartAccess':
     'Tip: Use Smart Router to switch directly between models in your custom model list within an app.',
+  'hint.voiceInput':
+    'Tip: In the AI era, voice input helps you work more efficiently and supports automatic translation into other languages.',
+  'hint.voiceSelection':
+    'Tip: After enabling Smart text refinement in Voice Input, you can also enable selection translation and Ask.',
   'hint.myProjects':
     "Swap the model on your vibe-coded app or game — reference Reversi's and AI Translator's models.json, or just copy it to your project.",
   // Mother Agent

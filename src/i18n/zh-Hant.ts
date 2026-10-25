@@ -610,6 +610,8 @@ const zhHant: Partial<Translations> = {
     '小技巧：桌面版應用程式通常因介面調度、介面辨識等，比 CLI 版消耗更多 Token、等待更久。（推薦使用 Coffee CLI 啟動 CLI 版，還原桌面版的體驗。）',
   'hint.appReorder': '小技巧：在應用桌面，長按拖動應用程式圖示，可調整排列順序。',
   'hint.smartAccess': '小技巧：使用智能接入，可在應用程式中直接切換你自訂的模型清單。',
+  'hint.voiceInput': '小技巧：在 AI 時代，語音輸入更有效率，還支援自動翻譯成其他語言。',
+  'hint.voiceSelection': '小技巧：在語音輸入中開啟文字智慧最佳化後，還可啟用劃詞翻譯和提問。',
   'hint.myProjects':
     '給你 Vibe Coding 的應用或遊戲切換模型，參考黑白棋和 AI 翻譯的 models.json 或複製它到你的專案。',
   'mother.selectModel': '選擇模型',
