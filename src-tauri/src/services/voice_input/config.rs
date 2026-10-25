@@ -38,6 +38,7 @@ pub struct Config {
     pub microphone: Option<String>,
     pub shortcut_enabled: bool,
     pub hotkey_enabled: bool,
+    pub hotkey_mode: String,
     pub shortcut: Binding,
     pub island_theme: String,
     pub island_palette: String,
@@ -57,6 +58,7 @@ impl Default for Config {
             microphone: None,
             shortcut_enabled: false,
             hotkey_enabled: false,
+            hotkey_mode: "hold".into(),
             shortcut: Binding {
                 code: "AltRight".into(),
                 modifiers: Vec::new(),
@@ -121,6 +123,9 @@ impl Config {
     }
 
     pub fn validate(&self) -> Result<(), String> {
+        if !matches!(self.hotkey_mode.as_str(), "hold" | "toggle") {
+            return Err("voice.error.config".into());
+        }
         if language_name(&self.selection_translation_language).is_none() {
             return Err("voice.error.config".into());
         }

@@ -467,26 +467,42 @@ export function VoiceInputMain() {
               </span>
               <span className="voice-shortcut-description">{t('voice.shortcutCaution')}</span>
             </span>
-            <div className="voice-shortcut-control">
-              <ShortcutRecorder
-                key={String(active)}
-                active={active}
-                enabled={config.hotkeyEnabled}
-                binding={config.shortcut}
+            <div className="voice-shortcut-controls">
+              <fieldset
+                aria-label={t('voice.shortcutMode')}
                 disabled={busy}
-                onSave={(shortcut) => save({ shortcut, hotkeyEnabled: true })}
-              />
-              {config.hotkeyEnabled && (
-                <button
-                  type="button"
-                  className="voice-shortcut-clear"
-                  aria-label={t('voice.disableShortcut')}
+                className="m-0 min-w-0 shrink-0 border-0 p-0 disabled:opacity-40"
+              >
+                <ViewModeTabs
+                  value={config.hotkeyMode ?? 'hold'}
+                  options={[
+                    { value: 'hold', label: t('voice.shortcutHold') },
+                    { value: 'toggle', label: t('voice.shortcutToggle') },
+                  ]}
+                  onChange={(value) => update('hotkeyMode', value)}
+                />
+              </fieldset>
+              <div className="voice-shortcut-control">
+                <ShortcutRecorder
+                  key={String(active)}
+                  active={active}
+                  enabled={config.hotkeyEnabled}
+                  binding={config.shortcut}
                   disabled={busy}
-                  onClick={() => update('hotkeyEnabled', false)}
-                >
-                  <X size={16} />
-                </button>
-              )}
+                  onSave={(shortcut) => save({ shortcut, hotkeyEnabled: true })}
+                />
+                {config.hotkeyEnabled && (
+                  <button
+                    type="button"
+                    className="voice-shortcut-clear"
+                    aria-label={t('voice.disableShortcut')}
+                    disabled={busy}
+                    onClick={() => update('hotkeyEnabled', false)}
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           {snapshot.shortcutDescription && (

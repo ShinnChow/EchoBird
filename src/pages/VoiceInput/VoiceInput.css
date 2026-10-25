@@ -104,13 +104,20 @@
   font-size: 12px;
   line-height: 1.5;
 }
+.voice-shortcut-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 1 340px;
+  max-width: 55%;
+  min-width: 0;
+}
 .voice-shortcut-control {
   display: flex;
   align-items: center;
   gap: 4px;
-  width: 220px;
-  max-width: 40%;
-  flex: none;
+  min-width: 0;
+  flex: 1;
 }
 .voice-shortcut-control > button {
   height: 40px;

@@ -68,7 +68,10 @@ const en: Translations = {
   'voice.translation.es': 'Spanish',
   'voice.seconds': 's',
   'voice.enableInput': 'Enable voice input',
-  'voice.shortcut': 'Hold-to-talk shortcut',
+  'voice.shortcut': 'Voice input shortcut',
+  'voice.shortcutMode': 'Shortcut input mode',
+  'voice.shortcutHold': 'Hold',
+  'voice.shortcutToggle': 'Toggle',
   'voice.changeShortcutHint': 'Prefer clicking the microphone{mic}to dictate.',
   'voice.shortcutCaution':
     'Other actions during keyboard input can cause shortcut conflicts and loss of cursor focus.',

@@ -375,10 +375,10 @@ describe('localized shortcut transitions', () => {
   });
 
   const labels: Record<string, string> = {
-    'zh-Hans': '长按输入快捷键',
-    'zh-Hant': '長按輸入快捷鍵',
-    en: 'Hold-to-talk shortcut',
-    ja: '長押し入力キー',
+    'zh-Hans': '语音输入快捷键',
+    'zh-Hant': '語音輸入快捷鍵',
+    en: 'Voice input shortcut',
+    ja: '音声入力キー',
   };
   const cases = Object.keys(labels).flatMap((locale) =>
     ['Win32', 'MacIntel', 'Linux x86_64'].map((platform) => ({ locale, platform }))
@@ -403,6 +403,68 @@ describe('localized shortcut transitions', () => {
     stopPropagation: vi.fn(),
   });
 
+  it.each(Object.keys(labels))(
+    'changes the shortcut mode independently and preserves it on save failure in %s',
+    async (locale) => {
+      await loadLocale(locale);
+      localization.locale = locale;
+      const config = {
+        ...voiceSnapshot().config,
+        channels: [{ kind: 'model' as const, id: 'speech-model' }],
+        shortcutEnabled: true,
+      };
+      voice.setState({ snapshot: voiceSnapshot({ config }) });
+      act(() => {
+        renderer = create(<VoiceInputMain />);
+      });
+      const tabs = () =>
+        renderer.root
+          .findAllByType(ViewModeTabs)
+          .find((node) =>
+            node.props.options.some((option: { value: string }) => option.value === 'hold')
+          )!;
+      expect(tabs().props.value).toBe('hold');
+      expect(tabs().props.options.map((option: { label: string }) => option.label)).toEqual([
+        translate('voice.shortcutHold', locale),
+        translate('voice.shortcutToggle', locale),
+      ]);
+      expect(api.saveVoiceConfig).not.toHaveBeenCalled();
+      vi.mocked(api.saveVoiceConfig).mockImplementationOnce(async (saved) =>
+        voiceSnapshot({ config: saved, revision: 2 })
+      );
+      await act(async () => tabs().props.onChange('toggle'));
+      expect(api.saveVoiceConfig).toHaveBeenCalledExactlyOnceWith({
+        ...config,
+        hotkeyMode: 'toggle',
+      });
+      expect(tabs().props.value).toBe('toggle');
+      expect(voice.getState().snapshot?.config.hotkeyEnabled).toBe(false);
+      expect(voice.getState().snapshot?.config.shortcutEnabled).toBe(true);
+      vi.mocked(api.saveVoiceConfig).mockRejectedValueOnce('voice.error.save');
+      await act(async () => tabs().props.onChange('hold'));
+      expect(tabs().props.value).toBe('toggle');
+      for (const phase of [
+        'starting',
+        'recording',
+        'transcribing',
+        'optimizing',
+        'inserting',
+      ] as const) {
+        act(() =>
+          voice.setState({
+            snapshot: voiceSnapshot({ config: { ...config, hotkeyMode: 'toggle' }, phase }),
+          })
+        );
+        expect(tabs().parent!.props.disabled).toBe(true);
+        await act(async () => tabs().props.onChange('hold'));
+      }
+      expect(api.saveVoiceConfig).toHaveBeenCalledTimes(2);
+      expect(api.startVoice).not.toHaveBeenCalled();
+      expect(api.recordVoice).not.toHaveBeenCalled();
+      expect(api.stopVoice).not.toHaveBeenCalled();
+    }
+  );
+
   it.each(cases)(
     'preserves surrounding card content through capture, cancel and save in $locale on $platform',
     async ({ locale, platform }) => {
@@ -416,7 +478,8 @@ describe('localized shortcut transitions', () => {
       const card = () =>
         renderer.root.findByProps({ className: 'voice-card voice-shortcut-card rounded-card' });
       const row = () => card().findByProps({ className: 'voice-row voice-shortcut-row' });
-      const control = () => row().findAllByType('button')[0];
+      const control = () =>
+        row().findByProps({ className: 'voice-shortcut-control' }).findAllByType('button')[0];
       const originalCard = card();
       const originalLabel = row().findAllByType('span')[0];
       const originalContent = surroundingContent(originalCard);

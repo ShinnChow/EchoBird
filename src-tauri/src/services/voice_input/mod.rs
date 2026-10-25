@@ -303,6 +303,7 @@ pub async fn save(app: &AppHandle, mut config: Config) -> Result<Snapshot, Strin
         None
     };
     let mut saved = voice.saved.lock().unwrap().clone();
+    let mode_changed = saved.config.hotkey_mode != config.hotkey_mode;
     saved.config = config.clone();
     if let Err(error) = config::save(&voice.path, &saved) {
         if let Some(registration) = &replacement {
@@ -310,8 +311,10 @@ pub async fn save(app: &AppHandle, mut config: Config) -> Result<Snapshot, Strin
         }
         return Err(error);
     }
-    if !same {
+    if !same || mode_changed {
         voice.held.store(false, Ordering::Release);
+    }
+    if !same {
         if let Some(previous) = current.take() {
             previous.close(app);
         }
@@ -763,10 +766,16 @@ enum ShortcutAction {
     Stop,
 }
 
-fn shortcut_action(phase: &str, origin: &str, down: bool) -> Option<ShortcutAction> {
-    if phase == "recording" && origin == "shortcut" && !down {
+fn shortcut_action(mode: &str, phase: &str, origin: &str, down: bool) -> Option<ShortcutAction> {
+    if mode == "toggle" && down {
+        return None;
+    }
+    if origin == "shortcut"
+        && !down
+        && (phase == "recording" || (mode == "toggle" && phase == "starting"))
+    {
         Some(ShortcutAction::Stop)
-    } else if down
+    } else if (down || mode == "toggle")
         && !matches!(
             phase,
             "starting" | "recording" | "testing" | "transcribing" | "optimizing" | "inserting"
@@ -799,14 +808,17 @@ pub fn trigger(app: &AppHandle, binding: &config::Binding, down: bool) {
     }
     let action = {
         let runtime = voice.runtime.lock().unwrap();
-        shortcut_action(&runtime.phase, &runtime.origin, down)
+        shortcut_action(&config.hotkey_mode, &runtime.phase, &runtime.origin, down)
     };
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let result = match action {
             Some(ShortcutAction::Stop) => stop_capture(&app, true).await,
             Some(ShortcutAction::Start) => match begin(&app, "shortcut").await {
-                Ok(_) if !shared(&app).held.load(Ordering::Acquire) => {
+                Ok(_)
+                    if config.hotkey_mode == "hold"
+                        && !shared(&app).held.load(Ordering::Acquire) =>
+                {
                     stop_capture(&app, true).await
                 }
                 result => result,

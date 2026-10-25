@@ -688,19 +688,19 @@ fn usage_tracks_only_nonempty_completed_dictations_with_known_duration() {
 #[test]
 fn keyboard_hold_and_release_only_control_keyboard_recording() {
     assert_eq!(
-        shortcut_action("idle", "page", true),
+        shortcut_action("hold", "idle", "page", true),
         Some(ShortcutAction::Start)
     );
     assert_eq!(
-        shortcut_action("done", "island", true),
+        shortcut_action("hold", "done", "island", true),
         Some(ShortcutAction::Start)
     );
     assert_eq!(
-        shortcut_action("recording", "shortcut", false),
+        shortcut_action("hold", "recording", "shortcut", false),
         Some(ShortcutAction::Stop)
     );
     for origin in ["island", "test", "page"] {
-        assert_eq!(shortcut_action("recording", origin, false), None);
+        assert_eq!(shortcut_action("hold", "recording", origin, false), None);
     }
     for phase in [
         "starting",
@@ -710,10 +710,57 @@ fn keyboard_hold_and_release_only_control_keyboard_recording() {
         "optimizing",
         "inserting",
     ] {
-        assert_eq!(shortcut_action(phase, "island", true), None);
-        assert_eq!(shortcut_action(phase, "shortcut", true), None);
+        assert_eq!(shortcut_action("hold", phase, "island", true), None);
+        assert_eq!(shortcut_action("hold", phase, "shortcut", true), None);
     }
-    assert_eq!(shortcut_action("idle", "shortcut", false), None);
+    assert_eq!(shortcut_action("hold", "idle", "shortcut", false), None);
+}
+
+#[test]
+fn keyboard_toggle_starts_and_finishes_on_separate_releases_without_stopping_mouse_input() {
+    for phase in ["idle", "done", "error"] {
+        assert_eq!(shortcut_action("toggle", phase, "page", true), None);
+        assert_eq!(
+            shortcut_action("toggle", phase, "page", false),
+            Some(ShortcutAction::Start)
+        );
+    }
+    for phase in ["starting", "recording"] {
+        assert_eq!(shortcut_action("toggle", phase, "shortcut", true), None);
+        assert_eq!(
+            shortcut_action("toggle", phase, "shortcut", false),
+            Some(ShortcutAction::Stop)
+        );
+        for origin in ["island", "page", "test"] {
+            assert_eq!(shortcut_action("toggle", phase, origin, false), None);
+        }
+    }
+    for phase in ["testing", "transcribing", "optimizing", "inserting"] {
+        for down in [false, true] {
+            assert_eq!(shortcut_action("toggle", phase, "shortcut", down), None);
+        }
+    }
+}
+
+#[test]
+fn hotkey_mode_defaults_to_hold_and_toggle_survives_save_without_enabling_the_hotkey() {
+    let legacy: Config = serde_json::from_value(serde_json::json!({
+        "shortcut": { "code": "AltRight", "modifiers": [] }
+    }))
+    .unwrap();
+    assert_eq!(legacy.hotkey_mode, "hold");
+    let directory = std::env::temp_dir().join(format!("echobird-hotkey-{}", uuid::Uuid::new_v4()));
+    let path = directory.join("voice.json");
+    let mut saved = Saved::default();
+    saved.config.hotkey_mode = "toggle".into();
+    config::save(&path, &saved).unwrap();
+    let restored = config::load(&path).unwrap().config;
+    assert_eq!(restored.hotkey_mode, "toggle");
+    assert!(!restored.hotkey_enabled);
+    assert!(!restored.shortcut_enabled);
+    saved.config.hotkey_mode = "invalid".into();
+    assert_eq!(saved.config.validate().unwrap_err(), "voice.error.config");
+    std::fs::remove_dir_all(directory).unwrap();
 }
 
 #[test]

@@ -47,6 +47,7 @@ export interface VoiceConfig {
   microphone: string | null;
   shortcutEnabled: boolean;
   hotkeyEnabled: boolean;
+  hotkeyMode?: 'hold' | 'toggle';
   shortcut: VoiceBinding;
   islandTheme: 'auto' | 'dark' | 'light' | 'system';
   islandPalette: VoicePalette;

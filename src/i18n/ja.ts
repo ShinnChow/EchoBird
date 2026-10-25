@@ -69,7 +69,10 @@ const ja: Partial<Translations> = {
   'voice.translation.es': 'スペイン語',
   'voice.seconds': '秒',
   'voice.enableInput': '音声入力を有効にする',
-  'voice.shortcut': '長押し入力キー',
+  'voice.shortcut': '音声入力キー',
+  'voice.shortcutMode': 'キー入力方式',
+  'voice.shortcutHold': '長押し',
+  'voice.shortcutToggle': '短押し',
   'voice.changeShortcutHint': 'マイク{mic}をクリックして入力することをおすすめします。',
   'voice.shortcutCaution':
     'キー入力中のほかの操作により、キーの競合やカーソルのフォーカス喪失が起きやすくなります。',
