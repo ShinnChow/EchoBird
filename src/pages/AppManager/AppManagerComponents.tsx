@@ -1536,6 +1536,23 @@ export const AppManagerBottom: React.FC = () => {
 // Orange instructional copy shown at the bottom-left of the launch row.
 // Branches on activePage so the same AppManagerBottom can serve both
 // "应用桌面" and "我的AI项目" without duplicating the rest of the row.
+const APP_TIP_KEYS = ['hint.cliRecommendation', 'hint.appReorder', 'hint.smartAccess'] as const;
+
+const RandomAppTip: React.FC = () => {
+  const { t } = useI18n();
+  const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * APP_TIP_KEYS.length));
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const offset = 1 + Math.floor(Math.random() * (APP_TIP_KEYS.length - 1));
+      setTipIndex((current) => (current + offset) % APP_TIP_KEYS.length);
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return <>{t(APP_TIP_KEYS[tipIndex])}</>;
+};
+
 export const PageAwareHint: React.FC = () => {
   const { t } = useI18n();
   const { viewMode, selectedTool } = useAppManager();
@@ -1549,10 +1566,10 @@ export const PageAwareHint: React.FC = () => {
           ? 'hint.responsesRequired'
           : ['claudedesktop', 'workbuddy', 'workbuddyai'].includes(selectedTool ?? '')
             ? 'hint.localHistoryPreserved'
-            : 'hint.appReorder';
+            : null;
   return (
     <div className="flex-1 text-[15px] font-medium text-cyber-accent">
-      {t(key)}
+      {key ? t(key) : activePage === 'apps' && <RandomAppTip />}
       {key === 'hint.responsesRequired' && (
         <>
           <br />

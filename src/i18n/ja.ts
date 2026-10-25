@@ -610,7 +610,12 @@ const ja: Partial<Translations> = {
     'ChatGPT / Codex CLI に接続するには、サードパーティモデルが Responses をサポートしている必要があります。',
   'hint.localHistoryPreserved':
     'アカウントやモデルを切り替えても、ローカルの会話履歴は自動で保持されます。',
-  'hint.appReorder': 'アプリのアイコンを長押ししてドラッグすると並べ替えられます。',
+  'hint.cliRecommendation':
+    'ヒント：デスクトップ版は、画面制御や画面認識などにより、CLI 版よりトークン消費が多く、待ち時間も長くなりがちです。（Coffee CLI で CLI 版を起動し、デスクトップ版の体験を再現することをおすすめします。）',
+  'hint.appReorder':
+    'ヒント：アプリデスクトップで、アプリのアイコンを長押ししてドラッグすると並べ替えられます。',
+  'hint.smartAccess':
+    'ヒント：スマートルーターを使うと、アプリ内でカスタムモデルリストのモデルを直接切り替えられます。',
   'hint.myProjects':
     'Vibe Coding したアプリ / ゲームのモデルを切り替え。リバーシ / AI 翻訳 の models.json を参考にするか、あなたのプロジェクトにコピーしてください。',
   'mother.selectModel': 'モデルを選択',

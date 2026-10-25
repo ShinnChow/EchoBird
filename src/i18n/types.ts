@@ -551,7 +551,9 @@ export type TKey =
   // App hints
   | 'hint.responsesRequired'
   | 'hint.localHistoryPreserved'
+  | 'hint.cliRecommendation'
   | 'hint.appReorder'
+  | 'hint.smartAccess'
   // Mother Agent
   | 'mother.selectModel'
   | 'mother.reasoning.title'

@@ -1,7 +1,12 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { act, create, type ReactTestRenderer } from 'react-test-renderer';
-import { describe, expect, it, vi } from 'vitest';
+import {
+  act,
+  create,
+  type ReactTestRenderer,
+  type ReactTestRendererJSON,
+} from 'react-test-renderer';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as api from '../../api/tauri';
 import type { LocalTool, ModelConfig } from '../../api/types';
 import type { TKey } from '../../i18n';
@@ -611,6 +616,19 @@ describe('AppManager views', () => {
 });
 
 describe('PageAwareHint', () => {
+  let renderer: ReactTestRenderer | undefined;
+
+  beforeEach(() => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  });
+
+  afterEach(() => {
+    act(() => renderer?.unmount());
+    renderer = undefined;
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
   const renderHint = async (selectedTool: string | null, selectedAccount: string | null = null) => {
     vi.stubGlobal('__APP_EDITION__', 'full');
     useNavigationStore.setState({ activePage: 'apps' });
@@ -662,6 +680,70 @@ describe('PageAwareHint', () => {
   it('shows the app reorder hint for other tools', async () => {
     const markup = await renderHint('test-tool');
     expect(markup).toContain('hint.appReorder');
+  });
+
+  it.each([
+    [0, 'hint.cliRecommendation'],
+    [0.5, 'hint.appReorder'],
+    [0.99, 'hint.smartAccess'],
+  ] as const)('randomly selects %s on opening', async (random, hint) => {
+    vi.mocked(Math.random).mockReturnValue(random);
+    expect(await renderHint('test-tool')).toContain(hint);
+  });
+
+  it('rotates every 30 seconds without repeating and stops when hidden or unmounted', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('__APP_EDITION__', 'full');
+    useNavigationStore.setState({ activePage: 'apps' });
+    const { PageAwareHint } = await import('./AppManagerComponents');
+    const render = (selectedTool = 'test-tool', viewMode = 'desktop') => (
+      <AppManagerContext.Provider value={{ selectedTool, viewMode } as AppManagerContextType}>
+        <PageAwareHint />
+      </AppManagerContext.Provider>
+    );
+    act(() => {
+      renderer = create(render());
+    });
+    const text = () => (renderer!.toJSON() as ReactTestRendererJSON).children?.join('');
+    expect(text()).toBe('hint.appReorder');
+    expect(vi.getTimerCount()).toBe(1);
+    act(() => {
+      vi.advanceTimersByTime(29_999);
+    });
+    expect(text()).toBe('hint.appReorder');
+    for (const hint of ['hint.cliRecommendation', 'hint.smartAccess', 'hint.appReorder']) {
+      act(() => {
+        vi.advanceTimersByTime(hint === 'hint.cliRecommendation' ? 1 : 30_000);
+      });
+      expect(text()).toBe(hint);
+    }
+
+    act(() => renderer!.update(render('claudecode')));
+    expect(text()).toBe('hint.appReorder');
+    expect(vi.getTimerCount()).toBe(1);
+
+    for (const toolId of ['chatgptdesktop', 'codex', 'claudedesktop', 'workbuddy', 'workbuddyai']) {
+      act(() => renderer!.update(render(toolId)));
+      expect(vi.getTimerCount()).toBe(0);
+    }
+    act(() => renderer!.update(render('test-tool', 'install')));
+    expect(text()).toBe('aiDesktop.installHint');
+    expect(vi.getTimerCount()).toBe(0);
+    act(() => renderer!.update(render()));
+    expect(vi.getTimerCount()).toBe(1);
+    act(() => useNavigationStore.setState({ activePage: 'myProjects' }));
+    expect(text()).toBe('hint.myProjects');
+    expect(vi.getTimerCount()).toBe(0);
+    act(() => useNavigationStore.setState({ activePage: 'voice' }));
+    expect(vi.getTimerCount()).toBe(0);
+
+    vi.mocked(Math.random).mockReturnValue(0.99);
+    act(() => useNavigationStore.setState({ activePage: 'apps' }));
+    expect(text()).toBe('hint.smartAccess');
+    expect(vi.getTimerCount()).toBe(1);
+    act(() => renderer!.unmount());
+    renderer = undefined;
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 

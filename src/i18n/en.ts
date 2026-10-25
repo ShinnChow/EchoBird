@@ -593,7 +593,12 @@ const en: Translations = {
     'Third-party models must support Responses to connect successfully with ChatGPT / Codex CLI.',
   'hint.localHistoryPreserved':
     'Local conversation history is automatically retained when switching accounts or models.',
-  'hint.appReorder': 'Press and hold, then drag app icons to change their order.',
+  'hint.cliRecommendation':
+    'Tip: Desktop versions often consume more tokens and take longer than their CLI versions due to UI orchestration, screen recognition, and similar tasks. (Use Coffee CLI to launch the CLI version and recreate the desktop experience.)',
+  'hint.appReorder':
+    'Tip: On App Desktop, press and hold, then drag app icons to change their order.',
+  'hint.smartAccess':
+    'Tip: Use Smart Router to switch directly between models in your custom model list within an app.',
   'hint.myProjects':
     "Swap the model on your vibe-coded app or game — reference Reversi's and AI Translator's models.json, or just copy it to your project.",
   // Mother Agent

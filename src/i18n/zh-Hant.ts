@@ -580,7 +580,10 @@ const zhHant: Partial<Translations> = {
   'hint.responsesRequired':
     'ChatGPT / Codex CLI 切換模型時，第三方模型必須支援 Responses 才能成功接入。',
   'hint.localHistoryPreserved': '切換帳號或模型，本機對話記錄自動保留。',
-  'hint.appReorder': '長按拖動應用程式圖示，可調整排列順序。',
+  'hint.cliRecommendation':
+    '小技巧：應用程式的桌面版通常因介面調度、介面辨識等，比 CLI 版消耗更多 Token、等待更久。（推薦使用 Coffee CLI 啟動 CLI 版，還原桌面版的體驗。）',
+  'hint.appReorder': '小技巧：在應用桌面頁面，長按拖動應用程式圖示，可調整排列順序。',
+  'hint.smartAccess': '小技巧：使用智能接入功能，可在應用程式中直接切換你自訂的模型清單。',
   'hint.myProjects':
     '給你 Vibe Coding 的應用或遊戲切換模型，參考黑白棋和 AI 翻譯的 models.json 或複製它到你的專案。',
   'mother.selectModel': '選擇模型',
