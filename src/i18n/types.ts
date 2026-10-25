@@ -2,6 +2,9 @@
 
 // Translation key definitions
 export type TKey =
+  | 'voice.guide.description'
+  | 'voice.guide.example'
+  | 'voice.guide.placeholder'
   | 'voice.selection'
   | 'voice.selectionAction'
   | 'voice.selectionAsk'

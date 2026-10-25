@@ -195,6 +195,7 @@ export const Sidebar = ({
         <NavItem
           collapsed={collapsed}
           icon={<Mic size={20} />}
+          id="voice-input-nav"
           label={t('voice.input')}
           active={activePage === 'voice'}
           onClick={() => onPageChange('voice')}

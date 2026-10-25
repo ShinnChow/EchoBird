@@ -2,6 +2,7 @@
 import React from 'react';
 
 export interface NavItemProps {
+  id?: string;
   icon: React.ReactNode;
   label: string;
   active?: boolean;
@@ -13,6 +14,7 @@ export interface NavItemProps {
 
 export const NavItem = React.memo(
   ({
+    id,
     icon,
     label,
     active = false,
@@ -29,6 +31,7 @@ export const NavItem = React.memo(
           : 'bg-cyber-elevated/75 text-cyber-text';
     return (
       <button
+        id={id}
         type="button"
         aria-label={label}
         aria-current={active ? 'page' : undefined}

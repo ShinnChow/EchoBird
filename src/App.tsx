@@ -206,6 +206,7 @@ function AppContent() {
   const { t, locale, setLocale } = useI18n();
   const [showSettings, setShowSettings] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [showVoiceGuideOnClose, setShowVoiceGuideOnClose] = useState(false);
 
   // Stores — selector form so App.tsx (the root of the entire tree) only
   // re-renders when activePage flips, not on every motherNewMessage tick.
@@ -245,6 +246,7 @@ function AppContent() {
           // indistinguishable — showing the notes once on either is the robust
           // choice. Only a downgrade (seen is newer) is skipped.
           if (!seen || isNewerVersion(appVersion, seen)) {
+            setShowVoiceGuideOnClose(true);
             setShowChangelog(true);
           }
           if (seen !== appVersion) {
@@ -373,7 +375,10 @@ function AppContent() {
                         <TitleBar
                           onSettingsClick={() => setShowSettings(true)}
                           onFeedbackClick={() => setActivePage('feedback')}
-                          onChangelogClick={() => setShowChangelog(true)}
+                          onChangelogClick={() => {
+                            setShowVoiceGuideOnClose(false);
+                            setShowChangelog(true);
+                          }}
                         />
                         <div className="flex flex-1 overflow-hidden text-cyber-text font-sans p-4 gap-0 relative isolate">
                           {/* Sidebar */}
@@ -629,7 +634,11 @@ function AppContent() {
 
             {/* Changelog dialog */}
             <OnFirstVisit active={showChangelog}>
-              <ChangelogDialog isOpen={showChangelog} onClose={() => setShowChangelog(false)} />
+              <ChangelogDialog
+                isOpen={showChangelog}
+                showVoiceGuideOnClose={showVoiceGuideOnClose}
+                onClose={() => setShowChangelog(false)}
+              />
             </OnFirstVisit>
           </DownloadProvider>
         </ConfirmDialogProvider>

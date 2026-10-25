@@ -9,6 +9,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useI18n } from '../hooks/useI18n';
 import { mdComponents } from '../pages/MotherAgent/mdComponents';
+import { VoiceInputGuide } from './VoiceInputGuide';
 
 const VERSION_MANIFEST_URL = 'https://echobird.ai/api/version/index.json';
 
@@ -106,9 +107,14 @@ const changelogMdComponents = {
 interface ChangelogDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  showVoiceGuideOnClose?: boolean;
 }
 
-export const ChangelogDialog: React.FC<ChangelogDialogProps> = ({ isOpen, onClose }) => {
+export const ChangelogDialog: React.FC<ChangelogDialogProps> = ({
+  isOpen,
+  onClose,
+  showVoiceGuideOnClose = false,
+}) => {
   const { t, locale } = useI18n();
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   const [manifest, setManifest] = useState<Manifest | null>(null);
@@ -116,6 +122,15 @@ export const ChangelogDialog: React.FC<ChangelogDialogProps> = ({ isOpen, onClos
   // Whether we've ever loaded good notes. Once true, a later failed refetch
   // keeps the last content on screen instead of flipping to the error state.
   const loadedRef = useRef(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
+  const closeGuide = useCallback(() => setShowGuide(false), []);
+  useEffect(
+    () => () => {
+      if (closeTimer.current !== null) clearTimeout(closeTimer.current);
+    },
+    []
+  );
 
   // Fetch the manifest each time the dialog opens — it's a tiny JSON and we
   // want the freshest notes. The initial state is 'loading' (covers the first
@@ -145,12 +160,15 @@ export const ChangelogDialog: React.FC<ChangelogDialogProps> = ({ isOpen, onClos
   }, [isOpen]);
 
   const handleClose = useCallback(() => {
+    if (closeTimer.current !== null) return;
     setIsAnimatingOut(true);
-    setTimeout(() => {
+    closeTimer.current = setTimeout(() => {
+      closeTimer.current = null;
       setIsAnimatingOut(false);
+      setShowGuide(showVoiceGuideOnClose);
       onClose();
     }, 200);
-  }, [onClose]);
+  }, [onClose, showVoiceGuideOnClose]);
 
   // ESC to close
   useEffect(() => {
@@ -162,7 +180,7 @@ export const ChangelogDialog: React.FC<ChangelogDialogProps> = ({ isOpen, onClos
     return () => window.removeEventListener('keydown', handler);
   }, [isOpen, handleClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen) return showGuide ? <VoiceInputGuide onClose={closeGuide} /> : null;
 
   const notes = manifest ? notesForLocale(manifest, locale) : '';
 
