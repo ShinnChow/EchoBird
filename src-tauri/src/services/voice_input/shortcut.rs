@@ -11,6 +11,8 @@ pub struct Registration {
     pub binding: Binding,
     shortcut: Option<Shortcut>,
     stop: Arc<AtomicBool>,
+    #[cfg(windows)]
+    alt_release: Option<super::alt_release::Guard>,
     #[cfg(target_os = "linux")]
     portal: Option<tokio_util::sync::CancellationToken>,
     pub description: Option<String>,
@@ -23,6 +25,8 @@ impl Registration {
             return Self::portal(app, binding).await;
         }
         let stop = Arc::new(AtomicBool::new(false));
+        #[cfg(windows)]
+        let alt_release = super::alt_release::Guard::create(app, binding, stop.clone())?;
         let shortcut = if native::modifier(binding) {
             let monitor = native::ModifierMonitor::new(binding)?;
             let stop = stop.clone();
@@ -54,6 +58,8 @@ impl Registration {
             binding: binding.clone(),
             shortcut,
             stop,
+            #[cfg(windows)]
+            alt_release,
             description: None,
             #[cfg(target_os = "linux")]
             portal: None,
@@ -62,6 +68,10 @@ impl Registration {
 
     pub fn close(&self, app: &AppHandle) {
         self.stop.store(true, Ordering::Release);
+        #[cfg(windows)]
+        if let Some(guard) = &self.alt_release {
+            guard.close();
+        }
         if let Some(shortcut) = self.shortcut {
             let _ = app.global_shortcut().unregister(shortcut);
         }

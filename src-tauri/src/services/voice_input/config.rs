@@ -37,6 +37,7 @@ pub struct Config {
     pub api_options: BTreeMap<String, ApiOptions>,
     pub microphone: Option<String>,
     pub shortcut_enabled: bool,
+    pub hotkey_enabled: bool,
     pub shortcut: Binding,
     pub island_theme: String,
     pub island_palette: String,
@@ -53,6 +54,7 @@ impl Default for Config {
             api_options: BTreeMap::new(),
             microphone: None,
             shortcut_enabled: false,
+            hotkey_enabled: false,
             shortcut: Binding {
                 code: "AltRight".into(),
                 modifiers: Vec::new(),
@@ -68,6 +70,10 @@ impl Default for Config {
 }
 
 impl Config {
+    pub fn hotkey_active(&self) -> bool {
+        self.shortcut_enabled && self.hotkey_enabled
+    }
+
     pub fn translation_target(&self) -> Option<&'static str> {
         match self.translation_language.as_str() {
             "zh-Hans" => Some("Simplified Chinese (use simplified characters)"),

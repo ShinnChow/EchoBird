@@ -1,7 +1,6 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ShortcutRecorder, bindingFromEvent, formatBinding } from './ShortcutRecorder';
-import { VoiceStats } from './VoiceStats';
 import { suspendVoiceShortcut } from '../../api/voiceInput';
 
 vi.mock('../../hooks/useI18n', () => ({
@@ -148,49 +147,5 @@ describe('voice shortcuts', () => {
     expect(formatBinding({ code: 'ControlLeft', modifiers: [] }, 'Win32', sides)).toBe('左侧 Ctrl');
     expect(formatBinding({ code: 'MetaRight', modifiers: [] }, 'MacIntel')).toBe('Right ⌘');
     expect(formatBinding({ code: 'MetaRight', modifiers: [] }, 'Linux x86_64')).toBe('Right Super');
-  });
-});
-
-describe('voice statistics', () => {
-  function values() {
-    return renderer.root.findAllByType('dd').map((node) => node.children[0]);
-  }
-  it('keeps unavailable time metrics empty for historical counts without duration', () => {
-    act(() => {
-      renderer = create(
-        <VoiceStats days={{ '2026-10-23': 42 }} usage={{ characters: 0, durationMs: 0 }} />
-      );
-    });
-    expect(values()).toEqual(['42', '—', '—', '—']);
-    expect(
-      renderer.root
-        .findAllByType('span')
-        .some((node) => node.children.includes('voice.partialTiming'))
-    ).toBe(true);
-  });
-  it('calculates speech rate and estimated saved time from completed recordings', () => {
-    act(() => {
-      renderer = create(
-        <VoiceStats days={{ today: 120 }} usage={{ characters: 120, durationMs: 60000 }} />
-      );
-    });
-    expect(values()).toEqual(['120', '2', '120', '1']);
-    expect(
-      renderer.root
-        .findAllByType('span')
-        .some((node) => node.children.includes('voice.partialTiming'))
-    ).toBe(false);
-  });
-  it('does not invent zeros before use or negative saved time for slow speech', () => {
-    act(() => {
-      renderer = create(<VoiceStats days={{}} usage={{ characters: 0, durationMs: 0 }} />);
-    });
-    expect(values()).toEqual(['—', '—', '—', '—']);
-    act(() =>
-      renderer.update(
-        <VoiceStats days={{ today: 20 }} usage={{ characters: 20, durationMs: 60000 }} />
-      )
-    );
-    expect(values()).toEqual(['20', '0', '20', '1']);
   });
 });

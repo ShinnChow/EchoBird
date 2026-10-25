@@ -26,7 +26,11 @@ where
 {
     for channel in channels {
         if let Ok(text) = request(channel.clone()).await {
-            return Ok(text);
+            return if text.trim().is_empty() {
+                Err("voice.error.noTranscript".into())
+            } else {
+                Ok(text)
+            };
         }
     }
     Err("voice.error.allChannels".into())

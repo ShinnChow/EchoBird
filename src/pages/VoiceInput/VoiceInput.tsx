@@ -28,6 +28,7 @@ import {
   Mic,
   Plus,
   Trash2,
+  X,
 } from 'lucide-react';
 import { useI18n } from '../../hooks/useI18n';
 import type { TKey } from '../../i18n';
@@ -55,7 +56,6 @@ import { useMotherAgent } from '../MotherAgent/context';
 import { isSmartRouterId } from '../../utils/smartRouter';
 import { useVoiceAccounts } from './provider';
 import { ShortcutRecorder } from './ShortcutRecorder';
-import { VoiceStats } from './VoiceStats';
 import { IslandContent } from './VoiceIsland';
 import { voicePalettes, voicePaletteColor } from './voicePalettes';
 import { copyVoiceResult } from '../../api/voiceInput';
@@ -94,6 +94,7 @@ export function VoiceInputMain() {
       </div>
     );
   const config = snapshot.config;
+  const shortcutHint = t('voice.changeShortcutHint').split('{mic}');
   const busy = saving || voiceActive;
   const channels = orderedChannels ?? config.channels;
   const error = state.error || snapshot.error;
@@ -299,22 +300,6 @@ export function VoiceInputMain() {
               <i key={index} className={snapshot.level * 30 > index ? 'lit' : ''} />
             ))}
           </div>
-          <div className="voice-row voice-microphone-shortcut">
-            <span>
-              {t('voice.shortcut')}
-              <span className="voice-shortcut-hint">{t('voice.changeShortcutHint')}</span>
-            </span>
-            <ShortcutRecorder
-              key={String(active)}
-              active={active}
-              binding={config.shortcut}
-              disabled={busy}
-              onSave={(shortcut) => save({ shortcut })}
-            />
-          </div>
-          {snapshot.shortcutDescription && (
-            <span className="voice-status">{snapshot.shortcutDescription}</span>
-          )}
         </section>
         <section className="voice-card voice-optimization-card rounded-card">
           <div className="voice-section-heading">
@@ -386,8 +371,41 @@ export function VoiceInputMain() {
             </div>
           </fieldset>
         </section>
-        <section className="voice-statistics-card rounded-card">
-          <VoiceStats days={snapshot.days} usage={snapshot.usage} />
+        <section className="voice-card voice-shortcut-card rounded-card">
+          <div className="voice-row voice-shortcut-row">
+            <span>
+              {t('voice.shortcut')}
+              <span className="voice-shortcut-hint">
+                {shortcutHint[0]}
+                <Mic size={13} aria-hidden="true" className="voice-shortcut-hint-icon" />
+                {shortcutHint[1]}
+              </span>
+            </span>
+            <div className="voice-shortcut-control">
+              <ShortcutRecorder
+                key={String(active)}
+                active={active}
+                enabled={config.hotkeyEnabled}
+                binding={config.shortcut}
+                disabled={busy}
+                onSave={(shortcut) => save({ shortcut, hotkeyEnabled: true })}
+              />
+              {config.hotkeyEnabled && (
+                <button
+                  type="button"
+                  className="voice-shortcut-clear"
+                  aria-label={t('voice.disableShortcut')}
+                  disabled={busy}
+                  onClick={() => update('hotkeyEnabled', false)}
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+          {snapshot.shortcutDescription && (
+            <span className="voice-status">{snapshot.shortcutDescription}</span>
+          )}
         </section>
       </div>
       {error && (

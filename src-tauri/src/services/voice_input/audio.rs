@@ -19,9 +19,11 @@ enum Command {
         mpsc::Sender<Result<(), String>>,
     ),
     Stop(mpsc::Sender<Result<Recording, String>>),
+    Chunk(mpsc::Sender<Result<Vec<u8>, String>>),
     Cancel,
 }
 
+#[derive(Clone)]
 pub struct Recorder(mpsc::Sender<Command>);
 
 impl Recorder {
@@ -45,6 +47,13 @@ impl Recorder {
                             .take()
                             .ok_or_else(|| "voice.error.idle".to_string())
                             .and_then(Capture::finish);
+                        let _ = reply.send(result);
+                    }
+                    Command::Chunk(reply) => {
+                        let result = active
+                            .as_mut()
+                            .ok_or_else(|| "voice.error.idle".to_string())
+                            .map(Capture::chunk);
                         let _ = reply.send(result);
                     }
                     Command::Cancel => active = None,
@@ -82,6 +91,16 @@ impl Recorder {
     pub fn cancel(&self) {
         let _ = self.0.send(Command::Cancel);
     }
+
+    pub fn chunk(&self) -> Result<Vec<u8>, String> {
+        let (sender, receiver) = mpsc::channel();
+        self.0
+            .send(Command::Chunk(sender))
+            .map_err(|_| "voice.error.microphone")?;
+        receiver
+            .recv_timeout(Duration::from_secs(3))
+            .map_err(|_| "voice.error.microphone")?
+    }
 }
 
 pub fn devices() -> Result<Vec<String>, String> {
@@ -96,9 +115,19 @@ struct Capture {
     samples: Arc<Mutex<Vec<f32>>>,
     error: Arc<Mutex<Option<String>>>,
     rate: u32,
+    streamed: usize,
 }
 
 impl Capture {
+    fn chunk(&mut self) -> Vec<u8> {
+        let samples = self.samples.lock().unwrap();
+        // Keep one input sample for interpolation across callback boundaries.
+        let count = samples.len().saturating_sub(1) as u64 * 16000 / u64::from(self.rate);
+        let chunk = pcm(&samples, self.rate, self.streamed, count as usize);
+        self.streamed = count as usize;
+        chunk
+    }
+
     fn finish(self) -> Result<Recording, String> {
         drop(self.stream);
         if self.error.lock().unwrap().is_some() {
@@ -163,6 +192,7 @@ fn open(name: Option<&str>, capture_audio: bool, level: Level) -> Result<Capture
         samples,
         error,
         rate: config.sample_rate.0,
+        streamed: 0,
     })
 }
 
@@ -213,11 +243,9 @@ where
             let mut samples = samples.lock().unwrap();
             let mut peak = 0.0_f32;
             for frame in data.chunks_exact(channels) {
-                let value = frame
-                    .iter()
-                    .map(|sample| sample.to_sample::<f32>())
-                    .sum::<f32>()
-                    / channels as f32;
+                // Speech devices can expose an unused second channel. Match the
+                // mono capture path instead of attenuating speech with silence.
+                let value = frame[0].to_sample::<f32>();
                 let value = if value.is_finite() {
                     value.clamp(-1.0, 1.0)
                 } else {
@@ -252,7 +280,13 @@ pub(super) fn wav(samples: &[f32], rate: u32) -> Vec<u8> {
     bytes.extend_from_slice(&32000_u32.to_le_bytes());
     bytes.extend_from_slice(b"\x02\0\x10\0data");
     bytes.extend_from_slice(&length.to_le_bytes());
-    for index in 0..count {
+    bytes.extend_from_slice(&pcm(samples, rate, 0, count as usize));
+    bytes
+}
+
+pub(super) fn pcm(samples: &[f32], rate: u32, start: usize, end: usize) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(end.saturating_sub(start) * 2);
+    for index in start..end {
         let position = index as f64 * rate as f64 / 16000.0;
         let left = position as usize;
         let right = (left + 1).min(samples.len() - 1);

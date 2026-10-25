@@ -1,3 +1,5 @@
+#[cfg(windows)]
+mod alt_release;
 mod app_icon;
 mod app_icon_cache;
 mod audio;
@@ -9,6 +11,7 @@ mod shortcut;
 mod speech_api;
 #[cfg(test)]
 mod speech_api_tests;
+mod streaming;
 #[cfg(target_os = "linux")]
 mod wayland;
 #[cfg(any(target_os = "linux", test))]
@@ -56,7 +59,7 @@ struct Runtime {
     cancel: CancellationToken,
     config: Config,
     insert: bool,
-    target: Option<u64>,
+    target: Option<native::InputTarget>,
     shortcut_active: bool,
     shortcut_description: Option<String>,
     app_icon: Option<String>,
@@ -110,6 +113,7 @@ pub struct Voice {
     saved: Mutex<Saved>,
     runtime: Mutex<Runtime>,
     recorder: Recorder,
+    stream: Mutex<Option<streaming::Session>>,
     operation: tokio::sync::Mutex<()>,
     registration: tokio::sync::Mutex<Option<shortcut::Registration>>,
     suspended: AtomicBool,
@@ -152,6 +156,7 @@ pub fn init(app: &AppHandle) {
             app_icon_generation: 0,
         }),
         recorder: Recorder::new(),
+        stream: Mutex::new(None),
         operation: tokio::sync::Mutex::new(()),
         registration: tokio::sync::Mutex::new(None),
         suspended: AtomicBool::new(false),
@@ -164,16 +169,18 @@ pub fn init(app: &AppHandle) {
         tauri::async_runtime::spawn(async move {
             let voice = shared(&app);
             let _operation = voice.operation.lock().await;
-            match shortcut::Registration::create(&app, &config.shortcut).await {
-                Ok(registration) => {
-                    {
-                        let mut runtime = voice.runtime.lock().unwrap();
-                        runtime.shortcut_active = true;
-                        runtime.shortcut_description = registration.description.clone();
+            if config.hotkey_active() {
+                match shortcut::Registration::create(&app, &config.shortcut).await {
+                    Ok(registration) => {
+                        {
+                            let mut runtime = voice.runtime.lock().unwrap();
+                            runtime.shortcut_active = true;
+                            runtime.shortcut_description = registration.description.clone();
+                        }
+                        *voice.registration.lock().await = Some(registration);
                     }
-                    *voice.registration.lock().await = Some(registration);
+                    Err(error) => voice.runtime.lock().unwrap().error = Some(error),
                 }
-                Err(error) => voice.runtime.lock().unwrap().error = Some(error),
             }
             if let Err(error) = show_island(&app) {
                 voice.runtime.lock().unwrap().error.get_or_insert(error);
@@ -232,11 +239,11 @@ pub async fn save(app: &AppHandle, mut config: Config) -> Result<Snapshot, Strin
         return Err("voice.error.busy".into());
     }
     let mut current = voice.registration.lock().await;
-    let same = config.shortcut_enabled
+    let same = config.hotkey_active()
         && current
             .as_ref()
             .is_some_and(|registration| registration.binding == config.shortcut);
-    let replacement = if config.shortcut_enabled && !same {
+    let replacement = if config.hotkey_active() && !same {
         Some(shortcut::Registration::create(app, &config.shortcut).await?)
     } else {
         None
@@ -309,12 +316,20 @@ pub async fn begin(app: &AppHandle, origin: &str) -> Result<Snapshot, String> {
         runtime.level = 0.0;
         runtime.elapsed_ms = 0;
         runtime.config = config.clone();
-        runtime.target = if insert { native::foreground() } else { None };
+        runtime.target = if insert { native::input_target() } else { None };
         runtime.insert = insert
             && (runtime.target.is_some() || native::wayland())
             && !app
                 .get_webview_window("main")
                 .is_some_and(|window| window.is_focused().unwrap_or(false));
+        if !test {
+            log::info!(
+                "[VoiceInput] start origin={} insert={} target_present={}",
+                runtime.origin,
+                runtime.insert,
+                runtime.target.is_some()
+            );
+        }
         runtime.generation
     };
     if test && !island_visible(&config) {
@@ -377,6 +392,20 @@ pub async fn begin(app: &AppHandle, origin: &str) -> Result<Snapshot, String> {
         runtime.started = Some(Instant::now());
     }
     if !test {
+        if let Some(channel) = config
+            .channels
+            .first()
+            .filter(|channel| channel.kind == "workbuddy")
+        {
+            let cancel = voice.runtime.lock().unwrap().cancel.clone();
+            *voice.stream.lock().unwrap() = Some(streaming::Session::start(
+                channel.id.clone(),
+                voice.recorder.clone(),
+                cancel,
+            ));
+        }
+    }
+    if !test {
         if let Err(error) = show_island(app) {
             shared(app).runtime.lock().unwrap().error = Some(error);
         }
@@ -402,11 +431,14 @@ fn fail(app: &AppHandle, generation: u64, error: String) {
         if runtime.generation != generation {
             return;
         }
+        log::warn!("[VoiceInput] failed phase={} code={error}", runtime.phase);
+        runtime.cancel.cancel();
         runtime.phase = "error".into();
         runtime.error = Some(error);
         runtime.level = 0.0;
         runtime.started = None;
     }
+    voice.stream.lock().unwrap().take();
     publish(app);
 }
 
@@ -469,6 +501,16 @@ async fn stop_capture(app: &AppHandle, shortcut_only: bool) -> Result<Snapshot, 
             return Ok(snapshot(app));
         }
     };
+    let peak = audio.wav[44..]
+        .chunks_exact(2)
+        .map(|sample| i16::from_le_bytes([sample[0], sample[1]]).unsigned_abs())
+        .max()
+        .unwrap_or(0);
+    log::info!(
+        "[VoiceInput] captured duration_ms={} wav_bytes={} peak_pcm16={peak}",
+        audio.duration_ms,
+        audio.wav.len()
+    );
     let client = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(15))
         .build()
@@ -477,21 +519,44 @@ async fn stop_capture(app: &AppHandle, shortcut_only: bool) -> Result<Snapshot, 
     let client_ref = &client;
     let audio_ref = &bytes;
     let api_options = &config.api_options;
-    let recognized = tokio::select! {
-        biased;
-        _ = cancel.cancelled() => return Ok(snapshot(app)),
-        result = pipeline::first_transcript(&config.channels, |channel| async move {
-            tokio::time::timeout(Duration::from_secs(60), pipeline::recognize(&channel, api_options, audio_ref, client_ref))
-                .await.map_err(|_| "voice.error.transcribe".to_string())?
-        }) => result,
+    let stream = voice.stream.lock().unwrap().take();
+    let streamed = if let Some(stream) = stream {
+        Some(tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return Ok(snapshot(app)),
+            result = stream.finish(&audio.wav) => result,
+        })
+    } else {
+        None
+    };
+    let recognized = match streamed {
+        Some(Ok(text)) => Ok(text),
+        Some(Err(error)) if error == "voice.error.noTranscript" => Err(error),
+        result => {
+            if result.is_some() {
+                log::warn!("[VoiceInput] realtime unavailable; falling back to complete WAV");
+            }
+            tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return Ok(snapshot(app)),
+            result = pipeline::first_transcript(&config.channels, |channel| async move {
+                tokio::time::timeout(Duration::from_secs(60), pipeline::recognize(&channel, api_options, audio_ref, client_ref))
+                    .await.map_err(|_| "voice.error.transcribe".to_string())?
+            }) => result,
+                }
+        }
     };
     let mut text = match recognized {
         Ok(text) => text,
-        Err(_) => {
-            fail(app, generation, "voice.error.allChannels".into());
+        Err(error) => {
+            fail(app, generation, error);
             return Ok(snapshot(app));
         }
     };
+    log::info!(
+        "[VoiceInput] recognized characters={}",
+        text.chars().count()
+    );
     let mut warning = None;
     if !text.trim().is_empty() && config.optimization_enabled {
         {
@@ -533,10 +598,18 @@ async fn stop_capture(app: &AppHandle, shortcut_only: bool) -> Result<Snapshot, 
             .await
         };
         match result {
-            Ok(Err(error)) => warning = Some(error),
-            Err(_) => warning = Some("voice.error.insert".into()),
-            _ => {}
+            Ok(Err(error)) => {
+                log::warn!("[VoiceInput] input failed code={error}");
+                warning = Some(error);
+            }
+            Err(_) => {
+                log::warn!("[VoiceInput] input worker failed");
+                warning = Some("voice.error.insert".into());
+            }
+            _ => log::info!("[VoiceInput] text input dispatched"),
         }
+    } else {
+        log::info!("[VoiceInput] text input skipped insert_enabled={insert}");
     }
     let _completion = voice.operation.lock().await;
     {
@@ -584,6 +657,7 @@ async fn cancel_generation(app: &AppHandle, expected: Option<u64>) -> Snapshot {
         }
     }
     voice.recorder.cancel();
+    voice.stream.lock().unwrap().take();
     if !island_visible(&voice.saved.lock().unwrap().config) {
         if let Some(window) = app.get_webview_window("voice-island") {
             let _ = window.hide();
@@ -638,7 +712,7 @@ pub fn trigger(app: &AppHandle, binding: &config::Binding, down: bool) {
     if down == voice.held.swap(down, Ordering::AcqRel) {
         return;
     }
-    if !config.shortcut_enabled {
+    if !config.hotkey_active() {
         return;
     }
     let action = {

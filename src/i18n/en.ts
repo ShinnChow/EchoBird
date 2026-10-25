@@ -47,8 +47,11 @@ const en: Translations = {
   'voice.translation.es': 'Spanish',
   'voice.seconds': 's',
   'voice.enableInput': 'Enable voice input',
-  'voice.shortcut': 'Voice input shortcut',
-  'voice.changeShortcutHint': ' (click to change shortcut)',
+  'voice.shortcut': 'Hold-to-talk shortcut',
+  'voice.changeShortcutHint':
+    'Prefer the microphone{mic} for input. Other actions during shortcut input can easily cause conflicts or loss of window focus.',
+  'voice.enableShortcut': 'Enable',
+  'voice.disableShortcut': 'Disable shortcut',
   'voice.recordShortcut': 'Press a key or combination',
   'voice.leftSide': 'Left',
   'voice.rightSide': 'Right',
@@ -88,6 +91,7 @@ const en: Translations = {
   'voice.error.microphone':
     'Cannot use the microphone. Check device access and system permissions.',
   'voice.error.noAudio': 'No audio was captured.',
+  'voice.error.noTranscript': 'No speech was recognized. Please try again.',
   'voice.error.noMicrophone': 'The selected microphone is unavailable.',
   'voice.error.idle': 'Recording has already stopped.',
   'voice.error.noChannels': 'Add a speech recognition channel first.',
@@ -97,7 +101,7 @@ const en: Translations = {
   'voice.error.optimizationModel': 'Select a model for text refinement or translation.',
   'voice.error.optimization':
     'Text refinement or translation failed. The original transcript is retained.',
-  'voice.error.focus': 'The target window changed. Copy the retained transcript to insert it.',
+  'voice.error.focus': 'The input focus changed. Copy the retained transcript to insert it.',
   'voice.error.insert': 'Could not insert text. The transcript is retained for copying.',
   'voice.error.cancelled': 'Cancelled',
   'voice.error.island': 'Could not show the Dynamic Island.',

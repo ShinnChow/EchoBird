@@ -13,7 +13,7 @@ import { MiniSelect } from '../../components/MiniSelect';
 import { ViewModeTabs } from '../../components/ViewModeTabs';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { loadLocale, translate, type TKey } from '../../i18n';
-import { ShortcutRecorder, formatBinding } from './ShortcutRecorder';
+import { formatBinding } from './ShortcutRecorder';
 
 const themeSync = vi.hoisted(() => vi.fn());
 const appAppearance = vi.hoisted(() => ({ resolved: 'dark' }));
@@ -194,13 +194,14 @@ describe('microphone card', () => {
     }
   );
 
-  it('keeps the moved master and retired island switches out of the voice page', () => {
+  it('keeps the moved master, retired island switches and statistics out of the voice page', () => {
     act(() => {
       renderer = create(<VoiceInputMain />);
     });
     expect(
       renderer.root.findAllByProps({ role: 'switch' }).map((node) => node.props['aria-label'])
     ).toEqual(['voice.optimization']);
+    expect(renderer.root.findAllByType('dl')).toHaveLength(0);
     expect(api.saveVoiceConfig).not.toHaveBeenCalled();
     expect(api.startVoice).not.toHaveBeenCalled();
     expect(api.stopVoice).not.toHaveBeenCalled();
@@ -246,18 +247,50 @@ describe('microphone card', () => {
 });
 
 describe('localized shortcut transitions', () => {
+  it('does not enable or disable the hotkey when saving fails and leaves mouse input enabled', async () => {
+    const config = {
+      ...voiceSnapshot().config,
+      shortcutEnabled: true,
+      channels: [{ kind: 'model' as const, id: 'speech-source' }],
+    };
+    voice.setState({ snapshot: voiceSnapshot({ config }) });
+    act(() => {
+      renderer = create(<VoiceInputMain />);
+    });
+    vi.mocked(api.saveVoiceConfig).mockRejectedValueOnce('voice.error.shortcut');
+    act(() => button('voice.enableShortcut').props.onClick());
+    expect(api.saveVoiceConfig).not.toHaveBeenCalled();
+    await act(async () => button('voice.recordShortcut').props.onKeyDown(keyEvent('F8')));
+    expect(button('voice.enableShortcut')).toBeDefined();
+    expect(button('voice.disableShortcut')).toBeUndefined();
+    expect(voice.getState().snapshot?.config.hotkeyEnabled).toBe(false);
+    vi.mocked(api.saveVoiceConfig).mockImplementationOnce(async (saved) =>
+      voiceSnapshot({ config: saved, revision: 2 })
+    );
+    act(() => button('voice.enableShortcut').props.onClick());
+    await act(async () => button('voice.recordShortcut').props.onKeyDown(keyEvent('F8')));
+    expect(button('F8')).toBeDefined();
+    vi.mocked(api.saveVoiceConfig).mockRejectedValueOnce('voice.error.save');
+    await act(async () => button('voice.disableShortcut').props.onClick());
+    expect(button('F8')).toBeDefined();
+    expect(button('voice.disableShortcut')).toBeDefined();
+    expect(voice.getState().snapshot?.config.hotkeyEnabled).toBe(true);
+    expect(voice.getState().snapshot?.config.shortcutEnabled).toBe(true);
+    expect(api.recordVoice).not.toHaveBeenCalled();
+  });
+
   const labels: Record<string, string> = {
-    'zh-Hans': '语音输入快捷键',
-    'zh-Hant': '語音輸入快捷鍵',
-    en: 'Voice input shortcut',
-    ja: '音声入力キー',
+    'zh-Hans': '长按输入快捷键',
+    'zh-Hant': '長按輸入快捷鍵',
+    en: 'Hold-to-talk shortcut',
+    ja: '長押し入力キー',
   };
   const cases = Object.keys(labels).flatMap((locale) =>
     ['Win32', 'MacIntel', 'Linux x86_64'].map((platform) => ({ locale, platform }))
   );
   const surroundingContent = (node: ReactTestInstance | string): unknown => {
     if (typeof node === 'string') return node;
-    if (node.type === ShortcutRecorder) return 'shortcut-control';
+    if (node.props.className === 'voice-shortcut-control') return 'shortcut-control';
     return {
       type: node.type,
       children: node.children.map(surroundingContent),
@@ -286,9 +319,9 @@ describe('localized shortcut transitions', () => {
         renderer = create(<VoiceInputMain />);
       });
       const card = () =>
-        renderer.root.findByProps({ className: 'voice-card voice-microphone-card rounded-card' });
-      const row = () => card().findByProps({ className: 'voice-row voice-microphone-shortcut' });
-      const control = () => row().findByType('button');
+        renderer.root.findByProps({ className: 'voice-card voice-shortcut-card rounded-card' });
+      const row = () => card().findByProps({ className: 'voice-row voice-shortcut-row' });
+      const control = () => row().findAllByType('button')[0];
       const originalCard = card();
       const originalLabel = row().findAllByType('span')[0];
       const originalContent = surroundingContent(originalCard);
@@ -303,12 +336,13 @@ describe('localized shortcut transitions', () => {
         right: translate('voice.rightSide', locale),
       };
       expect(originalLabel.children[0]).toBe(translate('voice.shortcut', locale));
-      expect(originalLabel.findByProps({ className: 'voice-shortcut-hint' }).children).toEqual([
-        translate('voice.changeShortcutHint', locale),
-      ]);
-      expect(control().children).toEqual([
-        formatBinding(voiceSnapshot().config.shortcut, platform, sides),
-      ]);
+      const hint = originalLabel.findByProps({ className: 'voice-shortcut-hint' });
+      expect(hint.children.filter((child) => typeof child === 'string').join('')).toBe(
+        translate('voice.changeShortcutHint', locale).replace('{mic}', '')
+      );
+      expect(hint.findByType('svg').props['aria-hidden']).toBe('true');
+      expect(control().children).toEqual([translate('voice.enableShortcut', locale)]);
+      expect(button(translate('voice.disableShortcut', locale))).toBeUndefined();
       act(() => control().props.onClick());
       expect(control().children).toEqual([translate('voice.recordShortcut', locale)]);
       stable();
@@ -328,6 +362,7 @@ describe('localized shortcut transitions', () => {
       stable();
       const config = vi.mocked(api.saveVoiceConfig).mock.calls[0][0];
       expect(config.shortcut).toEqual({ code: 'KeyK', modifiers: ['Control', 'Shift'] });
+      expect(config.hotkeyEnabled).toBe(true);
       await act(async () => complete(voiceSnapshot({ config, revision: 2 })));
       expect(control().children).toEqual([formatBinding(config.shortcut, platform, sides)]);
       stable();
@@ -342,6 +377,14 @@ describe('localized shortcut transitions', () => {
         translate('voice.error.shortcut', locale),
       ]);
       expect(api.saveVoiceConfig).toHaveBeenCalledTimes(2);
+      vi.mocked(api.saveVoiceConfig).mockImplementationOnce(async (saved) =>
+        voiceSnapshot({ config: saved, revision: 3 })
+      );
+      await act(async () => button(translate('voice.disableShortcut', locale)).props.onClick());
+      expect(api.saveVoiceConfig).toHaveBeenLastCalledWith({ ...config, hotkeyEnabled: false });
+      expect(control().children).toEqual([translate('voice.enableShortcut', locale)]);
+      expect(button(translate('voice.disableShortcut', locale))).toBeUndefined();
+      stable();
       expect(api.startVoice).not.toHaveBeenCalled();
       expect(api.recordVoice).not.toHaveBeenCalled();
     }
@@ -1087,6 +1130,27 @@ describe('island speech entry', () => {
     );
     expect(button('voice.speak').props.disabled).toBe(false);
     expect(api.startVoice).not.toHaveBeenCalled();
+  });
+
+  it('shows an empty recognition result as an error instead of a completed dictation', () => {
+    voice.setState({
+      snapshot: voiceSnapshot({
+        phase: 'error',
+        origin: 'shortcut',
+        text: '',
+        error: 'voice.error.noTranscript',
+      }),
+    });
+    act(() => {
+      renderer = create(<LiveIsland />);
+    });
+    expect(renderer.root.findByProps({ 'data-error': true }).props['data-active']).toBe(false);
+    expect(renderer.root.findByProps({ role: 'status' }).children).toEqual([
+      'voice.error.noTranscript',
+    ]);
+    expect(api.recordVoice).not.toHaveBeenCalled();
+    expect(api.stopVoice).not.toHaveBeenCalled();
+    expect(api.copyVoiceResult).not.toHaveBeenCalled();
   });
 });
 

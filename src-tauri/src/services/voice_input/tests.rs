@@ -210,6 +210,30 @@ fn microphone_meter_makes_quiet_input_visible_and_keeps_silence_empty() {
 }
 
 #[test]
+fn streamed_pcm_matches_complete_recording_across_non_aligned_sample_boundaries() {
+    for rate in [8000, 16000, 44100, 48000] {
+        let samples: Vec<_> = (0..rate / 3)
+            .map(|index| (index as f32 * 0.17).sin() * 0.7)
+            .collect();
+        let complete = audio::wav(&samples, rate);
+        let mut streamed = Vec::new();
+        let mut sent = 0;
+        for available in (1..samples.len()).step_by(137) {
+            let count = (available - 1) as u64 * 16000 / u64::from(rate);
+            streamed.extend(audio::pcm(
+                &samples[..available],
+                rate,
+                sent,
+                count as usize,
+            ));
+            sent = count as usize;
+        }
+        streamed.extend_from_slice(&complete[44 + sent * 2..]);
+        assert_eq!(streamed, complete[44..], "sample rate {rate}");
+    }
+}
+
+#[test]
 fn microphone_meter_keeps_speech_between_ui_updates_and_clears_the_previous_window() {
     let start = Instant::now();
     let mut meter = audio::LevelMeter::new(start);
@@ -258,12 +282,35 @@ fn missing_configuration_is_read_only_and_malformed_configuration_is_not_replace
     let saved = config::load(&path).unwrap();
     assert!(saved.config.channels.is_empty());
     assert!(!saved.config.shortcut_enabled);
+    assert!(!saved.config.hotkey_enabled);
     assert!(!directory.exists());
     std::fs::create_dir_all(&directory).unwrap();
     std::fs::write(&path, b"broken-config").unwrap();
     assert!(config::load(&path).is_err());
     assert_eq!(std::fs::read(&path).unwrap(), b"broken-config");
     std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn keyboard_input_is_opt_in_and_independent_of_mouse_input() {
+    let mut config: Config = serde_json::from_value(serde_json::json!({
+        "shortcutEnabled": true,
+        "shortcut": { "code": "AltRight", "modifiers": [] }
+    }))
+    .unwrap();
+    assert!(config.shortcut_enabled);
+    assert!(!config.hotkey_enabled);
+    assert!(!config.hotkey_active());
+    config.hotkey_enabled = true;
+    assert!(config.hotkey_active());
+    let restored: Config = serde_json::from_value(serde_json::to_value(&config).unwrap()).unwrap();
+    assert!(restored.hotkey_active());
+    config.hotkey_enabled = false;
+    assert!(!config.hotkey_active());
+    assert!(config.shortcut_enabled);
+    config.hotkey_enabled = true;
+    config.shortcut_enabled = false;
+    assert!(!config.hotkey_active());
 }
 
 #[test]
@@ -589,14 +636,14 @@ fn physical_shortcuts_keep_platform_modifiers_and_reject_unknown_codes() {
 }
 
 #[tokio::test]
-async fn channel_failover_preserves_order_and_never_repeats_a_successful_or_silent_result() {
+async fn channel_failover_preserves_order_and_never_repeats_a_successful_result() {
     let channels: Vec<_> = (0..3)
         .map(|index| config::Channel {
             kind: "model".into(),
             id: index.to_string(),
         })
         .collect();
-    for successful in ["recognized", ""] {
+    for successful in ["recognized", " recognized "] {
         let mut calls = Vec::new();
         let result = pipeline::first_transcript(&channels, |channel| {
             calls.push(channel.id.clone());
@@ -620,6 +667,30 @@ async fn channel_failover_preserves_order_and_never_repeats_a_successful_or_sile
     .unwrap_err();
     assert_eq!(calls, ["0", "1", "2"]);
     assert_eq!(error, "voice.error.allChannels");
+}
+
+#[tokio::test]
+async fn empty_transcripts_are_reported_without_retrying_silence_on_backup_channels() {
+    let channels: Vec<_> = (0..3)
+        .map(|index| config::Channel {
+            kind: "model".into(),
+            id: index.to_string(),
+        })
+        .collect();
+    for text in ["", " \n\t", "\u{3000}"] {
+        let mut calls = Vec::new();
+        let result = pipeline::first_transcript(&channels, |channel| {
+            calls.push(channel.id.clone());
+            std::future::ready(if channel.id == "0" {
+                Err("failed".into())
+            } else {
+                Ok(text.into())
+            })
+        })
+        .await;
+        assert_eq!(result, Err("voice.error.noTranscript".into()));
+        assert_eq!(calls, ["0", "1"]);
+    }
 }
 
 #[tokio::test]
@@ -844,6 +915,58 @@ async fn optimization_uses_a_tool_free_text_request_and_only_returns_text() {
     }
     assert_eq!(calls.lock().unwrap().len(), 27);
     task.abort();
+}
+
+#[test]
+fn input_target_checks_focus_within_the_original_window() {
+    let target = native::InputTarget {
+        window: 1,
+        focus: Some(2),
+    };
+    assert!(target.matches(Some(target)));
+    assert!(!target.matches(Some(native::InputTarget {
+        window: 1,
+        focus: Some(3),
+    })));
+    assert!(!target.matches(Some(native::InputTarget {
+        window: 1,
+        focus: None,
+    })));
+    assert!(!target.matches(Some(native::InputTarget {
+        window: 4,
+        focus: Some(2),
+    })));
+    assert!(!target.matches(None));
+
+    let window_only = native::InputTarget {
+        window: 1,
+        focus: None,
+    };
+    assert!(window_only.matches(Some(target)));
+    assert!(window_only.matches(Some(window_only)));
+    assert!(!window_only.matches(None));
+}
+
+#[test]
+fn menu_mask_only_applies_to_bare_alt_shortcuts() {
+    for (code, key) in [("AltLeft", 0xA4), ("AltRight", 0xA5)] {
+        let mut binding = config::Binding {
+            code: code.into(),
+            modifiers: Vec::new(),
+        };
+        assert_eq!(native::alt_menu_key(&binding), Some(key));
+        binding.modifiers.push("Control".into());
+        assert_eq!(native::alt_menu_key(&binding), None);
+    }
+    for code in ["ControlRight", "ShiftLeft", "MetaLeft", "KeyV"] {
+        assert_eq!(
+            native::alt_menu_key(&config::Binding {
+                code: code.into(),
+                modifiers: Vec::new(),
+            }),
+            None
+        );
+    }
 }
 
 #[tokio::test]

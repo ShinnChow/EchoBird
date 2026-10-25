@@ -60,11 +60,13 @@ export function ShortcutRecorder({
   binding,
   disabled,
   active,
+  enabled = true,
   onSave,
 }: {
   binding: VoiceBinding;
   disabled: boolean;
   active: boolean;
+  enabled?: boolean;
   onSave: (binding: VoiceBinding) => Promise<boolean>;
 }) {
   const { t } = useI18n();
@@ -101,10 +103,12 @@ export function ShortcutRecorder({
         disabled={disabled}
         onClick={() => setRecording(true)}
       >
-        {formatBinding(binding, navigator.platform, {
-          left: t('voice.leftSide'),
-          right: t('voice.rightSide'),
-        })}
+        {enabled
+          ? formatBinding(binding, navigator.platform, {
+              left: t('voice.leftSide'),
+              right: t('voice.rightSide'),
+            })
+          : t('voice.enableShortcut')}
       </button>
     );
   return (

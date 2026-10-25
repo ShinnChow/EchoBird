@@ -169,6 +169,7 @@ describe('voice input lifecycle', () => {
 
   it('does not duplicate a mouse start or apply its late response after cancellation', async () => {
     const config = { ...voiceSnapshot().config, shortcutEnabled: true };
+    expect(config.hotkeyEnabled).toBe(false);
     store.setState({ snapshot: voiceSnapshot({ config }) });
     const pending = deferred<ReturnType<typeof voiceSnapshot>>();
     vi.mocked(api.recordVoice).mockReturnValue(pending.promise);

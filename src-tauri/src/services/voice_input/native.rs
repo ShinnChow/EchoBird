@@ -57,9 +57,68 @@ pub fn foreground() -> Option<u64> {
     }
 }
 
-pub fn insert(text: &str, target: Option<u64>) -> Result<(), String> {
-    if target.is_some() && foreground() != target {
-        return Err("voice.error.focus".into());
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InputTarget {
+    pub window: u64,
+    pub focus: Option<u64>,
+}
+
+impl InputTarget {
+    pub fn matches(self, current: Option<Self>) -> bool {
+        current.is_some_and(|current| {
+            self.window == current.window
+                && self
+                    .focus
+                    .map_or(true, |focus| current.focus == Some(focus))
+        })
+    }
+}
+
+pub fn input_target() -> Option<InputTarget> {
+    let window = foreground()?;
+    #[cfg(not(windows))]
+    let focus = None;
+    #[cfg(windows)]
+    let focus = unsafe {
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GetGUIThreadInfo, GetWindowThreadProcessId, GUITHREADINFO,
+        };
+        let thread = GetWindowThreadProcessId(HWND(window as *mut _), None);
+        let mut info = GUITHREADINFO {
+            cbSize: std::mem::size_of::<GUITHREADINFO>() as u32,
+            ..Default::default()
+        };
+        (thread != 0 && GetGUIThreadInfo(thread, &mut info).is_ok() && !info.hwndFocus.0.is_null())
+            .then_some(info.hwndFocus.0 as u64)
+    };
+    Some(InputTarget { window, focus })
+}
+
+#[cfg(any(windows, test))]
+pub(super) fn alt_menu_key(binding: &Binding) -> Option<u16> {
+    if !binding.modifiers.is_empty() {
+        return None;
+    }
+    match binding.code.as_str() {
+        "AltLeft" => Some(0xA4),
+        "AltRight" => Some(0xA5),
+        _ => None,
+    }
+}
+
+pub fn insert(text: &str, target: Option<InputTarget>) -> Result<(), String> {
+    let current = input_target();
+    if let Some(target) = target {
+        log::info!(
+            "[VoiceInput] input target window_same={} focus_known={} focus_same={}",
+            current.is_some_and(|current| current.window == target.window),
+            target.focus.is_some(),
+            current.is_some_and(|current| current.focus == target.focus)
+        );
+        if !target.matches(current) {
+            return Err("voice.error.focus".into());
+        }
     }
     let mut keyboard = Enigo::new(&Settings::default()).map_err(|_| "voice.error.insert")?;
     keyboard.text(text).map_err(|_| "voice.error.insert".into())

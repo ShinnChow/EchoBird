@@ -6,6 +6,7 @@ export function voiceSnapshot(overrides: Partial<VoiceSnapshot> = {}): VoiceSnap
       channels: [],
       microphone: null,
       shortcutEnabled: false,
+      hotkeyEnabled: false,
       shortcut: { code: 'AltRight', modifiers: [] },
       islandTheme: 'auto',
       islandPalette: 'white',
