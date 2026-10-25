@@ -38,6 +38,22 @@ pub(crate) async fn transcribe(
         .await
         .map_err(request_error)?;
     if !response.status().is_success() {
+        let response_format = match response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.split(';').next())
+            .map(str::trim)
+        {
+            Some("application/json") => "json",
+            Some("text/html") => "html",
+            _ => "other",
+        };
+        log::warn!(
+            "[VoiceInput] Codex speech rejected status={} response_format={response_format} challenge={}",
+            response.status().as_u16(),
+            response.headers().get("cf-mitigated").is_some_and(|value| value == "challenge")
+        );
         let mut error = ProxyError::new(response.status(), "Codex speech request failed");
         error.retry_after = response.headers().get(header::RETRY_AFTER).cloned();
         return Err(error);
@@ -78,6 +94,16 @@ fn auth_headers(credentials: &Value) -> Result<HeaderMap, ProxyError> {
 }
 
 fn request_error(error: reqwest::Error) -> ProxyError {
+    let kind = if error.is_timeout() {
+        "timeout"
+    } else if error.is_connect() {
+        "connect"
+    } else if error.is_decode() {
+        "decode"
+    } else {
+        "request"
+    };
+    log::warn!("[VoiceInput] Codex speech transport failed kind={kind}");
     if error.is_timeout() {
         ProxyError::new(
             StatusCode::GATEWAY_TIMEOUT,

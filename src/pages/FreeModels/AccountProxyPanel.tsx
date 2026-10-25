@@ -110,13 +110,14 @@ export function AccountProxyPanel({
           <span className="flex-1 min-w-0 text-base font-bold text-cyber-text truncate">
             {provider.name}
           </span>
-          {['antigravity', 'claudeCode', 'qoder', 'qoderCn', 'doubaowork', 'dola'].includes(
-            provider.id
-          ) && (
-            <span className="shrink-0 whitespace-nowrap font-medium text-cyber-accent text-[10px] leading-none">
-              {t('accountProxy.highRisk')}
-            </span>
-          )}
+          {!voice &&
+            ['antigravity', 'claudeCode', 'qoder', 'qoderCn', 'doubaowork', 'dola'].includes(
+              provider.id
+            ) && (
+              <span className="shrink-0 whitespace-nowrap font-medium text-cyber-accent text-[10px] leading-none">
+                {t('accountProxy.highRisk')}
+              </span>
+            )}
           <span className="shrink-0 text-xs text-cyber-text-secondary tabular-nums whitespace-nowrap">
             {counts[provider.id] === undefined
               ? '—'

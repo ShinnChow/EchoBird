@@ -157,7 +157,7 @@ pub(crate) async fn transcribe(
     request: SpeechRequest<'_>,
 ) -> Result<String, ProxyError> {
     let (source, _) = parse_selector(request.selector)?;
-    tokio::time::timeout(
+    let result = tokio::time::timeout(
         request_timeout(source.provider, request.audio.len()),
         transcribe_with(client, request, |rejected| {
             let source = &source;
@@ -165,12 +165,20 @@ pub(crate) async fn transcribe(
         }),
     )
     .await
-    .map_err(|_| {
-        ProxyError::new(
+    .unwrap_or_else(|_| {
+        Err(ProxyError::new(
             StatusCode::GATEWAY_TIMEOUT,
             "Speech transcription timed out",
-        )
-    })?
+        ))
+    });
+    if let Err(error) = &result {
+        log::warn!(
+            "[VoiceInput] account transcription failed provider={:?} status={}",
+            source.provider,
+            error.status.as_u16()
+        );
+    }
+    result
 }
 
 pub(crate) async fn credentials(
