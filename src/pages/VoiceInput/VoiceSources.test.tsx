@@ -146,51 +146,91 @@ it('opens the shared account form only on explicit selection and uses the speech
   expect(context.setShowAddModelModal).toHaveBeenCalledWith(true);
   expect(account.add).not.toHaveBeenCalled();
 });
-it('shares risk confirmation, revocation and the same notice between voice and smart access', async () => {
-  await act(async () => {
-    renderer = create(
-      <>
-        <VoiceInputPanel />
-        <AccountProxyPanel />
-      </>
-    );
-  });
-  const checkboxes = () => renderer.root.findAllByProps({ type: 'checkbox' });
-  const voiceRow = () =>
-    renderer.root.findByProps({ 'aria-label': 'voice.accountInput: WorkBuddy' });
-  const routerRow = () =>
-    renderer.root.findByProps({ 'aria-label': 'freeModels.addToRouter: WorkBuddy' });
-  expect(checkboxes().map((box) => box.props.checked)).toEqual([false, false]);
-  expect(voiceRow().props.disabled).toBe(true);
-  expect(routerRow().props.disabled).toBe(true);
-  act(() => {
-    voiceRow().props.onClick();
-    routerRow().props.onClick();
-  });
-  expect(context.setShowAddModelModal).not.toHaveBeenCalled();
-  await act(async () => checkboxes()[0].props.onChange({ target: { checked: true } }));
-  expect(checkboxes().map((box) => box.props.checked)).toEqual([true, true]);
-  expect(voiceRow().props.disabled).toBe(false);
-  expect(routerRow().props.disabled).toBe(false);
-  const notices = renderer.root.findAllByProps({ 'aria-haspopup': 'dialog' });
-  await act(async () => {
-    await notices[0].props.onClick();
-    await notices[1].props.onClick();
-  });
-  expect(confirm).toHaveBeenCalledTimes(2);
-  expect(confirm.mock.calls[0]).toEqual(confirm.mock.calls[1]);
-  expect(confirm.mock.calls[0][0].message).toBe('accountProxy.riskMessage');
-  await act(async () => checkboxes()[1].props.onChange({ target: { checked: false } }));
-  expect(checkboxes().map((box) => box.props.checked)).toEqual([false, false]);
-  expect(voiceRow().props.disabled).toBe(true);
-  expect(routerRow().props.disabled).toBe(true);
-  expect(setItem.mock.calls).toEqual([
-    ['echobird-account-proxy-risk-acknowledged', 'true'],
-    ['echobird-account-proxy-risk-acknowledged', 'false'],
-  ]);
+it.each([0, 3])(
+  'shares risk confirmation and revocation with smart access with %i sources',
+  async (count) => {
+    voice.setState({
+      snapshot: voiceSnapshot({
+        config: {
+          ...voiceSnapshot().config,
+          channels: Array.from({ length: count }, (_, index) => ({
+            kind: 'model' as const,
+            id: `speech-${index}`,
+          })),
+        },
+      }),
+    });
+    await act(async () => {
+      renderer = create(
+        <>
+          <VoiceInputPanel />
+          <AccountProxyPanel />
+        </>
+      );
+    });
+    const checkboxes = () => renderer.root.findAllByProps({ type: 'checkbox' });
+    const voiceRow = () =>
+      renderer.root.findByProps({ 'aria-label': 'voice.accountInput: WorkBuddy' });
+    const routerRow = () =>
+      renderer.root.findByProps({ 'aria-label': 'freeModels.addToRouter: WorkBuddy' });
+    expect(checkboxes().map((box) => box.props.checked)).toEqual([false, false]);
+    expect(voiceRow().props.disabled).toBe(true);
+    expect(routerRow().props.disabled).toBe(true);
+    act(() => {
+      voiceRow().props.onClick();
+      routerRow().props.onClick();
+    });
+    expect(context.setShowAddModelModal).not.toHaveBeenCalled();
+    await act(async () => checkboxes()[0].props.onChange({ target: { checked: true } }));
+    expect(checkboxes().map((box) => box.props.checked)).toEqual([true, true]);
+    expect(voiceRow().props.disabled).toBe(false);
+    expect(routerRow().props.disabled).toBe(false);
+    const notices = renderer.root.findAllByProps({ 'aria-haspopup': 'dialog' });
+    await act(async () => {
+      await notices[0].props.onClick();
+      await notices[1].props.onClick();
+    });
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(confirm.mock.calls[0]).toEqual(confirm.mock.calls[1]);
+    expect(confirm.mock.calls[0][0].message).toBe('accountProxy.riskMessage');
+    await act(async () => checkboxes()[1].props.onChange({ target: { checked: false } }));
+    expect(checkboxes().map((box) => box.props.checked)).toEqual([false, false]);
+    expect(voiceRow().props.disabled).toBe(true);
+    expect(routerRow().props.disabled).toBe(true);
+    expect(setItem.mock.calls).toEqual([
+      ['echobird-account-proxy-risk-acknowledged', 'true'],
+      ['echobird-account-proxy-risk-acknowledged', 'false'],
+    ]);
+    expect(api.addModel).not.toHaveBeenCalled();
+    expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
+    expect(voiceApi.startVoice).not.toHaveBeenCalled();
+  }
+);
+it('opens account and API model forms with three sources without changing the configured sources', async () => {
+  const config = {
+    ...voiceSnapshot().config,
+    channels: [1, 2, 3].map((index) => ({ kind: 'model' as const, id: `speech-${index}` })),
+  };
+  voice.setState({ snapshot: voiceSnapshot({ config }) });
+  useAccountAccessRiskStore.setState({ acknowledged: true, hydrated: true });
+  await mount();
+  const row = renderer.root.findByProps({ 'aria-label': 'voice.accountInput: WorkBuddy' });
+  expect(row.props.disabled).toBe(false);
+  expect(renderer.root.findByProps({ 'aria-label': 'freeModels.customAdd' }).props.disabled).toBe(
+    false
+  );
+  act(() => row.props.onClick());
+  expect(context.setShowAddModelModal).toHaveBeenCalledOnce();
+  await modelTab();
+  const model = renderer.root.findAllByType(DirectoryRow)[0];
+  expect(model.props.add.disabled).toBe(false);
+  act(() => model.props.add.onClick());
+  expect(context.setShowAddModelModal).toHaveBeenCalledTimes(2);
+  expect(voice.getState().snapshot?.config).toEqual(config);
   expect(api.addModel).not.toHaveBeenCalled();
   expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
-  expect(voiceApi.startVoice).not.toHaveBeenCalled();
+  expect(account.add).not.toHaveBeenCalled();
+  expect(account.refresh).not.toHaveBeenCalled();
 });
 it('prefills speech URL/model/protocol from plus; the website side only opens the homepage', async () => {
   await mount();
@@ -339,7 +379,7 @@ it.each([
   }
 );
 
-it.each(['recording', 'pending', 'full', 'uninstalled', 'risk'] as const)(
+it.each(['recording', 'pending', 'uninstalled', 'risk'] as const)(
   'preserves unavailable panel feedback for %s even while saving',
   async (reason) => {
     useAccountAccessRiskStore.setState({ acknowledged: reason !== 'risk', hydrated: true });
@@ -351,7 +391,7 @@ it.each(['recording', 'pending', 'full', 'uninstalled', 'risk'] as const)(
         phase: reason === 'recording' ? 'recording' : 'idle',
         config: {
           ...voiceSnapshot().config,
-          channels: Array.from({ length: reason === 'full' ? 3 : 1 }, (_, index) => ({
+          channels: Array.from({ length: 1 }, (_, index) => ({
             kind: 'model' as const,
             id: `speech-${index}`,
           })),
@@ -393,6 +433,14 @@ describe('voice source card ordering', () => {
       renderer = create(<VoiceInputMain />);
     });
   };
+
+  it('keeps drag ordering and removal while omitting the old upward shortcut', () => {
+    mountSources();
+    expect(renderer.root.findAllByProps({ 'aria-label': 'voice.makePrimary' })).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ 'aria-label': 'voice.removeChannel' })).toHaveLength(3);
+    expect(order()).toEqual(channels.map((channel) => `${channel.kind}:${channel.id}`));
+    expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
+  });
 
   it('keeps empty cards blank except for their numbers and disables empty-slot dragging', () => {
     mountSources(0);

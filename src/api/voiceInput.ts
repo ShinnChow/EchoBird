@@ -54,6 +54,8 @@ export interface VoiceConfig {
   optimizationModel: string | null;
   optimizationMode: 'faithful' | 'semantic' | 'terms';
   translationLanguage: 'off' | 'zh-Hans' | 'zh-Hant' | 'en' | 'ja' | 'ko' | 'fr' | 'de' | 'es';
+  selectionTranslationEnabled?: boolean;
+  selectionTranslationLanguage?: Exclude<VoiceConfig['translationLanguage'], 'off'>;
 }
 export interface VoiceUsage {
   characters: number;
@@ -73,18 +75,48 @@ export interface VoiceSnapshot {
     | 'inserting'
     | 'done'
     | 'error';
+  activeChannel: number | null;
   level: number;
   elapsedMs: number;
   text: string;
+  resultAudioId: number | null;
   error: string | null;
   revision: number;
   shortcutActive: boolean;
   shortcutDescription: string | null;
   appIcon: string | null;
   appIconLoading: boolean;
+  selectionOpen?: boolean;
   origin: 'page' | 'test' | 'shortcut' | 'island';
 }
 export const getVoiceState = () => invoke<VoiceSnapshot>('voice_input_state');
+export const selectionLanguages = [
+  'zh-Hans',
+  'zh-Hant',
+  'en',
+  'ja',
+  'ko',
+  'fr',
+  'de',
+  'es',
+] as const;
+export interface SelectionTranslation {
+  mode?: 'closed' | 'toolbar' | 'card' | 'manual';
+  source: string;
+  text: string;
+  language: string;
+  error: string | null;
+  busy: boolean;
+  revision: number;
+}
+export const openSelectionTranslation = () => invoke<void>('voice_selection_open');
+export const askSelection = () => invoke<void>('voice_selection_ask');
+export const getSelectionTranslation = () => invoke<SelectionTranslation>('voice_selection_state');
+export const readySelectionTranslation = () =>
+  invoke<SelectionTranslation>('voice_selection_ready');
+export const translateSelection = (source: string, language: string) =>
+  invoke<void>('voice_selection_translate', { source, language });
+export const closeSelectionTranslation = () => invoke<void>('voice_selection_close');
 export const getVoiceModels = () => invoke<ModelConfig[]>('voice_input_models');
 export const getVoiceDevices = () => invoke<string[]>('voice_input_devices');
 export const saveVoiceConfig = (config: VoiceConfig) =>
@@ -96,5 +128,8 @@ export const cancelVoice = () => invoke<VoiceSnapshot>('voice_input_cancel');
 export const suspendVoiceShortcut = (suspended: boolean) =>
   invoke<void>('voice_input_suspend', { suspended });
 export const voiceIslandReady = () => invoke<VoiceSnapshot>('voice_input_island_ready');
-export const copyVoiceResult = () => invoke<void>('voice_input_copy_result');
+export const getVoiceReplay = async (audioId: number): Promise<ArrayBuffer> => {
+  const data = await invoke<ArrayBuffer | number[]>('voice_input_replay', { audioId });
+  return data instanceof ArrayBuffer ? data : new Uint8Array(data).buffer;
+};
 export const showMainWindow = () => invoke<void>('voice_input_show_main');

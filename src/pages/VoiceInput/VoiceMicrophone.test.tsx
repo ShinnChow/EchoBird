@@ -14,6 +14,10 @@ import { ViewModeTabs } from '../../components/ViewModeTabs';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { loadLocale, translate, type TKey } from '../../i18n';
 import { formatBinding } from './ShortcutRecorder';
+import { copyText } from '../../utils/copyText';
+import { VoiceReplay } from './VoiceReplay';
+
+vi.mock('../../utils/copyText', () => ({ copyText: vi.fn() }));
 
 const themeSync = vi.hoisted(() => vi.fn());
 const appAppearance = vi.hoisted(() => ({ resolved: 'dark' }));
@@ -67,10 +71,13 @@ vi.mock('../ModelNexus/context', () => ({
   useModelNexus: () => ({ userModels: [], isLoadingModels: false }),
 }));
 vi.mock('../../api/voiceInput', () => ({
+  selectionLanguages: ['zh-Hans', 'zh-Hant', 'en', 'ja', 'ko', 'fr', 'de', 'es'],
+  openSelectionTranslation: vi.fn().mockResolvedValue(undefined),
+  closeSelectionTranslation: vi.fn().mockResolvedValue(undefined),
   startVoice: vi.fn(),
   recordVoice: vi.fn(),
-  copyVoiceResult: vi.fn(),
   stopVoice: vi.fn(),
+  getVoiceReplay: vi.fn(),
   saveVoiceConfig: vi.fn(),
   cancelVoice: vi.fn(),
   suspendVoiceShortcut: vi.fn().mockResolvedValue(undefined),
@@ -118,6 +125,94 @@ function button(label: string) {
             .some((span) => span.props['aria-hidden'] !== true && span.children.includes(label)))
     )!;
 }
+
+describe('selection translation entry', () => {
+  const configured = () => ({
+    ...voiceSnapshot().config,
+    optimizationEnabled: true,
+    optimizationModel: 'saved-text-model',
+    selectionTranslationEnabled: true,
+  });
+  it('requires an enabled optimization model and performs no passive translation', () => {
+    act(() => {
+      renderer = create(<VoiceInputMain />);
+    });
+    expect(renderer.root.findByProps({ 'aria-label': 'voice.selection' }).props.disabled).toBe(
+      true
+    );
+    expect(api.openSelectionTranslation).not.toHaveBeenCalled();
+    expect(api.saveVoiceConfig).not.toHaveBeenCalled();
+  });
+  it('enables through the existing config save without enabling voice or requiring ASR sources', async () => {
+    const config = { ...configured(), selectionTranslationEnabled: false };
+    voice.setState({ snapshot: voiceSnapshot({ config }) });
+    vi.mocked(api.saveVoiceConfig).mockImplementation(async (saved) =>
+      voiceSnapshot({ config: saved, revision: 2 })
+    );
+    act(() => {
+      renderer = create(<VoiceInputMain />);
+    });
+    await act(async () =>
+      renderer.root
+        .findByProps({ 'aria-label': 'voice.selection' })
+        .findByType(ViewModeTabs)
+        .props.onChange('on')
+    );
+    expect(api.saveVoiceConfig).toHaveBeenCalledWith({
+      ...config,
+      selectionTranslationEnabled: true,
+    });
+    expect(voice.getState().snapshot?.config.shortcutEnabled).toBe(false);
+    expect(api.openSelectionTranslation).not.toHaveBeenCalled();
+  });
+  it('keeps the voice waveform in idle, preview and recording instead of selection actions', () => {
+    act(() => {
+      renderer = create(<IslandContent snapshot={voiceSnapshot({ config: configured() })} />);
+    });
+    for (const props of [
+      { snapshot: voiceSnapshot({ config: configured() }) },
+      { snapshot: voiceSnapshot({ config: configured() }), preview: true },
+      { snapshot: voiceSnapshot({ config: configured(), phase: 'recording' as const }) },
+    ]) {
+      act(() => renderer.update(<IslandContent {...props} />));
+      expect(button('voice.selectionAction')).toBeUndefined();
+      expect(button('voice.selectionAsk')).toBeUndefined();
+      expect(
+        renderer.root.findByProps({ className: 'voice-island-middle' }).findAllByType('button')
+      ).toHaveLength(0);
+    }
+    expect(api.openSelectionTranslation).not.toHaveBeenCalled();
+    expect(api.recordVoice).not.toHaveBeenCalled();
+    expect(startDragging).not.toHaveBeenCalled();
+  });
+  it('uses the sliding on/off tabs and removes the manual translation entry', () => {
+    voice.setState({ snapshot: voiceSnapshot({ config: configured() }) });
+    act(() => {
+      renderer = create(<VoiceInputMain />);
+    });
+    expect(button('voice.selectionManual')).toBeUndefined();
+    const tabs = renderer.root
+      .findByProps({ 'aria-label': 'voice.selection' })
+      .findByType(ViewModeTabs);
+    expect(tabs.props.options).toEqual([
+      { value: 'on', label: 'voice.selectionOn' },
+      { value: 'off', label: 'voice.selectionOff' },
+    ]);
+    expect(tabs.props.value).toBe('on');
+    expect(api.openSelectionTranslation).not.toHaveBeenCalled();
+    expect(api.recordVoice).not.toHaveBeenCalled();
+  });
+  it('does not let recording steal focus from an open translation card', () => {
+    act(() => {
+      renderer = create(
+        <IslandContent snapshot={voiceSnapshot({ config: configured(), selectionOpen: true })} />
+      );
+    });
+    expect(button('voice.speak').props.disabled).toBe(true);
+    expect(button('voice.selectionAction')).toBeUndefined();
+    expect(api.recordVoice).not.toHaveBeenCalled();
+  });
+});
 
 describe('microphone card', () => {
   it('offers five colors for a single waveform and saves through the existing configuration', async () => {
@@ -200,7 +295,7 @@ describe('microphone card', () => {
     });
     expect(
       renderer.root.findAllByProps({ role: 'switch' }).map((node) => node.props['aria-label'])
-    ).toEqual(['voice.optimization']);
+    ).toEqual([]);
     expect(renderer.root.findAllByType('dl')).toHaveLength(0);
     expect(api.saveVoiceConfig).not.toHaveBeenCalled();
     expect(api.startVoice).not.toHaveBeenCalled();
@@ -335,7 +430,12 @@ describe('localized shortcut transitions', () => {
         left: translate('voice.leftSide', locale),
         right: translate('voice.rightSide', locale),
       };
-      expect(originalLabel.children[0]).toBe(translate('voice.shortcut', locale));
+      expect(originalLabel.findByProps({ className: 'voice-shortcut-title' }).children).toContain(
+        translate('voice.shortcut', locale)
+      );
+      expect(
+        originalLabel.findByProps({ className: 'voice-shortcut-description' }).children
+      ).toEqual([translate('voice.shortcutCaution', locale)]);
       const hint = originalLabel.findByProps({ className: 'voice-shortcut-hint' });
       expect(hint.children.filter((child) => typeof child === 'string').join('')).toBe(
         translate('voice.changeShortcutHint', locale).replace('{mic}', '')
@@ -391,7 +491,155 @@ describe('localized shortcut transitions', () => {
   );
 });
 
+describe('last result bubble', () => {
+  it('keeps empty-source guidance visible in normal text and removes it once a source is available', () => {
+    act(() => {
+      renderer = create(<VoiceInputMain />);
+    });
+    expect(
+      renderer.root.findByProps({ className: 'voice-result' }).findByType('p').children
+    ).toEqual(['voice.error.noChannels']);
+    expect(renderer.root.findAllByProps({ role: 'alert' })).toHaveLength(0);
+    act(() =>
+      voice
+        .getState()
+        .accept(voiceSnapshot({ phase: 'error', error: 'voice.error.noChannels', revision: 2 }))
+    );
+    expect(renderer.root.findAllByProps({ role: 'alert' })).toHaveLength(0);
+    act(() =>
+      voice.getState().accept(
+        voiceSnapshot({
+          config: {
+            ...voiceSnapshot().config,
+            channels: [{ kind: 'model', id: 'speech' }],
+            shortcutEnabled: true,
+          },
+          revision: 3,
+        })
+      )
+    );
+    expect(renderer.root.findAllByProps({ className: 'voice-result' })).toHaveLength(0);
+    expect(api.saveVoiceConfig).not.toHaveBeenCalled();
+    expect(api.recordVoice).not.toHaveBeenCalled();
+  });
+  it('offers only the matching last recording beside copy, including after recognition fails', () => {
+    voice
+      .getState()
+      .accept(
+        voiceSnapshot({ phase: 'done', text: 'Recorded text', resultAudioId: 7, revision: 2 })
+      );
+    act(() => {
+      renderer = create(<VoiceInputMain />);
+    });
+    const actions = renderer.root.findByProps({ className: 'voice-result-actions' });
+    expect(actions.findByType(VoiceReplay).props.audioId).toBe(7);
+    expect(
+      actions
+        .findAllByType('button')
+        .map((control) => control.children.filter((child) => typeof child === 'string'))
+    ).toEqual([['voice.replay'], ['voice.copy']]);
+    act(() =>
+      voice.getState().accept(
+        voiceSnapshot({
+          phase: 'error',
+          error: 'voice.error.noTranscript',
+          resultAudioId: 8,
+          revision: 3,
+        })
+      )
+    );
+    const replay = renderer.root.findByType(VoiceReplay);
+    expect(replay.props.audioId).toBe(8);
+    expect(button('voice.copy')).toBeUndefined();
+    act(() => replay.props.onError(true));
+    expect(renderer.root.findByProps({ role: 'alert' }).children).toEqual(['voice.error.replay']);
+    act(() => voice.getState().accept(voiceSnapshot({ phase: 'recording', revision: 4 })));
+    expect(renderer.root.findByType(VoiceReplay).props.disabled).toBe(true);
+    act(() => useNavigationStore.setState({ activePage: 'apps' }));
+    expect(renderer.root.findByType(VoiceReplay).props.active).toBe(false);
+    expect(api.getVoiceReplay).not.toHaveBeenCalled();
+    expect(copyText).not.toHaveBeenCalled();
+  });
+
+  it('shows empty-source guidance and copies the last result even during the next recording', async () => {
+    vi.mocked(copyText).mockResolvedValue(true);
+    act(() => {
+      renderer = create(<VoiceInputMain />);
+    });
+    expect(
+      renderer.root.findByProps({ className: 'voice-result' }).findAllByType('p')[0].children
+    ).toEqual(['voice.error.noChannels']);
+    expect(renderer.root.findAllByProps({ role: 'alert' })).toHaveLength(0);
+    const text = '完整识别并优化后的文字。\n'.repeat(30);
+    act(() => voice.getState().accept(voiceSnapshot({ phase: 'done', text, revision: 2 })));
+    const bubble = renderer.root.findByProps({ className: 'voice-result' });
+    expect(bubble.parent!.props.className).toBe('voice-preview-stack');
+    expect(bubble.parent!.findByProps({ className: 'voice-island-preview' })).toBeDefined();
+    expect(bubble.findAllByType('p')[0].children).toEqual([text]);
+    expect(copyText).not.toHaveBeenCalled();
+    await act(async () => button('voice.copy').props.onClick());
+    expect(copyText).toHaveBeenLastCalledWith(text);
+    act(() => voice.getState().accept(voiceSnapshot({ phase: 'recording', revision: 3 })));
+    expect(renderer.root.findByProps({ className: 'voice-result' })).toBe(bubble);
+    expect(bubble.findAllByType('p')[0].children).toEqual([text]);
+    await act(async () => button('voice.copied').props.onClick());
+    expect(copyText).toHaveBeenCalledTimes(2);
+    expect(copyText).toHaveBeenLastCalledWith(text);
+    act(() =>
+      voice.getState().accept(voiceSnapshot({ phase: 'done', text: 'New final text', revision: 4 }))
+    );
+    expect(bubble.findAllByType('p')[0].children).toEqual(['New final text']);
+    expect(button('voice.copy')).toBeDefined();
+    act(() =>
+      voice
+        .getState()
+        .accept(voiceSnapshot({ phase: 'error', error: 'voice.error.noTranscript', revision: 5 }))
+    );
+    expect(
+      renderer.root.findByProps({ className: 'voice-result is-error' }).parent!.props.className
+    ).toBe('voice-preview-stack');
+    expect(renderer.root.findByProps({ role: 'alert' }).children).toEqual([
+      'voice.error.noTranscript',
+    ]);
+    expect(button('voice.copy')).toBeUndefined();
+    expect(copyText).toHaveBeenCalledTimes(2);
+    expect(api.saveVoiceConfig).not.toHaveBeenCalled();
+    expect(api.recordVoice).not.toHaveBeenCalled();
+    expect(api.startVoice).not.toHaveBeenCalled();
+  });
+
+  it('keeps the visible transcript when clipboard copying fails', async () => {
+    vi.mocked(copyText).mockResolvedValue(false);
+    voice
+      .getState()
+      .accept(voiceSnapshot({ phase: 'done', text: 'Keep this result', revision: 2 }));
+    act(() => {
+      renderer = create(<VoiceInputMain />);
+    });
+    await act(async () => button('voice.copy').props.onClick());
+    const bubble = renderer.root.findByProps({ className: 'voice-result' });
+    expect(bubble.findAllByType('p')[0].children).toEqual(['Keep this result']);
+    expect(bubble.findByProps({ role: 'alert' }).children).toEqual(['voice.error.copy']);
+    expect(copyText).toHaveBeenCalledExactlyOnceWith('Keep this result');
+    expect(button('voice.copy')).toBeDefined();
+    vi.mocked(copyText).mockResolvedValue(true);
+    await act(async () => button('voice.copy').props.onClick());
+    expect(bubble.findAllByProps({ role: 'alert' })).toHaveLength(0);
+    expect(button('voice.copied')).toBeDefined();
+    expect(api.recordVoice).not.toHaveBeenCalled();
+  });
+});
+
 it('anchors three curved routes to the preview and remeasures or hides them as space changes', () => {
+  const config = {
+    ...voiceSnapshot().config,
+    shortcutEnabled: true,
+    channels: [
+      { kind: 'model' as const, id: 'primary' },
+      { kind: 'model' as const, id: 'backup' },
+    ],
+  };
+  voice.setState({ snapshot: voiceSnapshot({ config }) });
   let width = 800;
   let previewY = 140;
   let frame!: FrameRequestCallback;
@@ -423,9 +671,17 @@ it('anchors three curved routes to the preview and remeasures or hides them as s
   });
   const previewArea = {};
   const island = { getBoundingClientRect: () => rect(100, 50 + previewY - 22, 176, 44) };
-  const cards = Array.from({ length: 3 }, (_, index) => ({
-    getBoundingClientRect: () => rect(40 + width - 280, 58 + index * 116, 254, 80),
-  }));
+  let cardGeneration = 0;
+  const createCards = () => {
+    const generation = cardGeneration;
+    return Array.from({ length: 3 }, (_, index) => ({
+      getBoundingClientRect: () =>
+        generation === cardGeneration
+          ? rect(40 + width - 280, 58 + index * 116, 254, 80)
+          : rect(0, 0, 0, 0),
+    }));
+  };
+  let cards = createCards();
   act(() => {
     renderer = create(<VoiceInputMain />, {
       createNodeMock: (element) =>
@@ -455,6 +711,53 @@ it('anchors three curved routes to the preview and remeasures or hides them as s
   expect(paths().every((path) => path.includes(' C ') && path.endsWith('254 140'))).toBe(true);
   expect(observe).toHaveBeenCalledTimes(5);
   expect(observe).toHaveBeenCalledWith(previewArea);
+  const routes = renderer.root.findAllByProps({ className: 'free-model-route-path' });
+  expect(routes.map((path) => path.parent!.props.className)).toEqual([
+    undefined,
+    undefined,
+    'is-disabled',
+  ]);
+  const glow = () => renderer.root.findAllByProps({ className: 'free-model-route-glow' });
+  expect(glow()).toHaveLength(0);
+  const idlePaths = paths();
+  // Entering or leaving a recording recreates the sortable cards to cancel dragging.
+  cardGeneration++;
+  cards = createCards();
+  for (const [revision, phase, activeChannel] of [
+    [2, 'recording', 0],
+    [3, 'transcribing', 1],
+  ] as const) {
+    act(() => voice.getState().accept(voiceSnapshot({ config, phase, activeChannel, revision })));
+    act(() => {
+      frame(0);
+      resize();
+    });
+    expect(paths()).toEqual(idlePaths);
+    expect(glow()).toHaveLength(1);
+    expect(glow()[0].props.d).toBe(paths()[activeChannel]);
+    expect(glow()[0].props.pathLength).toBe('1');
+  }
+  cardGeneration++;
+  cards = createCards();
+  act(() => voice.getState().accept(voiceSnapshot({ config, phase: 'done', revision: 4 })));
+  act(() => {
+    frame(0);
+    resize();
+  });
+  expect(paths()).toEqual(idlePaths);
+  expect(glow()).toHaveLength(0);
+  act(() =>
+    voice.getState().accept(
+      voiceSnapshot({
+        config: { ...config, shortcutEnabled: false },
+        phase: 'transcribing',
+        activeChannel: 1,
+        revision: 5,
+      })
+    )
+  );
+  expect(glow()).toHaveLength(0);
+  expect(routes[0].parent!.parent!.props.className).toContain('is-disabled');
   act(() => {
     width = 520;
     resize();
@@ -473,6 +776,8 @@ it('anchors three curved routes to the preview and remeasures or hides them as s
   expect(api.saveVoiceConfig).not.toHaveBeenCalled();
   expect(api.startVoice).not.toHaveBeenCalled();
   expect(api.recordVoice).not.toHaveBeenCalled();
+  disconnect.mockClear();
+  cancelFrame.mockClear();
   act(() => renderer.unmount());
   expect(disconnect).toHaveBeenCalledOnce();
   expect(cancelFrame).toHaveBeenCalledExactlyOnceWith(1);
@@ -480,6 +785,68 @@ it('anchors three curved routes to the preview and remeasures or hides them as s
 });
 
 describe('model refinement settings', () => {
+  it('uses one header menu to enable a model or turn refinement off without losing its settings', async () => {
+    const config = {
+      ...voiceSnapshot().config,
+      optimizationModel: 'text-model',
+      optimizationMode: 'semantic' as const,
+      translationLanguage: 'fr' as const,
+    };
+    mother.models = [{ internalId: 'text-model', name: 'DeepSeek', modelId: 'deepseek-chat' }];
+    voice.setState({ snapshot: voiceSnapshot({ config }) });
+    let revision = 1;
+    vi.mocked(api.saveVoiceConfig).mockImplementation(async (saved) =>
+      voiceSnapshot({ config: saved, revision: ++revision })
+    );
+    act(() => {
+      renderer = create(<VoiceInputMain />);
+    });
+    const selector = () => renderer.root.findByType(RemoteModelSelector);
+    const card = renderer.root.findByProps({
+      className: 'voice-card voice-optimization-card rounded-card',
+    });
+    expect(
+      card.findByProps({ className: 'voice-section-heading' }).findByType(RemoteModelSelector)
+    ).toBe(selector());
+    expect(
+      card
+        .findByProps({ className: 'voice-optimization' })
+        .findAllByProps({ className: 'voice-row' })
+    ).toHaveLength(2);
+    expect(card.findAllByProps({ role: 'switch' })).toHaveLength(0);
+    expect(selector().props.currentModelId).toBe('');
+    expect(selector().props.models[0]).toEqual({ id: '', name: 'voice.optimizationOff' });
+    expect(api.saveVoiceConfig).not.toHaveBeenCalled();
+    await act(async () => selector().props.onSelect('text-model'));
+    expect(api.saveVoiceConfig).toHaveBeenLastCalledWith({ ...config, optimizationEnabled: true });
+    expect(selector().props.currentModelId).toBe('text-model');
+    await act(async () => selector().props.onSelect(''));
+    expect(api.saveVoiceConfig).toHaveBeenLastCalledWith(config);
+    expect(selector().props.currentModelId).toBe('');
+    expect(card.findByProps({ className: 'voice-optimization' }).props.disabled).toBe(true);
+    expect(api.startVoice).not.toHaveBeenCalled();
+    expect(api.recordVoice).not.toHaveBeenCalled();
+  });
+
+  it('keeps the off selection after a failed enable and prevents changes while recording', async () => {
+    act(() => {
+      renderer = create(<VoiceInputMain />);
+    });
+    const selector = () => renderer.root.findByType(RemoteModelSelector);
+    expect(selector().props.models).toEqual([{ id: '', name: 'voice.optimizationOff' }]);
+    vi.mocked(api.saveVoiceConfig).mockRejectedValueOnce('voice.error.save');
+    await act(async () => selector().props.onSelect('text-model'));
+    expect(selector().props.currentModelId).toBe('');
+    expect(voice.getState().snapshot?.config.optimizationEnabled).toBe(false);
+    act(() => voice.getState().accept(voiceSnapshot({ phase: 'recording', revision: 3 })));
+    expect(
+      renderer.root.findByProps({ className: 'voice-optimization-model' }).props.disabled
+    ).toBe(true);
+    act(() => selector().props.onSelect('another-model'));
+    expect(api.saveVoiceConfig).toHaveBeenCalledTimes(1);
+    expect(api.recordVoice).not.toHaveBeenCalled();
+  });
+
   const enable = () => {
     voice.setState({
       snapshot: voiceSnapshot({
@@ -503,6 +870,7 @@ describe('model refinement settings', () => {
     });
     const selector = renderer.root.findByType(RemoteModelSelector);
     expect(selector.props.models).toEqual([
+      { id: '', name: 'voice.optimizationOff' },
       expect.objectContaining({
         id: 'text-model',
         name: 'DeepSeek',
@@ -695,9 +1063,12 @@ describe('model refinement settings', () => {
       expect(grid().props['data-saving']).toBe(false);
       expect(renderer.root.findByType(RemoteModelSelector)).toBe(selector);
       expect(renderer.root.findAllByType('section')).toEqual(sections);
-      expect(renderer.root.findAllByType('fieldset').every((node) => !node.props.disabled)).toBe(
-        true
-      );
+      expect(
+        renderer.root
+          .findAllByType('fieldset')
+          .filter((node) => node.props['aria-label'] !== 'voice.selection')
+          .every((node) => !node.props.disabled)
+      ).toBe(true);
       expect(api.recordVoice).not.toHaveBeenCalled();
       expect(api.startVoice).not.toHaveBeenCalled();
       expect(mother.setAgentModel).not.toHaveBeenCalled();
@@ -728,7 +1099,7 @@ describe('model refinement settings', () => {
     expect(api.startVoice).not.toHaveBeenCalled();
   });
 
-  it('closes model menus on leaving and blocks changes while refinement is off or voice is busy', async () => {
+  it('closes model menus on leaving and blocks changes while hidden or voice is busy', async () => {
     enable();
     mother.models = [{ internalId: 'text-model', name: 'DeepSeek', modelId: 'deepseek-chat' }];
     useNavigationStore.setState({ activePage: 'voice' });
@@ -1082,7 +1453,7 @@ describe('island speech entry', () => {
     });
     expect(renderer.root.findAllByType('button')).toHaveLength(1);
     expect(JSON.stringify(renderer.toJSON())).not.toContain('Saved text');
-    expect(api.copyVoiceResult).not.toHaveBeenCalled();
+    expect(copyText).not.toHaveBeenCalled();
     expect(button('voice.speak')).toBeDefined();
     expect(api.cancelVoice).not.toHaveBeenCalled();
     expect(api.stopVoice).not.toHaveBeenCalled();
@@ -1150,7 +1521,7 @@ describe('island speech entry', () => {
     ]);
     expect(api.recordVoice).not.toHaveBeenCalled();
     expect(api.stopVoice).not.toHaveBeenCalled();
-    expect(api.copyVoiceResult).not.toHaveBeenCalled();
+    expect(copyText).not.toHaveBeenCalled();
   });
 });
 
@@ -1186,7 +1557,13 @@ describe('independent island appearance', () => {
       act(() => {
         renderer = create(<VoiceInputMain />);
       });
-      expect(renderer.root.findByType(ViewModeTabs).props.options).toEqual(
+      expect(
+        renderer.root
+          .findAllByType(ViewModeTabs)
+          .find((tabs) =>
+            tabs.props.options.some((option: { value: string }) => option.value === 'auto')
+          )!.props.options
+      ).toEqual(
         ['auto', 'dark', 'light', 'system'].map((mode) => ({
           value: mode,
           label: translate(`voice.${mode}` as TKey, locale),

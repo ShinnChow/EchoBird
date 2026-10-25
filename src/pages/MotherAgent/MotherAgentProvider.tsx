@@ -1,6 +1,7 @@
 import { isSmartRouterId } from '../../utils/smartRouter';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useI18n } from '../../hooks/useI18n';
+import { listen } from '@tauri-apps/api/event';
 import * as api from '../../api/tauri';
 import type { ModelConfig, AgentEvent, ParasiteEvent, ReasoningEffort } from '../../api/types';
 import { useChatPersistence } from '../../hooks/useChatPersistence';
@@ -32,7 +33,12 @@ const countConversationMessage = (message: ChatMessage) =>
 export function MotherAgentProvider({ children }: { children: React.ReactNode }) {
   // From stores (replaces drilled props)
   const { detectedTools: _detectedTools } = useToolsStore();
-  const { activePage, motherPrefill: initialMessage, clearMotherPrefill } = useNavigationStore();
+  const {
+    activePage,
+    motherPrefill: initialMessage,
+    motherPrefillCursor,
+    clearMotherPrefill,
+  } = useNavigationStore();
   const onAgentRunningChange = useNavigationStore((s) => s.setAgentRunning);
   const { t, locale } = useI18n(); // locale for agent hint; t for error messages
   const confirm = useConfirm();
@@ -125,6 +131,7 @@ export function MotherAgentProvider({ children }: { children: React.ReactNode })
   const [chatCursorPos, setChatCursorPos] = useState(0);
   const chatEndRef = useRef<HTMLDivElement>(null!);
   const chatInputRef = useRef<HTMLTextAreaElement>(null!);
+  const chatPrefillRef = useRef<{ text: string; cursor: number } | null>(null);
   // Holds the prefill-focus timer so it survives the re-render that
   // clearMotherPrefill() triggers mid-effect — an effect cleanup would
   // tear it down before it fires, dropping the input focus.
@@ -147,6 +154,10 @@ export function MotherAgentProvider({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (!initialMessage || activePage !== 'mother') return;
+    chatPrefillRef.current = {
+      text: initialMessage,
+      cursor: motherPrefillCursor ?? initialMessage.length,
+    };
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setChatInput(initialMessage);
     // One-shot: consume the prefill so it doesn't linger in the store and
@@ -154,8 +165,47 @@ export function MotherAgentProvider({ children }: { children: React.ReactNode })
     // which would re-fill "安装XX" into an input the user already cleared.
     clearMotherPrefill();
     if (prefillFocusRef.current) clearTimeout(prefillFocusRef.current);
-    prefillFocusRef.current = setTimeout(() => chatInputRef.current?.focus(), 100);
-  }, [activePage, initialMessage, clearMotherPrefill]);
+    prefillFocusRef.current = setTimeout(() => {
+      const input = chatInputRef.current;
+      const prefill = chatPrefillRef.current;
+      if (input && !input.disabled && prefill && input.value === prefill.text) {
+        input.focus();
+        input.setSelectionRange(prefill.cursor, prefill.cursor);
+        chatPrefillRef.current = null;
+      }
+    }, 100);
+  }, [activePage, initialMessage, motherPrefillCursor, clearMotherPrefill]);
+
+  useEffect(() => {
+    let disposed = false;
+    let stop: (() => void) | undefined;
+    void listen<{
+      source: string;
+      error: 'voice.selectionEmpty' | 'voice.selectionTooLong' | null;
+    }>('voice-selection-ask', ({ payload }) => {
+      if (disposed) return;
+      if (payload.error || !payload.source.trim()) {
+        showToast('error', t(payload.error ?? 'voice.selectionEmpty'));
+        return;
+      }
+      const question = t('mother.selectionQuestion');
+      useNavigationStore
+        .getState()
+        .goToMother(
+          `${question}\n${t('mother.selectionContent')}${payload.source}`,
+          question.length
+        );
+    })
+      .then((unlisten) => {
+        if (disposed) unlisten();
+        else stop = unlisten;
+      })
+      .catch(() => {});
+    return () => {
+      disposed = true;
+      stop?.();
+    };
+  }, [t, showToast]);
 
   // SSH servers shared state (persisted via backend)
   const [sshServers, setSSHServers] = useState<
@@ -711,6 +761,7 @@ export function MotherAgentProvider({ children }: { children: React.ReactNode })
         chatCursorPos,
         setChatCursorPos,
         chatInputRef,
+        chatPrefillRef,
         chatEndRef,
         handleChatSend,
         sendMessage: handleChatSendInternal,

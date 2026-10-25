@@ -34,6 +34,7 @@ export function MotherAgentMain() {
     agentState: _agentState,
     chatEndRef,
     chatInputRef,
+    chatPrefillRef,
     handleChatSend,
 
     sshServers: _sshServers,
@@ -51,6 +52,15 @@ export function MotherAgentMain() {
   useLayoutEffect(() => {
     if (initialInput.current) chatInputRef.current?.focus();
   }, [chatInputRef]);
+  useLayoutEffect(() => {
+    const input = chatInputRef.current;
+    const prefill = chatPrefillRef?.current;
+    if (input && !isProcessing && prefill && prefill.text === chatInput) {
+      input.focus();
+      input.setSelectionRange(prefill.cursor, prefill.cursor);
+      chatPrefillRef.current = null;
+    }
+  }, [chatInput, chatInputRef, chatPrefillRef, isProcessing]);
   const visibleChatOutput = React.useMemo(() => chatOutput.filter(isVisibleMessage), [chatOutput]);
 
   // Build model list for RemoteModelSelector (with icons)
@@ -330,7 +340,10 @@ export function MotherAgentMain() {
           <textarea
             ref={chatInputRef}
             value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
+            onChange={(e) => {
+              if (chatPrefillRef) chatPrefillRef.current = null;
+              setChatInput(e.target.value);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();

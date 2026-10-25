@@ -5,6 +5,7 @@
   "windows": [
     "main",
     "voice-island",
+    "voice-translation",
     "tool-*"
   ],
   "permissions": [

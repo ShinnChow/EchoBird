@@ -4,9 +4,16 @@ mod app_icon;
 mod app_icon_cache;
 mod audio;
 pub mod config;
+mod island_input;
 mod monitor;
 mod native;
+#[cfg(windows)]
+mod paste_windows;
 mod pipeline;
+pub mod selection;
+mod selection_gesture;
+mod selection_native;
+mod selection_pointer;
 mod shortcut;
 mod speech_api;
 #[cfg(test)]
@@ -18,7 +25,9 @@ mod wayland;
 mod wayland_state;
 
 use audio::Recorder;
+use axum::body::Bytes;
 use config::{Config, Saved};
+use island_input::{WINDOW_HEIGHT as ISLAND_HEIGHT, WINDOW_WIDTH as ISLAND_WIDTH};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -35,24 +44,29 @@ pub struct Snapshot {
     pub days: std::collections::BTreeMap<String, u64>,
     pub usage: config::Usage,
     pub phase: String,
+    pub active_channel: Option<usize>,
     pub level: f32,
     pub elapsed_ms: u64,
     pub text: String,
+    pub result_audio_id: Option<u64>,
     pub error: Option<String>,
     pub revision: u64,
     pub shortcut_active: bool,
     pub shortcut_description: Option<String>,
     pub app_icon: Option<String>,
     pub app_icon_loading: bool,
+    pub selection_open: bool,
 }
 
 struct Runtime {
     origin: String,
     phase: String,
+    active_channel: Option<usize>,
     level: f32,
     started: Option<Instant>,
     elapsed_ms: u64,
     text: String,
+    result_audio: Option<(u64, Bytes)>,
     error: Option<String>,
     revision: u64,
     generation: u64,
@@ -68,6 +82,37 @@ struct Runtime {
 }
 
 impl Runtime {
+    fn finish_audio(&mut self, generation: u64, audio: Option<Bytes>) -> bool {
+        if generation != self.generation || self.cancel.is_cancelled() {
+            return false;
+        }
+        if self.origin != "test" {
+            self.result_audio = audio.map(|bytes| (generation, bytes));
+        }
+        true
+    }
+
+    fn replay_audio(&self, id: u64) -> Result<Bytes, String> {
+        if self.active() {
+            return Err("voice.error.busy".into());
+        }
+        self.result_audio
+            .as_ref()
+            .filter(|(current, _)| *current == id)
+            .map(|(_, bytes)| bytes.clone())
+            .ok_or_else(|| "voice.error.noAudio".into())
+    }
+
+    fn active_channel(&self) -> Option<usize> {
+        if matches!(self.phase.as_str(), "recording" | "transcribing")
+            && !self.cancel.is_cancelled()
+        {
+            self.active_channel
+        } else {
+            None
+        }
+    }
+
     fn begin_app_icon(&mut self, loading: bool) -> u64 {
         self.app_icon_generation += 1;
         self.app_icon_loading = loading;
@@ -119,6 +164,7 @@ pub struct Voice {
     suspended: AtomicBool,
     held: AtomicBool,
     stopped: AtomicBool,
+    selection: Mutex<selection::State>,
 }
 
 fn shared(app: &AppHandle) -> Arc<Voice> {
@@ -138,10 +184,12 @@ pub fn init(app: &AppHandle) {
         runtime: Mutex::new(Runtime {
             origin: "page".into(),
             phase: "idle".into(),
+            active_channel: None,
             level: 0.0,
             started: None,
             elapsed_ms: 0,
             text: String::new(),
+            result_audio: None,
             error,
             revision: 0,
             generation: 0,
@@ -162,9 +210,11 @@ pub fn init(app: &AppHandle) {
         suspended: AtomicBool::new(false),
         held: AtomicBool::new(false),
         stopped: AtomicBool::new(false),
+        selection: Mutex::new(selection::State::default()),
     }));
     monitor::start(app);
-    if config.shortcut_enabled {
+    selection::start(app);
+    if island_visible(&config) {
         let app = app.clone();
         tauri::async_runtime::spawn(async move {
             let voice = shared(&app);
@@ -194,24 +244,28 @@ pub fn snapshot(app: &AppHandle) -> Snapshot {
     let voice = shared(app);
     let saved = voice.saved.lock().unwrap().clone();
     let runtime = voice.runtime.lock().unwrap();
+    let selection = voice.selection.lock().unwrap();
     Snapshot {
         origin: runtime.origin.clone(),
         config: saved.config,
         days: saved.days,
         usage: saved.usage,
         phase: runtime.phase.clone(),
+        active_channel: runtime.active_channel(),
         level: runtime.level,
         elapsed_ms: runtime
             .started
             .map(|time| time.elapsed().as_millis() as u64)
             .unwrap_or(runtime.elapsed_ms),
         text: runtime.text.clone(),
+        result_audio_id: runtime.result_audio.as_ref().map(|(id, _)| *id),
         error: runtime.error.clone(),
         revision: runtime.revision,
         shortcut_active: runtime.shortcut_active,
         shortcut_description: runtime.shortcut_description.clone(),
         app_icon: runtime.app_icon.clone(),
         app_icon_loading: runtime.app_icon_loading,
+        selection_open: selection.open,
     }
 }
 
@@ -272,6 +326,7 @@ pub async fn save(app: &AppHandle, mut config: Config) -> Result<Snapshot, Strin
         runtime.error = None;
     }
     *voice.saved.lock().unwrap() = saved;
+    selection::close(app);
     if island_visible(&config) {
         if let Err(error) = show_island(app) {
             voice.runtime.lock().unwrap().error = Some(error);
@@ -301,6 +356,9 @@ pub async fn begin(app: &AppHandle, origin: &str) -> Result<Snapshot, String> {
     if !test && config.channels.is_empty() {
         return Err("voice.error.noChannels".into());
     }
+    if voice.selection.lock().unwrap().open {
+        return Err("voice.error.busy".into());
+    }
     let generation = {
         let mut runtime = voice.runtime.lock().unwrap();
         if runtime.active() {
@@ -316,6 +374,7 @@ pub async fn begin(app: &AppHandle, origin: &str) -> Result<Snapshot, String> {
         runtime.level = 0.0;
         runtime.elapsed_ms = 0;
         runtime.config = config.clone();
+        runtime.active_channel = None;
         runtime.target = if insert { native::input_target() } else { None };
         runtime.insert = insert
             && (runtime.target.is_some() || native::wayland())
@@ -352,7 +411,12 @@ pub async fn begin(app: &AppHandle, origin: &str) -> Result<Snapshot, String> {
                             return;
                         }
                         voice.recorder.cancel();
-                        fail(&level_app, generation, "voice.error.microphone".into());
+                        fail(
+                            &level_app,
+                            generation,
+                            "voice.error.microphone".into(),
+                            None,
+                        );
                         return;
                     }
                     {
@@ -376,7 +440,7 @@ pub async fn begin(app: &AppHandle, origin: &str) -> Result<Snapshot, String> {
     };
     if let Err(error) = result {
         voice.recorder.cancel();
-        fail(app, generation, error.clone());
+        fail(app, generation, error.clone(), None);
         return Err(error);
     }
     {
@@ -403,6 +467,7 @@ pub async fn begin(app: &AppHandle, origin: &str) -> Result<Snapshot, String> {
                 voice.recorder.clone(),
                 cancel,
             ));
+            voice.runtime.lock().unwrap().active_channel = Some(0);
         }
     }
     if !test {
@@ -424,11 +489,11 @@ pub async fn begin(app: &AppHandle, origin: &str) -> Result<Snapshot, String> {
     Ok(snapshot(app))
 }
 
-fn fail(app: &AppHandle, generation: u64, error: String) {
+fn fail(app: &AppHandle, generation: u64, error: String, audio: Option<Bytes>) {
     let voice = shared(app);
     {
         let mut runtime = voice.runtime.lock().unwrap();
-        if runtime.generation != generation {
+        if !runtime.finish_audio(generation, audio) {
             return;
         }
         log::warn!("[VoiceInput] failed phase={} code={error}", runtime.phase);
@@ -497,7 +562,7 @@ async fn stop_capture(app: &AppHandle, shortcut_only: bool) -> Result<Snapshot, 
     let audio = match captured {
         Ok(audio) => audio,
         Err(error) => {
-            fail(app, generation, error);
+            fail(app, generation, error, None);
             return Ok(snapshot(app));
         }
     };
@@ -507,9 +572,10 @@ async fn stop_capture(app: &AppHandle, shortcut_only: bool) -> Result<Snapshot, 
         .max()
         .unwrap_or(0);
     log::info!(
-        "[VoiceInput] captured duration_ms={} wav_bytes={} peak_pcm16={peak}",
+        "[VoiceInput] captured duration_ms={} wav_bytes={} raw_peak_pcm16={} peak_pcm16={peak}",
         audio.duration_ms,
-        audio.wav.len()
+        audio.wav.len(),
+        (audio.raw_peak * i16::MAX as f32) as u16
     );
     let client = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(15))
@@ -519,6 +585,8 @@ async fn stop_capture(app: &AppHandle, shortcut_only: bool) -> Result<Snapshot, 
     let client_ref = &client;
     let audio_ref = &bytes;
     let api_options = &config.api_options;
+    let channels = &config.channels;
+    let runtime_voice = &voice;
     let stream = voice.stream.lock().unwrap().take();
     let streamed = if let Some(stream) = stream {
         Some(tokio::select! {
@@ -529,27 +597,28 @@ async fn stop_capture(app: &AppHandle, shortcut_only: bool) -> Result<Snapshot, 
     } else {
         None
     };
-    let recognized = match streamed {
-        Some(Ok(text)) => Ok(text),
-        Some(Err(error)) if error == "voice.error.noTranscript" => Err(error),
-        result => {
-            if result.is_some() {
-                log::warn!("[VoiceInput] realtime unavailable; falling back to complete WAV");
-            }
-            tokio::select! {
-            biased;
-            _ = cancel.cancelled() => return Ok(snapshot(app)),
-            result = pipeline::first_transcript(&config.channels, |channel| async move {
-                tokio::time::timeout(Duration::from_secs(60), pipeline::recognize(&channel, api_options, audio_ref, client_ref))
-                    .await.map_err(|_| "voice.error.transcribe".to_string())?
-            }) => result,
+    let recognized = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => return Ok(snapshot(app)),
+        result = pipeline::first_transcript(channels, streamed, |channel| async move {
+            let selected = {
+                let mut runtime = runtime_voice.runtime.lock().unwrap();
+                if runtime.generation == generation && !runtime.cancel.is_cancelled() {
+                    runtime.active_channel = channels.iter().position(|candidate| candidate == &channel);
+                    true
+                } else {
+                    false
                 }
-        }
+            };
+            if selected { publish(app); }
+            tokio::time::timeout(Duration::from_secs(60), pipeline::recognize(&channel, api_options, audio_ref, client_ref))
+                .await.map_err(|_| "voice.error.transcribe".to_string())?
+        }) => result,
     };
     let mut text = match recognized {
         Ok(text) => text,
         Err(error) => {
-            fail(app, generation, error);
+            fail(app, generation, error, Some(bytes));
             return Ok(snapshot(app));
         }
     };
@@ -557,6 +626,14 @@ async fn stop_capture(app: &AppHandle, shortcut_only: bool) -> Result<Snapshot, 
         "[VoiceInput] recognized characters={}",
         text.chars().count()
     );
+    {
+        let mut runtime = voice.runtime.lock().unwrap();
+        if runtime.generation != generation || cancel.is_cancelled() {
+            return Ok(snapshot_after_unlock(app, runtime));
+        }
+        runtime.active_channel = None;
+    }
+    publish(app);
     let mut warning = None;
     if !text.trim().is_empty() && config.optimization_enabled {
         {
@@ -592,7 +669,7 @@ async fn stop_capture(app: &AppHandle, shortcut_only: bool) -> Result<Snapshot, 
                 if cancel.is_cancelled() {
                     Err("voice.error.cancelled".into())
                 } else {
-                    native::insert(&text, target)
+                    native::insert(&text, target, &cancel)
                 }
             })
             .await
@@ -618,6 +695,7 @@ async fn stop_capture(app: &AppHandle, shortcut_only: bool) -> Result<Snapshot, 
             return Ok(snapshot_after_unlock(app, runtime));
         }
         runtime.phase = "done".into();
+        runtime.finish_audio(generation, Some(bytes));
         runtime.elapsed_ms = audio.duration_ms;
         runtime.error = warning;
     }
@@ -706,6 +784,10 @@ pub fn trigger(app: &AppHandle, binding: &config::Binding, down: bool) {
     if config.shortcut != *binding {
         return;
     }
+    if voice.selection.lock().unwrap().open {
+        voice.held.store(false, Ordering::Release);
+        return;
+    }
     if voice.suspended.load(Ordering::Acquire) {
         return;
     }
@@ -736,7 +818,7 @@ pub fn trigger(app: &AppHandle, binding: &config::Binding, down: bool) {
                 return;
             }
             let generation = shared(&app).runtime.lock().unwrap().generation;
-            fail(&app, generation, error);
+            fail(&app, generation, error, None);
             let _ = show_island(&app);
         }
     });
@@ -746,9 +828,6 @@ fn island_visible(config: &Config) -> bool {
     config.shortcut_enabled && !config.channels.is_empty()
 }
 
-const ISLAND_WIDTH: f64 = 420.0;
-const ISLAND_HEIGHT: f64 = 108.0;
-
 fn island_position(
     area: &tauri::PhysicalRect<i32, u32>,
     scale: f64,
@@ -757,7 +836,8 @@ fn island_position(
         (f64::from(area.position.x) + (f64::from(area.size.width) - ISLAND_WIDTH * scale) / 2.0)
             .round() as i32,
         (f64::from(area.position.y)
-            + (f64::from(area.size.height) - (ISLAND_HEIGHT + 24.0) * scale).max(0.0))
+            + (f64::from(area.size.height) - (ISLAND_HEIGHT + island_input::BOTTOM_GAP) * scale)
+                .max(0.0))
         .round() as i32,
     )
 }
@@ -788,6 +868,13 @@ fn show_island(app: &AppHandle) -> Result<(), String> {
     .visible(false)
     .build()
     .map_err(|_| "voice.error.island")?;
+    island_input::configure(&window).map_err(|_| "voice.error.island")?;
+    let moved_app = app.clone();
+    window.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::Moved(_)) {
+            selection::close(&moved_app);
+        }
+    });
     if let Some(monitor) = app
         .get_webview_window("main")
         .and_then(|main| main.current_monitor().ok().flatten())
@@ -808,21 +895,21 @@ pub fn island_ready(app: &AppHandle) -> Snapshot {
     status
 }
 
-pub fn copy_result(app: &AppHandle) -> Result<(), String> {
-    use tauri_plugin_clipboard_manager::ClipboardExt;
-    let text = snapshot(app).text;
-    if text.is_empty() {
-        return Err("voice.error.noAudio".into());
-    }
-    app.clipboard()
-        .write_text(text)
-        .map_err(|_| "voice.error.copy".into())
+pub fn replay_audio(app: &AppHandle, id: u64) -> Result<tauri::ipc::Response, String> {
+    let voice = shared(app);
+    let bytes = voice.runtime.lock().unwrap().replay_audio(id)?;
+    Ok(tauri::ipc::Response::new(bytes.to_vec()))
 }
 
 pub fn shutdown(app: &AppHandle) {
     let voice = shared(app);
     voice.stopped.store(true, Ordering::Release);
-    voice.runtime.lock().unwrap().cancel.cancel();
+    selection::close(app);
+    {
+        let mut runtime = voice.runtime.lock().unwrap();
+        runtime.cancel.cancel();
+        runtime.result_audio = None;
+    }
     voice.recorder.cancel();
     if let Ok(mut registration) = voice.registration.try_lock() {
         if let Some(registration) = registration.take() {

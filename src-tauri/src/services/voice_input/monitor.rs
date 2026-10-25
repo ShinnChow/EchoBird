@@ -3,6 +3,8 @@ use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use tauri::AppHandle;
+#[cfg(any(windows, target_os = "macos"))]
+use tauri::Manager;
 
 pub fn start(app: &AppHandle) {
     let app = app.clone();
@@ -49,8 +51,10 @@ pub fn start(app: &AppHandle) {
         let mut previous_window = None;
         let mut checked_icon = Instant::now();
         let mut foreground = None;
+        #[cfg(any(windows, target_os = "macos"))]
+        let mut cursor = super::island_input::CursorTracker::default();
         while !voice.stopped.load(Ordering::Acquire) {
-            let enabled = voice.saved.lock().unwrap().config.shortcut_enabled;
+            let enabled = super::island_visible(&voice.saved.lock().unwrap().config);
             if enabled && !enabled_before {
                 foreground = Some(app_icon::Monitor::new());
                 escape = native::ModifierMonitor::escape();
@@ -58,6 +62,10 @@ pub fn start(app: &AppHandle) {
                 checked_icon = Instant::now() - Duration::from_secs(1);
             }
             if enabled {
+                #[cfg(any(windows, target_os = "macos"))]
+                if let Some(window) = app.get_webview_window("voice-island") {
+                    cursor.update(&window);
+                }
                 let pressed = escape.as_ref().is_some_and(native::ModifierMonitor::down);
                 if pressed && !pressed_before {
                     super::escape(&app);

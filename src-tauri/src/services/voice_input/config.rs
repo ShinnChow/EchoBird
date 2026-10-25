@@ -45,6 +45,8 @@ pub struct Config {
     pub optimization_model: Option<String>,
     pub optimization_mode: String,
     pub translation_language: String,
+    pub selection_translation_enabled: bool,
+    pub selection_translation_language: String,
 }
 
 impl Default for Config {
@@ -65,7 +67,23 @@ impl Default for Config {
             optimization_model: None,
             optimization_mode: "faithful".into(),
             translation_language: "off".into(),
+            selection_translation_enabled: false,
+            selection_translation_language: "zh-Hans".into(),
         }
+    }
+}
+
+pub(super) fn language_name(language: &str) -> Option<&'static str> {
+    match language {
+        "zh-Hans" => Some("Simplified Chinese (use simplified characters)"),
+        "zh-Hant" => Some("Traditional Chinese (use traditional characters)"),
+        "en" => Some("English"),
+        "ja" => Some("Japanese"),
+        "ko" => Some("Korean"),
+        "fr" => Some("French"),
+        "de" => Some("German"),
+        "es" => Some("Spanish"),
+        _ => None,
     }
 }
 
@@ -75,22 +93,24 @@ impl Config {
     }
 
     pub fn translation_target(&self) -> Option<&'static str> {
-        match self.translation_language.as_str() {
-            "zh-Hans" => Some("Simplified Chinese (use simplified characters)"),
-            "zh-Hant" => Some("Traditional Chinese (use traditional characters)"),
-            "en" => Some("English"),
-            "ja" => Some("Japanese"),
-            "ko" => Some("Korean"),
-            "fr" => Some("French"),
-            "de" => Some("German"),
-            "es" => Some("Spanish"),
-            _ => None,
-        }
+        language_name(&self.translation_language)
+    }
+
+    pub fn selection_active(&self) -> bool {
+        self.selection_translation_enabled
+            && self.optimization_enabled
+            && self
+                .optimization_model
+                .as_ref()
+                .is_some_and(|id| !id.is_empty())
     }
 
     pub fn normalize_optimization_mode(&mut self) {
         if self.optimization_mode == "custom" {
             self.optimization_mode = "semantic".into();
+        }
+        if !self.optimization_enabled || self.optimization_model.is_none() {
+            self.selection_translation_enabled = false;
         }
     }
 
@@ -101,6 +121,9 @@ impl Config {
     }
 
     pub fn validate(&self) -> Result<(), String> {
+        if language_name(&self.selection_translation_language).is_none() {
+            return Err("voice.error.config".into());
+        }
         if self.api_options.iter().any(|(id, options)| {
             id.is_empty()
                 || id.len() > 512

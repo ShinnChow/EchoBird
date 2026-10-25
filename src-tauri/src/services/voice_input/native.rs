@@ -1,4 +1,5 @@
 use super::config::Binding;
+#[cfg(not(windows))]
 use enigo::{Enigo, Keyboard, Settings};
 
 pub fn wayland() -> bool {
@@ -107,7 +108,14 @@ pub(super) fn alt_menu_key(binding: &Binding) -> Option<u16> {
     }
 }
 
-pub fn insert(text: &str, target: Option<InputTarget>) -> Result<(), String> {
+pub fn insert(
+    text: &str,
+    target: Option<InputTarget>,
+    cancel: &tokio_util::sync::CancellationToken,
+) -> Result<(), String> {
+    if cancel.is_cancelled() {
+        return Err("voice.error.cancelled".into());
+    }
     let current = input_target();
     if let Some(target) = target {
         log::info!(
@@ -120,8 +128,15 @@ pub fn insert(text: &str, target: Option<InputTarget>) -> Result<(), String> {
             return Err("voice.error.focus".into());
         }
     }
-    let mut keyboard = Enigo::new(&Settings::default()).map_err(|_| "voice.error.insert")?;
-    keyboard.text(text).map_err(|_| "voice.error.insert".into())
+    #[cfg(windows)]
+    {
+        super::paste_windows::insert(text, target, cancel)
+    }
+    #[cfg(not(windows))]
+    {
+        let mut keyboard = Enigo::new(&Settings::default()).map_err(|_| "voice.error.insert")?;
+        keyboard.text(text).map_err(|_| "voice.error.insert".into())
+    }
 }
 
 pub fn modifier(binding: &Binding) -> bool {
@@ -261,7 +276,42 @@ impl ModifierMonitor {
 #[cfg(target_os = "macos")]
 #[link(name = "CoreGraphics", kind = "framework")]
 extern "C" {
+    fn CGEventSourceButtonState(state: i32, button: u32) -> bool;
     fn CGEventSourceKeyState(state: i32, key: u16) -> bool;
     fn CGPreflightListenEventAccess() -> bool;
     fn CGRequestListenEventAccess() -> bool;
+}
+
+#[cfg(any(windows, target_os = "macos"))]
+pub(super) fn left_mouse_down() -> bool {
+    #[cfg(windows)]
+    unsafe {
+        use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
+        GetAsyncKeyState(VK_LBUTTON.0 as i32) < 0
+    }
+    #[cfg(target_os = "macos")]
+    unsafe {
+        CGEventSourceButtonState(1, 0)
+    }
+}
+
+#[cfg(any(windows, target_os = "macos"))]
+pub(super) fn selection_keys_down(copying: bool) -> bool {
+    #[cfg(windows)]
+    {
+        (8..255)
+            .filter(|key| {
+                !([16, 160, 161].contains(key) || copying && [17, 67, 162, 163].contains(key))
+            })
+            .any(|key| unsafe {
+                windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState(key) < 0
+            })
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = copying;
+        (0..128)
+            .filter(|key| ![56, 60].contains(key))
+            .any(|key| unsafe { CGEventSourceKeyState(1, key) })
+    }
 }

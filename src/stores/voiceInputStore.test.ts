@@ -29,7 +29,50 @@ beforeEach(() => {
 });
 
 describe('voice input lifecycle', () => {
-  it('turns input off in the same save when its last source is removed and requires explicit re-enabling', async () => {
+  it('keeps only the last completed result in memory through recording, testing and navigation', () => {
+    expect(store.getState().lastResult).toBeNull();
+    store
+      .getState()
+      .accept(voiceSnapshot({ phase: 'done', text: 'First final text', revision: 2 }));
+    const previous = store.getState().lastResult;
+    for (const [revision, phase, origin] of [
+      [3, 'starting', 'island'],
+      [4, 'recording', 'island'],
+      [5, 'transcribing', 'island'],
+      [6, 'idle', 'page'],
+      [7, 'error', 'test'],
+    ] as const) {
+      store.getState().accept(voiceSnapshot({ revision, phase, origin }));
+      expect(store.getState().lastResult).toBe(previous);
+    }
+    store
+      .getState()
+      .accept(voiceSnapshot({ phase: 'error', error: 'voice.error.noTranscript', revision: 8 }));
+    expect(store.getState().lastResult).toEqual({
+      text: '',
+      error: 'voice.error.noTranscript',
+      resultAudioId: null,
+    });
+    store.getState().accept(voiceSnapshot({ phase: 'done', text: 'Stale text', revision: 2 }));
+    expect(store.getState().lastResult).toEqual({
+      text: '',
+      error: 'voice.error.noTranscript',
+      resultAudioId: null,
+    });
+    store
+      .getState()
+      .accept(voiceSnapshot({ phase: 'done', text: 'Latest final text', revision: 9 }));
+    expect(store.getState().lastResult).toEqual({
+      text: 'Latest final text',
+      error: null,
+      resultAudioId: null,
+    });
+    expect(api.saveVoiceConfig).not.toHaveBeenCalled();
+    expect(api.startVoice).not.toHaveBeenCalled();
+    expect(api.recordVoice).not.toHaveBeenCalled();
+  });
+
+  it('turns input off when its last source is removed and on when sources are added again', async () => {
     const channels = [0, 1, 2].map((index) => ({ kind: 'model' as const, id: `speech-${index}` }));
     const config = { ...voiceSnapshot().config, channels, shortcutEnabled: true };
     store.setState({ snapshot: voiceSnapshot({ config }) });
@@ -48,13 +91,50 @@ describe('voice input lifecycle', () => {
     }
     expect(api.saveVoiceConfig).toHaveBeenCalledTimes(3);
     expect(await store.getState().save({ channels })).toBe(true);
-    expect(store.getState().snapshot?.config.shortcutEnabled).toBe(false);
-    expect(await store.getState().save({ shortcutEnabled: true })).toBe(true);
     expect(store.getState().snapshot?.config.shortcutEnabled).toBe(true);
     expect(api.recordVoice).not.toHaveBeenCalled();
     expect(api.startVoice).not.toHaveBeenCalled();
     expect(api.stopVoice).not.toHaveBeenCalled();
     expect(api.cancelVoice).not.toHaveBeenCalled();
+  });
+
+  it('preserves a manually disabled master through settings, reordering and removal until a new source is added', async () => {
+    const channels = [0, 1].map((index) => ({ kind: 'model' as const, id: `speech-${index}` }));
+    store.setState({
+      snapshot: voiceSnapshot({
+        config: { ...voiceSnapshot().config, channels, shortcutEnabled: false },
+      }),
+    });
+    let revision = 1;
+    vi.mocked(api.saveVoiceConfig).mockImplementation(async (config) =>
+      voiceSnapshot({ config, revision: ++revision })
+    );
+    for (const changes of [
+      { islandTheme: 'dark' as const },
+      { channels: [...channels].reverse() },
+      { channels: channels.slice(0, 1) },
+    ]) {
+      expect(await store.getState().save(changes)).toBe(true);
+      expect(store.getState().snapshot?.config.shortcutEnabled).toBe(false);
+    }
+    expect(await store.getState().save({ channels })).toBe(true);
+    expect(store.getState().snapshot?.config.shortcutEnabled).toBe(true);
+    expect(api.recordVoice).not.toHaveBeenCalled();
+    expect(api.startVoice).not.toHaveBeenCalled();
+  });
+
+  it('keeps the master disabled if adding its first source fails', async () => {
+    const snapshot = voiceSnapshot();
+    store.setState({ snapshot });
+    vi.mocked(api.saveVoiceConfig).mockRejectedValue('voice.error.save');
+    expect(await store.getState().save({ channels: [{ kind: 'model', id: 'speech' }] })).toBe(
+      false
+    );
+    expect(api.saveVoiceConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ shortcutEnabled: true })
+    );
+    expect(store.getState().snapshot).toBe(snapshot);
+    expect(api.recordVoice).not.toHaveBeenCalled();
   });
 
   it('preserves sources and input state when removing the last source fails', async () => {
@@ -153,6 +233,7 @@ describe('voice input lifecycle', () => {
     await stopping;
     expect(api.stopVoice).toHaveBeenCalledTimes(1);
     expect(store.getState().snapshot?.text).toBe('');
+    expect(store.getState().lastResult).toBeNull();
     expect(store.getState().snapshot?.days).toEqual({});
     expect(store.getState().snapshot?.usage).toEqual({ characters: 0, durationMs: 0 });
   });

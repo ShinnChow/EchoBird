@@ -1,0 +1,160 @@
+pub(super) const BODY_WIDTH: f64 = 176.0;
+pub(super) const BODY_HEIGHT: f64 = 44.0;
+pub(super) const SHADOW_PADDING: f64 = 24.0;
+pub(super) const WINDOW_WIDTH: f64 = BODY_WIDTH + SHADOW_PADDING * 2.0;
+pub(super) const WINDOW_HEIGHT: f64 = BODY_HEIGHT + SHADOW_PADDING * 2.0;
+// Keep the visible capsule's existing 56px bottom inset after shrinking its host.
+pub(super) const BOTTOM_GAP: f64 = 56.0 - SHADOW_PADDING;
+
+fn contains(x: f64, y: f64) -> bool {
+    let x = x - SHADOW_PADDING;
+    let y = y - SHADOW_PADDING;
+    if !(0.0..BODY_WIDTH).contains(&x) || !(0.0..BODY_HEIGHT).contains(&y) {
+        return false;
+    }
+    let radius = BODY_HEIGHT / 2.0;
+    let dx = x - x.clamp(radius, BODY_WIDTH - radius);
+    let dy = y - radius;
+    dx * dx + dy * dy <= radius * radius
+}
+
+#[cfg(any(windows, target_os = "macos", test))]
+#[derive(Default)]
+pub(super) struct CursorTracker {
+    ignored: Option<bool>,
+}
+
+#[cfg(any(windows, target_os = "macos", test))]
+impl CursorTracker {
+    fn desired_ignore(&self, inside: bool, pressed: bool) -> bool {
+        !(inside || (pressed && self.ignored == Some(false)))
+    }
+
+    #[cfg(any(windows, target_os = "macos"))]
+    pub(super) fn update(&mut self, window: &tauri::WebviewWindow) {
+        let inside = window
+            .cursor_position()
+            .and_then(|cursor| {
+                let origin = window.inner_position()?;
+                let scale = window.scale_factor()?;
+                Ok(contains(
+                    (cursor.x - f64::from(origin.x)) / scale,
+                    (cursor.y - f64::from(origin.y)) / scale,
+                ))
+            })
+            .unwrap_or(true);
+        let ignore = self.desired_ignore(inside, super::native::left_mouse_down());
+        if self.ignored != Some(ignore) && window.set_ignore_cursor_events(ignore).is_ok() {
+            self.ignored = Some(ignore);
+        }
+    }
+}
+
+#[cfg(any(windows, target_os = "macos"))]
+pub(super) fn configure(window: &tauri::WebviewWindow) -> tauri::Result<()> {
+    window.set_ignore_cursor_events(true)
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn input_rows() -> Vec<(i32, i32, i32)> {
+    (0..BODY_HEIGHT as i32)
+        .filter_map(|row| {
+            let inset = (0..BODY_WIDTH as i32 / 2).find(|column| {
+                contains(
+                    SHADOW_PADDING + f64::from(*column) + 0.5,
+                    SHADOW_PADDING + f64::from(row) + 0.5,
+                )
+            })?;
+            Some((
+                SHADOW_PADDING as i32 + inset,
+                SHADOW_PADDING as i32 + row,
+                BODY_WIDTH as i32 - inset * 2,
+            ))
+        })
+        .collect()
+}
+
+#[cfg(target_os = "linux")]
+pub(super) fn configure(window: &tauri::WebviewWindow) -> tauri::Result<()> {
+    use gtk::{
+        cairo::{RectangleInt, Region},
+        prelude::*,
+    };
+    let island = window.clone();
+    window.run_on_main_thread(move || {
+        let Ok(widget) = island.gtk_window() else {
+            log::warn!("[VoiceInput] could not configure the island input region");
+            return;
+        };
+        let region = Region::create();
+        for (x, y, width) in input_rows() {
+            if let Err(error) = region.union_rectangle(&RectangleInt::new(x, y, width, 1)) {
+                log::warn!("[VoiceInput] could not create the island input region: {error}");
+                return;
+            }
+        }
+        widget.realize();
+        widget.input_shape_combine_region(Some(&region));
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_the_visible_capsule_captures_the_mouse_at_any_scale_or_monitor_origin() {
+        for (x, y, expected) in [
+            (112.0, 46.0, true),
+            (48.0, 46.0, true),
+            (176.0, 46.0, true),
+            (24.0, 46.0, true),
+            (24.0, 24.0, false),
+            (199.0, 25.0, false),
+            (112.0, 23.0, false),
+            (112.0, 68.0, false),
+            (201.0, 46.0, false),
+            (0.0, 0.0, false),
+            (223.0, 91.0, false),
+        ] {
+            for (origin_x, origin_y, scale) in [
+                (-1920.0, -400.0, 1.0),
+                (50.0, 80.0, 1.25),
+                (2560.0, 0.0, 2.0),
+            ] {
+                let cursor_x = origin_x + x * scale;
+                let cursor_y = origin_y + y * scale;
+                assert_eq!(
+                    contains((cursor_x - origin_x) / scale, (cursor_y - origin_y) / scale),
+                    expected
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn dragging_keeps_mouse_capture_until_release_and_outside_clicks_do_not_enable_it() {
+        let mut tracker = CursorTracker::default();
+        assert!(tracker.desired_ignore(false, false));
+        tracker.ignored = Some(true);
+        assert!(tracker.desired_ignore(false, true));
+        assert!(!tracker.desired_ignore(true, false));
+        tracker.ignored = Some(false);
+        assert!(!tracker.desired_ignore(false, true));
+        assert!(tracker.desired_ignore(false, false));
+    }
+
+    #[test]
+    fn linux_input_mask_matches_the_visible_capsule_without_its_shadow_or_corners() {
+        let rows = input_rows();
+        assert_eq!(rows.len(), 44);
+        for y in 0..WINDOW_HEIGHT as i32 {
+            for x in 0..WINDOW_WIDTH as i32 {
+                let masked = rows
+                    .iter()
+                    .any(|&(left, top, width)| y == top && x >= left && x < left + width);
+                assert_eq!(masked, contains(f64::from(x) + 0.5, f64::from(y) + 0.5));
+            }
+        }
+    }
+}

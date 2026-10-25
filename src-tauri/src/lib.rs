@@ -1421,8 +1421,14 @@ pub fn run() {
             commands::voice_input_commands::voice_input_cancel,
             commands::voice_input_commands::voice_input_suspend,
             commands::voice_input_commands::voice_input_island_ready,
-            commands::voice_input_commands::voice_input_copy_result,
+            commands::voice_input_commands::voice_input_replay,
             commands::voice_input_commands::voice_input_show_main,
+            commands::voice_input_commands::voice_selection_open,
+            commands::voice_input_commands::voice_selection_ask,
+            commands::voice_input_commands::voice_selection_state,
+            commands::voice_input_commands::voice_selection_ready,
+            commands::voice_input_commands::voice_selection_translate,
+            commands::voice_input_commands::voice_selection_close,
         ])
         .build(context)
         .expect("error while building tauri application")

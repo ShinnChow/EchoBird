@@ -8,6 +8,11 @@ import { MotherAgentProvider } from './MotherAgentProvider';
 import { useMotherAgent } from './context';
 import type { MotherAgentCtx } from './types';
 import { REASONING_STORAGE_KEY } from './reasoning';
+import { listen } from '@tauri-apps/api/event';
+import { loadLocale, translate } from '../../i18n';
+
+const { selectionLabels } = vi.hoisted(() => ({ selectionLabels: new Map<string, string>() }));
+vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn() }));
 
 vi.mock('../../api/tauri', () => ({
   getModels: vi.fn(),
@@ -26,7 +31,7 @@ vi.mock('../../api/tauri', () => ({
   parasiteReset: vi.fn(),
 }));
 vi.mock('../../hooks/useI18n', () => ({
-  useI18n: () => ({ t: (key: string) => key, locale: 'en' }),
+  useI18n: () => ({ t: (key: string) => selectionLabels.get(key) ?? key, locale: 'en' }),
 }));
 vi.mock('../../components/ConfirmDialog', () => ({ useConfirm: () => confirm }));
 vi.mock('../../components/Toast', () => ({ useToast: () => ({ showToast }) }));
@@ -48,6 +53,9 @@ let agentEvent: (event: AgentEvent) => void;
 let parasiteEvent: (event: ParasiteEvent) => void;
 let stored: Map<string, string>;
 let routerEnabled = true;
+let selectionQuestion: (event: {
+  payload: { source: string; error: 'voice.selectionEmpty' | 'voice.selectionTooLong' | null };
+}) => void;
 
 function Harness() {
   const result = useMotherAgent();
@@ -101,6 +109,11 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-10-12T09:00:00Z'));
   vi.resetAllMocks();
+  selectionLabels.clear();
+  vi.mocked(listen).mockImplementation(async (name, callback) => {
+    if (name === 'voice-selection-ask') selectionQuestion = callback as typeof selectionQuestion;
+    return vi.fn<() => void>();
+  });
   routerEnabled = true;
   confirm.mockResolvedValue(true);
   stored = new Map([['echobird_agent_model', model.internalId]]);
@@ -119,6 +132,7 @@ beforeEach(() => {
   useNavigationStore.setState({
     activePage: 'mother',
     motherPrefill: undefined,
+    motherPrefillCursor: undefined,
     agentRunning: false,
   });
   vi.mocked(api.getModels).mockResolvedValue([model]);
@@ -148,6 +162,61 @@ afterEach(() => {
   renderer = undefined;
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+it.each(['zh-Hans', 'zh-Hant', 'en', 'ja'])(
+  'prefills a %s selection question once without sending it or resetting the conversation',
+  async (locale) => {
+    await loadLocale(locale);
+    const question = translate('mother.selectionQuestion', locale);
+    const content = translate('mother.selectionContent', locale);
+    selectionLabels.set('mother.selectionQuestion', question);
+    selectionLabels.set('mother.selectionContent', content);
+    await mount();
+    const session = state.activeConversationId;
+    const source = 'Selected text 😀\n<script>plain text</script>';
+    act(() => selectionQuestion({ payload: { source, error: null } }));
+    const draft = `${question}\n${content}${source}`;
+    expect(useNavigationStore.getState().activePage).toBe('mother');
+    expect(state.chatInput).toBe(draft);
+    expect(state.chatPrefillRef.current).toEqual({ text: draft, cursor: question.length });
+    expect(useNavigationStore.getState().motherPrefill).toBeUndefined();
+    expect(state.activeConversationId).toBe(session);
+    expect(api.sendAgentMessage).not.toHaveBeenCalled();
+    expect(api.parasiteSendMessage).not.toHaveBeenCalled();
+  }
+);
+
+it('retains the existing application-install prefill with its caret at the end', async () => {
+  await mount();
+  const text = 'Install selected application';
+  act(() => useNavigationStore.getState().goToMother(text));
+  expect(state.chatInput).toBe(text);
+  expect(state.chatPrefillRef.current).toEqual({ text, cursor: text.length });
+  expect(api.sendAgentMessage).not.toHaveBeenCalled();
+});
+
+it('preserves the draft and navigation if selection capture fails', async () => {
+  await mount();
+  act(() => state.setChatInput('Keep existing draft'));
+  act(() => useNavigationStore.getState().setActivePage('voice'));
+  act(() => selectionQuestion({ payload: { source: '', error: 'voice.selectionEmpty' } }));
+  expect(state.chatInput).toBe('Keep existing draft');
+  expect(useNavigationStore.getState().activePage).toBe('voice');
+  expect(showToast).toHaveBeenCalledWith('error', 'voice.selectionEmpty');
+  expect(api.sendAgentMessage).not.toHaveBeenCalled();
+  expect(api.parasiteSendMessage).not.toHaveBeenCalled();
+});
+
+it('ignores a queued selection event after the assistant provider unmounts', async () => {
+  await mount();
+  const callback = selectionQuestion;
+  act(() => renderer!.unmount());
+  renderer = undefined;
+  act(() => useNavigationStore.getState().setActivePage('voice'));
+  act(() => callback({ payload: { source: 'Stale selected text', error: null } }));
+  expect(useNavigationStore.getState().activePage).toBe('voice');
+  expect(api.sendAgentMessage).not.toHaveBeenCalled();
 });
 
 describe('Mother Agent reasoning workflow', () => {

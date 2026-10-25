@@ -3,12 +3,12 @@ use super::*;
 #[test]
 fn island_defaults_to_bottom_center_of_the_work_area_across_monitors_and_dpi() {
     for (x, y, width, height, scale, expected_x, expected_y) in [
-        (0, 0, 1920, 1040, 1.0, 750, 908),
-        (48, 40, 1872, 1000, 1.0, 774, 908),
-        (-1920, 80, 1920, 1000, 1.5, -1275, 882),
-        (2560, -1440, 2560, 1360, 2.0, 3420, -344),
-        (0, 0, 1920, 1030, 1.25, 698, 865),
-        (-10, -20, 320, 100, 1.0, -60, -20),
+        (0, 0, 1920, 1040, 1.0, 848, 916),
+        (48, 40, 1872, 1000, 1.0, 872, 916),
+        (-1920, 80, 1920, 1000, 1.5, -1128, 894),
+        (2560, -1440, 2560, 1360, 2.0, 3616, -328),
+        (0, 0, 1920, 1030, 1.25, 820, 875),
+        (-10, -20, 320, 100, 1.0, 38, -20),
     ] {
         let area = tauri::PhysicalRect {
             position: tauri::PhysicalPosition::new(x, y),
@@ -18,6 +18,15 @@ fn island_defaults_to_bottom_center_of_the_work_area_across_monitors_and_dpi() {
             island_position(&area, scale),
             tauri::PhysicalPosition::new(expected_x, expected_y)
         );
+        let position = island_position(&area, scale);
+        let center = f64::from(position.x)
+            + (island_input::SHADOW_PADDING + island_input::BODY_WIDTH / 2.0) * scale;
+        assert!((center - (f64::from(x) + f64::from(width) / 2.0)).abs() <= 0.5);
+        if f64::from(height) >= (ISLAND_HEIGHT + island_input::BOTTOM_GAP) * scale {
+            let bottom = f64::from(position.y)
+                + (island_input::SHADOW_PADDING + island_input::BODY_HEIGHT) * scale;
+            assert!((f64::from(y) + f64::from(height) - bottom - 56.0 * scale).abs() <= 0.5);
+        }
     }
 }
 
@@ -25,10 +34,12 @@ fn cancel_runtime(phase: &str, origin: &str) -> Runtime {
     Runtime {
         origin: origin.into(),
         phase: phase.into(),
+        active_channel: None,
         level: 0.7,
         started: Some(Instant::now()),
         elapsed_ms: 0,
         text: String::new(),
+        result_audio: None,
         error: None,
         revision: 0,
         generation: 7,
@@ -42,6 +53,79 @@ fn cancel_runtime(phase: &str, origin: &str) -> Runtime {
         app_icon_loading: false,
         app_icon_generation: 0,
     }
+}
+
+#[test]
+fn replay_retains_only_the_latest_completed_audio_and_rejects_late_or_cancelled_results() {
+    let mut runtime = cancel_runtime("done", "island");
+    assert_eq!(runtime.replay_audio(7), Err("voice.error.noAudio".into()));
+    let first = Bytes::from(audio::wav(&[0.1, -0.1], 16_000));
+    assert!(runtime.finish_audio(7, Some(first.clone())));
+    assert_eq!(runtime.replay_audio(7), Ok(first));
+    runtime.generation = 8;
+    let latest = Bytes::from(audio::wav(&[0.2, -0.2], 16_000));
+    assert!(runtime.finish_audio(8, Some(latest.clone())));
+    assert_eq!(runtime.replay_audio(7), Err("voice.error.noAudio".into()));
+    assert!(!runtime.finish_audio(7, None));
+    runtime.origin = "test".into();
+    runtime.generation = 9;
+    assert!(runtime.finish_audio(9, None));
+    assert_eq!(runtime.replay_audio(8), Ok(latest.clone()));
+    runtime.origin = "island".into();
+    runtime.cancel(None);
+    assert!(!runtime.finish_audio(runtime.generation, None));
+    assert_eq!(runtime.replay_audio(8), Ok(latest));
+    runtime.cancel = CancellationToken::new();
+    assert!(runtime.finish_audio(runtime.generation, None));
+    assert_eq!(runtime.replay_audio(8), Err("voice.error.noAudio".into()));
+}
+
+#[test]
+fn replay_is_blocked_while_capturing_or_processing_but_available_after_recognition_errors() {
+    let mut runtime = cancel_runtime("done", "island");
+    let wav = Bytes::from(audio::wav(&[0.25; 16], 16_000));
+    assert!(runtime.finish_audio(7, Some(wav.clone())));
+    for phase in [
+        "starting",
+        "recording",
+        "testing",
+        "transcribing",
+        "optimizing",
+        "inserting",
+    ] {
+        runtime.phase = phase.into();
+        assert_eq!(runtime.replay_audio(7), Err("voice.error.busy".into()));
+    }
+    runtime.cancel.cancel();
+    for phase in ["idle", "done", "error"] {
+        runtime.phase = phase.into();
+        assert_eq!(runtime.replay_audio(7), Ok(wav.clone()));
+    }
+}
+
+#[test]
+fn channel_activity_stops_after_recognition_or_cancellation() {
+    let mut runtime = cancel_runtime("recording", "shortcut");
+    runtime.active_channel = Some(1);
+    for phase in ["recording", "transcribing"] {
+        runtime.phase = phase.into();
+        assert_eq!(runtime.active_channel(), Some(1));
+    }
+    for phase in [
+        "idle",
+        "starting",
+        "testing",
+        "optimizing",
+        "inserting",
+        "done",
+        "error",
+    ] {
+        runtime.phase = phase.into();
+        assert_eq!(runtime.active_channel(), None);
+    }
+    runtime.phase = "transcribing".into();
+    runtime.cancel.cancel();
+    assert_eq!(runtime.active_channel(), None);
 }
 
 #[test]
@@ -186,6 +270,81 @@ fn live_microphone_level_callbacks() {
         callbacks > 0,
         "The microphone did not deliver audio callbacks"
     );
+}
+
+#[test]
+fn capture_gain_enhances_quiet_speech_without_boosting_silence_or_floor_noise() {
+    for rate in [8_000, 16_000, 44_100, 48_000] {
+        let mut gain = audio::InputGain::new(rate);
+        for sample in [0.0, 0.0002, -0.0002]
+            .into_iter()
+            .cycle()
+            .take(rate as usize)
+        {
+            assert_eq!(gain.process(sample), sample);
+        }
+        let peak = (0..rate)
+            .map(|index| (index as f32 * 220.0 * std::f32::consts::TAU / rate as f32).sin() * 0.007)
+            .map(|sample| gain.process(sample).abs())
+            .fold(0.0_f32, f32::max);
+        assert!(
+            (0.25..0.5).contains(&peak),
+            "enhanced peak={peak} at {rate}Hz"
+        );
+    }
+}
+
+#[test]
+fn capture_gain_preserves_normal_levels_and_limits_sudden_loud_transients() {
+    let mut normal = audio::InputGain::new(16_000);
+    for sample in [0.6, -0.6, 1.0, -1.0].into_iter().cycle().take(16_000) {
+        assert_eq!(normal.process(sample), sample);
+    }
+    let mut gain = audio::InputGain::new(16_000);
+    for _ in 0..16_000 {
+        let value = gain.process(0.003);
+        assert!(value <= 0.003 * 64.001);
+    }
+    assert!(gain.process(0.003) > 0.15);
+    for sample in [0.9_f32, -0.9, 1.0, -1.0, 0.6, -0.6] {
+        let value = gain.process(sample);
+        assert!(value.is_finite() && value.abs() <= 1.0);
+        assert_eq!(value.signum(), sample.signum());
+        if sample.abs() <= 0.95 {
+            assert!(value.abs() <= 0.950_001);
+        } else {
+            assert_eq!(value, sample);
+        }
+    }
+}
+
+#[test]
+fn capture_gain_is_continuous_across_callback_boundaries() {
+    let samples: Vec<_> = (0..32_000)
+        .map(|index| (index as f32 * 0.13).sin() * 0.007)
+        .collect();
+    let mut whole_gain = audio::InputGain::new(16_000);
+    let whole: Vec<_> = samples
+        .iter()
+        .map(|&value| whole_gain.process(value))
+        .collect();
+    let mut chunk_gain = audio::InputGain::new(16_000);
+    let chunked: Vec<_> = samples
+        .chunks(137)
+        .flat_map(|chunk| {
+            chunk
+                .iter()
+                .map(|&value| chunk_gain.process(value))
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    assert_eq!(whole, chunked);
+    let wav = audio::wav(&whole, 16_000);
+    let streamed: Vec<_> = (0..chunked.len())
+        .step_by(1600)
+        .flat_map(|start| audio::pcm(&chunked, 16_000, start, (start + 1600).min(chunked.len())))
+        .collect();
+    assert_eq!(&wav[44..], streamed);
 }
 
 #[test]
@@ -645,7 +804,7 @@ async fn channel_failover_preserves_order_and_never_repeats_a_successful_result(
         .collect();
     for successful in ["recognized", " recognized "] {
         let mut calls = Vec::new();
-        let result = pipeline::first_transcript(&channels, |channel| {
+        let result = pipeline::first_transcript(&channels, None, |channel| {
             calls.push(channel.id.clone());
             std::future::ready(if channel.id == "0" {
                 Err("failed".into())
@@ -659,7 +818,7 @@ async fn channel_failover_preserves_order_and_never_repeats_a_successful_result(
         assert_eq!(calls, ["0", "1"]);
     }
     let mut calls = Vec::new();
-    let error = pipeline::first_transcript(&channels, |channel| {
+    let error = pipeline::first_transcript(&channels, None, |channel| {
         calls.push(channel.id);
         std::future::ready(Err("failed".into()))
     })
@@ -670,7 +829,7 @@ async fn channel_failover_preserves_order_and_never_repeats_a_successful_result(
 }
 
 #[tokio::test]
-async fn empty_transcripts_are_reported_without_retrying_silence_on_backup_channels() {
+async fn empty_transcripts_try_backups_and_preserve_the_no_transcript_error_if_none_succeed() {
     let channels: Vec<_> = (0..3)
         .map(|index| config::Channel {
             kind: "model".into(),
@@ -678,19 +837,76 @@ async fn empty_transcripts_are_reported_without_retrying_silence_on_backup_chann
         })
         .collect();
     for text in ["", " \n\t", "\u{3000}"] {
+        for successful in [false, true] {
+            let mut calls = Vec::new();
+            let result = pipeline::first_transcript(&channels, None, |channel| {
+                calls.push(channel.id.clone());
+                std::future::ready(if channel.id == "0" {
+                    Err("failed".into())
+                } else if channel.id == "2" && successful {
+                    Ok("recognized by third source".into())
+                } else {
+                    Ok(text.into())
+                })
+            })
+            .await;
+            assert_eq!(
+                result,
+                if successful {
+                    Ok("recognized by third source".into())
+                } else {
+                    Err("voice.error.noTranscript".into())
+                }
+            );
+            assert_eq!(calls, ["0", "1", "2"]);
+        }
+    }
+}
+
+#[tokio::test]
+async fn realtime_results_use_backups_only_when_needed_and_keep_wav_recovery_for_network_errors() {
+    let channels: Vec<_> = (0..3)
+        .map(|index| config::Channel {
+            kind: "model".into(),
+            id: index.to_string(),
+        })
+        .collect();
+    for (streamed, expected_calls, expected_text) in [
+        (Ok("live transcript".to_string()), vec![], "live transcript"),
+        (Ok(" \n\t".into()), vec!["1", "2"], "backup transcript"),
+        (
+            Err("voice.error.noTranscript".into()),
+            vec!["1", "2"],
+            "backup transcript",
+        ),
+        (
+            Err("voice.error.transcribe".into()),
+            vec!["0", "1", "2"],
+            "backup transcript",
+        ),
+    ] {
         let mut calls = Vec::new();
-        let result = pipeline::first_transcript(&channels, |channel| {
+        let result = pipeline::first_transcript(&channels, Some(streamed), |channel| {
             calls.push(channel.id.clone());
-            std::future::ready(if channel.id == "0" {
-                Err("failed".into())
+            std::future::ready(if channel.id == "2" {
+                Ok("backup transcript".into())
             } else {
-                Ok(text.into())
+                Err("voice.error.transcribe".into())
             })
         })
         .await;
-        assert_eq!(result, Err("voice.error.noTranscript".into()));
-        assert_eq!(calls, ["0", "1"]);
+        assert_eq!(result, Ok(expected_text.into()));
+        assert_eq!(calls, expected_calls);
     }
+    let result = pipeline::first_transcript(
+        &channels[..1],
+        Some(Err("voice.error.noTranscript".into())),
+        |_| -> std::future::Ready<Result<String, String>> {
+            panic!("an empty realtime result must not reupload to the same source")
+        },
+    )
+    .await;
+    assert_eq!(result, Err("voice.error.noTranscript".into()));
 }
 
 #[tokio::test]
@@ -703,7 +919,7 @@ async fn cancellation_drops_the_pending_channel_without_requesting_backups() {
         .collect();
     let cancelled = CancellationToken::new();
     let calls = Arc::new(Mutex::new(Vec::new()));
-    let pending = pipeline::first_transcript(&channels, |channel| {
+    let pending = pipeline::first_transcript(&channels, None, |channel| {
         calls.lock().unwrap().push(channel.id);
         std::future::pending::<Result<String, String>>()
     });
@@ -788,6 +1004,7 @@ async fn short_audio_and_disabled_optimization_never_resolve_or_request_a_text_m
     let mut audio = audio::Recording {
         wav: Vec::new(),
         duration_ms: 500,
+        raw_peak: 0.0,
     };
     let disabled = Config {
         translation_language: "en".into(),

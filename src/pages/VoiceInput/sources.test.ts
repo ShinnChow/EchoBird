@@ -33,7 +33,7 @@ beforeEach(() => {
     voiceSnapshot({ config, revision: 2 })
   );
 });
-it('saves a voice-scoped model through existing CRUD and attaches its matching protocol without changing the master switch', async () => {
+it('saves a voice-scoped model with its matching protocol and automatically enables voice input', async () => {
   await saveVoiceSource(form);
   expect(api.addModel).toHaveBeenCalledExactlyOnceWith({
     name: form.name,
@@ -46,7 +46,7 @@ it('saves a voice-scoped model through existing CRUD and attaches its matching p
   expect(voice.getState().snapshot?.config).toMatchObject({
     channels: [{ kind: 'model', id: saved.internalId }],
     apiOptions: { [saved.internalId]: { protocol: 'mimo' } },
-    shortcutEnabled: false,
+    shortcutEnabled: true,
   });
   expect(api.deleteModel).not.toHaveBeenCalled();
 });
@@ -75,6 +75,7 @@ it('rolls back a new API model when attaching the channel fails and preserves pr
   expect(voice.getState().snapshot?.config.channels).toEqual([]);
   expect(voice.getState().models).toEqual([]);
 });
+
 it('rolls back a late model creation after the configuration dialog has been closed', async () => {
   let resolve!: (model: typeof saved) => void;
   vi.mocked(api.addModel).mockReturnValue(
@@ -100,17 +101,33 @@ it.each(['recording', 'testing', 'transcribing'] as const)(
     expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
   }
 );
-it('rejects a fourth channel and a non-speech account model without creating or saving anything', async () => {
-  voice.setState({
-    snapshot: voiceSnapshot({
-      config: {
-        ...voiceSnapshot().config,
-        channels: [1, 2, 3].map((id) => ({ kind: 'model', id: String(id) })),
-      },
-    }),
-  });
-  await expect(saveVoiceSource(form)).rejects.toThrow('voice.error.channels');
-  voice.setState({ snapshot: voiceSnapshot() });
+it.each(['api', 'account'] as const)(
+  'rejects a fourth %s source on Save without creating or saving anything',
+  async (kind) => {
+    voice.setState({
+      snapshot: voiceSnapshot({
+        config: {
+          ...voiceSnapshot().config,
+          channels: [1, 2, 3].map((id) => ({ kind: 'model', id: String(id) })),
+        },
+      }),
+    });
+    await expect(
+      saveVoiceSource(
+        kind === 'account'
+          ? {
+              ...form,
+              accountSource: { provider: 'workBuddy', accountId: 'a'.repeat(64) },
+              modelId: `workbuddy:${'a'.repeat(64)}`,
+            }
+          : form
+      )
+    ).rejects.toThrow('voice.error.channels');
+    expect(api.addModel).not.toHaveBeenCalled();
+    expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
+  }
+);
+it('rejects a non-speech account model without creating or saving anything', async () => {
   await expect(
     saveVoiceSource({
       ...form,

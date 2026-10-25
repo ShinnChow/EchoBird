@@ -116,6 +116,42 @@ it('focuses an existing prefill when the first-visit input mounts late', () => {
   expect(state.handleChatSend).toBeUndefined();
 });
 
+it.each([false, true])(
+  'places the question caret before the selected text after mounting (busy=%s)',
+  (busy) => {
+    const focus = vi.fn();
+    const setSelectionRange = vi.fn();
+    const draft = '提问：\n划词内容：Selected text 😀';
+    const pending = {
+      current: { text: draft, cursor: 3 } as { text: string; cursor: number } | null,
+    };
+    state = {
+      ...state,
+      chatInput: draft,
+      chatPrefillRef: pending,
+      isProcessing: busy,
+      handleChatSend: vi.fn(),
+    };
+    act(() => {
+      renderer = create(<MotherAgentMain />, {
+        createNodeMock: (element) =>
+          element.type === 'textarea' ? { focus, setSelectionRange } : null,
+      });
+    });
+    if (busy) {
+      expect(setSelectionRange).not.toHaveBeenCalled();
+      state = { ...state, isProcessing: false };
+      act(() => renderer!.update(<MotherAgentMain />));
+    }
+    expect(setSelectionRange).toHaveBeenCalledExactlyOnceWith(3, 3);
+    expect(pending.current).toBeNull();
+    state = { ...state, chatInput: '提问：My question\n划词内容：Selected text 😀' };
+    act(() => renderer!.update(<MotherAgentMain />));
+    expect(setSelectionRange).toHaveBeenCalledTimes(1);
+    expect(state.handleChatSend).not.toHaveBeenCalled();
+  }
+);
+
 it('keeps automatic memory operations out of the visible conversation', () => {
   state = {
     ...state,

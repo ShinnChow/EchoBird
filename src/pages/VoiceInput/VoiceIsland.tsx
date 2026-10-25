@@ -100,6 +100,7 @@ export function IslandContent({
           preview ||
           state.pending ||
           state.saving ||
+          snapshot.selectionOpen ||
           (!recording && (!ready || !config.shortcutEnabled))
         }
         onClick={() => void (recording ? state.stop() : state.record())}

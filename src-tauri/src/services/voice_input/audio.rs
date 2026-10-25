@@ -9,6 +9,7 @@ type Level = Arc<dyn Fn(f32) + Send + Sync>;
 pub struct Recording {
     pub wav: Vec<u8>,
     pub duration_ms: u64,
+    pub raw_peak: f32,
 }
 
 enum Command {
@@ -110,9 +111,15 @@ pub fn devices() -> Result<Vec<String>, String> {
         .map(|devices| devices.filter_map(|device| device.name().ok()).collect())
 }
 
+#[derive(Default)]
+struct CapturedSamples {
+    samples: Vec<f32>,
+    raw_peak: f32,
+}
+
 struct Capture {
     stream: cpal::Stream,
-    samples: Arc<Mutex<Vec<f32>>>,
+    samples: Arc<Mutex<CapturedSamples>>,
     error: Arc<Mutex<Option<String>>>,
     rate: u32,
     streamed: usize,
@@ -120,10 +127,11 @@ struct Capture {
 
 impl Capture {
     fn chunk(&mut self) -> Vec<u8> {
-        let samples = self.samples.lock().unwrap();
+        let captured = self.samples.lock().unwrap();
+        let samples = &captured.samples;
         // Keep one input sample for interpolation across callback boundaries.
         let count = samples.len().saturating_sub(1) as u64 * 16000 / u64::from(self.rate);
-        let chunk = pcm(&samples, self.rate, self.streamed, count as usize);
+        let chunk = pcm(samples, self.rate, self.streamed, count as usize);
         self.streamed = count as usize;
         chunk
     }
@@ -133,13 +141,15 @@ impl Capture {
         if self.error.lock().unwrap().is_some() {
             return Err("voice.error.microphone".into());
         }
-        let samples = self.samples.lock().unwrap();
+        let captured = self.samples.lock().unwrap();
+        let samples = &captured.samples;
         if samples.is_empty() {
             return Err("voice.error.noAudio".into());
         }
         Ok(Recording {
             duration_ms: samples.len() as u64 * 1000 / self.rate as u64,
-            wav: wav(&samples, self.rate),
+            wav: wav(samples, self.rate),
+            raw_peak: captured.raw_peak,
         })
     }
 }
@@ -158,7 +168,7 @@ fn open(name: Option<&str>, capture_audio: bool, level: Level) -> Result<Capture
         .default_input_config()
         .map_err(|_| "voice.error.microphone")?;
     let config: cpal::StreamConfig = supported.clone().into();
-    let samples = Arc::new(Mutex::new(Vec::new()));
+    let samples = Arc::new(Mutex::new(CapturedSamples::default()));
     let error = Arc::new(Mutex::new(None));
     macro_rules! build {
         ($sample:ty) => {
@@ -201,6 +211,48 @@ pub(super) struct LevelMeter {
     emitted: Instant,
 }
 
+pub(super) struct InputGain {
+    envelope: f32,
+    gain: f32,
+    decay: f32,
+    rise: f32,
+    fall: f32,
+}
+
+impl InputGain {
+    pub(super) fn new(rate: u32) -> Self {
+        let rate = rate as f32;
+        Self {
+            envelope: 0.0,
+            gain: 1.0,
+            decay: (-1.0 / (rate * 0.25)).exp(),
+            rise: (-1.0 / (rate * 0.08)).exp(),
+            fall: (-1.0 / (rate * 0.005)).exp(),
+        }
+    }
+
+    pub(super) fn process(&mut self, sample: f32) -> f32 {
+        let magnitude = sample.abs();
+        self.envelope = magnitude.max(self.envelope * self.decay);
+        let target = if self.envelope >= 0.001 {
+            (0.35 / self.envelope).clamp(1.0, 64.0)
+        } else {
+            1.0
+        };
+        let smoothing = if target < self.gain {
+            self.fall
+        } else {
+            self.rise
+        };
+        self.gain = target + (self.gain - target) * smoothing;
+        // Lower gain immediately for transients instead of clipping the boosted sample.
+        if magnitude > 0.0 {
+            self.gain = self.gain.min((0.95 / magnitude).max(1.0));
+        }
+        sample * self.gain
+    }
+}
+
 impl LevelMeter {
     pub(super) fn new(now: Instant) -> Self {
         Self {
@@ -225,7 +277,7 @@ impl LevelMeter {
 fn input<T: SizedSample + Sample>(
     device: &cpal::Device,
     config: &cpal::StreamConfig,
-    samples: Arc<Mutex<Vec<f32>>>,
+    samples: Arc<Mutex<CapturedSamples>>,
     error: Arc<Mutex<Option<String>>>,
     capture_audio: bool,
     level: Level,
@@ -236,11 +288,12 @@ where
     let channels = config.channels as usize;
     let limit = config.sample_rate.0 as usize * MAX_SECONDS as usize;
     let mut meter = LevelMeter::new(Instant::now());
+    let mut gain = InputGain::new(config.sample_rate.0);
     let error_level = level.clone();
     device.build_input_stream(
         config,
         move |data: &[T], _| {
-            let mut samples = samples.lock().unwrap();
+            let mut captured = samples.lock().unwrap();
             let mut peak = 0.0_f32;
             for frame in data.chunks_exact(channels) {
                 // Speech devices can expose an unused second channel. Match the
@@ -251,12 +304,14 @@ where
                 } else {
                     0.0
                 };
-                peak = peak.max(value.abs());
-                if capture_audio && samples.len() < limit {
-                    samples.push(value);
+                let enhanced = gain.process(value);
+                peak = peak.max(enhanced.abs());
+                if capture_audio && captured.samples.len() < limit {
+                    captured.raw_peak = captured.raw_peak.max(value.abs());
+                    captured.samples.push(enhanced);
                 }
             }
-            drop(samples);
+            drop(captured);
             if let Some(reading) = meter.update(peak, Instant::now()) {
                 level(reading);
             }

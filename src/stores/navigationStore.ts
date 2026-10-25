@@ -9,6 +9,7 @@ import type { PageType } from '../components';
 interface NavigationState {
   activePage: PageType;
   motherPrefill: string | undefined;
+  motherPrefillCursor: number | undefined;
   agentRunning: boolean;
   updateAvailable: string | null;
 
@@ -16,7 +17,7 @@ interface NavigationState {
   sshServersVersion: number;
 
   setActivePage: (page: PageType) => void;
-  goToMother: (prefill: string) => void;
+  goToMother: (prefill: string, cursor?: number) => void;
   clearMotherPrefill: () => void;
   setAgentRunning: (running: boolean) => void;
   setUpdateAvailable: (v: string | null) => void;
@@ -26,16 +27,18 @@ interface NavigationState {
 export const useNavigationStore = create<NavigationState>((set) => ({
   activePage: 'apps',
   motherPrefill: undefined,
+  motherPrefillCursor: undefined,
   agentRunning: false,
   updateAvailable: null,
   sshServersVersion: 0,
 
   setActivePage: (page) => set({ activePage: page }),
-  goToMother: (prefill) => set({ activePage: 'mother', motherPrefill: prefill }),
+  goToMother: (prefill, cursor) =>
+    set({ activePage: 'mother', motherPrefill: prefill, motherPrefillCursor: cursor }),
   // One-shot consume: MotherAgentProvider clears this right after it fills
   // the chat input, so revisiting the Mother page doesn't re-fill a stale
   // "安装XX" prompt the user already sent or cleared.
-  clearMotherPrefill: () => set({ motherPrefill: undefined }),
+  clearMotherPrefill: () => set({ motherPrefill: undefined, motherPrefillCursor: undefined }),
   setAgentRunning: (running) => set({ agentRunning: running }),
   setUpdateAvailable: (v) => set({ updateAvailable: v }),
   bumpSshServersVersion: () => set((s) => ({ sshServersVersion: s.sshServersVersion + 1 })),

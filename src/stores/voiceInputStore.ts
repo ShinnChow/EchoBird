@@ -10,6 +10,7 @@ export const voiceBusy = (phase?: string) =>
 interface VoiceInputState {
   models: ModelConfig[];
   snapshot: api.VoiceSnapshot | null;
+  lastResult: Pick<api.VoiceSnapshot, 'text' | 'error' | 'resultAudioId'> | null;
   devices: string[];
   saving: boolean;
   pending: boolean;
@@ -26,14 +27,23 @@ interface VoiceInputState {
 export const useVoiceInputStore = create<VoiceInputState>((set, get) => ({
   models: [],
   snapshot: null,
+  lastResult: null,
   devices: [],
   saving: false,
   pending: false,
   error: null,
   accept: (snapshot) =>
-    set((state) =>
-      !state.snapshot || snapshot.revision >= state.snapshot.revision ? { snapshot } : {}
-    ),
+    set((state) => {
+      if (state.snapshot && snapshot.revision < state.snapshot.revision) return {};
+      const completed = snapshot.origin !== 'test' && ['done', 'error'].includes(snapshot.phase);
+      return {
+        snapshot,
+        lastResult:
+          completed && (snapshot.text || snapshot.error)
+            ? { text: snapshot.text, error: snapshot.error, resultAudioId: snapshot.resultAudioId }
+            : state.lastResult,
+      };
+    }),
   load: async () => {
     const results = await Promise.allSettled([api.getVoiceState(), api.getVoiceDevices()]);
     if (results[0].status === 'fulfilled') get().accept(results[0].value);
@@ -46,6 +56,16 @@ export const useVoiceInputStore = create<VoiceInputState>((set, get) => ({
     set({ saving: true, error: null });
     try {
       const config = { ...snapshot.config, ...changes };
+      if (
+        changes.shortcutEnabled === undefined &&
+        changes.channels?.some(
+          (channel) =>
+            !snapshot.config.channels.some(
+              (current) => current.kind === channel.kind && current.id === channel.id
+            )
+        )
+      )
+        config.shortcutEnabled = true;
       if (!config.channels.length) config.shortcutEnabled = false;
       get().accept(await api.saveVoiceConfig(config));
       return true;

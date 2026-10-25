@@ -19,12 +19,13 @@ import {
 } from '@dnd-kit/sortable';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import {
-  ArrowUp,
   AudioLines,
   Box,
   Check,
   Copy,
   FilePenLine,
+  Languages,
+  Keyboard,
   Mic,
   Plus,
   Trash2,
@@ -39,7 +40,6 @@ import { useToolsStore } from '../../stores/toolsStore';
 import { useAccountPrivacyStore, ACCOUNT_NAME_MASK } from '../../stores/accountPrivacyStore';
 import { RemoteModelSelector } from '../../components/RemoteModelSelector';
 import { MiniSelect } from '../../components/MiniSelect';
-import { RoutingToggle } from '../../components/RoutingToggle';
 import { ViewModeTabs } from '../../components/ViewModeTabs';
 import { ModelListCard } from '../../components/ModelListCard';
 import { SortableCard } from '../../components/SortableCard';
@@ -50,15 +50,21 @@ import { getModelIcon } from '../../components/cards';
 import { openAccountModelForm } from '../FreeModels/AccountProxyPanel';
 import modelDirectory from '../../data/modelDirectory.json';
 import * as modelApi from '../../api/models';
-import { getVoiceModels, voiceProtocols, type VoiceDirectoryEntry } from '../../api/voiceInput';
+import {
+  getVoiceModels,
+  selectionLanguages,
+  voiceProtocols,
+  type VoiceDirectoryEntry,
+} from '../../api/voiceInput';
 import { useModelNexus } from '../ModelNexus/context';
 import { useMotherAgent } from '../MotherAgent/context';
 import { isSmartRouterId } from '../../utils/smartRouter';
+import { copyText } from '../../utils/copyText';
 import { useVoiceAccounts } from './provider';
 import { ShortcutRecorder } from './ShortcutRecorder';
 import { IslandContent } from './VoiceIsland';
+import { VoiceReplay } from './VoiceReplay';
 import { voicePalettes, voicePaletteColor } from './voicePalettes';
-import { copyVoiceResult } from '../../api/voiceInput';
 import '../FreeModels/FreeModels.css';
 import './VoiceInput.css';
 
@@ -75,7 +81,8 @@ export function VoiceInputMain() {
   const hidden = useAccountPrivacyStore((privacy) => privacy.hidden);
   const active = useNavigationStore((navigation) => navigation.activePage === 'voice');
   const { snapshot, saving, pending, devices, save } = state;
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<{ text: string; success: boolean } | null>(null);
+  const [replayErrorId, setReplayErrorId] = useState<number | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [orderedChannels, setOrderedChannels] = useState<VoiceChannel[] | null>(null);
   const sensors = useSensors(
@@ -96,8 +103,19 @@ export function VoiceInputMain() {
   const config = snapshot.config;
   const shortcutHint = t('voice.changeShortcutHint').split('{mic}');
   const busy = saving || voiceActive;
+  const channelLayoutKey = active && !voiceActive ? 'active' : 'hidden';
   const channels = orderedChannels ?? config.channels;
-  const error = state.error || snapshot.error;
+  const result = state.lastResult ?? snapshot;
+  const resultText = result.text;
+  const resultAudioId = result.resultAudioId;
+  const copyFailed = copyState?.text === resultText && copyState?.success === false;
+  const replayFailed = resultAudioId !== null && replayErrorId === resultAudioId;
+  const error =
+    state.error ||
+    (copyFailed ? 'voice.error.copy' : replayFailed ? 'voice.error.replay' : result.error);
+  const emptySources = channels.length === 0;
+  const visibleError = error === 'voice.error.noChannels' ? null : error;
+  const copied = copyState?.text === resultText && copyState?.success === true;
   const update = <K extends keyof VoiceConfig>(key: K, value: VoiceConfig[K]) => {
     if (!busy) void save({ [key]: value });
   };
@@ -133,10 +151,6 @@ export function VoiceInputMain() {
         disabled={busy || activeDragId !== null || overlay}
         handle={channel ? handle : undefined}
         overlay={overlay}
-        onPrimary={() =>
-          channel &&
-          update('channels', [channel, ...channels.filter((_, position) => position !== index)])
-        }
         onRemove={() =>
           update(
             'channels',
@@ -169,10 +183,60 @@ export function VoiceInputMain() {
             stageRef={routingStage}
             enabled={config.shortcutEnabled}
             sourceOrder={JSON.stringify(channels)}
+            layoutKey={channelLayoutKey}
+            channelCount={channels.length}
+            activeChannel={snapshot.activeChannel}
           />
           <section className="voice-input-section">
-            <div className="voice-island-preview">
-              <IslandContent snapshot={snapshot} preview />
+            <div className="voice-preview-stack">
+              {(resultText || visibleError || emptySources) && (
+                <div
+                  className={`voice-result${!resultText && visibleError ? ' is-error' : ''}`}
+                  aria-live="polite"
+                >
+                  <div className="voice-result-content">
+                    {resultText && <p>{resultText}</p>}
+                    {emptySources && <p>{t('voice.error.noChannels')}</p>}
+                    {visibleError && (
+                      <p className="voice-error" role="alert">
+                        {visibleError.startsWith('voice.') ? t(visibleError as TKey) : visibleError}
+                      </p>
+                    )}
+                  </div>
+                  {(resultText || resultAudioId !== null) && (
+                    <div className="voice-result-actions">
+                      {resultAudioId !== null && (
+                        <VoiceReplay
+                          key={`${resultAudioId}:${voiceActive}:${active}`}
+                          audioId={resultAudioId}
+                          disabled={voiceActive}
+                          active={active}
+                          onError={(failed) => setReplayErrorId(failed ? resultAudioId : null)}
+                        />
+                      )}
+                      {resultText && (
+                        <button
+                          type="button"
+                          className="voice-text-button"
+                          onClick={async () => {
+                            const success = await copyText(resultText);
+                            setCopyState({ text: resultText, success });
+                            clearTimeout(copyTimer.current);
+                            if (success)
+                              copyTimer.current = setTimeout(() => setCopyState(null), 2000);
+                          }}
+                        >
+                          {copied ? <Check size={14} /> : <Copy size={14} />}
+                          {t(copied ? 'voice.copied' : 'voice.copy')}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="voice-island-preview">
+                <IslandContent snapshot={snapshot} preview />
+              </div>
             </div>
             <fieldset disabled={busy} className="voice-island-options">
               <div className="voice-row">
@@ -212,7 +276,7 @@ export function VoiceInputMain() {
             </fieldset>
           </section>
           <DndContext
-            key={active && !voiceActive ? 'active' : 'hidden'}
+            key={channelLayoutKey}
             sensors={sensors}
             modifiers={[restrictToVerticalAxis]}
             collisionDetection={closestCenter}
@@ -307,37 +371,37 @@ export function VoiceInputMain() {
               <FilePenLine size={18} />
               {t('voice.optimization')}
             </h3>
-            <RoutingToggle
-              hideLabel
-              label={t('voice.optimization')}
-              checked={config.optimizationEnabled}
-              disabled={busy}
-              onChange={(value) => update('optimizationEnabled', value)}
-            />
+            <fieldset disabled={busy || !active} className="voice-optimization-model">
+              <RemoteModelSelector
+                key={`${active}:${voiceActive}:${config.optimizationEnabled}`}
+                models={[
+                  { id: '', name: t('voice.optimizationOff') },
+                  ...optimizationModels.map((model) => ({
+                    id: model.internalId,
+                    name: model.name,
+                    icon: getModelIcon('', model.modelId),
+                    iconKind: isSmartRouterId(model.internalId) ? ('router' as const) : undefined,
+                  })),
+                ]}
+                currentModelId={config.optimizationEnabled ? config.optimizationModel : ''}
+                loading={false}
+                onSelect={(id) => {
+                  if (active && !busy)
+                    void save(
+                      id
+                        ? { optimizationEnabled: true, optimizationModel: id }
+                        : { optimizationEnabled: false }
+                    );
+                }}
+                placeholder={t('voice.selectModel')}
+              />
+            </fieldset>
           </div>
           <fieldset
             disabled={busy || !config.optimizationEnabled}
             data-enabled={config.optimizationEnabled}
             className="voice-optimization"
           >
-            <div className="voice-row">
-              <span>{t('voice.optimizationModel')}</span>
-              <RemoteModelSelector
-                key={`${active}:${voiceActive}:${config.optimizationEnabled}`}
-                models={optimizationModels.map((model) => ({
-                  id: model.internalId,
-                  name: model.name,
-                  icon: getModelIcon('', model.modelId),
-                  iconKind: isSmartRouterId(model.internalId) ? ('router' as const) : undefined,
-                }))}
-                currentModelId={config.optimizationModel}
-                loading={false}
-                onSelect={(id) => {
-                  if (config.optimizationEnabled) update('optimizationModel', id);
-                }}
-                placeholder={t('voice.selectModel')}
-              />
-            </div>
             <div className="voice-row">
               <span>{t('voice.optimizationMode')}</span>
               <MiniSelect
@@ -374,12 +438,18 @@ export function VoiceInputMain() {
         <section className="voice-card voice-shortcut-card rounded-card">
           <div className="voice-row voice-shortcut-row">
             <span>
-              {t('voice.shortcut')}
-              <span className="voice-shortcut-hint">
-                {shortcutHint[0]}
-                <Mic size={13} aria-hidden="true" className="voice-shortcut-hint-icon" />
-                {shortcutHint[1]}
+              <span className="voice-shortcut-heading">
+                <span className="voice-shortcut-title">
+                  <Keyboard size={17} aria-hidden="true" />
+                  {t('voice.shortcut')}
+                </span>
+                <span className="voice-shortcut-hint">
+                  {shortcutHint[0]}
+                  <Mic size={13} aria-hidden="true" className="voice-shortcut-hint-icon" />
+                  {shortcutHint[1]}
+                </span>
               </span>
+              <span className="voice-shortcut-description">{t('voice.shortcutCaution')}</span>
             </span>
             <div className="voice-shortcut-control">
               <ShortcutRecorder
@@ -407,34 +477,64 @@ export function VoiceInputMain() {
             <span className="voice-status">{snapshot.shortcutDescription}</span>
           )}
         </section>
+        <section className="voice-card voice-selection-settings rounded-card">
+          <div className="voice-row">
+            <span className="voice-selection-label">
+              <Languages size={17} />
+              <span>
+                {t('voice.selection')}
+                <span className="voice-shortcut-hint">
+                  {t(
+                    config.optimizationEnabled && config.optimizationModel
+                      ? 'voice.selectionHint'
+                      : 'voice.selectionRequiresModel'
+                  )}
+                </span>
+              </span>
+            </span>
+            <div className="voice-selection-controls">
+              <MiniSelect
+                value={config.selectionTranslationLanguage ?? 'zh-Hans'}
+                disabled={busy || !config.optimizationEnabled || !config.optimizationModel}
+                dropUp
+                options={selectionLanguages.map((language) => ({
+                  id: language,
+                  label: t(`voice.translation.${language}` as TKey),
+                }))}
+                onChange={(value) =>
+                  update(
+                    'selectionTranslationLanguage',
+                    value as VoiceConfig['selectionTranslationLanguage']
+                  )
+                }
+              />
+              <fieldset
+                aria-label={t('voice.selection')}
+                disabled={busy || !config.optimizationEnabled || !config.optimizationModel}
+                className="m-0 min-w-0 shrink-0 border-0 p-0 disabled:opacity-40"
+              >
+                <ViewModeTabs
+                  value={
+                    config.selectionTranslationEnabled &&
+                    config.optimizationEnabled &&
+                    config.optimizationModel
+                      ? 'on'
+                      : 'off'
+                  }
+                  options={[
+                    { value: 'on', label: t('voice.selectionOn') },
+                    { value: 'off', label: t('voice.selectionOff') },
+                  ]}
+                  onChange={(value) => {
+                    if (config.optimizationEnabled && config.optimizationModel)
+                      update('selectionTranslationEnabled', value === 'on');
+                  }}
+                />
+              </fieldset>
+            </div>
+          </div>
+        </section>
       </div>
-      {error && (
-        <div className="voice-error" role="alert">
-          {error.startsWith('voice.') ? t(error as TKey) : error}
-        </div>
-      )}
-      {snapshot.text && (
-        <div className="voice-result rounded-card">
-          <p>{snapshot.text}</p>
-          <button
-            type="button"
-            className="voice-text-button"
-            onClick={async () => {
-              try {
-                await copyVoiceResult();
-                setCopied(true);
-                clearTimeout(copyTimer.current);
-                copyTimer.current = setTimeout(() => setCopied(false), 2000);
-              } catch {
-                useVoiceInputStore.setState({ error: 'voice.error.copy' });
-              }
-            }}
-          >
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-            {t(copied ? 'voice.copied' : 'voice.copy')}
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -448,7 +548,6 @@ function VoiceChannelCard({
   disabled,
   handle,
   overlay,
-  onPrimary,
   onRemove,
 }: {
   index: number;
@@ -459,7 +558,6 @@ function VoiceChannelCard({
   disabled: boolean;
   handle?: ReactNode;
   overlay: boolean;
-  onPrimary: () => void;
   onRemove: () => void;
 }) {
   const { t } = useI18n();
@@ -504,19 +602,6 @@ function VoiceChannelCard({
               <span className="min-w-0 flex-1 text-xs text-cyber-text-secondary truncate">
                 {detail}
               </span>
-              {index > 0 && (
-                <div className="voice-channel-actions">
-                  <button
-                    type="button"
-                    className="pointer-events-auto"
-                    aria-label={t('voice.makePrimary')}
-                    disabled={disabled}
-                    onClick={onPrimary}
-                  >
-                    <ArrowUp size={13} />
-                  </button>
-                </div>
-              )}
             </div>
           </div>
           <button
@@ -538,10 +623,16 @@ function VoiceRoutingLines({
   stageRef,
   enabled,
   sourceOrder,
+  layoutKey,
+  channelCount,
+  activeChannel,
 }: {
   stageRef: RefObject<HTMLDivElement>;
   enabled: boolean;
   sourceOrder: string;
+  layoutKey: string;
+  channelCount: number;
+  activeChannel: number | null;
 }) {
   const [lines, setLines] = useState({ width: 0, height: 0, curves: [] as string[], arrow: '' });
   useEffect(() => {
@@ -583,10 +674,10 @@ function VoiceRoutingLines({
       window.removeEventListener('resize', measure);
       stage.removeEventListener('transitionend', measure);
     };
-  }, [stageRef, sourceOrder]);
+  }, [stageRef, sourceOrder, layoutKey]);
   return (
     <svg
-      className={`voice-routing-lines${enabled ? '' : ' is-disabled'}`}
+      className={`voice-routing-lines${enabled && channelCount > 0 ? '' : ' is-disabled'}`}
       width="100%"
       height="100%"
       viewBox={`0 0 ${lines.width || 1} ${lines.height || 1}`}
@@ -594,7 +685,23 @@ function VoiceRoutingLines({
       aria-hidden="true"
     >
       {lines.curves.map((d, index) => (
-        <path key={index} className="free-model-route-path" d={d} />
+        <g key={index} className={index < channelCount ? undefined : 'is-disabled'}>
+          <path className="free-model-route-path" d={d} />
+          {enabled && index < channelCount && activeChannel === index && (
+            <path
+              className="free-model-route-glow"
+              d={d}
+              pathLength="1"
+              ref={(path) => {
+                if (path)
+                  path.style.setProperty(
+                    '--free-model-route-glow-span',
+                    String(Math.min(1, Math.max(0.07, 20 / path.getTotalLength())))
+                  );
+              }}
+            />
+          )}
+        </g>
       ))}
       <path className="free-model-route-arrow" d={lines.arrow} />
     </svg>
@@ -615,11 +722,7 @@ export function VoiceInputPanel() {
   const installed = useToolsStore((tools) =>
     tools.detectedTools.some((tool) => tool.id === 'workbuddy' && tool.installed)
   );
-  const unavailable =
-    !state.snapshot ||
-    state.pending ||
-    voiceBusy(state.snapshot?.phase) ||
-    state.snapshot.config.channels.length >= 3;
+  const unavailable = !state.snapshot || state.pending || voiceBusy(state.snapshot?.phase);
   const disabled = unavailable || state.saving;
   useEffect(() => {
     if (!active) return;
