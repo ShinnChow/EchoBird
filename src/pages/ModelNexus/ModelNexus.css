@@ -1,0 +1,6 @@
+.model-nexus-grid {
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, max(16rem, calc((100% - 2rem) / 3))), 1fr)
+  );
+}

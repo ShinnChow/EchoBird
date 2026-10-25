@@ -196,6 +196,23 @@ it('retains the existing application-install prefill with its caret at the end',
   expect(api.sendAgentMessage).not.toHaveBeenCalled();
 });
 
+it('preserves an edited question through back and forward without replaying or sending its prefill', async () => {
+  await mount();
+  act(() => useNavigationStore.getState().setActivePage('voice'));
+  act(() => useNavigationStore.getState().goToMother('Question: \nSelected text: original', 10));
+  const edited = 'Question: explain this\nSelected text: original';
+  act(() => state.setChatInput(edited));
+  act(() => useNavigationStore.getState().goBack());
+  expect(useNavigationStore.getState().activePage).toBe('voice');
+  expect(state.chatInput).toBe(edited);
+  act(() => useNavigationStore.getState().goForward());
+  expect(useNavigationStore.getState().activePage).toBe('mother');
+  expect(state.chatInput).toBe(edited);
+  expect(useNavigationStore.getState().motherPrefill).toBeUndefined();
+  expect(api.sendAgentMessage).not.toHaveBeenCalled();
+  expect(api.parasiteSendMessage).not.toHaveBeenCalled();
+});
+
 it('preserves the draft and navigation if selection capture fails', async () => {
   await mount();
   act(() => state.setChatInput('Keep existing draft'));

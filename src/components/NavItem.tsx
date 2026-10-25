@@ -8,10 +8,19 @@ export interface NavItemProps {
   onClick?: () => void;
   color?: 'accent' | 'warning' | 'secondary' | 'blue';
   trailing?: React.ReactNode;
+  collapsed?: boolean;
 }
 
 export const NavItem = React.memo(
-  ({ icon, label, active = false, onClick, color = 'accent', trailing }: NavItemProps) => {
+  ({
+    icon,
+    label,
+    active = false,
+    onClick,
+    color = 'accent',
+    trailing,
+    collapsed = false,
+  }: NavItemProps) => {
     const colorClasses =
       color === 'warning'
         ? 'bg-cyber-warning/15 text-cyber-warning'
@@ -19,8 +28,11 @@ export const NavItem = React.memo(
           ? 'bg-cyber-elevated/75 text-cyber-text'
           : 'bg-cyber-elevated/75 text-cyber-text';
     return (
-      <div
-        className={`flex items-center gap-3 p-2 cursor-pointer transition-colors rounded-lg font-medium ${
+      <button
+        type="button"
+        aria-label={label}
+        aria-current={active ? 'page' : undefined}
+        className={`relative flex w-full items-center ${collapsed ? 'justify-center min-h-[calc(1.5em_+_1rem)]' : 'gap-3'} p-2 cursor-default text-left transition-colors rounded-lg font-medium ${
           active
             ? colorClasses
             : 'hover:bg-cyber-elevated/50 text-cyber-text-secondary hover:text-cyber-text'
@@ -28,9 +40,17 @@ export const NavItem = React.memo(
         onClick={onClick}
       >
         {icon}
-        <span>{label}</span>
-        {trailing && <span className="ml-auto flex-shrink-0">{trailing}</span>}
-      </div>
+        <span className={collapsed ? 'sr-only' : undefined}>{label}</span>
+        {trailing && (
+          <span
+            className={
+              collapsed ? 'absolute right-1 top-1 [&>svg]:h-2 [&>svg]:w-2' : 'ml-auto flex-shrink-0'
+            }
+          >
+            {trailing}
+          </span>
+        )}
+      </button>
     );
   }
 );

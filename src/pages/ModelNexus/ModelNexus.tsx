@@ -1,6 +1,14 @@
 // Model Nexus Page — Model cards, debug console, add/edit modal
 // Extracted from App.tsx with Provider pattern for shared state
-import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  type ReactNode,
+} from 'react';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { readText as readClipboardText } from '@tauri-apps/plugin-clipboard-manager';
 import {
@@ -41,6 +49,7 @@ import { saveVoiceSource } from '../VoiceInput/sources';
 import { useVoiceInputStore, voiceBusy } from '../../stores/voiceInputStore';
 import { useNavigationStore } from '../../stores/navigationStore';
 import type { TKey } from '../../i18n/types';
+import './ModelNexus.css';
 export { ModelNexusProvider } from './provider';
 
 const isZhipuCnUrl = (baseUrl: string, anthropicUrl?: string | null) => {
@@ -181,7 +190,7 @@ export function ModelNexusMain() {
 
   // Model card body, shared by the grid item and the DragOverlay ghost (the
   // ghost is wrapped in pointer-events-none so its interactions are inert).
-  const renderModelCard = (model: (typeof userModels)[0]) => {
+  const renderModelCard = (model: (typeof userModels)[0], dragHandle?: ReactNode) => {
     const protocols: ('openai' | 'anthropic')[] = [];
     if (model.baseUrl) protocols.push('openai');
     if (model.anthropicUrl) protocols.push('anthropic');
@@ -201,7 +210,7 @@ export function ModelNexusMain() {
         isPinging={pingingModelIds.has(model.internalId)}
         viewMode={viewMode}
         usageData={modelUsageData[model.internalId]}
-        dragHandlePad
+        dragHandle={dragHandle}
         onEdit={isDemo ? undefined : () => handleCardEdit(model)}
         onDelete={isDemo ? undefined : () => handleCardDelete(model.internalId)}
         onRefresh={() => refreshSingleUsage(model.internalId)}
@@ -229,14 +238,14 @@ export function ModelNexusMain() {
           onDragCancel={handleDragCancel}
           autoScroll={false}
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="model-nexus-grid grid gap-4">
             {/* Show skeleton when loading */}
             {isLoadingModels ? (
               <>
-                <ModelCardSkeleton />
-                <ModelCardSkeleton />
-                <ModelCardSkeleton />
-                <ModelCardSkeleton />
+                <ModelCardSkeleton viewMode={viewMode} />
+                <ModelCardSkeleton viewMode={viewMode} />
+                <ModelCardSkeleton viewMode={viewMode} />
+                <ModelCardSkeleton viewMode={viewMode} />
               </>
             ) : (
               <>
@@ -251,19 +260,14 @@ export function ModelNexusMain() {
                       id={model.internalId}
                       dragLabel={t('model.dragSort')}
                     >
-                      {(handle) => (
-                        <>
-                          {renderModelCard(model)}
-                          <span className="absolute top-2 left-2 z-10">{handle}</span>
-                        </>
-                      )}
+                      {(handle) => renderModelCard(model, handle)}
                     </SortableCard>
                   ))}
                 </SortableContext>
 
                 {/* Add new model button */}
                 <div
-                  className="h-48 border border-dashed border-cyber-border flex flex-col items-center justify-center hover:border-cyber-border cursor-pointer transition-all rounded-card text-cyber-text-secondary hover:text-cyber-text"
+                  className={`${viewMode === 'config' ? 'h-40' : 'h-48'} border border-dashed border-cyber-border flex flex-col items-center justify-center hover:border-cyber-border cursor-default transition-all rounded-card text-cyber-text-secondary hover:text-cyber-text`}
                   onClick={() => {
                     setNewModelForm({
                       name: '',
@@ -290,13 +294,12 @@ export function ModelNexusMain() {
                 style={{ width: activeDragWidth }}
                 className="pointer-events-none relative shadow-2xl"
               >
-                {renderModelCard(activeDragModel)}
-                <span
-                  aria-hidden="true"
-                  className="absolute top-2 left-2 z-10 p-0.5 text-cyber-text-muted/60"
-                >
-                  <GripVertical size={14} />
-                </span>
+                {renderModelCard(
+                  activeDragModel,
+                  <span aria-hidden="true" className="shrink-0 p-0.5 text-cyber-text-muted/60">
+                    <GripVertical size={14} />
+                  </span>
+                )}
               </div>
             )}
           </DragOverlay>

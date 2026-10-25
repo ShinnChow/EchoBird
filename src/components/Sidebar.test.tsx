@@ -5,6 +5,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { useVoiceInputStore as voice } from '../stores/voiceInputStore';
 import { voiceSnapshot } from '../pages/VoiceInput/testFixtures';
 import * as voiceApi from '../api/voiceInput';
+import { useSidebarStore } from '../stores/sidebarStore';
+import { Mic, Waypoints } from 'lucide-react';
 
 vi.mock('./BirdEasterEgg', () => ({ BirdEasterEgg: () => null }));
 const showToast = vi.hoisted(() => vi.fn());
@@ -28,6 +30,7 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   voice.setState(voice.getInitialState());
+  useSidebarStore.setState({ collapsed: false });
 });
 
 afterEach(() => act(() => renderer?.unmount()));
@@ -46,6 +49,122 @@ const sourceConfig = {
 const routerGroups = [{ candidateIds: ['one'], groupEnabled: true }];
 
 describe('Sidebar', () => {
+  it('collapses to accessible icons without changing the page, sources or global switches', () => {
+    voice.setState({ snapshot: voiceSnapshot({ config: sourceConfig }) });
+    act(() => {
+      renderer = create(<Sidebar {...baseProps} smartRouterGroups={routerGroups} />);
+    });
+    act(() => useSidebarStore.getState().setCollapsed(true));
+    const rail = renderer.root.findByType('nav');
+    expect(rail.props['data-collapsed']).toBe(true);
+    expect(rail.props.className).toContain('w-16');
+    const items = renderer.root
+      .findAllByType('button')
+      .filter((button) => button.props['aria-label'] && button.props.role !== 'switch');
+    expect(items).toHaveLength(10);
+    expect(items.every((item) => item.findByType('span').props.className === 'sr-only')).toBe(true);
+    expect(renderer.root.findAllByProps({ 'aria-current': 'page' })).toHaveLength(1);
+    expect(renderer.root.findByProps({ 'aria-current': 'page' }).props['aria-label']).toBe(
+      'nav.freeModels'
+    );
+    expect(
+      renderer.root
+        .findAllByType('span')
+        .filter((span) => span.props.className?.includes('brand-mark'))
+    ).toHaveLength(0);
+    expect(baseProps.onPageChange).not.toHaveBeenCalled();
+    expect(baseProps.onSmartRouterChange).not.toHaveBeenCalled();
+    expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
+    expect(voiceApi.getVoiceState).not.toHaveBeenCalled();
+    expect(voiceApi.recordVoice).not.toHaveBeenCalled();
+    act(() => items.find((item) => item.props['aria-label'] === 'voice.input')!.props.onClick());
+    expect(baseProps.onPageChange).toHaveBeenCalledExactlyOnceWith('voice');
+    act(() => useSidebarStore.getState().setCollapsed(false));
+    expect(rail.props.className).toContain('w-64');
+    expect(items.every((item) => item.findByType('span').props.className !== 'sr-only')).toBe(true);
+    expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
+  });
+
+  it('uses the same microphone and routing icons for collapsed switches and keeps their actions separate from navigation', async () => {
+    useSidebarStore.setState({ collapsed: true });
+    voice.setState({ snapshot: voiceSnapshot({ config: sourceConfig }) });
+    vi.mocked(voiceApi.saveVoiceConfig).mockResolvedValue(
+      voiceSnapshot({ config: { ...sourceConfig, shortcutEnabled: true }, revision: 2 })
+    );
+    act(() => {
+      renderer = create(<Sidebar {...baseProps} smartRouterGroups={routerGroups} />);
+    });
+    const microphone = () =>
+      renderer.root.findByProps({ role: 'switch', 'aria-label': 'voice.enableInput' });
+    const router = () =>
+      renderer.root.findByProps({ role: 'switch', 'aria-label': 'nav.smartRouter' });
+    expect(microphone().findByType(Mic)).toBeDefined();
+    expect(router().findByType(Waypoints)).toBeDefined();
+    expect(microphone().props.className).not.toContain('bg-cyber-accent/15');
+    await act(async () => microphone().props.onClick());
+    expect(voiceApi.saveVoiceConfig).toHaveBeenCalledExactlyOnceWith({
+      ...sourceConfig,
+      shortcutEnabled: true,
+    });
+    expect(microphone().props['aria-checked']).toBe(true);
+    expect(microphone().props.className).toContain('bg-cyber-accent/15');
+    expect(baseProps.onSmartRouterChange).not.toHaveBeenCalled();
+    act(() => router().props.onClick());
+    expect(baseProps.onSmartRouterChange).toHaveBeenCalledExactlyOnceWith(true);
+    expect(baseProps.onPageChange).not.toHaveBeenCalled();
+    expect(voiceApi.recordVoice).not.toHaveBeenCalled();
+    expect(voiceApi.startVoice).not.toHaveBeenCalled();
+  });
+
+  it('blocks collapsed controls while pending or recording and keeps their state after expanding', async () => {
+    useSidebarStore.setState({ collapsed: true });
+    voice.setState({
+      snapshot: voiceSnapshot({
+        config: { ...sourceConfig, shortcutEnabled: true },
+        phase: 'recording',
+      }),
+    });
+    act(() => {
+      renderer = create(
+        <Sidebar
+          {...baseProps}
+          smartRouterEnabled
+          smartRouterTogglePending
+          smartRouterGroups={routerGroups}
+        />
+      );
+    });
+    const switches = () => renderer.root.findAllByProps({ role: 'switch' });
+    expect(switches()).toHaveLength(2);
+    for (const control of switches()) {
+      expect(control.props.disabled).toBe(true);
+      expect(control.props['aria-checked']).toBe(true);
+      await act(async () => control.props.onClick());
+    }
+    expect(baseProps.onSmartRouterChange).not.toHaveBeenCalled();
+    expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
+    act(() => useSidebarStore.getState().setCollapsed(false));
+    for (const control of switches()) {
+      expect(control.props.disabled).toBe(true);
+      expect(control.props['aria-checked']).toBe(true);
+    }
+  });
+
+  it('keeps source-less global controls hidden in the collapsed rail', () => {
+    useSidebarStore.setState({ collapsed: true });
+    voice.setState({ snapshot: voiceSnapshot() });
+    act(() => {
+      renderer = create(<Sidebar {...baseProps} smartRouterGroups={[]} />);
+    });
+    expect(renderer.root.findAllByProps({ role: 'switch' })).toHaveLength(0);
+    expect(
+      renderer.root
+        .findAllByType('button')
+        .filter((button) => button.props['aria-label'] && button.props.role !== 'switch')
+    ).toHaveLength(10);
+    expect(baseProps.onPageChange).not.toHaveBeenCalled();
+  });
+
   it('places AI news immediately above My AI Career', () => {
     const markup = renderToStaticMarkup(<Sidebar {...baseProps} smartRouterGroups={[]} />);
     expect(markup.indexOf('nav.aiNews')).toBeGreaterThan(-1);

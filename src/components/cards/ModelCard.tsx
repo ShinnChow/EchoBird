@@ -112,9 +112,10 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
 };
 
 // Card skeleton (loading state)
-export const ModelCardSkeleton = () => (
-  <div className="h-48 p-4 bg-cyber-surface/60 rounded-card animate-pulse">
-    <div className="h-3 w-16 bg-cyber-border rounded mb-2"></div>
+export const ModelCardSkeleton = ({ viewMode = 'config' }: { viewMode?: 'config' | 'usage' }) => (
+  <div
+    className={`${viewMode === 'config' ? 'h-40' : 'h-48'} p-4 bg-cyber-surface/60 rounded-card animate-pulse`}
+  >
     <div className="h-5 w-32 bg-cyber-border rounded mb-4"></div>
     <div className="space-y-2">
       <div className="h-3 w-full bg-cyber-border/50 rounded"></div>
@@ -149,10 +150,7 @@ export interface ModelCardProps {
   isRefreshingUsage?: boolean; // usage refresh in progress (usage mode only)
   onAccessKey?: () => void; // open AK/SK config modal (Volcengine usage mode)
   akSkMissing?: boolean; // AK/SK not yet configured -> show hint
-  /** Add top/bottom spacing around the name row so the overlaid top-left drag
-   *  handle doesn't cover it, keeping the name left-aligned. Only used by the
-   *  Model Center's sortable grid. */
-  dragHandlePad?: boolean;
+  dragHandle?: React.ReactNode;
 }
 
 // Format countdown time (ms to human readable) - i18n aware
@@ -195,7 +193,7 @@ export const ModelCard = React.memo(
     isRefreshingUsage = false,
     onAccessKey,
     akSkMissing,
-    dragHandlePad = false,
+    dragHandle,
   }: ModelCardProps) => {
     // Config tab: resolve icon from the MODEL ID only (platform name must not
     // leak in — otherwise a Qwen platform card configured with model id
@@ -212,107 +210,116 @@ export const ModelCard = React.memo(
     );
 
     return (
-      <div className="h-48 p-4 border border-transparent bg-cyber-surface/60 hover:bg-cyber-elevated/70 relative overflow-hidden rounded-card cursor-default transition-colors flex flex-col">
-        {/* Action buttons — top right, different for config vs usage mode */}
-        {viewMode === 'config' ? (
-          // Config mode: [删除] [编辑]
-          (onEdit || onDelete) && (
-            <div className="absolute top-2 right-2 flex gap-0.5">
-              {onDelete && (
+      <div
+        className={`${viewMode === 'config' ? 'h-40' : 'h-48'} p-4 border border-transparent bg-cyber-surface/60 hover:bg-cyber-elevated/70 relative overflow-hidden rounded-card cursor-default transition-colors flex flex-col`}
+      >
+        <div
+          className={`-mx-2 -mt-2 mb-3 flex items-center gap-2 ${viewMode === 'usage' ? 'flex-wrap' : ''}`}
+        >
+          <div
+            className={`flex-1 flex items-center gap-2 ${viewMode === 'usage' ? 'min-w-[6rem]' : 'min-w-0'}`}
+          >
+            {dragHandle}
+            {/* Show provider logo in usage mode (based on baseUrl) */}
+            {viewMode === 'usage' &&
+              (() => {
+                const url = baseUrl || anthropicUrl || '';
+                const providerIcon = getModelIcon('', url);
+                return providerIcon ? (
+                  <img
+                    src={providerIcon}
+                    alt=""
+                    className="w-6 h-6 flex-shrink-0"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                ) : null;
+              })()}
+            <div className="text-lg font-bold truncate h-7 flex-1">
+              {name || <span className="invisible">-</span>}
+            </div>
+          </div>
+          {/* Action buttons — top right, different for config vs usage mode */}
+          {viewMode === 'config' ? (
+            // Config mode: [删除] [编辑]
+            (onEdit || onDelete) && (
+              <div className="flex shrink-0 gap-0.5 whitespace-nowrap">
+                {onDelete && (
+                  <button
+                    className="text-xs font-mono text-cyber-text-muted/70 hover:text-red-500 transition-colors"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const ok = await confirm({
+                        title: t('model.deleteTitle'),
+                        message: t('model.deleteConfirm'),
+                        confirmText: t('btn.delete'),
+                        cancelText: t('btn.cancel'),
+                        type: 'danger',
+                      });
+                      if (ok) {
+                        onDelete();
+                      }
+                    }}
+                  >
+                    [{t('btn.delete')}]
+                  </button>
+                )}
+                {onEdit && (
+                  <button
+                    className="text-xs font-mono text-cyber-text-muted/70 hover:text-cyber-text transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit();
+                    }}
+                  >
+                    [{t('btn.edit')}]
+                  </button>
+                )}
+              </div>
+            )
+          ) : (
+            // Usage mode: [访问权限] [刷新]
+            <div className="ml-auto flex shrink-0 gap-1.5 whitespace-nowrap">
+              {onAccessKey && (
                 <button
-                  className="text-xs font-mono text-cyber-text-muted/70 hover:text-red-500 transition-colors"
-                  onClick={async (e) => {
+                  className="usage-card-action-button text-xs font-mono"
+                  onClick={(e) => {
                     e.stopPropagation();
-                    const ok = await confirm({
-                      title: t('model.deleteTitle'),
-                      message: t('model.deleteConfirm'),
-                      confirmText: t('btn.delete'),
-                      cancelText: t('btn.cancel'),
-                      type: 'danger',
-                    });
-                    if (ok) {
-                      onDelete();
+                    onAccessKey();
+                  }}
+                >
+                  [{t('model.accessKey')}]
+                </button>
+              )}
+              {onRefresh && (
+                <button
+                  className="usage-card-action-button text-xs font-mono"
+                  disabled={isRefreshingUsage}
+                  aria-busy={isRefreshingUsage}
+                  aria-label={t('btn.refresh')}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isRefreshingUsage) {
+                      onRefresh();
                     }
                   }}
                 >
-                  [{t('btn.delete')}]
-                </button>
-              )}
-              {onEdit && (
-                <button
-                  className="text-xs font-mono text-cyber-text-muted/70 hover:text-cyber-text transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEdit();
-                  }}
-                >
-                  [{t('btn.edit')}]
+                  <span className={isRefreshingUsage ? 'invisible' : 'visible'}>
+                    {t('btn.refresh')}
+                  </span>
+                  {isRefreshingUsage && (
+                    <span
+                      className="absolute inset-0 flex items-center justify-center"
+                      aria-hidden="true"
+                    >
+                      <RefreshCw size={11} className="animate-spin" />
+                    </span>
+                  )}
                 </button>
               )}
             </div>
-          )
-        ) : (
-          // Usage mode: [访问权限] [刷新]
-          <div className="absolute top-2 right-2 flex gap-1.5">
-            {onAccessKey && (
-              <button
-                className="usage-card-action-button text-xs font-mono"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAccessKey();
-                }}
-              >
-                [{t('model.accessKey')}]
-              </button>
-            )}
-            {onRefresh && (
-              <button
-                className="usage-card-action-button text-xs font-mono"
-                disabled={isRefreshingUsage}
-                aria-busy={isRefreshingUsage}
-                aria-label={t('btn.refresh')}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!isRefreshingUsage) {
-                    onRefresh();
-                  }
-                }}
-              >
-                <span className={isRefreshingUsage ? 'invisible' : 'visible'}>
-                  {t('btn.refresh')}
-                </span>
-                {isRefreshingUsage && (
-                  <span
-                    className="absolute inset-0 flex items-center justify-center"
-                    aria-hidden="true"
-                  >
-                    <RefreshCw size={11} className="animate-spin" />
-                  </span>
-                )}
-              </button>
-            )}
-          </div>
-        )}
-        <div className={`flex items-center gap-2 ${dragHandlePad ? 'mt-5 mb-4' : 'mb-3'}`}>
-          {/* Show provider logo in usage mode (based on baseUrl) */}
-          {viewMode === 'usage' &&
-            (() => {
-              const url = baseUrl || anthropicUrl || '';
-              const providerIcon = getModelIcon('', url);
-              return providerIcon ? (
-                <img
-                  src={providerIcon}
-                  alt=""
-                  className="w-6 h-6 flex-shrink-0"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-              ) : null;
-            })()}
-          <div className="text-lg font-bold truncate h-7 flex-1">
-            {name || <span className="invisible">-</span>}
-          </div>
+          )}
         </div>
 
         {/* Content area - switches based on viewMode */}
@@ -466,6 +473,7 @@ export const ModelCard = React.memo(
       'viewMode',
       'isRefreshingUsage',
       'akSkMissing',
+      'dragHandle',
     ];
     const p = prev as unknown as Record<string, unknown>;
     const n = next as unknown as Record<string, unknown>;

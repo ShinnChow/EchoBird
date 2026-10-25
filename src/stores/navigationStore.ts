@@ -8,6 +8,8 @@ import type { PageType } from '../components';
 
 interface NavigationState {
   activePage: PageType;
+  backHistory: PageType[];
+  forwardHistory: PageType[];
   motherPrefill: string | undefined;
   motherPrefillCursor: number | undefined;
   agentRunning: boolean;
@@ -17,6 +19,8 @@ interface NavigationState {
   sshServersVersion: number;
 
   setActivePage: (page: PageType) => void;
+  goBack: () => void;
+  goForward: () => void;
   goToMother: (prefill: string, cursor?: number) => void;
   clearMotherPrefill: () => void;
   setAgentRunning: (running: boolean) => void;
@@ -24,17 +28,58 @@ interface NavigationState {
   bumpSshServersVersion: () => void;
 }
 
+function visitPage(state: NavigationState, page: PageType): Partial<NavigationState> {
+  if (state.activePage === page) return state;
+  return {
+    activePage: page,
+    backHistory: [...state.backHistory, state.activePage],
+    forwardHistory: [],
+    motherPrefill: undefined,
+    motherPrefillCursor: undefined,
+  };
+}
+
 export const useNavigationStore = create<NavigationState>((set) => ({
   activePage: 'apps',
+  backHistory: [],
+  forwardHistory: [],
   motherPrefill: undefined,
   motherPrefillCursor: undefined,
   agentRunning: false,
   updateAvailable: null,
   sshServersVersion: 0,
 
-  setActivePage: (page) => set({ activePage: page }),
+  setActivePage: (page) => set((state) => visitPage(state, page)),
+  goBack: () =>
+    set((state) => {
+      const page = state.backHistory[state.backHistory.length - 1];
+      if (!page) return state;
+      return {
+        activePage: page,
+        backHistory: state.backHistory.slice(0, -1),
+        forwardHistory: [...state.forwardHistory, state.activePage],
+        motherPrefill: undefined,
+        motherPrefillCursor: undefined,
+      };
+    }),
+  goForward: () =>
+    set((state) => {
+      const page = state.forwardHistory[state.forwardHistory.length - 1];
+      if (!page) return state;
+      return {
+        activePage: page,
+        backHistory: [...state.backHistory, state.activePage],
+        forwardHistory: state.forwardHistory.slice(0, -1),
+        motherPrefill: undefined,
+        motherPrefillCursor: undefined,
+      };
+    }),
   goToMother: (prefill, cursor) =>
-    set({ activePage: 'mother', motherPrefill: prefill, motherPrefillCursor: cursor }),
+    set((state) => ({
+      ...visitPage(state, 'mother'),
+      motherPrefill: prefill,
+      motherPrefillCursor: cursor,
+    })),
   // One-shot consume: MotherAgentProvider clears this right after it fills
   // the chat input, so revisiting the Mother page doesn't re-fill a stale
   // "安装XX" prompt the user already sent or cleared.

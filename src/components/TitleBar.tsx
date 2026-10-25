@@ -1,11 +1,25 @@
 // Custom frameless window title bar
 import React, { useState, useEffect } from 'react';
-import { Settings, Minus, Maximize2, Minimize2, X } from 'lucide-react';
+import {
+  Settings,
+  Minus,
+  Maximize2,
+  Minimize2,
+  X,
+  PanelLeft,
+  ArrowLeft,
+  ArrowRight,
+} from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { getSettings, hideMainWindow, saveSettings } from '../api/tauri';
 import { CloseWindowDialog } from './CloseWindowDialog';
 import { useI18n } from '../hooks/useI18n';
 import { IS_MACOS } from '../utils/platform';
+import { useSidebarStore } from '../stores/sidebarStore';
+import { useNavigationStore } from '../stores/navigationStore';
+
+const navigationButtonClass =
+  'h-full w-8 flex items-center justify-center rounded text-cyber-text-secondary enabled:hover:bg-cyber-elevated/50 enabled:hover:text-cyber-text disabled:text-cyber-text-muted disabled:opacity-40 transition-colors';
 
 interface TitleBarProps {
   onSettingsClick?: () => void;
@@ -19,6 +33,12 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   onChangelogClick,
 }) => {
   const { t } = useI18n();
+  const collapsed = useSidebarStore((state) => state.collapsed);
+  const setCollapsed = useSidebarStore((state) => state.setCollapsed);
+  const canGoBack = useNavigationStore((state) => state.backHistory.length > 0);
+  const canGoForward = useNavigationStore((state) => state.forwardHistory.length > 0);
+  const goBack = useNavigationStore((state) => state.goBack);
+  const goForward = useNavigationStore((state) => state.goForward);
   const handleMinimize = () => getCurrentWindow().minimize();
   // One-click hide to tray. Reuses the same native hide command as
   // the X-button's "tray" choice in handleClose, so tray-restore is identical.
@@ -112,7 +132,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   return (
     <>
       <div
-        className="h-8 flex items-center justify-end select-none flex-shrink-0 cursor-default"
+        className="h-8 flex items-center justify-between select-none flex-shrink-0 cursor-default"
         onMouseDown={(e) => {
           // Use startDragging for Linux (WebkitAppRegion doesn't work on Linux GTK)
           // Also works cross-platform as a reliable fallback
@@ -124,6 +144,39 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           }
         }}
       >
+        <div
+          className={`${IS_MACOS ? 'ml-20' : 'ml-2'} flex h-full items-center gap-0.5`}
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
+          <button
+            type="button"
+            aria-label={t('nav.back')}
+            disabled={!canGoBack}
+            onClick={goBack}
+            className={navigationButtonClass}
+          >
+            <ArrowLeft size={16} strokeWidth={1.75} />
+          </button>
+          <button
+            type="button"
+            aria-label={t('nav.forward')}
+            disabled={!canGoForward}
+            onClick={goForward}
+            className={navigationButtonClass}
+          >
+            <ArrowRight size={16} strokeWidth={1.75} />
+          </button>
+          <button
+            type="button"
+            aria-label={t(collapsed ? 'nav.expandSidebar' : 'nav.collapseSidebar')}
+            aria-controls="app-sidebar"
+            aria-expanded={!collapsed}
+            onClick={() => setCollapsed(!collapsed)}
+            className={navigationButtonClass}
+          >
+            <PanelLeft size={16} strokeWidth={1.75} />
+          </button>
+        </div>
         {/* Window controls */}
         <div
           className="flex items-center h-full"
