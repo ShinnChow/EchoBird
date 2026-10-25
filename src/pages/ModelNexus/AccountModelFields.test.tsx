@@ -24,6 +24,7 @@ vi.mock('../../api/accountProxy', async (original) => ({
   ...(await original<typeof import('../../api/accountProxy')>()),
   listProxyAccounts: vi.fn(),
   getAccountProxyModels: vi.fn(),
+  getAccountSpeechModels: vi.fn(),
 }));
 
 let renderer: ReactTestRenderer;
@@ -76,11 +77,78 @@ it('uses the saved WorkBuddy speech ID without fetching chat models or querying 
   });
   expect(current.accountSource).toEqual({ provider: 'workBuddy', accountId });
   expect(current.modelId).toBe(`workbuddy:${accountId}`);
-  expect(field('accountProxy.provider').props.options).toEqual(['workBuddy']);
+  expect(field('accountProxy.provider').props.options).toEqual([
+    'claudeCode',
+    'codex',
+    'workBuddy',
+    'workBuddyAi',
+    'dumate',
+    'doubaowork',
+    'antigravity',
+    'trae',
+    'traecn',
+    'minimax',
+    'qoder',
+    'qoderCn',
+    'kilo',
+    'codeArts',
+    'devin',
+    'cursor',
+    'grokbot',
+    'qwenworkcn',
+    'qwenwork',
+  ]);
   expect(field('model.modelId').props.onRefresh).toBeUndefined();
   expect(api.getAccountProxyModels).not.toHaveBeenCalled();
+  expect(api.getAccountSpeechModels).not.toHaveBeenCalled();
   expect(setItem).not.toHaveBeenCalled();
 });
+
+it.each(['qwenworkcn', 'qwenwork'] as const)(
+  'reuses saved %s speech identity and plan without discovering text models',
+  async (provider) => {
+    const accountId = 'b'.repeat(64);
+    vi.mocked(api.listProxyAccounts).mockResolvedValue([
+      {
+        source: { provider, accountId },
+        label: 'Saved user · Organization',
+        plan: 'qwen-office-pro',
+      },
+    ]);
+    await act(async () => {
+      renderer = create(<Harness provider={provider} voice />);
+    });
+    expect(current.name).toBe('Saved user · Organization');
+    expect(current.modelId).toBe(`${provider}:${accountId}`);
+    expect(field('accountProxy.account').props.optionLabels[accountId]).toBe(
+      `Saved user · Organization · ${provider === 'qwenwork' ? 'Pro' : 'agent.qwenworkPro'}`
+    );
+    expect(api.getAccountProxyModels).not.toHaveBeenCalled();
+    expect(api.getAccountSpeechModels).not.toHaveBeenCalled();
+    expect(setItem).not.toHaveBeenCalled();
+  }
+);
+
+it('discovers Kilo speech models and offers explicit refresh without writing text cache', async () => {
+  const accountId = 'a'.repeat(64);
+  const source = { provider: 'kilo' as const, accountId };
+  const selector = `kilo:${accountId}:speech-model`;
+  vi.mocked(api.listProxyAccounts).mockResolvedValue([{ source, label: 'Speech account' }]);
+  vi.mocked(api.getAccountSpeechModels).mockResolvedValue([selector]);
+  api.cacheAccountProxyModels(source, ['text-model']);
+  setItem.mockClear();
+  await act(async () => {
+    renderer = create(<Harness provider="kilo" voice />);
+  });
+  expect(api.getAccountSpeechModels).toHaveBeenCalledExactlyOnceWith(source);
+  expect(api.getAccountProxyModels).not.toHaveBeenCalled();
+  expect(current.modelId).toBe(selector);
+  expect(api.getCachedAccountProxyModels(source)).toEqual(['text-model']);
+  expect(setItem).not.toHaveBeenCalled();
+  await act(async () => field('model.modelId').props.onRefresh());
+  expect(api.getAccountSpeechModels).toHaveBeenCalledTimes(2);
+});
+
 async function open(accountId = '', modelId = '', provider: AccountProvider = 'codex') {
   await act(async () => {
     renderer = create(<Harness accountId={accountId} modelId={modelId} provider={provider} />, {

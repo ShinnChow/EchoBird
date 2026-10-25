@@ -24,7 +24,7 @@ use tokio_stream::wrappers::ReceiverStream;
 const MODELS: &str = "/exa.api_server_pb.ApiServerService/GetCliModelConfigs";
 const CHAT: &str = "/exa.api_server_pb.ApiServerService/GetChatMessage";
 const LIMIT: usize = 64 * 1024 * 1024;
-fn client() -> Result<&'static reqwest::Client, ProxyError> {
+pub(super) fn client() -> Result<&'static reqwest::Client, ProxyError> {
     static CLIENT: OnceLock<Result<reqwest::Client, &'static str>> = OnceLock::new();
     CLIENT
         .get_or_init(|| {
@@ -38,7 +38,7 @@ fn client() -> Result<&'static reqwest::Client, ProxyError> {
         .as_ref()
         .map_err(|e| ProxyError::upstream(*e))
 }
-fn auth(c: &Value) -> Result<(&str, &str), ProxyError> {
+pub(super) fn auth(c: &Value) -> Result<(&str, &str), ProxyError> {
     let key = c["accessToken"]
         .as_str()
         .filter(|s| s.starts_with("devin-session-token$"))
@@ -64,7 +64,7 @@ fn auth(c: &Value) -> Result<(&str, &str), ProxyError> {
     }
     Ok((key, server))
 }
-fn metadata(key: &str) -> Vec<u8> {
+pub(super) fn metadata(key: &str) -> Vec<u8> {
     Message::default()
         .bytes(1, "devin-cli")
         .bytes(2, devin_accounts::VERSION)
@@ -76,7 +76,7 @@ fn metadata(key: &str) -> Vec<u8> {
         .bytes(28, "chisel")
         .0
 }
-fn error(status: StatusCode, payload: &[u8]) -> ProxyError {
+pub(super) fn error(status: StatusCode, payload: &[u8]) -> ProxyError {
     let v: Value = serde_json::from_slice(payload).unwrap_or(Value::Null);
     let v = v.get("error").unwrap_or(&v);
     let code = v["code"].as_str().unwrap_or("");

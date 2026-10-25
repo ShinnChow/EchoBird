@@ -331,6 +331,9 @@ pub(super) fn base(provider: AccountProvider, credentials: &Value) -> &str {
             AccountProvider::Antigravity => CODE_ASSIST_BASE,
             AccountProvider::Copilot => "https://api.githubcopilot.com",
             AccountProvider::Kilo => "https://api.kilo.ai/api/openrouter",
+            AccountProvider::Cursor | AccountProvider::GrokBot => "https://api2.cursor.sh",
+            AccountProvider::QwenWork => "https://gateway.qwenwork.ai",
+            AccountProvider::QwenWorkCn => "https://gateway.qwenwork.cn",
             AccountProvider::OpenDesign => super::super::opendesign_accounts::LINK,
             AccountProvider::ClaudeCode => unreachable!("Claude uses its CLI"),
             AccountProvider::Trae | AccountProvider::Traecn => {
@@ -360,6 +363,12 @@ fn signed(
 ) -> Result<reqwest::RequestBuilder, ProxyError> {
     let mut request = request.bearer_auth(access_token(credentials)?);
     match provider {
+        AccountProvider::QwenWork
+        | AccountProvider::QwenWorkCn
+        | AccountProvider::Cursor
+        | AccountProvider::GrokBot => {
+            super::require_text_provider(provider)?;
+        }
         AccountProvider::Dumate => {
             request = request
                 .header("X-Dumate-Client-Type", "web")
@@ -757,7 +766,7 @@ async fn prepared_project(
         credentials,
         refresh,
         || async {
-            fetch_project(credentials, client)
+            fetch_project(credentials, client, true)
                 .await
                 .map(PreparedMetadata::Project)
         },
@@ -769,9 +778,10 @@ async fn prepared_project(
     Ok(value)
 }
 
-async fn fetch_project(
+pub(super) async fn fetch_project(
     credentials: &Value,
     client: &reqwest::Client,
+    require_project: bool,
 ) -> Result<(String, Option<String>), ProxyError> {
     let load_base = project_load_base(credentials);
     let request = client
@@ -792,7 +802,8 @@ async fn fetch_project(
         .filter(|id| !id.is_empty())
         .or_else(|| value["cloudaicompanionProject"].as_str())
         .or_else(|| value["cloudaicompanionProject"]["id"].as_str());
-    let Some(id) = id.filter(|id| !id.trim().is_empty()) else {
+    let id = id.filter(|id| !id.trim().is_empty()).unwrap_or_default();
+    if id.is_empty() && require_project {
         let reason = value["ineligibleTiers"]
             .as_array()
             .into_iter()
@@ -804,7 +815,7 @@ async fn fetch_project(
             })
             .unwrap_or("Antigravity has not set up this account; sign in to its app first");
         return Err(ProxyError::new(StatusCode::FORBIDDEN, reason));
-    };
+    }
     let tier = value["paidTier"]["id"]
         .as_str()
         .filter(|tier| !matches!(*tier, "" | "free-tier" | "legacy-tier"))
@@ -910,6 +921,15 @@ async fn fetch_models(
 ) -> Result<Vec<String>, ProxyError> {
     let api = base(provider, credentials);
     let value = match provider {
+        AccountProvider::QwenWork
+        | AccountProvider::QwenWorkCn
+        | AccountProvider::Cursor
+        | AccountProvider::GrokBot => {
+            return Err(ProxyError::new(
+                StatusCode::BAD_REQUEST,
+                "This account source only supports speech transcription",
+            ));
+        }
         // The gateway has no public /models endpoint. This is its verified
         // native text route, not an alias for a claimed underlying model.
         AccountProvider::Dumate => return Ok(vec!["model-text".into()]),

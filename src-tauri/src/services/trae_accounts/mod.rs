@@ -427,7 +427,7 @@ fn proxy_value(edition: Edition, credentials: &Credentials) -> Result<Value, Str
     let region = native::text(&credentials.auth["userRegion"], "region")
         .or_else(|| credentials.auth["userRegion"].as_str())
         .unwrap_or(fallback_region);
-    let value = serde_json::json!({
+    let mut value = serde_json::json!({
         "accessToken": native::access(&credentials.auth)?,
         "userId": native::text(&credentials.auth, "userId").ok_or("accountError.invalidAccount")?,
         "deviceId": credentials.identity.device_id,
@@ -436,6 +436,20 @@ fn proxy_value(edition: Edition, credentials: &Credentials) -> Result<Value, Str
         "region": region.to_ascii_uppercase(),
         "edition": edition,
     });
+    if edition == Edition::Trae {
+        for (source, target) in [("storeRegion", "storeRegion"), ("scope", "accountScope")] {
+            if let Some(field) = credentials.auth["account"][source]
+                .as_str()
+                .filter(|value| !value.trim().is_empty())
+            {
+                value[target] = if source == "storeRegion" {
+                    serde_json::json!(field.to_ascii_uppercase())
+                } else {
+                    serde_json::json!(field)
+                };
+            }
+        }
+    }
     Ok(value)
 }
 

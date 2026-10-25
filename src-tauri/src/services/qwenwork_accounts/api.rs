@@ -39,7 +39,7 @@ pub(super) struct Client {
     http: reqwest::Client,
     pub(super) edition: Edition,
     pub(super) base: String,
-    version: String,
+    pub(super) version: String,
     release: String,
 }
 

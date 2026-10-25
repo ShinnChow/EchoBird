@@ -81,6 +81,20 @@ fn text<'a>(c: &'a Value, key: &str) -> Result<&'a str, ProxyError> {
     })
 }
 pub(super) fn headers(c: &Value, path: &str, body: &str) -> Result<HeaderMap, ProxyError> {
+    headers_with_versions(c, path, body, VERSION, "")
+}
+
+pub(super) fn speech_headers(c: &Value, path: &str) -> Result<HeaderMap, ProxyError> {
+    headers_with_versions(c, path, "", "1.0.0", text(c, "appVersion")?)
+}
+
+fn headers_with_versions(
+    c: &Value,
+    path: &str,
+    body: &str,
+    cosy_version: &str,
+    ide_version: &str,
+) -> Result<HeaderMap, ProxyError> {
     let user = text(c, "userId")?;
     let token = text(c, "accessToken")?;
     let machine = text(c, "machineId")?;
@@ -97,7 +111,7 @@ pub(super) fn headers(c: &Value, path: &str, body: &str) -> Result<HeaderMap, Pr
         rsa.encrypt(&mut rand::thread_rng(), Pkcs1v15Encrypt, key)
             .map_err(ProxyError::upstream)?,
     );
-    let payload=STANDARD.encode(json!({"version":"v1","requestId":uuid::Uuid::new_v4().simple().to_string(),"info":info,"cosyVersion":VERSION,"ideVersion":""}).to_string());
+    let payload=STANDARD.encode(json!({"version":"v1","requestId":uuid::Uuid::new_v4().simple().to_string(),"info":info,"cosyVersion":cosy_version,"ideVersion":ide_version}).to_string());
     let timestamp = chrono::Utc::now().timestamp().to_string();
     let path = path
         .split('?')
@@ -136,7 +150,7 @@ pub(super) fn headers(c: &Value, path: &str, body: &str) -> Result<HeaderMap, Pr
         ("cosy-machineos", machine_os.as_str()),
         ("cosy-scene", "app"),
         ("cosy-user", user),
-        ("cosy-version", VERSION),
+        ("cosy-version", cosy_version),
         ("login-version", "v2"),
     ] {
         headers.insert(
@@ -199,6 +213,34 @@ mod tests {
         assert_eq!(signature, expected);
         let payload: Value = serde_json::from_slice(&STANDARD.decode(payload).unwrap()).unwrap();
         assert_eq!(payload["cosyVersion"], VERSION);
+        assert_eq!(payload["ideVersion"], "");
         assert!(payload["info"].is_string());
+    }
+
+    #[test]
+    fn speech_envelope_uses_native_app_versions_and_signs_empty_body_without_changing_chat() {
+        let c = json!({"userId":"user","accessToken":"device-token","machineId":"machine","appVersion":"0.4.9"});
+        let path = "/api/v2/service/ws/asr";
+        let h = speech_headers(&c, path).unwrap();
+        let raw = h["authorization"]
+            .to_str()
+            .unwrap()
+            .strip_prefix("Bearer COSY.")
+            .unwrap();
+        let (payload, signature) = raw.rsplit_once('.').unwrap();
+        let expected = format!(
+            "{:x}",
+            Md5::digest(format!(
+                "{payload}\n{}\n{}\n\n{path}",
+                h["cosy-key"].to_str().unwrap(),
+                h["cosy-date"].to_str().unwrap()
+            ))
+        );
+        assert_eq!(signature, expected);
+        let payload: Value = serde_json::from_slice(&STANDARD.decode(payload).unwrap()).unwrap();
+        assert_eq!(payload["cosyVersion"], "1.0.0");
+        assert_eq!(payload["ideVersion"], "0.4.9");
+        assert_eq!(h["cosy-version"], "1.0.0");
+        assert_eq!(headers(&c, path, "").unwrap()["cosy-version"], VERSION);
     }
 }

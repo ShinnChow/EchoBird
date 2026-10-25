@@ -611,7 +611,7 @@ async fn stop_capture(app: &AppHandle, shortcut_only: bool) -> Result<Snapshot, 
                 }
             };
             if selected { publish(app); }
-            tokio::time::timeout(Duration::from_secs(60), pipeline::recognize(&channel, api_options, audio_ref, client_ref))
+            tokio::time::timeout(pipeline::recognition_timeout(&channel, audio_ref), pipeline::recognize(&channel, api_options, audio_ref, client_ref))
                 .await.map_err(|_| "voice.error.transcribe".to_string())?
         }) => result,
     };

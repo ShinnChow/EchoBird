@@ -1,4 +1,5 @@
 //! Grok Bot 0.61 native account catalog (separate from Grok Build).
+pub(crate) mod speech;
 use super::cursor_auth::{
     cipher, claims, decrypt, encrypt, identity, read, write, Cipher, LoginFlow,
 };
@@ -23,6 +24,8 @@ static LOGIN: LoginFlow = LoginFlow::new();
 #[derive(Clone, Serialize, Deserialize)]
 struct Saved {
     row: Row,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    email: Option<String>,
     // An unapplied browser login must not be replaced by the client's older session.
     applied: bool,
     #[serde(default)]
@@ -118,6 +121,7 @@ fn load_store(path: &Path, current: &Catalog) -> Result<Store, String> {
                 id.clone(),
                 Saved {
                     row: row.clone(),
+                    email: None,
                     applied: true,
                     usage: None,
                 },
@@ -175,9 +179,10 @@ pub async fn list() -> Result<Vec<Account>, String> {
     let key = cipher(&dir)?;
     sync_native(&mut saved, &current, &key)?;
     let result = saved
-        .iter()
+        .iter_mut()
         .map(|(id, s)| {
             let mut account = summary(id, &s.row, current.active.as_deref(), &key)?;
+            s.email = Some(account.email.clone());
             account.usage = s.usage.clone();
             Ok(account)
         })
@@ -199,8 +204,8 @@ pub async fn refresh(id: &str) -> Result<Usage, String> {
         let path = store_path()?;
         let mut store = load_store(&path, &current)?;
         sync_native(&mut store, &current, &key)?;
-        let entry = store.get(id).ok_or("accountError.invalidAccount")?;
-        summary(id, &entry.row, None, &key)?;
+        let entry = store.get_mut(id).ok_or("accountError.invalidAccount")?;
+        entry.email = Some(summary(id, &entry.row, None, &key)?.email);
         let token = decrypt(
             &key,
             entry.row.get(ACCESS).ok_or("accountError.invalidAccount")?,
@@ -267,6 +272,7 @@ pub async fn poll_login(id: &str) -> Result<Option<Account>, String> {
             id,
             Saved {
                 row,
+                email: Some(account.email.clone()),
                 applied: false,
                 usage: None,
             },
@@ -300,6 +306,7 @@ pub async fn switch(id: &str) -> Result<Account, String> {
     sync_native(&mut saved, &current, &key)?;
     let selected = saved.get_mut(id).ok_or("accountError.invalidAccount")?;
     let account = summary(id, &selected.row, Some(id), &key)?;
+    selected.email = Some(account.email.clone());
     apply(&mut document, id, selected)?;
     // Keep the unapplied snapshot recoverable if writing the native file fails.
     write(&path, &saved)?;
@@ -329,6 +336,7 @@ mod tests {
                 let (id, row) = login_row(&json!({"accessToken":token(subject),"refreshToken":"refresh","selectedTeamId":42}), &key).unwrap();
                 let saved = Saved {
                     row,
+                    email: None,
                     applied: true,
                     usage: None,
                 };
@@ -373,6 +381,7 @@ mod tests {
             id,
             Saved {
                 row,
+                email: None,
                 applied: false,
                 usage: None,
             },

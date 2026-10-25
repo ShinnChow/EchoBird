@@ -457,6 +457,76 @@ pub(crate) async fn proxy_credentials_after_rejection(
         .ok_or("accountError.invalidAccount")?;
     proxy_credentials_inner(edition, id, Some(access)).await
 }
+
+pub(crate) async fn voice_credentials(
+    edition: Edition,
+    id: &str,
+    rejected: Option<&Value>,
+) -> Result<Value, String> {
+    let executable =
+        super::tool_manager::get_tool_exe_path(edition.tool()).ok_or("accountError.unavailable")?;
+    if super::qoder_native::desktop::identity(Path::new(&executable))
+        != Some((edition, super::qoder_native::desktop::ProductKind::App))
+    {
+        return Err("accountError.unavailable".into());
+    }
+    let metadata = super::tool_manager::packaged_desktop_metadata(Path::new(&executable))
+        .ok_or("accountError.unavailable")?;
+    let version = metadata["version"]
+        .as_str()
+        .filter(|value| {
+            !value.is_empty()
+                && value.len() <= 96
+                && value.bytes().all(|byte| byte.is_ascii_graphic())
+        })
+        .ok_or("accountError.unavailable")?;
+    voice_credentials_at(
+        &store_path(edition)?,
+        edition,
+        id,
+        rejected,
+        edition.openapi(),
+        version,
+    )
+    .await
+}
+
+async fn voice_credentials_at(
+    path: &Path,
+    edition: Edition,
+    id: &str,
+    rejected: Option<&Value>,
+    base: &str,
+    app_version: &str,
+) -> Result<Value, String> {
+    let rejected = rejected
+        .map(|value| {
+            value["deviceToken"]
+                .as_str()
+                .filter(|token| !token.is_empty())
+                .ok_or("accountError.invalidAccount")
+        })
+        .transpose()?;
+    let lock = request_lock(edition, id)?;
+    let _request = lock.lock().await;
+    let previous = saved_credentials_at(path, edition, id).await?;
+    let force = rejected.is_some_and(|token| token == previous.device_token);
+    let incoming = rotate_at(&previous, true, force, base).await?;
+    let _guard = ACCOUNT_LOCK.lock().await;
+    let mut store = load_at(path)?;
+    let current = save_rotation(&mut store, id, &previous, &incoming)?;
+    if current != previous {
+        super::cursor_auth::write(path, &store)?;
+        rotations()
+            .lock()
+            .map_err(|_| "accountError.write")?
+            .remove(&rotation_key(&previous, true));
+    }
+    Ok(
+        serde_json::json!({"edition":current.edition,"deviceToken":current.device_token,"userId":current.user_id,"name":current.name,"email":current.email,"machineId":current.machine_id,"appVersion":app_version}),
+    )
+}
+
 async fn proxy_credentials_inner(
     edition: Edition,
     id: &str,
@@ -909,6 +979,121 @@ mod tests {
             .unwrap()
             .unwrap();
             assert_eq!(credentials.access_token, "valid");
+        }
+    }
+
+    #[tokio::test]
+    async fn voice_credentials_rotate_only_the_rejected_device_family_once() {
+        use axum::{routing::post, Json, Router};
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        };
+        for (edition, device_chat) in [
+            (Edition::Qoder, false),
+            (Edition::QoderCn, false),
+            (Edition::QoderCn, true),
+        ] {
+            let count = Arc::new(AtomicUsize::new(0));
+            let requests = count.clone();
+            let app = Router::new().route("/api/v1/deviceToken/refresh", post(move |Json(body): Json<Value>| {
+                assert_eq!(body["refresh_token"], "single-use-device-refresh");
+                requests.fetch_add(1, Ordering::SeqCst);
+                async { Json(serde_json::json!({"token":"rotated-device","refresh_token":"next-device-refresh","expires_in":3600})) }
+            }));
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let base = format!("http://{}", listener.local_addr().unwrap());
+            let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+            let c = Credentials {
+                edition,
+                access_token: "job-token".into(),
+                refresh_token: "job-refresh".into(),
+                expires_at: i64::MAX,
+                user_id: uuid::Uuid::new_v4().to_string(),
+                name: "User".into(),
+                email: "mail".into(),
+                machine_id: "machine".into(),
+                device_token: "device-token".into(),
+                device_refresh: "single-use-device-refresh".into(),
+                device_expires_at: i64::MAX,
+                device_chat,
+            };
+            let id = account_id(&c);
+            let path =
+                std::env::temp_dir().join(format!("qoder-voice-{}.json", uuid::Uuid::new_v4()));
+            let store = Store::from([(
+                id.clone(),
+                Saved {
+                    account: summary(&c),
+                    credential: protect(&c).unwrap(),
+                },
+            )]);
+            super::super::cursor_auth::write(&path, &store).unwrap();
+            let before = std::fs::read(&path).unwrap();
+            let first = voice_credentials_at(&path, edition, &id, None, &base, "0.4.9")
+                .await
+                .unwrap();
+            assert_eq!(first["deviceToken"], "device-token");
+            assert_eq!(first["appVersion"], "0.4.9");
+            assert!(first.get("accessToken").is_none());
+            assert!(first.get("deviceRefresh").is_none());
+            assert_eq!(std::fs::read(&path).unwrap(), before);
+            let wrong_family =
+                serde_json::json!({"deviceToken":"job-token","accessToken":"device-token"});
+            voice_credentials_at(&path, edition, &id, Some(&wrong_family), &base, "0.4.9")
+                .await
+                .unwrap();
+            let invalid = serde_json::json!({"accessToken":"device-token"});
+            assert!(
+                voice_credentials_at(&path, edition, &id, Some(&invalid), &base, "0.4.9")
+                    .await
+                    .is_err()
+            );
+            assert_eq!(count.load(Ordering::SeqCst), 0);
+            let rejected = serde_json::json!({"deviceToken":"device-token"});
+            let renewed =
+                voice_credentials_at(&path, edition, &id, Some(&rejected), &base, "0.4.9")
+                    .await
+                    .unwrap();
+            assert_eq!(renewed["deviceToken"], "rotated-device");
+            assert_eq!(count.load(Ordering::SeqCst), 1);
+            let current = selected(&load_at(&path).unwrap(), edition, &id).unwrap();
+            assert_eq!(current.device_refresh, "next-device-refresh");
+            assert_eq!(
+                current.access_token,
+                if device_chat {
+                    "rotated-device"
+                } else {
+                    "job-token"
+                }
+            );
+            assert_eq!(
+                current.refresh_token,
+                if device_chat {
+                    "next-device-refresh"
+                } else {
+                    "job-refresh"
+                }
+            );
+            assert_eq!(
+                voice_credentials_at(&path, edition, &id, Some(&rejected), &base, "0.4.9")
+                    .await
+                    .unwrap(),
+                renewed
+            );
+            assert_eq!(count.load(Ordering::SeqCst), 1);
+            let other = if edition == Edition::Qoder {
+                Edition::QoderCn
+            } else {
+                Edition::Qoder
+            };
+            assert!(
+                voice_credentials_at(&path, other, &id, None, &base, "0.4.9")
+                    .await
+                    .is_err()
+            );
+            std::fs::remove_file(path).unwrap();
+            server.abort();
         }
     }
 }

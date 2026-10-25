@@ -5,10 +5,25 @@ use serde_json::Value;
 use std::time::Duration;
 
 use super::ProxyError;
+use crate::models::model::AccountProvider;
 
 pub(crate) mod stream;
 
+#[cfg(test)]
+mod provider_tests;
+
 const ENDPOINT: &str = "https://www.workbuddy.cn";
+
+fn endpoint(provider: AccountProvider) -> Result<&'static str, ProxyError> {
+    match provider {
+        AccountProvider::WorkBuddy => Ok(ENDPOINT),
+        AccountProvider::WorkBuddyAi => Ok("https://www.workbuddy.ai"),
+        _ => Err(ProxyError::new(
+            StatusCode::BAD_REQUEST,
+            "Speech recognition is unavailable for this account provider",
+        )),
+    }
+}
 
 pub(crate) async fn transcribe_with<F, Fut>(
     client: &reqwest::Client,
@@ -44,7 +59,26 @@ pub(crate) async fn transcribe(
     filename: &str,
     mime: &str,
 ) -> Result<String, ProxyError> {
-    let endpoint = ENDPOINT;
+    transcribe_for_provider(
+        client,
+        AccountProvider::WorkBuddy,
+        credentials,
+        audio,
+        filename,
+        mime,
+    )
+    .await
+}
+
+pub(crate) async fn transcribe_for_provider(
+    client: &reqwest::Client,
+    provider: AccountProvider,
+    credentials: &Value,
+    audio: &Bytes,
+    filename: &str,
+    mime: &str,
+) -> Result<String, ProxyError> {
+    let endpoint = endpoint(provider)?;
     #[cfg(test)]
     let endpoint = credentials["_voice_test_endpoint"]
         .as_str()

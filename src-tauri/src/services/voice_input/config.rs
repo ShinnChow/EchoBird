@@ -145,7 +145,10 @@ impl Config {
             || self.channels.iter().any(|channel| {
                 channel.id.is_empty()
                     || channel.id.len() > 512
-                    || !matches!(channel.kind.as_str(), "workbuddy" | "model")
+                    || !matches!(channel.kind.as_str(), "workbuddy" | "account" | "model")
+                    || (channel.kind == "account"
+                        && crate::services::account_proxy::voice::parse_selector(&channel.id)
+                            .is_err())
                     || (channel.kind == "workbuddy"
                         && (channel.id.len() != 64
                             || !channel.id.bytes().all(|byte| byte.is_ascii_hexdigit())))

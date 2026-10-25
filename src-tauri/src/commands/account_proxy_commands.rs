@@ -12,3 +12,8 @@ pub async fn list_proxy_accounts(
 pub async fn get_account_proxy_models(source: AccountSource) -> Result<Vec<String>, String> {
     account_model_sources::list_models(&source).await
 }
+
+#[tauri::command]
+pub async fn get_account_speech_models(source: AccountSource) -> Result<Vec<String>, String> {
+    crate::services::account_proxy::voice::list_models(&source).await
+}

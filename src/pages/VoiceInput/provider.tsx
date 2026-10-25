@@ -1,27 +1,54 @@
-import { createContext, useContext, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useNavigationStore } from '../../stores/navigationStore';
-import { useToolsStore } from '../../stores/toolsStore';
 import { useVoiceInputStore, voiceBusy } from '../../stores/voiceInputStore';
 import { getVoiceState, type VoiceSnapshot } from '../../api/voiceInput';
-import { useWorkBuddyAccounts } from '../AppManager/useWorkBuddyAccounts';
+import type { AccountProvider } from '../../api/types';
+import {
+  accountSpeechProviders,
+  listProxyAccounts,
+  type ProxyAccount,
+} from '../../api/accountProxy';
 
-const clearModel = () => {};
-const showError = (error: string) => useVoiceInputStore.setState({ error });
-const Context = createContext<ReturnType<typeof useWorkBuddyAccounts> | null>(null);
+interface AccountDirectory {
+  accounts: ProxyAccount[];
+  accountCounts: Partial<Record<AccountProvider, number>>;
+}
+
+const Context = createContext<AccountDirectory | null>(null);
 
 export function VoiceInputProvider({ children }: { children: ReactNode }) {
   const active = useNavigationStore((state) => state.activePage === 'voice');
-  const installed = useToolsStore((state) =>
-    state.detectedTools.some((tool) => tool.id === 'workbuddy' && tool.installed)
-  );
-  const accounts = useWorkBuddyAccounts(
-    installed ? 'workbuddy' : null,
-    false,
-    clearModel,
-    showError,
-    active && installed
-  );
+  const [directory, setDirectory] = useState<AccountDirectory>({
+    accounts: [],
+    accountCounts: {},
+  });
+  useEffect(() => {
+    if (!active) return;
+    let disposed = false;
+    void Promise.resolve().then(async () => {
+      if (disposed) return;
+      const results = await Promise.allSettled(
+        accountSpeechProviders.map((provider) => listProxyAccounts(provider.id))
+      );
+      if (disposed) return;
+      setDirectory((previous) => {
+        const accountCounts = { ...previous.accountCounts };
+        const accounts = accountSpeechProviders.flatMap((provider, index) => {
+          const result = results[index];
+          if (result.status === 'fulfilled') {
+            accountCounts[provider.id] = result.value.length;
+            return result.value;
+          }
+          return previous.accounts.filter((account) => account.source.provider === provider.id);
+        });
+        return { accounts, accountCounts };
+      });
+    });
+    return () => {
+      disposed = true;
+    };
+  }, [active]);
   useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
@@ -57,7 +84,7 @@ export function VoiceInputProvider({ children }: { children: ReactNode }) {
         void state.cancel();
     };
   }, [active]);
-  return <Context.Provider value={accounts}>{children}</Context.Provider>;
+  return <Context.Provider value={directory}>{children}</Context.Provider>;
 }
 
 export function useVoiceAccounts() {

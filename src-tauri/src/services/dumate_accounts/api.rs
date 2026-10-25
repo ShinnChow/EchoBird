@@ -88,6 +88,15 @@ impl Client {
         })
     }
     async fn request(&self, c: &Credentials, method: Method, path: &str) -> Result<Value, String> {
+        self.request_as(c, method, path, false).await
+    }
+    async fn request_as(
+        &self,
+        c: &Credentials,
+        method: Method,
+        path: &str,
+        desktop: bool,
+    ) -> Result<Value, String> {
         let url =
             url::Url::parse(&format!("{}{path}", self.base)).map_err(|_| "accountError.format")?;
         let (cookie, csrf) = headers(c, &url)?;
@@ -96,9 +105,31 @@ impl Client {
             .request(method.clone(), url)
             .header("Cookie", cookie)
             .header("Accept", "application/json")
-            .header("X-Dumate-Client-Type", "web")
+            .header(
+                "X-Dumate-Client-Type",
+                if desktop { "desktop" } else { "web" },
+            )
             .header("Origin", &self.base)
-            .header("Referer", format!("{}/app", self.base));
+            .header(
+                "Referer",
+                format!("{}/{}", self.base, if desktop { "" } else { "app" }),
+            );
+        if desktop {
+            request = request
+                .header("Content-Type", "application/json")
+                .header("X-Requested-With", "XMLHttpRequest");
+            if let Some(version) = super::super::tool_manager::get_tool_exe_path("dumate")
+                .and_then(|path| {
+                    super::super::tool_manager::packaged_desktop_metadata(std::path::Path::new(
+                        &path,
+                    ))
+                })
+                .filter(|metadata| metadata["name"] == "qianfan-desktop-app")
+                .and_then(|metadata| metadata["version"].as_str().map(str::to_owned))
+            {
+                request = request.header("dumate-version", version);
+            }
+        }
         if let Some(csrf) = csrf {
             request = request.header("csrftoken", csrf);
         }
@@ -121,6 +152,13 @@ impl Client {
     }
     pub(super) async fn user(&self, c: &Credentials) -> Result<Value, String> {
         self.request(c, Method::GET, "/api/dumate/user/info").await
+    }
+    pub(super) async fn speech_session(&self, c: &Credentials) -> Result<Value, String> {
+        if c.enterprise() {
+            return Err("accountError.unavailable".into());
+        }
+        self.request_as(c, Method::GET, "/api/dumate/system/sessionToken", true)
+            .await
     }
     pub(super) async fn gateway_token(
         &self,

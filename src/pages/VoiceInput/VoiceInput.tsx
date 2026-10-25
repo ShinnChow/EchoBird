@@ -36,7 +36,6 @@ import type { TKey } from '../../i18n';
 import type { VoiceChannel, VoiceConfig } from '../../api/voiceInput';
 import { useVoiceInputStore, voiceBusy } from '../../stores/voiceInputStore';
 import { useNavigationStore } from '../../stores/navigationStore';
-import { useToolsStore } from '../../stores/toolsStore';
 import { useAccountPrivacyStore, ACCOUNT_NAME_MASK } from '../../stores/accountPrivacyStore';
 import { RemoteModelSelector } from '../../components/RemoteModelSelector';
 import { MiniSelect } from '../../components/MiniSelect';
@@ -44,10 +43,10 @@ import { ViewModeTabs } from '../../components/ViewModeTabs';
 import { ModelListCard } from '../../components/ModelListCard';
 import { SortableCard } from '../../components/SortableCard';
 import { DirectoryRow } from '../../components/DirectoryRow';
-import { AccountAccessRiskNotice } from '../../components/AccountAccessRiskNotice';
 import { useAccountAccessRisk } from '../../stores/accountAccessRiskStore';
 import { getModelIcon } from '../../components/cards';
-import { openAccountModelForm } from '../FreeModels/AccountProxyPanel';
+import { AccountProxyPanel, openAccountModelForm } from '../FreeModels/AccountProxyPanel';
+import { accountSpeechProviders, speechSourceFromSelector } from '../../api/accountProxy';
 import modelDirectory from '../../data/modelDirectory.json';
 import * as modelApi from '../../api/models';
 import {
@@ -119,31 +118,48 @@ export function VoiceInputMain() {
   const update = <K extends keyof VoiceConfig>(key: K, value: VoiceConfig[K]) => {
     if (!busy) void save({ [key]: value });
   };
-  const label = (channel: VoiceChannel) =>
-    channel.kind === 'model'
-      ? sourceModels.find((model) => model.internalId === channel.id)?.name ||
+  const accountSource = (channel: VoiceChannel) =>
+    channel.kind === 'workbuddy'
+      ? { provider: 'workBuddy' as const, accountId: channel.id }
+      : channel.kind === 'account'
+        ? speechSourceFromSelector(channel.id)
+        : undefined;
+  const label = (channel: VoiceChannel) => {
+    if (channel.kind === 'model')
+      return (
+        sourceModels.find((model) => model.internalId === channel.id)?.name ||
         t('voice.missingSource')
-      : hidden
-        ? ACCOUNT_NAME_MASK
-        : accounts.accounts.find((account) => account.id === channel.id)?.name || 'WorkBuddy';
+      );
+    if (hidden) return ACCOUNT_NAME_MASK;
+    const source = accountSource(channel);
+    return (
+      (source &&
+        accounts.accounts.find(
+          (account) =>
+            account.source.provider === source.provider &&
+            account.source.accountId === source.accountId
+        )?.label) ||
+      accountSpeechProviders.find((provider) => provider.id === source?.provider)?.name ||
+      t('voice.missingSource')
+    );
+  };
   const renderChannel = (index: number, handle?: ReactNode, overlay = false) => {
     const channel = channels[index];
     const model =
       channel?.kind === 'model'
         ? sourceModels.find((item) => item.internalId === channel.id)
         : undefined;
+    const source = channel && accountSource(channel);
+    const provider = accountSpeechProviders.find((entry) => entry.id === source?.provider);
     return (
       <VoiceChannelCard
         index={index}
         channel={channel}
         name={channel ? label(channel) : ''}
-        detail={
-          model?.modelId ||
-          t(channel?.kind === 'workbuddy' ? 'voice.accountInput' : 'voice.apiInput')
-        }
+        detail={model?.modelId || t(source ? 'voice.accountInput' : 'voice.apiInput')}
         icon={
-          channel?.kind === 'workbuddy'
-            ? '/icons/tools/workbuddy.png'
+          provider
+            ? `/icons/tools/${provider.icon}`
             : model
               ? getModelIcon(model.name, model.modelId)
               : null
@@ -719,9 +735,6 @@ export function VoiceInputPanel() {
   const { acknowledged } = useAccountAccessRisk();
   const models = useModelNexus();
   const active = useNavigationStore((navigation) => navigation.activePage === 'voice');
-  const installed = useToolsStore((tools) =>
-    tools.detectedTools.some((tool) => tool.id === 'workbuddy' && tool.installed)
-  );
   const unavailable = !state.snapshot || state.pending || voiceBusy(state.snapshot?.phase);
   const disabled = unavailable || state.saving;
   useEffect(() => {
@@ -781,13 +794,12 @@ export function VoiceInputPanel() {
     models.setShowAddModelModal(true);
   };
   const openAccount = () => {
-    if (!disabled && installed && acknowledged)
-      openAccountModelForm('workBuddy', models, 'voiceInput');
+    if (!disabled && acknowledged) openAccountModelForm('workBuddy', models, 'voiceInput');
   };
   return (
     <div
       className="voice-input-panel flex h-full flex-col overflow-hidden"
-      data-saving={state.saving && !unavailable && (tab === 'model' || (installed && acknowledged))}
+      data-saving={state.saving && !unavailable && (tab === 'model' || acknowledged)}
     >
       <div className="h-10 shrink-0 px-2 mb-2 flex items-center justify-between gap-2">
         <div className="min-w-0 w-fit">
@@ -802,7 +814,7 @@ export function VoiceInputPanel() {
         </div>
         <button
           type="button"
-          disabled={disabled || (tab === 'account' && (!installed || !acknowledged))}
+          disabled={disabled || (tab === 'account' && !acknowledged)}
           aria-label={t('freeModels.customAdd')}
           onClick={() => (tab === 'account' ? openAccount() : openModel())}
           className="w-9 h-9 shrink-0 flex items-center justify-center border border-cyber-border rounded-button text-cyber-text-secondary enabled:hover:text-cyber-text enabled:hover:bg-cyber-elevated disabled:opacity-40 transition-colors"
@@ -812,35 +824,12 @@ export function VoiceInputPanel() {
       </div>
       <div className="flex-1 px-2 pt-0.5 pb-2 overflow-y-auto space-y-2">
         {tab === 'account' ? (
-          <>
-            <AccountAccessRiskNotice />
-            <button
-              type="button"
-              disabled={disabled || !installed || !acknowledged}
-              onClick={openAccount}
-              aria-label={`${t('voice.accountInput')}: WorkBuddy`}
-              className="w-full min-h-[64px] flex items-center gap-3 px-3 bg-cyber-surface/60 rounded text-left enabled:hover:bg-cyber-elevated disabled:opacity-40 transition-colors"
-            >
-              <img
-                src="/icons/tools/workbuddy.png"
-                alt=""
-                className="w-8 h-8 shrink-0 object-contain"
-              />
-              <span className="flex-1 min-w-0 text-base font-bold text-cyber-text truncate">
-                WorkBuddy
-              </span>
-              <span className="shrink-0 text-xs text-cyber-text-secondary tabular-nums whitespace-nowrap">
-                {t(
-                  accounts.accounts.length === 1
-                    ? 'accountProxy.accountCountOne'
-                    : 'accountProxy.accountCountOther'
-                ).replace('{count}', String(accounts.accounts.length))}
-              </span>
-            </button>
-            {!installed && (
-              <span className="text-xs text-cyber-text-muted">{t('voice.notInstalled')}</span>
-            )}
-          </>
+          <AccountProxyPanel
+            voice
+            disabled={disabled}
+            accounts={accounts.accounts}
+            accountCounts={accounts.accountCounts}
+          />
         ) : (
           <>
             {state.models

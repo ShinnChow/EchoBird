@@ -1,5 +1,6 @@
 //! Cursor 3.22 account state in the default user-data directory.
 //! Only authentication keys and team selection are changed, in one SQLite transaction.
+pub(crate) mod speech;
 use super::cursor_auth::{
     cipher, claims, decrypt, encrypt, identity, read, write, Cipher, LoginFlow,
 };
@@ -34,6 +35,8 @@ struct Saved {
     // EchoBird never persists Cursor's plaintext SQLite tokens in its own account store.
     session: String,
     applied: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    email: Option<String>,
     #[serde(default)]
     usage: Option<Usage>,
 }
@@ -148,6 +151,7 @@ fn saved(credentials: &Credentials, key: &Cipher, applied: bool) -> Result<Saved
             &serde_json::to_string(credentials).map_err(|_| "accountError.format")?,
         )?,
         applied,
+        email: Some(summary(credentials, None)?.email),
         usage: None,
     })
 }
@@ -184,7 +188,9 @@ fn sync_native(
             {
                 entry.usage = None;
             }
-            entry.session = saved(current, key, true)?.session;
+            let replacement = saved(current, key, true)?;
+            entry.session = replacement.session;
+            entry.email = replacement.email;
         }
     }
     Ok(())
@@ -267,9 +273,10 @@ pub async fn list() -> Result<Vec<Account>, String> {
         .map(|c| identity(&c.access_token))
         .transpose()?;
     let result = store
-        .iter()
+        .iter_mut()
         .map(|(id, saved)| {
             let mut account = summary(&credentials(id, saved, &key)?, active.as_deref())?;
+            saved.email = Some(account.email.clone());
             account.usage = saved.usage.clone();
             Ok(account)
         })
@@ -298,6 +305,10 @@ pub async fn refresh(id: &str) -> Result<Usage, String> {
             store.get(id).ok_or("accountError.invalidAccount")?,
             &key,
         )?;
+        store
+            .get_mut(id)
+            .ok_or("accountError.invalidAccount")?
+            .email = Some(summary(&login, None)?.email);
         write(&path, &store)?;
         (login.access_token, login.team_id)
     };
@@ -361,6 +372,10 @@ pub async fn switch(id: &str) -> Result<Account, String> {
         store.get(id).ok_or("accountError.invalidAccount")?,
         &key,
     )?;
+    store
+        .get_mut(id)
+        .ok_or("accountError.invalidAccount")?
+        .email = Some(summary(&selected, None)?.email);
     write(&path, &store)?;
     apply(&mut db, &selected)?;
     store

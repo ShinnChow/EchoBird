@@ -246,7 +246,15 @@ fn decrypt(encoded: &str) -> String {
 }
 
 #[cfg(test)]
+tokio::task_local! {
+    pub(crate) static LIVE_ACCOUNT_CRYPTO: ();
+}
+
+#[cfg(test)]
 fn encrypt(raw: &str) -> String {
+    if LIVE_ACCOUNT_CRYPTO.try_with(|()| ()).is_ok() {
+        return super::model_manager::encrypt_key_for_storage(raw);
+    }
     use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit};
     use rand::RngCore;
     let mut nonce = [0u8; 12];
@@ -261,6 +269,9 @@ fn encrypt(raw: &str) -> String {
 }
 #[cfg(test)]
 fn decrypt(encoded: &str) -> String {
+    if LIVE_ACCOUNT_CRYPTO.try_with(|()| ()).is_ok() {
+        return super::model_manager::decrypt_key_for_use(encoded);
+    }
     use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit};
     hex::decode(encoded.trim_start_matches("enc:v1:"))
         .ok()

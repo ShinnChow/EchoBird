@@ -1,4 +1,5 @@
 import * as api from '../../api/models';
+import { speechSourceFromSelector } from '../../api/accountProxy';
 import { useVoiceInputStore, voiceBusy } from '../../stores/voiceInputStore';
 import type { NewModelForm } from '../ModelNexus/context';
 
@@ -10,14 +11,14 @@ export async function saveVoiceSource(form: NewModelForm, isCurrent = () => true
     throw new Error('voice.error.busy');
   if (form.accountSource) {
     const { provider, accountId } = form.accountSource;
-    if (provider !== 'workBuddy' || !accountId || form.modelId !== `workbuddy:${accountId}`)
+    const source = speechSourceFromSelector(form.modelId);
+    if (!source || source.provider !== provider || source.accountId !== accountId)
       throw new Error('voice.error.missingSource');
-    if (config.channels.some((channel) => channel.kind === 'workbuddy' && channel.id === accountId))
-      return;
+    const kind = provider === 'workBuddy' ? 'workbuddy' : 'account';
+    const id = provider === 'workBuddy' ? accountId : form.modelId;
+    if (config.channels.some((channel) => channel.kind === kind && channel.id === id)) return;
     if (config.channels.length >= 3) throw new Error('voice.error.channels');
-    if (
-      !(await state.save({ channels: [...config.channels, { kind: 'workbuddy', id: accountId }] }))
-    )
+    if (!(await state.save({ channels: [...config.channels, { kind, id }] })))
       throw new Error('voice.error.save');
     return;
   }

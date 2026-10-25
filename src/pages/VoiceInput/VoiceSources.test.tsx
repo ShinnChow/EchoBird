@@ -379,11 +379,10 @@ it.each([
   }
 );
 
-it.each(['recording', 'pending', 'uninstalled', 'risk'] as const)(
+it.each(['recording', 'pending', 'risk'] as const)(
   'preserves unavailable panel feedback for %s even while saving',
   async (reason) => {
     useAccountAccessRiskStore.setState({ acknowledged: reason !== 'risk', hydrated: true });
-    if (reason === 'uninstalled') tools.setState({ detectedTools: [] });
     voice.setState({
       saving: true,
       pending: reason === 'pending',
@@ -409,6 +408,21 @@ it.each(['recording', 'pending', 'uninstalled', 'risk'] as const)(
     expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
   }
 );
+
+it('uses saved account access when native clients are uninstalled', async () => {
+  tools.setState({ detectedTools: [] });
+  useAccountAccessRiskStore.setState({ acknowledged: true, hydrated: true });
+  await mount();
+  const row = renderer.root.findByProps({ 'aria-label': 'voice.accountInput: WorkBuddy AI' });
+  expect(row.props.disabled).toBe(false);
+  act(() => row.props.onClick());
+  expect(context.setNewModelForm).toHaveBeenCalledWith(
+    expect.objectContaining({ accountSource: { provider: 'workBuddyAi', accountId: '' } })
+  );
+  expect(account.add).not.toHaveBeenCalled();
+  expect(account.refresh).not.toHaveBeenCalled();
+  expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
+});
 
 describe('voice source card ordering', () => {
   const channels = [

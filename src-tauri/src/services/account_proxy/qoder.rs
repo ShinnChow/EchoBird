@@ -18,6 +18,11 @@ use std::{
 
 const MODELS_PATH: &str = "/algo/api/v2/model/list?Encode=1";
 const CHAT_PATH:&str="/algo/api/v2/service/pro/sse/agent_chat_generation?FetchKeys=llm_model_result&AgentId=agent_common&Encode=1";
+
+pub(super) fn speech_headers(c: &Value, path: &str) -> Result<HeaderMap, ProxyError> {
+    codec::speech_headers(c, path)
+}
+
 type Catalog = BTreeMap<String, Value>;
 #[derive(Default, Serialize, Deserialize)]
 struct Cache(BTreeMap<String, Catalog>);

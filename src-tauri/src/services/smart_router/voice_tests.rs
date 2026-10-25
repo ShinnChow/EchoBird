@@ -57,6 +57,7 @@ async fn mock(responses: Vec<Response>) -> MockServer {
 
 fn upload() -> Upload {
     Upload {
+        selector: format!("workbuddy:{}", "a".repeat(64)),
         source: AccountSource {
             provider: AccountProvider::WorkBuddy,
             account_id: "a".repeat(64),

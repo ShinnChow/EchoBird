@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
-import { accountProxyProviders, listProxyAccounts } from '../../api/accountProxy';
+import {
+  accountProxyProviders,
+  accountSpeechProviders,
+  listProxyAccounts,
+  type ProxyAccount,
+} from '../../api/accountProxy';
 import type { AccountProvider } from '../../api/types';
 import { AccountAccessRiskNotice } from '../../components/AccountAccessRiskNotice';
 import { useAccountAccessRisk } from '../../stores/accountAccessRiskStore';
@@ -13,7 +18,10 @@ export function openAccountModelForm(
   destination: 'freeRouter' | 'voiceInput' = 'freeRouter'
 ) {
   context.setNewModelForm({
-    name: accountProxyProviders.find((p) => p.id === provider)?.name ?? '',
+    name:
+      (destination === 'voiceInput' ? accountSpeechProviders : accountProxyProviders).find(
+        (p) => p.id === provider
+      )?.name ?? '',
     baseUrl: '',
     anthropicUrl: '',
     apiKey: '',
@@ -27,7 +35,17 @@ export function openAccountModelForm(
   context.setShowAddModelModal(true);
 }
 
-export function AccountProxyPanel() {
+export function AccountProxyPanel({
+  voice = false,
+  disabled = false,
+  accounts,
+  accountCounts: suppliedCounts,
+}: {
+  voice?: boolean;
+  disabled?: boolean;
+  accounts?: ProxyAccount[];
+  accountCounts?: Partial<Record<AccountProvider, number>>;
+}) {
   const context = useModelNexus();
   const { t } = useI18n();
   const { acknowledged } = useAccountAccessRisk();
@@ -35,7 +53,7 @@ export function AccountProxyPanel() {
   const [accountCounts, setAccountCounts] = useState<Partial<Record<AccountProvider, number>>>({});
 
   useEffect(() => {
-    if (activePage !== 'freeModels') return;
+    if (voice || activePage !== 'freeModels') return;
     let ignore = false;
     void Promise.resolve().then(async () => {
       if (ignore) return;
@@ -55,24 +73,33 @@ export function AccountProxyPanel() {
     return () => {
       ignore = true;
     };
-  }, [activePage]);
+  }, [activePage, voice]);
 
-  const sortedProviders = [...accountProxyProviders].sort(
-    (a, b) => (accountCounts[b.id] ?? 0) - (accountCounts[a.id] ?? 0)
-  );
+  const providers = voice ? accountSpeechProviders : accountProxyProviders;
+  const counts: Partial<Record<AccountProvider, number>> = voice
+    ? (suppliedCounts ?? {})
+    : accountCounts;
+  if (voice && suppliedCounts === undefined && accounts !== undefined)
+    providers.forEach((provider) => {
+      counts[provider.id] = accounts.filter(
+        (account) => account.source.provider === provider.id
+      ).length;
+    });
+  const sortedProviders = [...providers].sort((a, b) => (counts[b.id] ?? 0) - (counts[a.id] ?? 0));
 
   return (
-    <div className="flex-1 px-2 pt-0.5 pb-2 overflow-y-auto space-y-2">
+    <div className={voice ? 'space-y-2' : 'flex-1 px-2 pt-0.5 pb-2 overflow-y-auto space-y-2'}>
       <AccountAccessRiskNotice />
       {sortedProviders.map((provider) => (
         <button
           key={provider.id}
           type="button"
-          disabled={!acknowledged}
+          disabled={disabled || !acknowledged}
           onClick={() => {
-            if (acknowledged) openAccountModelForm(provider.id, context);
+            if (!disabled && acknowledged)
+              openAccountModelForm(provider.id, context, voice ? 'voiceInput' : 'freeRouter');
           }}
-          aria-label={`${t('freeModels.addToRouter')}: ${provider.name}`}
+          aria-label={`${t(voice ? 'voice.accountInput' : 'freeModels.addToRouter')}: ${provider.name}`}
           className="w-full min-h-[64px] flex items-center gap-3 px-3 bg-cyber-surface/60 rounded text-left enabled:hover:bg-cyber-elevated/70 disabled:opacity-40 disabled:grayscale transition-colors"
         >
           <img
@@ -91,13 +118,13 @@ export function AccountProxyPanel() {
             </span>
           )}
           <span className="shrink-0 text-xs text-cyber-text-secondary tabular-nums whitespace-nowrap">
-            {accountCounts[provider.id] === undefined
+            {counts[provider.id] === undefined
               ? '—'
               : t(
-                  accountCounts[provider.id] === 1
+                  counts[provider.id] === 1
                     ? 'accountProxy.accountCountOne'
                     : 'accountProxy.accountCountOther'
-                ).replace('{count}', String(accountCounts[provider.id]))}
+                ).replace('{count}', String(counts[provider.id]))}
           </span>
         </button>
       ))}

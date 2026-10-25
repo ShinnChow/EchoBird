@@ -19,6 +19,10 @@ export function accountProxyStatus(
   provider: AccountProvider
 ): AccountProxyStatus {
   switch (provider) {
+    case 'cursor':
+      return context.cursorAccounts;
+    case 'grokbot':
+      return context.grokBotAccounts;
     case 'doubaowork':
     case 'dola':
       return context.doubaoAccountGroups[provider];
@@ -56,6 +60,9 @@ export function accountProxyStatus(
       return context.qoderAccountGroups.qoder;
     case 'qoderCn':
       return context.qoderAccountGroups.qodercn;
+    case 'qwenwork':
+    case 'qwenworkcn':
+      return context.qwenWorkAccountGroups[provider];
     case 'grok':
       return context.grokAccounts;
     case 'cline':

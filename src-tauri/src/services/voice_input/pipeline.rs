@@ -16,6 +16,15 @@ pub fn resolve_model(id: &str) -> Result<ModelConfig, String> {
         .ok_or_else(|| "voice.error.missingSource".into())
 }
 
+pub(super) fn recognition_timeout(channel: &Channel, audio: &Bytes) -> std::time::Duration {
+    if channel.kind == "account" {
+        if let Ok((source, _)) = account_proxy::voice::parse_selector(&channel.id) {
+            return account_proxy::voice::request_timeout(source.provider, audio.len());
+        }
+    }
+    std::time::Duration::from_secs(60)
+}
+
 pub(super) async fn first_transcript<F, Fut>(
     channels: &[Channel],
     mut streamed: Option<Result<String, String>>,
@@ -76,6 +85,19 @@ pub(super) async fn recognize(
                         account_model_sources::credentials(source, false).await
                     }
                 }
+            },
+        )
+        .await
+        .map_err(|_| "voice.error.transcribe".into());
+    }
+    if channel.kind == "account" {
+        return account_proxy::voice::transcribe(
+            client,
+            account_proxy::voice::SpeechRequest {
+                selector: &channel.id,
+                audio,
+                filename: "recording.wav",
+                mime: "audio/wav",
             },
         )
         .await

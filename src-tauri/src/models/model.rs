@@ -30,6 +30,9 @@ impl ModelScope {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum AccountProvider {
+    Cursor,
+    #[serde(rename = "grokbot")]
+    GrokBot,
     Dumate,
     #[serde(rename = "doubaowork")]
     DoubaoWork,
@@ -46,6 +49,10 @@ pub enum AccountProvider {
     Minimax,
     Qoder,
     QoderCn,
+    #[serde(rename = "qwenwork")]
+    QwenWork,
+    #[serde(rename = "qwenworkcn")]
+    QwenWorkCn,
     Grok,
     Cline,
     Kiro,

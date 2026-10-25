@@ -325,3 +325,109 @@ it('ignores an earlier directory after leaving the page and does not load while 
   expect(api.getAccountProxyModels).not.toHaveBeenCalled();
   expect(context.setShowAddModelModal).not.toHaveBeenCalled();
 });
+
+it('reuses the speech-capable provider rows and supplied counts without a second directory read', async () => {
+  useNavigationStore.setState({ activePage: 'voice' });
+  const saved = [
+    ...accounts('workBuddy', 1),
+    ...accounts('claudeCode', 2),
+    ...accounts('minimax', 3),
+  ];
+  await act(async () => {
+    renderer = create(<AccountProxyPanel voice accounts={saved} />);
+  });
+  const names = renderer.root
+    .findAllByType('button')
+    .filter((button) => button.props['aria-label']?.includes(': '))
+    .map((button) => button.findAllByType('span')[0].children.join(''));
+  expect(names).toEqual([
+    'MiniMax',
+    'Claude Code',
+    'WorkBuddy',
+    'ChatGPT / Codex',
+    'WorkBuddy AI',
+    'DuMate',
+    '豆包工作',
+    'Antigravity',
+    'Trae',
+    'Trae CN',
+    'Qoder',
+    'Qoder CN',
+    'Kilo',
+    'CodeArts',
+    'Devin',
+    'Cursor',
+    'Grok Bot',
+    '千问办公',
+    'QwenWork',
+  ]);
+  expect(count('workBuddy')).toBe('1 个账号');
+  expect(count('workBuddyAi')).toBe('0 个账号');
+  expect(count('claudeCode')).toBe('2 个账号');
+  expect(count('minimax')).toBe('3 个账号');
+  expect(renderer.root.findAllByType('div')[0].props.className).toBe('space-y-2');
+  expect(api.listProxyAccounts).not.toHaveBeenCalled();
+  expect(api.getAccountProxyModels).not.toHaveBeenCalled();
+  expect(invoke).not.toHaveBeenCalled();
+  act(() => row('minimax').props.onClick());
+  expect(context.setNewModelForm).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ accountSource: { provider: 'minimax', accountId: '' } })
+  );
+  expect(context.setModelModalDestination).toHaveBeenCalledWith('voiceInput');
+});
+
+it('keeps speech source actions disabled while pending or before risk acknowledgement', async () => {
+  useNavigationStore.setState({ activePage: 'voice' });
+  await act(async () => {
+    renderer = create(<AccountProxyPanel voice disabled accounts={[]} />);
+  });
+  expect(row('workBuddyAi').props.disabled).toBe(true);
+  act(() => row('workBuddyAi').props.onClick());
+  expect(context.setShowAddModelModal).not.toHaveBeenCalled();
+  await act(async () => {
+    useAccountAccessRiskStore.setState({ acknowledged: false });
+    renderer.update(<AccountProxyPanel voice accounts={[]} />);
+  });
+  expect(row('workBuddyAi').props.disabled).toBe(true);
+  act(() => row('workBuddyAi').props.onClick());
+  expect(context.setShowAddModelModal).not.toHaveBeenCalled();
+  expect(api.listProxyAccounts).not.toHaveBeenCalled();
+});
+
+it('shows unknown speech counts until supplied results establish zero or a saved count', async () => {
+  useNavigationStore.setState({ activePage: 'voice' });
+  const pending = {};
+  const saved = accounts('workBuddy', 1);
+  await act(async () => {
+    renderer = create(<AccountProxyPanel voice accounts={saved} accountCounts={pending} />);
+  });
+  expect(count('workBuddy')).toBe('—');
+  expect(count('claudeCode')).toBe('—');
+  expect(count('codex')).toBe('—');
+  await act(async () => {
+    renderer.update(
+      <AccountProxyPanel voice accounts={saved} accountCounts={{ workBuddy: 1, codex: 0 }} />
+    );
+  });
+  expect(count('workBuddy')).toBe('1 个账号');
+  expect(count('codex')).toBe('0 个账号');
+  expect(count('claudeCode')).toBe('—');
+  expect(pending).toEqual({});
+  expect(api.listProxyAccounts).not.toHaveBeenCalled();
+  expect(api.getAccountProxyModels).not.toHaveBeenCalled();
+  expect(invoke).not.toHaveBeenCalled();
+  expect(context.setNewModelForm).not.toHaveBeenCalled();
+});
+
+it('only infers known speech counts when account rows were explicitly supplied', async () => {
+  useNavigationStore.setState({ activePage: 'voice' });
+  await act(async () => {
+    renderer = create(<AccountProxyPanel voice />);
+  });
+  expect(count('workBuddy')).toBe('—');
+  await act(async () => renderer.update(<AccountProxyPanel voice accounts={[]} />));
+  expect(count('workBuddy')).toBe('0 个账号');
+  expect(api.listProxyAccounts).not.toHaveBeenCalled();
+  expect(api.getAccountProxyModels).not.toHaveBeenCalled();
+  expect(invoke).not.toHaveBeenCalled();
+});

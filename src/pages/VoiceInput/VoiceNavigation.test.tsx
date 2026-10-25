@@ -8,6 +8,7 @@ import { useNavigationStore as navigation } from '../../stores/navigationStore';
 import { useToolsStore as tools } from '../../stores/toolsStore';
 import * as accountApi from '../../api/tauri';
 import * as voiceApi from '../../api/voiceInput';
+import * as proxyApi from '../../api/accountProxy';
 import { listen } from '@tauri-apps/api/event';
 
 vi.mock('../../hooks/useI18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
@@ -15,6 +16,12 @@ vi.mock('../../components/ConfirmDialog', () => ({
   useConfirm: () => vi.fn().mockResolvedValue(true),
 }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn().mockResolvedValue(() => {}) }));
+vi.mock('../../api/accountProxy', async (original) => ({
+  ...(await original<typeof import('../../api/accountProxy')>()),
+  listProxyAccounts: vi.fn(),
+  getAccountProxyModels: vi.fn(),
+  getAccountSpeechModels: vi.fn(),
+}));
 vi.mock('../../api/voiceInput', () => ({
   getVoiceState: vi.fn(),
   getVoiceDevices: vi.fn(),
@@ -35,11 +42,9 @@ vi.mock('../../api/tauri', () => ({
 }));
 
 const saved = {
-  id: 'a'.repeat(64),
-  edition: 'workbuddy' as const,
-  name: 'Saved account',
-  active: false,
-} as accountApi.WorkBuddyAccount;
+  source: { provider: 'workBuddy', accountId: 'a'.repeat(64) },
+  label: 'Saved account',
+} as proxyApi.ProxyAccount;
 let renderer: ReactTestRenderer;
 let accounts: ReturnType<typeof useVoiceAccounts>;
 function Harness() {
@@ -78,8 +83,9 @@ beforeEach(() => {
   tools.setState({
     detectedTools: [{ id: 'workbuddy', name: 'WorkBuddy', category: 'desktop', installed: true }],
   });
-  vi.mocked(accountApi.listWorkBuddyAccounts).mockResolvedValue([saved]);
-  vi.mocked(accountApi.refreshWorkBuddyAccountQuota).mockResolvedValue({ ...saved, remaining: 42 });
+  vi.mocked(proxyApi.listProxyAccounts)
+    .mockReset()
+    .mockImplementation(async (provider) => (provider === 'workBuddy' ? [saved] : []));
   vi.mocked(voiceApi.getVoiceState).mockResolvedValue(voiceSnapshot());
   vi.mocked(voiceApi.getVoiceDevices).mockResolvedValue(['saved microphone']);
   vi.mocked(voiceApi.cancelVoice).mockResolvedValue(voiceSnapshot({ revision: 9 }));
@@ -96,6 +102,7 @@ describe('voice navigation boundaries', () => {
     expect(voice.getState().snapshot).toEqual(voiceSnapshot());
     expect(voiceApi.getVoiceDevices).not.toHaveBeenCalled();
     expect(accountApi.listWorkBuddyAccounts).not.toHaveBeenCalled();
+    expect(proxyApi.listProxyAccounts).not.toHaveBeenCalled();
     expect(accountApi.startWorkBuddyLogin).not.toHaveBeenCalled();
     expect(accountApi.refreshWorkBuddyAccountQuota).not.toHaveBeenCalled();
     expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
@@ -145,31 +152,80 @@ describe('voice navigation boundaries', () => {
     expect(voiceApi.getVoiceDevices).not.toHaveBeenCalled();
   });
 
-  it('reads installed saved accounts without login, quota, recording or writes; explicit refresh is a positive control', async () => {
+  it('reads the shared saved speech-account directory without native login, quota, recording or writes', async () => {
     await mount();
-    expect(accountApi.listWorkBuddyAccounts).not.toHaveBeenCalled();
+    expect(proxyApi.listProxyAccounts).not.toHaveBeenCalled();
     await visit('voice');
     expect(accounts.accounts).toEqual([saved]);
-    expect(accountApi.listWorkBuddyAccounts).toHaveBeenCalledExactlyOnceWith('workbuddy');
+    expect(accounts.accountCounts.workBuddy).toBe(1);
+    expect(accounts.accountCounts.claudeCode).toBe(0);
+    expect(vi.mocked(proxyApi.listProxyAccounts).mock.calls.map(([provider]) => provider)).toEqual([
+      'claudeCode',
+      'codex',
+      'workBuddy',
+      'workBuddyAi',
+      'dumate',
+      'doubaowork',
+      'antigravity',
+      'trae',
+      'traecn',
+      'minimax',
+      'qoder',
+      'qoderCn',
+      'kilo',
+      'codeArts',
+      'devin',
+      'cursor',
+      'grokbot',
+      'qwenworkcn',
+      'qwenwork',
+    ]);
+    expect(accountApi.listWorkBuddyAccounts).not.toHaveBeenCalled();
     expect(accountApi.startWorkBuddyLogin).not.toHaveBeenCalled();
     expect(accountApi.refreshWorkBuddyAccountQuota).not.toHaveBeenCalled();
+    expect(proxyApi.getAccountProxyModels).not.toHaveBeenCalled();
+    expect(proxyApi.getAccountSpeechModels).not.toHaveBeenCalled();
     expect(voiceApi.startVoice).not.toHaveBeenCalled();
     expect(voiceApi.recordVoice).not.toHaveBeenCalled();
     expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
-    await act(async () => {
-      await accounts.refresh(saved);
-    });
-    expect(accountApi.refreshWorkBuddyAccountQuota).toHaveBeenCalledExactlyOnceWith(
-      'workbuddy',
-      saved.id
-    );
-    expect(accounts.accounts[0].remaining).toBe(42);
   });
 
-  it('does not load uninstalled accounts; becoming installed enables the saved-account read', async () => {
+  it('keeps first-load speech account counts unknown while pending and after a failed read', async () => {
+    let finish!: (rows: proxyApi.ProxyAccount[]) => void;
+    vi.mocked(proxyApi.listProxyAccounts).mockImplementation((provider) =>
+      provider === 'workBuddy'
+        ? new Promise((resolve) => {
+            finish = resolve;
+          })
+        : provider === 'claudeCode'
+          ? Promise.reject(new Error('accountError.read'))
+          : Promise.resolve([])
+    );
+    await mount();
+    await visit('voice');
+    expect(accounts.accounts).toEqual([]);
+    expect(accounts.accountCounts).toEqual({});
+    await act(async () => finish([]));
+    expect(accounts.accounts).toEqual([]);
+    expect(accounts.accountCounts.workBuddy).toBe(0);
+    expect(accounts.accountCounts.codex).toBe(0);
+    expect(accounts.accountCounts.claudeCode).toBeUndefined();
+    expect(voice.getState().error).toBeNull();
+    expect(proxyApi.listProxyAccounts).toHaveBeenCalledTimes(19);
+    expect(proxyApi.getAccountProxyModels).not.toHaveBeenCalled();
+    expect(accountApi.listWorkBuddyAccounts).not.toHaveBeenCalled();
+    expect(accountApi.startWorkBuddyLogin).not.toHaveBeenCalled();
+    expect(accountApi.refreshWorkBuddyAccountQuota).not.toHaveBeenCalled();
+    expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
+    expect(voiceApi.recordVoice).not.toHaveBeenCalled();
+  });
+
+  it('loads only EchoBird saved accounts independently of native installation', async () => {
     tools.setState({ detectedTools: [] });
     await mount();
     await visit('voice');
+    expect(accounts.accounts).toEqual([saved]);
+    expect(proxyApi.listProxyAccounts).toHaveBeenCalledTimes(19);
     expect(accountApi.listWorkBuddyAccounts).not.toHaveBeenCalled();
     await act(async () => {
       tools.setState({
@@ -181,18 +237,60 @@ describe('voice navigation boundaries', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(accountApi.listWorkBuddyAccounts).toHaveBeenCalledTimes(1);
+    expect(proxyApi.listProxyAccounts).toHaveBeenCalledTimes(19);
+    expect(accountApi.listWorkBuddyAccounts).not.toHaveBeenCalled();
   });
 
   it('preserves cached rows without a blocking error after a passive reload fails', async () => {
     await mount();
     await visit('voice');
     await visit('models');
-    vi.mocked(accountApi.listWorkBuddyAccounts).mockRejectedValue('accountError.read');
+    const other: proxyApi.ProxyAccount = {
+      source: { provider: 'claudeCode', accountId: 'new-account' },
+      label: 'New saved account',
+    };
+    vi.mocked(proxyApi.listProxyAccounts).mockImplementation(async (provider) => {
+      if (provider === 'workBuddy') throw new Error('accountError.read');
+      return provider === 'claudeCode' ? [other] : [];
+    });
     await visit('voice');
-    expect(accounts.accounts).toEqual([saved]);
+    expect(accounts.accounts).toEqual([other, saved]);
+    expect(accounts.accountCounts.workBuddy).toBe(1);
+    expect(accounts.accountCounts.claudeCode).toBe(1);
     expect(voice.getState().error).toBeNull();
     expect(accountApi.refreshWorkBuddyAccountQuota).not.toHaveBeenCalled();
+  });
+
+  it('ignores an earlier account directory after leaving and returning to the voice page', async () => {
+    let finish!: (rows: proxyApi.ProxyAccount[]) => void;
+    vi.mocked(proxyApi.listProxyAccounts).mockImplementation((provider) =>
+      provider === 'workBuddy'
+        ? new Promise((resolve) => {
+            finish = resolve;
+          })
+        : Promise.resolve([])
+    );
+    await mount();
+    await visit('voice');
+    expect(accounts.accounts).toEqual([]);
+    expect(accounts.accountCounts).toEqual({});
+    await visit('models');
+    const latest: proxyApi.ProxyAccount = {
+      source: { provider: 'workBuddyAi', accountId: 'international' },
+      label: 'Current account',
+    };
+    vi.mocked(proxyApi.listProxyAccounts).mockImplementation(async (provider) =>
+      provider === 'workBuddyAi' ? [latest] : []
+    );
+    await visit('voice');
+    expect(accounts.accounts).toEqual([latest]);
+    expect(accounts.accountCounts.workBuddyAi).toBe(1);
+    expect(accounts.accountCounts.workBuddy).toBe(0);
+    await act(async () => finish([saved]));
+    expect(accounts.accounts).toEqual([latest]);
+    expect(accounts.accountCounts.workBuddyAi).toBe(1);
+    expect(accounts.accountCounts.workBuddy).toBe(0);
+    expect(proxyApi.listProxyAccounts).toHaveBeenCalledTimes(38);
   });
 
   it.each(['shortcut', 'island'] as const)(

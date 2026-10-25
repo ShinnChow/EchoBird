@@ -3,10 +3,11 @@ use std::future::Future;
 
 use super::*;
 use crate::models::model::AccountSource;
-use crate::services::{account_model_sources, account_proxy};
+use crate::services::account_proxy;
 
 struct Upload {
     source: AccountSource,
+    selector: String,
     audio: Bytes,
     filename: String,
     mime: String,
@@ -24,13 +25,9 @@ pub(super) async fn handle(State(state): State<AppState>, request: Request) -> R
     };
     let source = &upload.source;
     let result = tokio::time::timeout(
-        Duration::from_secs(60),
+        account_proxy::voice::request_timeout(source.provider, upload.audio.len()),
         transcribe(&state.http_client, &upload, |rejected| async move {
-            if let Some(rejected) = rejected {
-                account_model_sources::credentials_after_rejection(source, &rejected).await
-            } else {
-                account_model_sources::credentials(source, false).await
-            }
+            account_proxy::voice::credentials(source, rejected.as_ref()).await
         }),
     )
     .await;
@@ -56,6 +53,7 @@ async fn read_upload(request: Request, key: &str) -> Result<Upload, Response> {
         .await
         .map_err(|error| openai_error(error.status(), &error.body_text()))?;
     let mut source = None;
+    let mut selector = String::new();
     let mut audio = None;
     let mut filename = String::new();
     let mut mime = String::new();
@@ -71,19 +69,10 @@ async fn read_upload(request: Request, key: &str) -> Result<Upload, Response> {
                     .text()
                     .await
                     .map_err(|error| openai_error(error.status(), &error.body_text()))?;
-                let id = model
-                    .strip_prefix("workbuddy:")
-                    .filter(|id| id.len() == 64 && id.bytes().all(|byte| byte.is_ascii_hexdigit()))
-                    .ok_or_else(|| {
-                        openai_error(
-                            StatusCode::BAD_REQUEST,
-                            "model must be workbuddy:<saved account id>",
-                        )
-                    })?;
-                source = Some(AccountSource {
-                    provider: AccountProvider::WorkBuddy,
-                    account_id: id.to_owned(),
-                });
+                let (saved, _) = account_proxy::voice::parse_selector(&model)
+                    .map_err(account_proxy::ProxyError::into_response)?;
+                source = Some(saved);
+                selector = model;
             }
             Some("file") if audio.is_none() => {
                 filename = field.file_name().unwrap_or("audio").to_owned();
@@ -123,6 +112,7 @@ async fn read_upload(request: Request, key: &str) -> Result<Upload, Response> {
     }
     Ok(Upload {
         source: source.ok_or_else(|| openai_error(StatusCode::BAD_REQUEST, "model is required"))?,
+        selector,
         audio: audio.ok_or_else(|| openai_error(StatusCode::BAD_REQUEST, "file is required"))?,
         filename,
         mime,
@@ -139,11 +129,14 @@ where
     F: FnMut(Option<Value>) -> Fut,
     Fut: Future<Output = Result<Value, String>>,
 {
-    account_proxy::workbuddy_voice::transcribe_with(
+    account_proxy::voice::transcribe_with(
         client,
-        &upload.audio,
-        &upload.filename,
-        &upload.mime,
+        account_proxy::voice::SpeechRequest {
+            selector: &upload.selector,
+            audio: &upload.audio,
+            filename: &upload.filename,
+            mime: &upload.mime,
+        },
         credentials,
     )
     .await

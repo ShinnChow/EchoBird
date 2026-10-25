@@ -32,7 +32,7 @@ export interface VoiceDirectoryEntry {
 }
 
 export interface VoiceChannel {
-  kind: 'workbuddy' | 'model';
+  kind: 'workbuddy' | 'account' | 'model';
   id: string;
 }
 export interface VoiceBinding {

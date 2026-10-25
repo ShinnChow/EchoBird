@@ -2,6 +2,7 @@ import type { ProxyAccount } from '../../api/accountProxy';
 import type { QoderEdition } from '../../api/qoder';
 import type { TKey } from '../../i18n';
 import { codexPlanLabel } from './codexPlanLabel';
+import { qwenWorkPlanLabel } from './qwenWorkAccountDisplay';
 
 export function isFreePlan(plan?: string | null): boolean {
   return plan?.trim().toLowerCase() === 'free';
@@ -39,6 +40,11 @@ export function qoderPlanLabel(
 }
 
 export function accountProxyPlanLabel(account: ProxyAccount, t?: (key: TKey) => string): string {
+  if (t && (account.source.provider === 'qwenwork' || account.source.provider === 'qwenworkcn'))
+    return qwenWorkPlanLabel(
+      { edition: account.source.provider, plan: account.plan ?? null, planName: null },
+      t
+    );
   if (account.source.provider === 'minimax') return minimaxPlanLabel(account.plan);
   if (account.source.provider === 'qoder' || account.source.provider === 'qoderCn')
     return qoderPlanLabel(

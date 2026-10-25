@@ -1267,6 +1267,7 @@ pub fn run() {
             model_commands::get_cached_upstream_model_catalog,
             account_proxy_commands::list_proxy_accounts,
             account_proxy_commands::get_account_proxy_models,
+            account_proxy_commands::get_account_speech_models,
             minimax_account_commands::list_minimax_accounts,
             minimax_account_commands::start_minimax_login,
             minimax_account_commands::poll_minimax_login,

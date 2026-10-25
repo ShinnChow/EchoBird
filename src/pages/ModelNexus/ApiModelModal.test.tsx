@@ -196,6 +196,27 @@ it.each(['mimo', 'doubao'] as const)(
   }
 );
 
+it('allows a full voice source form and reports the limit only on Save without writing anything', async () => {
+  const config = {
+    ...voiceSnapshot().config,
+    channels: [1, 2, 3].map((id) => ({ kind: 'model' as const, id: String(id) })),
+  };
+  useNavigationStore.setState({ activePage: 'voice' });
+  useVoiceInputStore.setState({ snapshot: voiceSnapshot({ config }) });
+  await mount();
+  await act(async () => context.setModelModalDestination('voiceInput'));
+  await openAdd({ voiceOptions: { protocol: 'openai' } });
+  expect(button('model.enterSave').props.disabled).toBe(false);
+  expect(showToast).not.toHaveBeenCalled();
+  await act(async () => button('model.enterSave').props.onClick());
+  expect(showToast).toHaveBeenCalledExactlyOnceWith('error', 'voice.error.channels');
+  expect(context.showAddModelModal).toBe(true);
+  expect(catalogApi.addModel).not.toHaveBeenCalled();
+  expect(api.addModel).not.toHaveBeenCalled();
+  expect(saveVoiceConfig).not.toHaveBeenCalled();
+  expect(useVoiceInputStore.getState().snapshot?.config).toEqual(config);
+});
+
 it('adds an API model when Smart Router already has more than twenty candidates', async () => {
   for (let index = 0; index < 25; index++) selectedIds.add(`existing-${index}`);
   vi.mocked(api.addModel).mockResolvedValue(saved);

@@ -87,7 +87,7 @@ hex = "0.4"
 ring = "0.17"
 
 # HTTP client
-reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream", "gzip", "multipart"], default-features = false }
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream", "gzip", "multipart", "http2"], default-features = false }
 url = "2"
 rand = "0.8"
 futures-util = "0.3"
@@ -125,6 +125,7 @@ which = "8"
 zstd = "0.13.3"
 
 [dev-dependencies]
+axum = { version = "0.8", features = ["http2"] }
 regex = "1"
 
 [target.'cfg(unix)'.dependencies]

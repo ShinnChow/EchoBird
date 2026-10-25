@@ -314,11 +314,31 @@ async fn renew_once(
 }
 
 async fn credentials(edition: Edition, id: &str) -> Result<Credentials, String> {
+    credentials_at(&path(edition)?, edition, id, credential).await
+}
+
+async fn credentials_at(
+    path: &Path,
+    edition: Edition,
+    id: &str,
+    open: fn(&Store, Edition, &str) -> Result<Credentials, String>,
+) -> Result<Credentials, String> {
     let _guard = STORE_LOCK.lock().await;
-    credential(&load(&path(edition)?)?, edition, id)
+    open(&load(path)?, edition, id)
 }
 
 async fn rotate(c: &Credentials, force: bool, client: &api::Client) -> Result<Credentials, String> {
+    rotate_at(c, force, client, &path(c.edition)?, credential, protect).await
+}
+
+async fn rotate_at(
+    c: &Credentials,
+    force: bool,
+    client: &api::Client,
+    path: &Path,
+    open: fn(&Store, Edition, &str) -> Result<Credentials, String>,
+    seal: fn(&Credentials) -> Result<String, String>,
+) -> Result<Credentials, String> {
     if !force
         && !pending_rotations()
             .lock()
@@ -331,9 +351,8 @@ async fn rotate(c: &Credentials, force: bool, client: &api::Client) -> Result<Cr
     }
     let (key, next) = renew_once(c, client).await?;
     let _guard = STORE_LOCK.lock().await;
-    let path = path(c.edition)?;
-    let mut store = load(&path)?;
-    let current = credential(&store, c.edition, &c.id())?;
+    let mut store = load(path)?;
+    let current = open(&store, c.edition, &c.id())?;
     if current.auth != c.auth {
         pending_rotations()
             .lock()
@@ -344,13 +363,85 @@ async fn rotate(c: &Credentials, force: bool, client: &api::Client) -> Result<Cr
     store
         .get_mut(&c.id())
         .ok_or("accountError.invalidAccount")?
-        .credential = protect(&next)?;
-    super::cursor_auth::write(&path, &store)?;
+        .credential = seal(&next)?;
+    super::cursor_auth::write(path, &store)?;
     pending_rotations()
         .lock()
         .map_err(|_| "accountError.write")?
         .remove(&key);
     Ok(next)
+}
+
+pub(crate) async fn speech_credentials(
+    edition: Edition,
+    id: &str,
+    rejected: Option<&Value>,
+) -> Result<Value, String> {
+    speech_credentials_at(
+        edition,
+        id,
+        rejected,
+        &path(edition)?,
+        &api::Client::installed(edition)?,
+        credential,
+        protect,
+    )
+    .await
+}
+
+pub(crate) async fn proxy_credentials(
+    edition: Edition,
+    id: &str,
+    force: bool,
+) -> Result<Value, String> {
+    let rejected = if force {
+        let current = credentials(edition, id).await?;
+        Some(serde_json::json!({"accessToken":api::token(&current)?}))
+    } else {
+        None
+    };
+    speech_credentials(edition, id, rejected.as_ref()).await
+}
+
+async fn speech_credentials_at(
+    edition: Edition,
+    id: &str,
+    rejected: Option<&Value>,
+    path: &Path,
+    client: &api::Client,
+    open: fn(&Store, Edition, &str) -> Result<Credentials, String>,
+    seal: fn(&Credentials) -> Result<String, String>,
+) -> Result<Value, String> {
+    if client.edition != edition {
+        return Err("accountError.invalidAccount".into());
+    }
+    let rejected = rejected
+        .map(|value| {
+            value["accessToken"]
+                .as_str()
+                .filter(|token| !token.is_empty())
+                .ok_or("accountError.invalidAccount")
+        })
+        .transpose()?;
+    let request = request_lock(edition, id)?;
+    let _request = request.lock().await;
+    let c = credentials_at(path, edition, id, open).await?;
+    if c.auth["authRealm"]
+        .as_str()
+        .is_some_and(|realm| realm != "standard")
+    {
+        return Err("accountError.invalidAccount".into());
+    }
+    let force = rejected.is_some_and(|token| c.auth["token"].as_str() == Some(token));
+    let c = rotate_at(&c, force, client, path, open, seal).await?;
+    Ok(serde_json::json!({
+        "edition": c.edition,
+        "accessToken": api::token(&c)?,
+        "userId": c.auth["user"]["id"],
+        "name": c.auth["user"]["name"],
+        "email": c.auth["user"]["email"],
+        "version": client.version,
+    }))
 }
 
 pub async fn refresh(edition: Edition, id: &str) -> Result<Account, String> {
@@ -406,3 +497,295 @@ pub async fn apply(edition: Edition, id: &str) -> Result<Account, String> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod speech_tests {
+    use super::*;
+    use axum::{http::StatusCode, routing::post, Json, Router};
+    use serde_json::json;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    // Only synthetic credentials use this codec; fixtures never read the machine encryption key.
+    fn seal(c: &Credentials) -> Result<String, String> {
+        c.validate()?;
+        Ok(format!(
+            "enc:v1:fixture:{}",
+            serde_json::to_string(c).map_err(|_| "fixture encoding")?
+        ))
+    }
+
+    fn open(store: &Store, edition: Edition, id: &str) -> Result<Credentials, String> {
+        let saved = store
+            .get(id)
+            .filter(|saved| saved.account.edition == edition && saved.account.id == id)
+            .ok_or("accountError.invalidAccount")?;
+        let raw = saved
+            .credential
+            .strip_prefix("enc:v1:fixture:")
+            .ok_or("fixture encoding")?;
+        let c: Credentials = serde_json::from_str(raw).map_err(|_| "fixture encoding")?;
+        c.validate()?;
+        if c.edition != edition || c.id() != id {
+            return Err("accountError.invalidAccount".into());
+        }
+        Ok(c)
+    }
+
+    struct Fixture {
+        path: PathBuf,
+        c: Credentials,
+        id: String,
+    }
+
+    impl Fixture {
+        fn new(edition: Edition, expired: bool) -> Self {
+            let mut c = tests::fixture(edition);
+            c.auth["user"]["id"] = json!(uuid::Uuid::new_v4().to_string());
+            if expired {
+                c.auth["expiresAt"] = json!("2000-01-01T00:00:00.000Z");
+            }
+            let id = c.id();
+            let path = std::env::temp_dir().join(format!("qwenwork-speech-{id}.json"));
+            let mut account = c.summary();
+            account.remaining = Some(7.0);
+            account.active = true;
+            let store = Store::from([(
+                id.clone(),
+                Saved {
+                    account,
+                    credential: seal(&c).unwrap(),
+                },
+            )]);
+            super::super::cursor_auth::write(&path, &store).unwrap();
+            Self { path, c, id }
+        }
+    }
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.path);
+            pending_rotations()
+                .lock()
+                .unwrap()
+                .retain(|key, _| !key.starts_with(&format!("{}:", self.id)));
+        }
+    }
+
+    struct Server {
+        client: api::Client,
+        refreshes: Arc<AtomicUsize>,
+        unexpected: Arc<AtomicUsize>,
+        task: tokio::task::JoinHandle<()>,
+    }
+
+    impl Drop for Server {
+        fn drop(&mut self) {
+            self.task.abort();
+        }
+    }
+
+    async fn server(edition: Edition, reject: bool) -> Server {
+        let refreshes = Arc::new(AtomicUsize::new(0));
+        let unexpected = Arc::new(AtomicUsize::new(0));
+        let refreshed = refreshes.clone();
+        let other = unexpected.clone();
+        let app = Router::new()
+            .route("/api/v1/deviceToken/refresh", post(move |Json(body): Json<Value>| {
+                let refreshed = refreshed.clone();
+                async move {
+                    let attempt = refreshed.fetch_add(1, Ordering::SeqCst);
+                    assert_eq!(body["refresh_token"], "fixture-refresh-secret");
+                    assert_eq!(body["target"], "c");
+                    assert_eq!(body["client_id"], edition.client_id());
+                    if reject || attempt != 0 {
+                        return (StatusCode::UNAUTHORIZED, Json(json!({"error":"private consumed token"})));
+                    }
+                    (StatusCode::OK, Json(json!({"device_token":"rotated-access","refresh_token":"rotated-refresh","expires_in":3600})))
+                }
+            }))
+            .fallback(move || {
+                let other = other.clone();
+                async move {
+                    other.fetch_add(1, Ordering::SeqCst);
+                    StatusCode::NOT_FOUND
+                }
+            });
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let client = api::Client::new(edition, &base, "1.3.2-26101704").unwrap();
+        let task = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        Server {
+            client,
+            refreshes,
+            unexpected,
+            task,
+        }
+    }
+
+    async fn read(
+        fixture: &Fixture,
+        server: &Server,
+        rejected: Option<&Value>,
+    ) -> Result<Value, String> {
+        speech_credentials_at(
+            fixture.c.edition,
+            &fixture.id,
+            rejected,
+            &fixture.path,
+            &server.client,
+            open,
+            seal,
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn valid_saved_accounts_supply_speech_identity_and_app_version_without_refresh_or_writes()
+    {
+        for edition in [Edition::QwenWork, Edition::QwenWorkCn] {
+            let fixture = Fixture::new(edition, false);
+            let server = server(edition, false).await;
+            let before = std::fs::read(&fixture.path).unwrap();
+            let value = read(&fixture, &server, None).await.unwrap();
+            assert_eq!(value["edition"], serde_json::to_value(edition).unwrap());
+            assert_eq!(value["accessToken"], fixture.c.auth["token"]);
+            assert_eq!(value["userId"], fixture.c.auth["user"]["id"]);
+            assert_eq!(value["name"], "Fixture");
+            assert_eq!(value["email"], "fixture@example.test");
+            assert_eq!(value["version"], "1.3.2");
+            assert!(value.get("refreshToken").is_none());
+            assert_eq!(std::fs::read(&fixture.path).unwrap(), before);
+            assert_eq!(server.refreshes.load(Ordering::SeqCst), 0);
+            assert_eq!(server.unexpected.load(Ordering::SeqCst), 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn concurrent_rejections_renew_once_and_keep_selected_account_metadata() {
+        let fixture = Fixture::new(Edition::QwenWorkCn, false);
+        let server = server(fixture.c.edition, false).await;
+        let rejected = json!({"accessToken":fixture.c.auth["token"]});
+        let before =
+            serde_json::to_value(&load(&fixture.path).unwrap()[&fixture.id].account).unwrap();
+        let (first, second) = tokio::join!(
+            read(&fixture, &server, Some(&rejected)),
+            read(&fixture, &server, Some(&rejected))
+        );
+        assert_eq!(first.unwrap()["accessToken"], "rotated-access");
+        assert_eq!(second.unwrap()["accessToken"], "rotated-access");
+        assert_eq!(server.refreshes.load(Ordering::SeqCst), 1);
+        assert_eq!(server.unexpected.load(Ordering::SeqCst), 0);
+        let saved = load(&fixture.path).unwrap();
+        assert_eq!(
+            open(&saved, fixture.c.edition, &fixture.id).unwrap().auth["refreshToken"],
+            "rotated-refresh"
+        );
+        assert_eq!(
+            serde_json::to_value(&saved[&fixture.id].account).unwrap(),
+            before
+        );
+        let bytes = std::fs::read(&fixture.path).unwrap();
+        assert_eq!(
+            read(&fixture, &server, None).await.unwrap()["accessToken"],
+            "rotated-access"
+        );
+        assert_eq!(std::fs::read(&fixture.path).unwrap(), bytes);
+        assert_eq!(server.refreshes.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn expired_token_rotates_before_speech_and_failed_refresh_preserves_the_store() {
+        for rejected_refresh in [false, true] {
+            let fixture = Fixture::new(Edition::QwenWork, true);
+            let server = server(fixture.c.edition, rejected_refresh).await;
+            let before = std::fs::read(&fixture.path).unwrap();
+            let result = read(&fixture, &server, None).await;
+            if rejected_refresh {
+                assert_eq!(result.unwrap_err(), "accountError.loginRequired");
+                assert_eq!(std::fs::read(&fixture.path).unwrap(), before);
+            } else {
+                assert_eq!(result.unwrap()["accessToken"], "rotated-access");
+                assert_eq!(
+                    open(
+                        &load(&fixture.path).unwrap(),
+                        fixture.c.edition,
+                        &fixture.id
+                    )
+                    .unwrap()
+                    .auth["token"],
+                    "rotated-access"
+                );
+            }
+            assert_eq!(server.refreshes.load(Ordering::SeqCst), 1);
+            assert_eq!(server.unexpected.load(Ordering::SeqCst), 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn retry_after_local_save_failure_reuses_the_single_use_rotation() {
+        fn cannot_seal(_: &Credentials) -> Result<String, String> {
+            Err("fixture write failure".into())
+        }
+        let fixture = Fixture::new(Edition::QwenWorkCn, false);
+        let server = server(fixture.c.edition, false).await;
+        let rejected = json!({"accessToken":fixture.c.auth["token"]});
+        let before = std::fs::read(&fixture.path).unwrap();
+        let error = speech_credentials_at(
+            fixture.c.edition,
+            &fixture.id,
+            Some(&rejected),
+            &fixture.path,
+            &server.client,
+            open,
+            cannot_seal,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error, "fixture write failure");
+        assert_eq!(std::fs::read(&fixture.path).unwrap(), before);
+        assert_eq!(
+            read(&fixture, &server, Some(&rejected)).await.unwrap()["accessToken"],
+            "rotated-access"
+        );
+        assert_eq!(server.refreshes.load(Ordering::SeqCst), 1);
+        assert_eq!(server.unexpected.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn missing_or_cross_region_accounts_and_invalid_rejections_do_not_refresh() {
+        let fixture = Fixture::new(Edition::QwenWorkCn, false);
+        let server = server(fixture.c.edition, false).await;
+        let before = std::fs::read(&fixture.path).unwrap();
+        assert!(speech_credentials_at(
+            Edition::QwenWork,
+            &fixture.id,
+            None,
+            &fixture.path,
+            &server.client,
+            open,
+            seal
+        )
+        .await
+        .is_err());
+        assert!(speech_credentials_at(
+            fixture.c.edition,
+            "missing",
+            None,
+            &fixture.path,
+            &server.client,
+            open,
+            seal
+        )
+        .await
+        .is_err());
+        assert!(read(&fixture, &server, Some(&json!({}))).await.is_err());
+        let unrelated = json!({"accessToken":"already-replaced-token"});
+        assert_eq!(
+            read(&fixture, &server, Some(&unrelated)).await.unwrap()["accessToken"],
+            fixture.c.auth["token"]
+        );
+        assert_eq!(std::fs::read(&fixture.path).unwrap(), before);
+        assert_eq!(server.refreshes.load(Ordering::SeqCst), 0);
+        assert_eq!(server.unexpected.load(Ordering::SeqCst), 0);
+    }
+}

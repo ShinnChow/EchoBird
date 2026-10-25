@@ -34,6 +34,8 @@ export interface LocalTool extends DetectedTool {
 // ─── Model Types ───
 
 export type AccountProvider =
+  | 'cursor'
+  | 'grokbot'
   | 'doubaowork'
   | 'dola'
   | 'dumate'
@@ -50,6 +52,8 @@ export type AccountProvider =
   | 'minimax'
   | 'qoder'
   | 'qoderCn'
+  | 'qwenwork'
+  | 'qwenworkcn'
   | 'grok'
   | 'cline'
   | 'zcode'

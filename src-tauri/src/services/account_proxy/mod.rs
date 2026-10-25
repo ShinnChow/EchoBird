@@ -1,20 +1,36 @@
 //! Account credentials stay in the backend. These adapters never switch native clients.
 
+pub(crate) mod antigravity_voice;
 mod bridge;
+pub(crate) mod claude_voice;
 mod cline;
 mod codearts;
+pub(crate) mod codearts_voice;
+pub(crate) mod codex_voice;
+pub(crate) mod cursor_voice;
 mod devin;
+pub(crate) mod devin_voice;
 mod doubao;
+pub(crate) mod doubao_voice;
+pub(crate) mod dumate_voice;
 mod grok;
+pub(crate) mod grokbot_voice;
+pub(crate) mod kilo_voice;
 mod kiro;
 mod minimax;
+pub(crate) mod minimax_voice;
 mod protocol;
 mod providers;
 mod qoder;
+pub(crate) mod qoder_voice;
+pub(crate) mod qwenwork_voice;
 mod responses;
 mod signatures;
 mod tools;
 mod trae;
+pub(crate) mod trae_global_voice;
+pub(crate) mod trae_voice;
+pub(crate) mod voice;
 pub(crate) mod workbuddy_voice;
 mod zcode;
 
@@ -33,6 +49,7 @@ pub(crate) fn connection_base(
     provider: AccountProvider,
     metadata: &Value,
 ) -> Result<String, ProxyError> {
+    require_text_provider(provider)?;
     use AccountProvider::*;
     match provider {
         ClaudeCode => Ok("https://api.anthropic.com".into()),
@@ -183,6 +200,22 @@ impl std::fmt::Display for ProxyError {
 
 impl std::error::Error for ProxyError {}
 
+pub(crate) fn require_text_provider(provider: AccountProvider) -> Result<(), ProxyError> {
+    if matches!(
+        provider,
+        AccountProvider::QwenWork
+            | AccountProvider::QwenWorkCn
+            | AccountProvider::Cursor
+            | AccountProvider::GrokBot
+    ) {
+        return Err(ProxyError::new(
+            StatusCode::BAD_REQUEST,
+            "This account source only supports speech transcription",
+        ));
+    }
+    Ok(())
+}
+
 impl ProxyError {
     pub(crate) fn new(status: StatusCode, message: impl Into<String>) -> Self {
         Self {
@@ -228,6 +261,7 @@ pub async fn route(
     body: Value,
     client: &reqwest::Client,
 ) -> Result<Response, ProxyError> {
+    require_text_provider(provider)?;
     if matches!(
         provider,
         AccountProvider::DoubaoWork | AccountProvider::Dola
@@ -263,6 +297,7 @@ pub async fn route_responses(
     body: Value,
     client: &reqwest::Client,
 ) -> Result<Option<Response>, ProxyError> {
+    require_text_provider(provider)?;
     if provider == AccountProvider::Grok {
         return grok::route_responses(credentials, model, body, client)
             .await
@@ -276,6 +311,7 @@ pub async fn list_models(
     credentials: Value,
     client: &reqwest::Client,
 ) -> Result<Vec<String>, ProxyError> {
+    require_text_provider(provider)?;
     if matches!(
         provider,
         AccountProvider::DoubaoWork | AccountProvider::Dola
@@ -324,6 +360,52 @@ pub(crate) fn stream_response(body: Body) -> Response {
 #[cfg(test)]
 mod connection_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn speech_only_sources_never_enter_text_gateways() {
+        let client = reqwest::Client::new();
+        for provider in [
+            AccountProvider::QwenWork,
+            AccountProvider::QwenWorkCn,
+            AccountProvider::Cursor,
+            AccountProvider::GrokBot,
+        ] {
+            assert_eq!(
+                connection_base(provider, &Value::Null).unwrap_err().status,
+                StatusCode::BAD_REQUEST
+            );
+            assert_eq!(
+                list_models(provider, Value::Null, &client)
+                    .await
+                    .unwrap_err()
+                    .status,
+                StatusCode::BAD_REQUEST
+            );
+            assert_eq!(
+                route(provider, Value::Null, "model", Value::Null, &client)
+                    .await
+                    .unwrap_err()
+                    .status,
+                StatusCode::BAD_REQUEST
+            );
+            assert_eq!(
+                route_responses(provider, Value::Null, "model", Value::Null, &client)
+                    .await
+                    .unwrap_err()
+                    .status,
+                StatusCode::BAD_REQUEST
+            );
+            assert!(crate::services::account_model_sources::list_models(
+                &crate::models::model::AccountSource {
+                    provider,
+                    account_id: "not-saved".into(),
+                }
+            )
+            .await
+            .unwrap_err()
+            .contains("only supports speech"));
+        }
+    }
 
     #[test]
     fn connection_targets_cover_all_providers_and_saved_regions_without_authentication() {

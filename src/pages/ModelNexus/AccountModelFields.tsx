@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   accountProxyProviders,
+  accountSpeechProviders,
   accountModelPickerOptions,
   cacheAccountProxyModels,
   getAccountProxyModels,
+  getAccountSpeechModels,
+  fixedAccountSpeechModels,
   getCachedAccountProxyModels,
   listProxyAccounts,
   type ProxyAccount,
@@ -112,26 +115,33 @@ export function AccountModelFields({
   const fetchModels = useCallback(async () => {
     if (!active || !accountId || fetchingRef.current) return;
     if (voice) {
-      applyModels([`workbuddy:${accountId}`]);
-      return;
+      const fixed = fixedAccountSpeechModels({ provider, accountId });
+      if (fixed !== undefined) {
+        applyModels(fixed);
+        return;
+      }
     }
     const attempt = ++revision.current;
     fetchingRef.current = true;
     setFetching(true);
     try {
-      const models = await getAccountProxyModels({ provider, accountId });
+      const models = await (voice ? getAccountSpeechModels : getAccountProxyModels)({
+        provider,
+        accountId,
+      });
       if (attempt !== revision.current) return;
       if (
-        provider === 'qoder' ||
-        provider === 'qoderCn' ||
-        provider === 'kiro' ||
-        provider === 'doubaowork' ||
-        provider === 'dola' ||
-        provider === 'workBuddy' ||
-        provider === 'workBuddyAi' ||
-        provider === 'kilo' ||
-        provider === 'cline' ||
-        provider === 'zcode'
+        !voice &&
+        (provider === 'qoder' ||
+          provider === 'qoderCn' ||
+          provider === 'kiro' ||
+          provider === 'doubaowork' ||
+          provider === 'dola' ||
+          provider === 'workBuddy' ||
+          provider === 'workBuddyAi' ||
+          provider === 'kilo' ||
+          provider === 'cline' ||
+          provider === 'zcode')
       ) {
         try {
           const rows = await listProxyAccounts(provider);
@@ -144,7 +154,7 @@ export function AccountModelFields({
         }
         if (attempt !== revision.current) return;
       }
-      cacheAccountProxyModels({ provider, accountId }, models);
+      if (!voice) cacheAccountProxyModels({ provider, accountId }, models);
       applyModels(models);
     } catch (error) {
       if (attempt === revision.current) showToast('error', String(error));
@@ -164,7 +174,9 @@ export function AccountModelFields({
       setFetching(false);
       if (active && accountId && !waitingForLabels) {
         if (voice) {
-          applyModels([`workbuddy:${accountId}`]);
+          const fixed = fixedAccountSpeechModels({ provider, accountId });
+          if (fixed !== undefined) applyModels(fixed);
+          else void fetchModels();
           return;
         }
         const cached = getCachedAccountProxyModels({ provider, accountId });
@@ -191,7 +203,9 @@ export function AccountModelFields({
       ...form,
       name:
         (account ? accountProxyIdentityLabel(account, t) : undefined) ??
-        accountProxyProviders.find((entry) => entry.id === next.provider)?.name ??
+        (voice ? accountSpeechProviders : accountProxyProviders).find(
+          (entry) => entry.id === next.provider
+        )?.name ??
         '',
       accountSource: next,
       modelId: '',
@@ -201,9 +215,7 @@ export function AccountModelFields({
   const savedAccounts = accounts.filter((account) => account.source.provider === provider);
   const selectedAccount = savedAccounts.find((account) => account.source.accountId === accountId);
   const modelLabels = selectedAccount?.modelLabels;
-  const providers = voice
-    ? accountProxyProviders.filter((entry) => entry.id === 'workBuddy')
-    : accountProxyProviders;
+  const providers = voice ? accountSpeechProviders : accountProxyProviders;
   return (
     <>
       <div>
@@ -254,8 +266,19 @@ export function AccountModelFields({
           ariaLabel={t('model.modelId')}
           value={modelId}
           options={accountModelPickerOptions(modelIdOptions ?? [], modelId, modelLabels)}
-          optionLabels={modelLabels}
-          freeModelIds={selectedAccount?.freeModelIds}
+          optionLabels={
+            voice
+              ? Object.fromEntries(
+                  (modelIdOptions ?? []).map((id) => [
+                    id,
+                    id.split(':').slice(2).join(':') ||
+                      accountSpeechProviders.find((entry) => entry.id === provider)?.name ||
+                      id,
+                  ])
+                )
+              : modelLabels
+          }
+          freeModelIds={voice ? undefined : selectedAccount?.freeModelIds}
           freeLabel={t('model.free')}
           placeholder="—"
           disabled={!active || !accountId || waitingForLabels || fetching}
@@ -268,7 +291,7 @@ export function AccountModelFields({
                 : form
             );
           }}
-          onRefresh={voice ? undefined : () => void fetchModels()}
+          onRefresh={voice && provider !== 'kilo' ? undefined : () => void fetchModels()}
           refreshLabel={t('btn.refresh')}
           refreshing={fetching}
         />

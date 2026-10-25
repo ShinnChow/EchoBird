@@ -4,6 +4,7 @@ mod login;
 mod native;
 mod quota;
 mod rewards;
+pub(crate) mod speech;
 pub use login::LoginStart;
 pub use quota::{DailyReward, Quota};
 

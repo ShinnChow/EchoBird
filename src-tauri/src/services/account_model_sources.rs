@@ -44,6 +44,47 @@ fn option(
 pub async fn list_accounts(provider: AccountProvider) -> Result<Vec<SavedAccountOption>, String> {
     use AccountProvider::*;
     let mut accounts: Vec<SavedAccountOption> = match provider {
+        Cursor => super::cursor_accounts::speech::list_saved_accounts()
+            .await?
+            .into_iter()
+            .map(|account| {
+                option(
+                    provider,
+                    account.id,
+                    account.email,
+                    account.usage.and_then(|usage| usage.plan),
+                )
+            })
+            .collect(),
+        GrokBot => super::grok_bot_accounts::speech::list_saved_accounts()
+            .await?
+            .into_iter()
+            .map(|account| {
+                option(
+                    provider,
+                    account.id,
+                    account.email,
+                    account.usage.and_then(|usage| usage.plan),
+                )
+            })
+            .collect(),
+        QwenWork | QwenWorkCn => super::qwenwork_accounts::list(qwen_edition(provider))
+            .await?
+            .into_iter()
+            .map(|account| {
+                let label = account
+                    .organization
+                    .filter(|organization| !organization.trim().is_empty())
+                    .map(|organization| format!("{} · {organization}", account.name))
+                    .unwrap_or(account.name);
+                option(
+                    provider,
+                    account.id,
+                    label,
+                    account.plan_name.or(account.plan),
+                )
+            })
+            .collect(),
         DoubaoWork | Dola => super::doubao_accounts::list(doubao_edition(provider))
             .await?
             .into_iter()
@@ -231,6 +272,14 @@ fn qoder_edition(provider: AccountProvider) -> qoder_accounts::Edition {
     }
 }
 
+fn qwen_edition(provider: AccountProvider) -> super::qwenwork_accounts::Edition {
+    if provider == AccountProvider::QwenWorkCn {
+        super::qwenwork_accounts::Edition::QwenWorkCn
+    } else {
+        super::qwenwork_accounts::Edition::QwenWork
+    }
+}
+
 pub async fn validate_source(source: &AccountSource) -> Result<(), String> {
     validate_saved_source(source, &list_accounts(source.provider).await?)
 }
@@ -302,6 +351,22 @@ pub(crate) async fn credentials(
 ) -> Result<Value, String> {
     use AccountProvider::*;
     match source.provider {
+        Cursor => {
+            super::cursor_accounts::speech::proxy_credentials(&source.account_id, force_refresh)
+                .await
+        }
+        GrokBot => {
+            super::grok_bot_accounts::speech::proxy_credentials(&source.account_id, force_refresh)
+                .await
+        }
+        QwenWork | QwenWorkCn => {
+            super::qwenwork_accounts::proxy_credentials(
+                qwen_edition(source.provider),
+                &source.account_id,
+                force_refresh,
+            )
+            .await
+        }
         DoubaoWork | Dola => {
             super::doubao_accounts::proxy_credentials(
                 doubao_edition(source.provider),
@@ -368,6 +433,28 @@ pub(crate) async fn credentials_after_rejection(
 ) -> Result<Value, String> {
     use AccountProvider::*;
     match source.provider {
+        Cursor => {
+            super::cursor_accounts::speech::speech_credentials(
+                &source.account_id,
+                Some(rejected_credentials),
+            )
+            .await
+        }
+        GrokBot => {
+            super::grok_bot_accounts::speech::speech_credentials(
+                &source.account_id,
+                Some(rejected_credentials),
+            )
+            .await
+        }
+        QwenWork | QwenWorkCn => {
+            super::qwenwork_accounts::speech_credentials(
+                qwen_edition(source.provider),
+                &source.account_id,
+                Some(rejected_credentials),
+            )
+            .await
+        }
         DoubaoWork | Dola => {
             let current = super::doubao_accounts::proxy_credentials(
                 doubao_edition(source.provider),
@@ -565,6 +652,7 @@ fn preparation_credentials(credentials: Value, source: &AccountSource) -> Value 
 }
 
 pub async fn list_models(source: &AccountSource) -> Result<Vec<String>, String> {
+    super::account_proxy::require_text_provider(source.provider).map_err(|error| error.message)?;
     let secret = model_directory_credentials(credentials(source, false).await?, source);
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))

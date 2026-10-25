@@ -76,6 +76,43 @@ it('rolls back a new API model when attaching the channel fails and preserves pr
   expect(voice.getState().models).toEqual([]);
 });
 
+it.each([
+  ['workBuddyAi', 'workbuddyai'],
+  ['claudeCode', 'claudecode'],
+  ['codex', 'codex'],
+  ['minimax', 'minimax'],
+  ['antigravity', 'antigravity'],
+  ['cursor', 'cursor'],
+  ['grokbot', 'grokbot'],
+  ['dumate', 'dumate'],
+  ['doubaowork', 'doubaowork'],
+  ['devin', 'devin'],
+  ['trae', 'trae'],
+  ['codeArts', 'codearts'],
+  ['traecn', 'traecn'],
+  ['qoder', 'qoder'],
+  ['qoderCn', 'qodercn'],
+  ['qwenworkcn', 'qwenworkcn'],
+  ['qwenwork', 'qwenwork'],
+  ['kilo', 'kilo'],
+] as const)(
+  'attaches %s speech by reference and rejects a mismatched account before writes',
+  async (provider, prefix) => {
+    const hash = 'a'.repeat(64);
+    const accountId = provider === 'codeArts' ? `codearts:${hash}` : hash;
+    const modelId = `${prefix}:${hash}${provider === 'kilo' ? ':vendor:speech-model' : ''}`;
+    await saveVoiceSource({ ...form, accountSource: { provider, accountId }, modelId });
+    expect(voice.getState().snapshot?.config.channels).toEqual([{ kind: 'account', id: modelId }]);
+    expect(api.addModel).not.toHaveBeenCalled();
+    await saveVoiceSource({ ...form, accountSource: { provider, accountId }, modelId });
+    expect(voiceApi.saveVoiceConfig).toHaveBeenCalledTimes(1);
+    await expect(
+      saveVoiceSource({ ...form, accountSource: { provider, accountId: 'b'.repeat(64) }, modelId })
+    ).rejects.toThrow('voice.error.missingSource');
+    expect(voiceApi.saveVoiceConfig).toHaveBeenCalledTimes(1);
+    expect(api.deleteModel).not.toHaveBeenCalled();
+  }
+);
 it('rolls back a late model creation after the configuration dialog has been closed', async () => {
   let resolve!: (model: typeof saved) => void;
   vi.mocked(api.addModel).mockReturnValue(

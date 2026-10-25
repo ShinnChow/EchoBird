@@ -2,8 +2,10 @@ mod api;
 mod login;
 mod native;
 mod proxy;
+mod voice;
 pub use login::LoginStart;
 pub(crate) use proxy::{proxy_credentials, proxy_credentials_after_rejection};
+pub(crate) use voice::voice_credentials;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
