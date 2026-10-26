@@ -35,6 +35,7 @@
   grid-column: 2;
   grid-row: 1;
   align-self: center;
+  margin-inline: -4px;
   height: 66.667%;
   min-height: 0;
   touch-action: none;
@@ -46,7 +47,7 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 3px;
+  width: 5px;
   height: 82%;
   border-radius: 999px;
   background: rgb(var(--accent-rgb) / 0.55);
