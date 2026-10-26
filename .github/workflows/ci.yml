@@ -126,7 +126,40 @@ jobs:
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
 
       - name: Test
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_log="$RUNNER_TEMP/echobird-test-artifacts.jsonl"
+          cargo test --manifest-path src-tauri/Cargo.toml --message-format=json | tee "$artifact_log"
+          if [ "$RUNNER_OS" != 'Windows' ]; then
+            python3 - "$artifact_log" "$GITHUB_ENV" <<'PY'
+          import json
+          import os
+          import pathlib
+          import sys
+
+          manifest = pathlib.Path(os.environ['GITHUB_WORKSPACE']) / 'src-tauri/Cargo.toml'
+          executables = set()
+          for line in pathlib.Path(sys.argv[1]).read_text(encoding='utf-8').splitlines():
+              try:
+                  message = json.loads(line)
+              except json.JSONDecodeError:
+                  continue
+              if (isinstance(message, dict) and message.get('reason') == 'compiler-artifact'
+                      and message['target']['name'] == 'echobird_lib'
+                      and message['profile']['test']
+                      and message.get('executable')
+                      and pathlib.Path(message['manifest_path']).resolve() == manifest.resolve()):
+                  executables.add(message['executable'])
+          if len(executables) != 1:
+              raise SystemExit('Expected the exact application library test executable')
+          executable = executables.pop()
+          if not pathlib.Path(executable).is_file():
+              raise SystemExit('Application library test executable is missing')
+          with open(sys.argv[2], 'a', encoding='utf-8') as output:
+              output.write(f'ECHOBIRD_NATIVE_TEST_EXE={executable}\n')
+          PY
+          fi
 
       - name: Verify macOS native credential storage
         if: runner.os == 'macOS'
@@ -151,7 +184,9 @@ jobs:
           security unlock-keychain -p 'fixture-keychain-password' "$fixture_keychain"
           security list-keychains -d user -s "$fixture_keychain" "${original_keychains[@]}"
           security add-generic-password -s "$service" -a "$account" -w 'test-safe-storage-password' -T /usr/bin/security "$fixture_keychain"
-          cargo test --manifest-path src-tauri/Cargo.toml reads_native_os_credential_fixture -- --ignored
+          fixture_test='services::electron_storage::tests::reads_native_os_credential_fixture'
+          "$ECHOBIRD_NATIVE_TEST_EXE" --list --ignored --exact "$fixture_test" | grep -Fx "$fixture_test: test"
+          "$ECHOBIRD_NATIVE_TEST_EXE" --ignored --exact "$fixture_test"
 
       - name: Verify Linux native credential storage
         if: runner.os == 'Linux'
@@ -163,7 +198,9 @@ jobs:
           printf 'fixture-keyring-password' | gnome-keyring-daemon --unlock --components=secrets
           trap 'secret-tool clear application "EchoBird Native Storage Test" >/dev/null 2>&1 || true' EXIT
           printf 'test-safe-storage-password' | secret-tool store --label='EchoBird native credential test' application 'EchoBird Native Storage Test'
-          cargo test --manifest-path src-tauri/Cargo.toml reads_native_os_credential_fixture -- --ignored
+          fixture_test='services::electron_storage::tests::reads_native_os_credential_fixture'
+          "$ECHOBIRD_NATIVE_TEST_EXE" --list --ignored --exact "$fixture_test" | grep -Fx "$fixture_test: test"
+          "$ECHOBIRD_NATIVE_TEST_EXE" --ignored --exact "$fixture_test"
           SCRIPT
 
       - name: Security audit (cargo)
