@@ -126,13 +126,17 @@ jobs:
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
 
       - name: Test
+        if: runner.os == 'Windows'
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Test and capture native fixture executable
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
           artifact_log="$RUNNER_TEMP/echobird-test-artifacts.jsonl"
           cargo test --manifest-path src-tauri/Cargo.toml --message-format=json | tee "$artifact_log"
-          if [ "$RUNNER_OS" != 'Windows' ]; then
-            python3 - "$artifact_log" "$GITHUB_ENV" <<'PY'
+          python3 - "$artifact_log" "$GITHUB_ENV" <<'PY'
           import json
           import os
           import pathlib
@@ -159,7 +163,6 @@ jobs:
           with open(sys.argv[2], 'a', encoding='utf-8') as output:
               output.write(f'ECHOBIRD_NATIVE_TEST_EXE={executable}\n')
           PY
-          fi
 
       - name: Verify macOS native credential storage
         if: runner.os == 'macOS'
