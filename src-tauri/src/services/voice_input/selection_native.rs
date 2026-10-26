@@ -228,7 +228,7 @@ fn platform(window: u64) -> Reading {
         let _ = AXUIElementSetMessagingTimeout(element.0, 0.35);
         if let Some(role) = attribute(element.0, "AXSubrole") {
             if CFGetTypeID(role.0) == CFStringGetTypeID()
-                && CFString::wrap_under_get_rule(role.0.cast()).to_string() == "AXSecureTextField"
+                && CFString::wrap_under_get_rule(role.0.cast()) == "AXSecureTextField"
             {
                 return Reading::Empty;
             }
