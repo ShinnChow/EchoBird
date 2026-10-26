@@ -412,12 +412,6 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-.voice-result.is-error .voice-result-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
 .voice-result p {
   font-size: 14px;
   line-height: 1.5;

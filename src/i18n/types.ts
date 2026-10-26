@@ -126,6 +126,7 @@ export type TKey =
   | 'voice.error.optimizationModel'
   | 'voice.error.optimization'
   | 'voice.error.focus'
+  | 'voice.error.target'
   | 'voice.error.insert'
   | 'voice.error.cancelled'
   | 'voice.error.island'

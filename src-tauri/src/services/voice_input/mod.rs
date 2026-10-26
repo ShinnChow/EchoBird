@@ -4,6 +4,7 @@ mod app_icon;
 mod app_icon_cache;
 mod audio;
 pub mod config;
+mod dictation_target;
 mod island_input;
 mod monitor;
 mod native;
@@ -73,7 +74,7 @@ struct Runtime {
     cancel: CancellationToken,
     config: Config,
     insert: bool,
-    target: Option<native::InputTarget>,
+    target: Option<dictation_target::Target>,
     shortcut_active: bool,
     shortcut_description: Option<String>,
     app_icon: Option<String>,
@@ -139,6 +140,7 @@ impl Runtime {
         }
         self.generation += 1;
         self.cancel.cancel();
+        self.target = None;
         self.phase = "idle".into();
         self.started = None;
         self.level = 0.0;
@@ -349,7 +351,6 @@ pub fn suspend(app: &AppHandle, suspended: bool) {
 
 pub async fn begin(app: &AppHandle, origin: &str) -> Result<Snapshot, String> {
     let test = origin == "test";
-    let insert = !test;
     let voice = shared(app);
     let _operation = voice.operation.lock().await;
     let config = voice.saved.lock().unwrap().config.clone();
@@ -362,6 +363,11 @@ pub async fn begin(app: &AppHandle, origin: &str) -> Result<Snapshot, String> {
     if voice.selection.lock().unwrap().open {
         return Err("voice.error.busy".into());
     }
+    let insert = !test
+        && !app
+            .get_webview_window("main")
+            .is_some_and(|window| window.is_focused().unwrap_or(false));
+    let foreground = if insert { native::input_target() } else { None };
     let generation = {
         let mut runtime = voice.runtime.lock().unwrap();
         if runtime.active() {
@@ -378,20 +384,8 @@ pub async fn begin(app: &AppHandle, origin: &str) -> Result<Snapshot, String> {
         runtime.elapsed_ms = 0;
         runtime.config = config.clone();
         runtime.active_channel = None;
-        runtime.target = if insert { native::input_target() } else { None };
-        runtime.insert = insert
-            && (runtime.target.is_some() || native::wayland())
-            && !app
-                .get_webview_window("main")
-                .is_some_and(|window| window.is_focused().unwrap_or(false));
-        if !test {
-            log::info!(
-                "[VoiceInput] start origin={} insert={} target_present={}",
-                runtime.origin,
-                runtime.insert,
-                runtime.target.is_some()
-            );
-        }
+        runtime.target = None;
+        runtime.insert = insert;
         runtime.generation
     };
     if test && !island_visible(&config) {
@@ -400,6 +394,11 @@ pub async fn begin(app: &AppHandle, origin: &str) -> Result<Snapshot, String> {
         }
     }
     publish(app);
+    // Capture accessibility state alongside microphone startup, so a slow
+    // provider does not discard the first words spoken after clicking Record.
+    let target_task = insert.then(|| {
+        tauri::async_runtime::spawn_blocking(move || dictation_target::capture(foreground))
+    });
     let level_app = app.clone();
     let result = {
         let voice = voice.clone();
@@ -446,17 +445,36 @@ pub async fn begin(app: &AppHandle, origin: &str) -> Result<Snapshot, String> {
         fail(app, generation, error.clone(), None);
         return Err(error);
     }
+    let recorded_at = Instant::now();
+    let target = match target_task {
+        Some(task) => task.await.unwrap_or(None),
+        None => None,
+    };
     {
         let mut runtime = voice.runtime.lock().unwrap();
         if runtime.phase == "error" {
             return Err("voice.error.microphone".into());
+        }
+        if runtime.generation != generation || runtime.cancel.is_cancelled() {
+            drop(runtime);
+            voice.recorder.cancel();
+            return Ok(snapshot(app));
+        }
+        runtime.target = target;
+        if insert {
+            log::info!(
+                "[VoiceInput] start origin={} insert={} target_present={}",
+                runtime.origin,
+                runtime.insert,
+                runtime.target.is_some()
+            );
         }
         runtime.phase = if test {
             "testing".into()
         } else {
             "recording".into()
         };
-        runtime.started = Some(Instant::now());
+        runtime.started = Some(recorded_at);
     }
     if !test {
         if let Some(channel) = config
@@ -501,6 +519,7 @@ fn fail(app: &AppHandle, generation: u64, error: String, audio: Option<Bytes>) {
         }
         log::warn!("[VoiceInput] failed phase={} code={error}", runtime.phase);
         runtime.cancel.cancel();
+        runtime.target = None;
         runtime.phase = "error".into();
         runtime.error = Some(error);
         runtime.level = 0.0;
@@ -549,6 +568,7 @@ async fn stop_capture(app: &AppHandle, shortcut_only: bool) -> Result<Snapshot, 
             let mut runtime = voice.runtime.lock().unwrap();
             runtime.generation += 1;
             runtime.cancel.cancel();
+            runtime.target = None;
         }
         voice.recorder.cancel();
         publish(app);
@@ -662,7 +682,7 @@ async fn stop_capture(app: &AppHandle, shortcut_only: bool) -> Result<Snapshot, 
         }
         runtime.text = text.clone();
         runtime.phase = "inserting".into();
-        (runtime.insert, runtime.target)
+        (runtime.insert, runtime.target.take())
     };
     if insert && !text.trim().is_empty() {
         let result = {
@@ -672,7 +692,7 @@ async fn stop_capture(app: &AppHandle, shortcut_only: bool) -> Result<Snapshot, 
                 if cancel.is_cancelled() {
                     Err("voice.error.cancelled".into())
                 } else {
-                    native::insert(&text, target, &cancel)
+                    dictation_target::insert(&text, target, &cancel)
                 }
             })
             .await
@@ -920,6 +940,7 @@ pub fn shutdown(app: &AppHandle) {
     {
         let mut runtime = voice.runtime.lock().unwrap();
         runtime.cancel.cancel();
+        runtime.target = None;
         runtime.result_audio = None;
     }
     voice.recorder.cancel();

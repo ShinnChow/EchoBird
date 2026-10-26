@@ -132,6 +132,8 @@ const en: Translations = {
   'voice.error.optimization':
     'Text refinement or translation failed. The original transcript is retained.',
   'voice.error.focus': 'The input focus changed. Copy the retained transcript to insert it.',
+  'voice.error.target':
+    'Could not write to the original input. Your transcript is retained; copy and paste it.',
   'voice.error.insert': 'Could not insert text. The transcript is retained for copying.',
   'voice.error.cancelled': 'Cancelled',
   'voice.error.island': 'Could not show the Dynamic Island.',

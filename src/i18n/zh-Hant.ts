@@ -128,6 +128,7 @@ const zhHant: Partial<Translations> = {
   'voice.error.optimizationModel': '請選擇用於文字最佳化或翻譯的模型。',
   'voice.error.optimization': '文字最佳化或翻譯失敗，已保留原始轉寫。',
   'voice.error.focus': '輸入位置已變更，請複製保留的文字後輸入。',
+  'voice.error.target': '無法寫入原來的輸入位置，辨識結果已保留，可複製後貼上。',
   'voice.error.insert': '文字回填失敗，已保留辨識結果供複製。',
   'voice.error.cancelled': '已取消',
   'voice.error.island': '無法顯示動態島。',

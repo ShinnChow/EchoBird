@@ -126,6 +126,7 @@ const zhHans: Partial<Translations> = {
   'voice.error.optimizationModel': '请选择用于文本优化或翻译的模型。',
   'voice.error.optimization': '文本优化或翻译失败，已保留原始转写。',
   'voice.error.focus': '输入位置已改变，请复制保留的文字后输入。',
+  'voice.error.target': '无法写入原来的输入位置，识别结果已保留，可复制后粘贴。',
   'voice.error.insert': '文字回填失败，已保留识别结果供复制。',
   'voice.error.cancelled': '已取消',
   'voice.error.island': '无法显示灵动岛。',

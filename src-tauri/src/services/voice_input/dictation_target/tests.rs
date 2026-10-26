@@ -1,0 +1,96 @@
+use super::*;
+
+#[test]
+fn confirmation_allows_delayed_provider_state_and_document_line_endings() {
+    let mut values = [Some("old".into()), None, Some("new\r\nsecond\r".into())].into_iter();
+    assert_eq!(
+        confirm_write("new\nsecond", || values.next().flatten()),
+        Ok(())
+    );
+    assert!(values.next().is_none());
+}
+
+#[test]
+fn confirmation_does_not_accept_partial_or_missing_text() {
+    assert_eq!(
+        confirm_write("complete result", || Some("complete".into())),
+        Err(UNAVAILABLE.into())
+    );
+    assert_eq!(confirm_write("result", || None), Err(UNAVAILABLE.into()));
+}
+
+#[test]
+fn remembered_utf16_caret_inserts_before_the_original_suffix() {
+    let original = "开始🙂，最后一句";
+    let edit = Edit::utf16(original.into(), 4, 4).unwrap();
+    assert_eq!(
+        edit.replace(original, "新增\n第二行").unwrap(),
+        "开始🙂新增\n第二行，最后一句"
+    );
+    assert!(Edit::utf16(original.into(), 3, 3).is_none());
+    assert!(Edit::utf16(original.into(), 100, 100).is_none());
+}
+
+#[test]
+fn selection_replaces_only_the_selected_characters_and_rejects_later_edits() {
+    let original = "before🙂old café\nafter";
+    let edit = Edit::characters(original.into(), 7, 10).unwrap();
+    assert_eq!(
+        edit.replace(original, "新内容").unwrap(),
+        "before🙂新内容 café\nafter"
+    );
+    assert_eq!(
+        edit.replace("user edited this while waiting", "result"),
+        Err(UNAVAILABLE.into())
+    );
+    assert_eq!(edit.replace("", "result"), Err(UNAVAILABLE.into()));
+}
+
+#[test]
+fn provider_line_endings_map_back_without_rewriting_the_original_document() {
+    let original = "first\r\n🙂second\r\nlast";
+    let edit = Edit::surrounding(original.into(), "first\n🙂", "second", "\nlast\n").unwrap();
+    assert_eq!(
+        edit.replace(original, "new").unwrap(),
+        "first\r\n🙂new\r\nlast"
+    );
+    assert!(Edit::surrounding(original.into(), "different", "second", "\nlast").is_none());
+}
+
+#[test]
+fn cancellation_and_missing_targets_never_fall_through_to_current_focus() {
+    let cancel = CancellationToken::new();
+    cancel.cancel();
+    assert_eq!(
+        insert("result", None, &cancel),
+        Err("voice.error.cancelled".into())
+    );
+    assert_eq!(
+        insert("result", None, &CancellationToken::new()),
+        Err(UNAVAILABLE.into())
+    );
+    assert_eq!(
+        insert("before\0after", None, &CancellationToken::new()),
+        Err("voice.error.insert".into())
+    );
+}
+
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn an_unavailable_background_target_never_types_into_another_window() {
+    let target = Target {
+        foreground: Some(InputTarget {
+            window: u64::MAX,
+            focus: Some(u64::MAX),
+        }),
+        background: None,
+    };
+    assert_eq!(
+        insert(
+            "do not put this in B",
+            Some(target),
+            &CancellationToken::new()
+        ),
+        Err(UNAVAILABLE.into())
+    );
+}

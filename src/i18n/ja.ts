@@ -132,6 +132,8 @@ const ja: Partial<Translations> = {
   'voice.error.optimization':
     'テキスト補正または翻訳に失敗しました。元の文字起こしを保持しています。',
   'voice.error.focus': '入力先のフォーカスが変わりました。保持されたテキストをコピーしてください。',
+  'voice.error.target':
+    '元の入力位置に書き込めませんでした。認識結果は保持されています。コピーして貼り付けてください。',
   'voice.error.insert': 'テキストを入力できません。結果をコピーできます。',
   'voice.error.cancelled': 'キャンセルしました',
   'voice.error.island': 'ダイナミックアイランドを表示できません。',

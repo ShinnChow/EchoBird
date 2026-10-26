@@ -639,6 +639,7 @@ describe('last result bubble', () => {
     expect(bubble.parent!.props.className).toBe('voice-preview-stack');
     expect(bubble.parent!.findByProps({ className: 'voice-island-preview' })).toBeDefined();
     expect(bubble.findAllByType('p')[0].children).toEqual([text]);
+    expect(bubble.findAllByType('p')).toHaveLength(1);
     expect(copyText).not.toHaveBeenCalled();
     await act(async () => button('voice.copy').props.onClick());
     expect(copyText).toHaveBeenLastCalledWith(text);
@@ -664,6 +665,9 @@ describe('last result bubble', () => {
     expect(renderer.root.findByProps({ role: 'alert' }).children).toEqual([
       'voice.error.noTranscript',
     ]);
+    expect(
+      renderer.root.findByProps({ className: 'voice-result is-error' }).findAllByType('p')
+    ).toHaveLength(1);
     expect(button('voice.copy')).toBeUndefined();
     expect(copyText).toHaveBeenCalledTimes(2);
     expect(api.saveVoiceConfig).not.toHaveBeenCalled();

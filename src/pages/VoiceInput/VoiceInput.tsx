@@ -212,7 +212,9 @@ export function VoiceInputMain() {
                 >
                   <div className="voice-result-content">
                     {resultText && <p>{resultText}</p>}
-                    {emptySources && <p>{t('voice.error.noChannels')}</p>}
+                    {emptySources && !resultText && !visibleError && (
+                      <p>{t('voice.error.noChannels')}</p>
+                    )}
                     {visibleError && (
                       <p className="voice-error" role="alert">
                         {visibleError.startsWith('voice.') ? t(visibleError as TKey) : visibleError}
