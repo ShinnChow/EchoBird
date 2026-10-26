@@ -4,7 +4,7 @@ use super::*;
 fn confirmation_allows_delayed_provider_state_and_document_line_endings() {
     let mut values = [Some("old".into()), None, Some("new\r\nsecond\r".into())].into_iter();
     assert_eq!(
-        confirm_write("new\nsecond", || values.next().flatten()),
+        confirm_write("new\nsecond", false, || values.next().flatten()),
         Ok(())
     );
     assert!(values.next().is_none());
@@ -13,10 +13,28 @@ fn confirmation_allows_delayed_provider_state_and_document_line_endings() {
 #[test]
 fn confirmation_does_not_accept_partial_or_missing_text() {
     assert_eq!(
-        confirm_write("complete result", || Some("complete".into())),
+        confirm_write("complete result", false, || Some("complete".into())),
         Err(UNAVAILABLE.into())
     );
-    assert_eq!(confirm_write("result", || None), Err(UNAVAILABLE.into()));
+    assert_eq!(
+        confirm_write("result", false, || None),
+        Err(UNAVAILABLE.into())
+    );
+}
+
+#[test]
+fn acknowledged_automation_write_does_not_depend_on_stale_or_missing_readback() {
+    for cached in [Some("old cached value"), None] {
+        let mut reads = 0;
+        assert_eq!(
+            confirm_write("inserted text", true, || {
+                reads += 1;
+                cached.map(str::to_string)
+            }),
+            Ok(())
+        );
+        assert_eq!(reads, 0);
+    }
 }
 
 #[test]

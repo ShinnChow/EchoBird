@@ -70,7 +70,16 @@ struct Edit {
 }
 
 #[cfg(any(windows, test))]
-fn confirm_write(expected: &str, mut read: impl FnMut() -> Option<String>) -> Result<(), String> {
+fn confirm_write(
+    expected: &str,
+    acknowledged: bool,
+    mut read: impl FnMut() -> Option<String>,
+) -> Result<(), String> {
+    // An accessibility setter acknowledges the edit itself; its cached value
+    // may lag behind. Native message delivery alone is not this confirmation.
+    if acknowledged {
+        return Ok(());
+    }
     use std::time::{Duration, Instant};
     let started = Instant::now();
     let normalize = |text: &str| text.replace("\r\n", "\n").replace('\r', "\n");

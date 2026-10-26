@@ -250,7 +250,7 @@ impl Target {
                 let wide: Vec<u16> = text.encode_utf16().chain(Some(0)).collect();
                 let acknowledged =
                     send(handle, 0x00C2, WPARAM(1), LPARAM(wide.as_ptr() as isize)).is_some();
-                let verified = confirm_write(&expected, || value(handle));
+                let verified = confirm_write(&expected, false, || value(handle));
                 log::info!(
                     "[VoiceInput] background write kind=native_edit acknowledged={} verified={}",
                     acknowledged,
@@ -278,15 +278,15 @@ impl Target {
                         return Err("voice.error.cancelled".into());
                     }
                     let acknowledged = value.SetValue(&BSTR::from(output.as_str())).is_ok();
-                    let verified = confirm_write(&output, || {
+                    let confirmed = confirm_write(&output, acknowledged, || {
                         value.CurrentValue().ok().map(|text| text.to_string())
                     });
                     log::info!(
-                        "[VoiceInput] background write kind=automation acknowledged={} verified={}",
+                        "[VoiceInput] background write kind=automation acknowledged={} confirmed={}",
                         acknowledged,
-                        verified.is_ok()
+                        confirmed.is_ok()
                     );
-                    verified
+                    confirmed
                 }
             }
         }
