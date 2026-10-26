@@ -185,6 +185,111 @@ fn code_types_calls_and_operational_numbers_are_not_credentials() {
 }
 
 #[test]
+fn runtime_handles_remain_literal_in_text_and_structured_tool_payloads() {
+    let memory = engine();
+    let snapshot = json!({
+        "element_token":"s00000001",
+        "nodeToken":"n00000003",
+        "handle-token":"e17",
+        "snapshot_token":"s0000002a",
+        "ELEMENT_TOKEN":"SABCDEF01",
+        "snapshotToken":"s000000000000002a",
+        "element_index":74,
+        "frame":{"x":28,"y":28},
+        "label":"确认按钮"
+    });
+    let text = snapshot.to_string();
+    for mut body in [
+        json!({"messages":[{"role":"tool","content":text}]}),
+        json!({"messages":[{"content":[{"type":"tool_result","content":snapshot}]}]}),
+        json!({"messages":[{"content":[{"type":"tool_use","input":snapshot}]}]}),
+        json!({"messages":[{"tool_calls":[{"function":{"name":"click","arguments":text}}]}]}),
+        json!({"input":[{"type":"function_call_output","output":text}]}),
+        json!({"input":[{"type":"thinking","thinking":text,"signature":"sealed"}]}),
+        json!({"input":format!("Snapshot:\n{}\nClick the button.", serde_json::to_string_pretty(&snapshot).unwrap())}),
+        json!({"input":"element_token=s00000001 node_token=n00000003 handle_token=e17 snapshot_token=s0000002a"}),
+    ] {
+        let original = body.clone();
+        protect(&mut body, &memory);
+        assert_eq!(body, original, "runtime handle payload was changed");
+        assert!(memory.lock().unwrap().secrets.is_empty());
+    }
+}
+
+#[test]
+fn runtime_handle_exceptions_keep_real_credentials_protected() {
+    let payload = json!({
+        "element_token":"s00000001",
+        "snapshot_token":"s0000002a",
+        "handle_token":SECRET,
+        "access_token":"opaqueAccessCredential98765",
+        "api_key":"opaqueApiCredential98765",
+        "password":"actualPassword98765"
+    });
+    for content in [payload.clone(), Value::String(payload.to_string())] {
+        let memory = engine();
+        let mut body = json!({"messages":[{"content":[{"type":"tool_result","content":content}]}]});
+        protect(&mut body, &memory);
+        let masked = &body["messages"][0]["content"][0]["content"];
+        let masked = masked.as_str().map_or_else(
+            || masked.clone(),
+            |text| serde_json::from_str(text).unwrap(),
+        );
+        assert_eq!(masked["element_token"], "s00000001");
+        assert_eq!(masked["snapshot_token"], "s0000002a");
+        for key in ["handle_token", "access_token", "api_key", "password"] {
+            assert_ne!(
+                masked[key], payload[key],
+                "credential under {key} was exposed"
+            );
+        }
+        let mut reply = json!({"choices":[{"message":{"tool_calls":[{"function":{
+            "name":"use_result", "arguments":masked.to_string()
+        }}]}}]});
+        stream::restore_value(&restorer(&memory), &mut reply).unwrap();
+        let restored: Value = serde_json::from_str(
+            reply["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(restored, payload);
+    }
+    for (field, value) in [
+        ("access_token", "s00000001"),
+        ("session_token", "s00000001"),
+        ("node_access_token", "s00000001"),
+        ("api_key", "s00000001"),
+        ("password", "s00000001"),
+        ("my_element_token", "s00000001"),
+        ("element_token", "opaqueCredential98765"),
+    ] {
+        let memory = engine();
+        let mut body = json!({"input":format!("{field}={value}")});
+        protect(&mut body, &memory);
+        assert!(
+            !body["input"].as_str().unwrap().contains(value),
+            "credential was exposed: {field}"
+        );
+    }
+}
+
+#[test]
+fn runtime_handle_values_stay_protected_when_already_known_as_credentials() {
+    let memory = engine();
+    let mut first = json!({"input":"password=s00000001"});
+    protect(&mut first, &memory);
+    for content in [
+        json!({"element_token":"s00000001"}),
+        Value::String(r#"{"element_token":"s00000001"}"#.into()),
+    ] {
+        let mut body = json!({"messages":[{"content":[{"type":"tool_result","content":content}]}]});
+        protect(&mut body, &memory);
+        assert!(!body.to_string().contains("s00000001"));
+    }
+}
+
+#[test]
 fn model_and_toolchain_names_remain_literal_beside_credentials() {
     let text = format!(
         "[providers]\ngroqAPIKey = \"{SECRET}\"\ngroqAPIModel = \"llama3-70b-8192\"\n\

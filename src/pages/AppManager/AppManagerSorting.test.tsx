@@ -38,7 +38,7 @@ describe('App Desktop drag sorting', () => {
   const select = vi.fn();
   let mode: 'desktop' | 'install';
 
-  const render = () => (
+  const render = (isScanning = false) => (
     <AppManagerContext.Provider
       value={
         {
@@ -46,7 +46,7 @@ describe('App Desktop drag sorting', () => {
           viewMode: mode,
           selectedTool: null,
           setSelectedTool: select,
-          isScanning: false,
+          isScanning,
           aiInstallableIds: ['store-a', 'store-b', 'store-c'],
         } as unknown as AppManagerContextType
       }
@@ -105,6 +105,21 @@ describe('App Desktop drag sorting', () => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
   });
+
+  it.each(['desktop', 'install'] as const)(
+    '%s keeps cached cards mounted and selectable during background scanning',
+    (view) => {
+      open(view);
+      const first = renderer.root.findByProps({ 'aria-label': visible()[0] });
+      act(() => renderer.update(render(true)));
+      const cached = renderer.root.findByProps({ 'aria-label': visible()[0] });
+      expect(cached).toBe(first);
+      expect(cached.props.disabled).toBeFalsy();
+      act(() => cached.props.onClick());
+      expect(select).toHaveBeenCalledExactlyOnceWith(view === 'desktop' ? 'my-a' : 'store-a');
+      expect(setItem).not.toHaveBeenCalled();
+    }
+  );
 
   it('lets store apps move and remembers their order after reopening', () => {
     open();

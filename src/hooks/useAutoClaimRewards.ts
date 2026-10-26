@@ -5,7 +5,7 @@ import { useToolsStore } from '../stores/toolsStore';
 
 export function useAutoClaimRewards() {
   const enabled = useRewardClaimStore((state) => state.enabled);
-  const toolsReady = useToolsStore((state) => state.hasScanned);
+  const toolsReady = useToolsStore((state) => state.hasScanned && !state.usingCachedTools);
   useEffect(() => {
     if (!enabled || !toolsReady) return;
     let active = true;

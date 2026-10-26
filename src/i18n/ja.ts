@@ -436,10 +436,10 @@ const ja: Partial<Translations> = {
   'settings.alwaysAsk': '毎回確認',
   'settings.easterEgg': 'イースターエッグ',
   'settings.launchAtStartup': '起動時に開く',
-  'settings.autoClaimRewards': '報酬を自動受け取り',
-  'settings.sensitiveInfoProtection': '機密情報の保護',
+  'settings.autoClaimRewards': '報酬の自動受取',
+  'settings.sensitiveInfoProtection': '情報保護',
   'settings.sensitiveInfoProtectionHint':
-    'APIキー、Token、パスワードなどの機密情報を自動で検出・保護し、直接の漏洩を防ぎます。対応付けと保存はこの端末内で行い、リアルタイムのやり取りを妨げません。',
+    'スマートルーターの利用時に、APIキー、Token、パスワードなどのプライバシー情報を自動で検出・保護し、漏洩を防ぎます。対応付けと保存はこの端末内で行い、モデルの利用に影響しません。',
   'settings.sensitiveInfoProtectionError':
     '保護設定を読み込みまたは保存できません。設定を開き直して再試行してください。',
   'closeDialog.title': 'ウィンドウの閉じ方',

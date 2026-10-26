@@ -184,13 +184,13 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         >
           <button
             onClick={onChangelogClick}
-            className="h-full px-3 flex items-center justify-center text-[12px] font-mono text-cyber-text-secondary hover:bg-cyber-text/20 hover:text-cyber-text transition-colors"
+            className="h-full px-3 flex items-center justify-center whitespace-nowrap text-[14px] leading-none font-sans text-cyber-text-secondary hover:bg-cyber-text/20 hover:text-cyber-text transition-colors"
           >
             {t('nav.changelog')}
           </button>
           <button
             onClick={onFeedbackClick}
-            className="h-full px-3 flex items-center justify-center text-[12px] font-mono text-cyber-text-secondary hover:bg-cyber-text/20 hover:text-cyber-text transition-colors"
+            className="h-full px-3 flex items-center justify-center whitespace-nowrap text-[14px] leading-none font-sans text-cyber-text-secondary hover:bg-cyber-text/20 hover:text-cyber-text transition-colors"
           >
             {t('nav.feedback')}
           </button>

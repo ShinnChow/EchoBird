@@ -195,16 +195,16 @@ export const ChangelogDialog: React.FC<ChangelogDialogProps> = ({
 
       {/* Dialog */}
       <div
-        className={`relative w-[520px] max-w-[92vw] border border-cyber-border/30 bg-cyber-surface shadow-2xl rounded-xl overflow-hidden transition-all duration-200 ${
+        className={`relative flex max-h-[80vh] w-[clamp(640px,70vw,1100px)] max-w-[92vw] flex-col border border-cyber-border/30 bg-cyber-surface shadow-2xl rounded-xl overflow-hidden transition-[opacity,transform] duration-200 ${
           isAnimatingOut ? 'scale-95 opacity-0' : 'scale-100 opacity-100'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top accent line */}
-        <div className="h-px w-full bg-cyber-border" />
+        <div className="h-px w-full flex-shrink-0 bg-cyber-border" />
 
         {/* Header */}
-        <div className="px-6 pt-5 pb-4 flex items-center justify-between">
+        <div className="px-6 pt-5 pb-4 flex flex-shrink-0 items-center justify-between">
           <div className="flex items-baseline gap-2 min-w-0">
             <span className="text-lg font-bold text-cyber-text">{t('nav.changelog')}</span>
             {manifest?.version && (
@@ -225,7 +225,7 @@ export const ChangelogDialog: React.FC<ChangelogDialogProps> = ({
         </div>
 
         {/* Content */}
-        <div className="px-6 pb-6 max-h-[60vh] overflow-y-auto">
+        <div className="min-h-0 px-6 pb-6 overflow-y-auto">
           {status === 'loading' && (
             <p className="text-sm text-cyber-text-secondary py-8 text-center">
               {t('changelog.loading')}

@@ -27,11 +27,20 @@ const tool = (id: string, installed = true): LocalTool => ({
   category: 'Desktop',
   installed,
 });
+const cacheKey = 'echobird-tools-cache';
+const storage = new Map<string, string>();
+const setItem = vi.fn((key: string, value: string) => storage.set(key, value));
 let store: typeof import('./toolsStore').useToolsStore;
 
 beforeEach(async () => {
   vi.resetModules();
   vi.clearAllMocks();
+  storage.clear();
+  setItem.mockImplementation((key, value) => storage.set(key, value));
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem,
+  });
   PendingImage.instances = [];
   vi.stubGlobal('Image', PendingImage);
   store = (await import('./toolsStore')).useToolsStore;
@@ -123,4 +132,120 @@ it('preserves the last desktop when detection fails', async () => {
   await store.getState().scanTools();
   expect(store.getState().detectedTools).toBe(previous);
   expect(store.getState().isScanning).toBe(false);
+});
+
+async function restartWithCache(tools: LocalTool[]) {
+  storage.set(cacheKey, JSON.stringify({ version: 1, platform: navigator.platform, tools }));
+  vi.resetModules();
+  store = (await import('./toolsStore')).useToolsStore;
+}
+
+it('restores the last desktop and resolved icons synchronously without scanning', async () => {
+  const tools = [{ ...tool('cached'), icon: './icons/tools/cached.svg' }];
+  await restartWithCache(tools);
+  expect(store.getState().detectedTools).toEqual(tools);
+  expect(store.getState().isScanning).toBe(false);
+  expect(store.getState().hasScanned).toBe(false);
+  expect(store.getState().usingCachedTools).toBe(true);
+  expect(api.scanTools).not.toHaveBeenCalled();
+  expect(PendingImage.instances).toHaveLength(0);
+  expect(setItem).not.toHaveBeenCalled();
+});
+
+it('keeps the cached desktop until refreshed icons are ready, then persists additions and removals', async () => {
+  await restartWithCache([tool('keep'), tool('removed')]);
+  const cached = store.getState().detectedTools;
+  vi.mocked(api.scanTools).mockResolvedValue([tool('keep'), tool('added')]);
+  const refresh = store.getState().scanTools();
+  expect(store.getState().detectedTools).toBe(cached);
+  expect(store.getState().isScanning).toBe(true);
+  (await image('./icons/tools/keep.svg')).resolve();
+  expect(store.getState().detectedTools).toBe(cached);
+  (await image('./icons/tools/added.svg')).resolve();
+  await refresh;
+  expect(store.getState().detectedTools.map((entry) => entry.id)).toEqual(['keep', 'added']);
+  expect(store.getState().usingCachedTools).toBe(false);
+  expect(JSON.parse(storage.get(cacheKey)!).tools).toEqual(store.getState().detectedTools);
+  vi.resetModules();
+  store = (await import('./toolsStore')).useToolsStore;
+  expect(store.getState().detectedTools.map((entry) => entry.id)).toEqual(['keep', 'added']);
+});
+
+it('preserves the startup snapshot in memory and storage when the refresh fails', async () => {
+  await restartWithCache([tool('cached')]);
+  const cached = store.getState().detectedTools;
+  const saved = storage.get(cacheKey);
+  vi.mocked(api.scanTools).mockRejectedValue(new Error('Scan failed'));
+  await store.getState().scanTools();
+  expect(store.getState().detectedTools).toBe(cached);
+  expect(store.getState().isScanning).toBe(false);
+  expect(storage.get(cacheKey)).toBe(saved);
+  expect(store.getState().usingCachedTools).toBe(true);
+  expect(setItem).not.toHaveBeenCalled();
+});
+
+it('persists an empty completed scan rather than resurrecting removed apps on restart', async () => {
+  await restartWithCache([tool('removed')]);
+  vi.mocked(api.scanTools).mockResolvedValue([]);
+  await store.getState().scanTools();
+  vi.resetModules();
+  store = (await import('./toolsStore')).useToolsStore;
+  expect(store.getState().detectedTools).toEqual([]);
+  expect(JSON.parse(storage.get(cacheKey)!).tools).toEqual([]);
+});
+
+it.each([
+  '{broken',
+  JSON.stringify({ version: 2, platform: navigator.platform, tools: [tool('old')] }),
+  JSON.stringify({ version: 1, platform: 'another-platform', tools: [tool('other')] }),
+  JSON.stringify({ version: 1, platform: navigator.platform, tools: [{ id: 'incomplete' }] }),
+  JSON.stringify({
+    version: 1,
+    platform: navigator.platform,
+    tools: [{ ...tool('bad'), icon: {} }],
+  }),
+])('ignores an incompatible or malformed snapshot: %s', async (saved) => {
+  storage.set(cacheKey, saved);
+  vi.resetModules();
+  store = (await import('./toolsStore')).useToolsStore;
+  expect(store.getState().detectedTools).toEqual([]);
+  expect(api.scanTools).not.toHaveBeenCalled();
+});
+
+it('persists successful tool metadata updates through the existing setter', async () => {
+  store.getState().setDetectedTools([tool('one')]);
+  store
+    .getState()
+    .setDetectedTools((tools) => tools.map((entry) => ({ ...entry, activeModel: 'new' })));
+  expect(JSON.parse(storage.get(cacheKey)!).tools[0].activeModel).toBe('new');
+  expect(api.scanTools).not.toHaveBeenCalled();
+});
+
+it('does not mistake a cached model-label edit for fresh installation detection', async () => {
+  await restartWithCache([tool('cached')]);
+  store
+    .getState()
+    .setDetectedTools((tools) => tools.map((entry) => ({ ...entry, activeModel: 'new' })));
+  expect(store.getState().usingCachedTools).toBe(true);
+  expect(api.scanTools).not.toHaveBeenCalled();
+});
+
+it('remains usable when storage cannot be read or written', async () => {
+  vi.stubGlobal('localStorage', {
+    getItem: () => {
+      throw new Error('Storage unavailable');
+    },
+    setItem: () => {
+      throw new Error('Storage full');
+    },
+  });
+  vi.resetModules();
+  store = (await import('./toolsStore')).useToolsStore;
+  expect(store.getState().detectedTools).toEqual([]);
+  store.getState().setDetectedTools([tool('one')]);
+  expect(store.getState().detectedTools.map((entry) => entry.id)).toEqual(['one']);
+  vi.mocked(api.scanTools).mockResolvedValue([]);
+  await store.getState().scanTools();
+  expect(store.getState().isScanning).toBe(false);
+  expect(store.getState().hasScanned).toBe(true);
 });

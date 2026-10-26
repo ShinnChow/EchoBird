@@ -60,7 +60,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   useRewardClaimStore.setState({ enabled: false, running: false, revision: 0, updatedScope: null });
-  useToolsStore.setState({ detectedTools: [], hasScanned: false, isScanning: false });
+  useToolsStore.setState({
+    detectedTools: [],
+    hasScanned: false,
+    isScanning: false,
+    usingCachedTools: false,
+  });
   rows = {
     workbuddy: [
       { id: 'w1', edition: 'workbuddy' },
@@ -116,6 +121,19 @@ it('never includes QwenWork in startup or hourly claims while other gifts still 
     'claim_workbuddy_daily_credits',
   ]);
   expect(mocks.invoke.mock.calls.some(([command]) => command.includes('qwenwork'))).toBe(false);
+});
+
+it('waits for a current scan before using cached tools for automatic rewards', async () => {
+  installed('workbuddy');
+  useToolsStore.setState({ usingCachedTools: true });
+  useRewardClaimStore.setState({ enabled: true });
+  await mount();
+  expect(mocks.invoke).not.toHaveBeenCalled();
+  await act(async () => installed('workbuddy'));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(0);
+  });
+  expect(claims()).toHaveLength(2);
 });
 
 it('starts after installation detection and keeps an hourly schedule across pages', async () => {

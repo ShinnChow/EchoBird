@@ -377,10 +377,10 @@ const zhHans: Partial<Translations> = {
   'settings.alwaysAsk': '每次询问',
   'settings.easterEgg': '彩蛋',
   'settings.launchAtStartup': '开机启动',
-  'settings.autoClaimRewards': '自动领取奖励',
-  'settings.sensitiveInfoProtection': '敏感信息保护',
+  'settings.autoClaimRewards': '自动领奖',
+  'settings.sensitiveInfoProtection': '信息保护',
   'settings.sensitiveInfoProtectionHint':
-    '自动识别并增强防护，避免你的敏感信息直接泄露，例如：密钥、Token、密码等。仅在本机映射和保存，不影响实时交互。',
+    '使用智能接入时，自动识别并增强防护，避免隐私信息泄露，例如：密钥、Token、密码等。仅在本机映射和保存，不影响模型使用。',
   'settings.sensitiveInfoProtectionError': '无法读取或保存保护设置，请重新打开设置后重试。',
   'closeDialog.title': '窗口关闭方式',
   'closeDialog.hint': '注意：如果正在使用 EchoBird 的智能接入，退出会导致应用无法使用。',

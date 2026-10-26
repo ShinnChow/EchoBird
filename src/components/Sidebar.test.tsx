@@ -116,39 +116,46 @@ describe('Sidebar', () => {
     expect(voiceApi.startVoice).not.toHaveBeenCalled();
   });
 
-  it('blocks collapsed controls while pending or recording and keeps their state after expanding', async () => {
-    useSidebarStore.setState({ collapsed: true });
-    voice.setState({
-      snapshot: voiceSnapshot({
-        config: { ...sourceConfig, shortcutEnabled: true },
-        phase: 'recording',
-      }),
-    });
-    act(() => {
-      renderer = create(
-        <Sidebar
-          {...baseProps}
-          smartRouterEnabled
-          smartRouterTogglePending
-          smartRouterGroups={routerGroups}
-        />
-      );
-    });
-    const switches = () => renderer.root.findAllByProps({ role: 'switch' });
-    expect(switches()).toHaveLength(2);
-    for (const control of switches()) {
-      expect(control.props.disabled).toBe(true);
-      expect(control.props['aria-checked']).toBe(true);
-      await act(async () => control.props.onClick());
+  it.each(['saving', 'recording'] as const)(
+    'keeps collapsed controls stable while %s and after expanding',
+    async (mode) => {
+      useSidebarStore.setState({ collapsed: true });
+      voice.setState({
+        saving: mode === 'saving',
+        snapshot: voiceSnapshot({
+          config: { ...sourceConfig, shortcutEnabled: true },
+          phase: mode === 'recording' ? 'recording' : 'idle',
+        }),
+      });
+      act(() => {
+        renderer = create(
+          <Sidebar
+            {...baseProps}
+            smartRouterEnabled
+            smartRouterTogglePending
+            smartRouterGroups={routerGroups}
+          />
+        );
+      });
+      const switches = () => renderer.root.findAllByProps({ role: 'switch' });
+      expect(switches()).toHaveLength(2);
+      for (const control of switches()) {
+        expect(control.props.disabled).toBe(true);
+        expect(control.props['aria-checked']).toBe(true);
+        expect(control.props.className.includes('disabled:opacity-40')).toBe(
+          control.props['aria-label'] === 'voice.enableInput' && mode === 'recording'
+        );
+        await act(async () => control.props.onClick());
+      }
+      expect(baseProps.onSmartRouterChange).not.toHaveBeenCalled();
+      expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
+      act(() => useSidebarStore.getState().setCollapsed(false));
+      for (const control of switches()) {
+        expect(control.props.disabled).toBe(true);
+        expect(control.props['aria-checked']).toBe(true);
+      }
     }
-    expect(baseProps.onSmartRouterChange).not.toHaveBeenCalled();
-    expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
-    act(() => useSidebarStore.getState().setCollapsed(false));
-    for (const control of switches()) {
-      expect(control.props.disabled).toBe(true);
-      expect(control.props['aria-checked']).toBe(true);
-    }
-  });
+  );
 
   it('keeps source-less global controls hidden in the collapsed rail', () => {
     useSidebarStore.setState({ collapsed: true });

@@ -81,7 +81,7 @@ function SidebarToggle({
         aria-checked={checked}
         aria-busy={pending}
         disabled={disabled || pending}
-        className={`mx-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors disabled:opacity-40 ${checked ? 'bg-cyber-accent/15 text-cyber-accent' : 'text-cyber-text-secondary hover:bg-cyber-elevated/50 hover:text-cyber-text'}`}
+        className={`mx-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors ${disabled ? 'disabled:opacity-40' : ''} ${checked ? 'bg-cyber-accent/15 text-cyber-accent' : 'text-cyber-text-secondary hover:bg-cyber-elevated/50 hover:text-cyber-text'}`}
         onClick={() => {
           if (!disabled && !pending) return onChange(!checked);
         }}

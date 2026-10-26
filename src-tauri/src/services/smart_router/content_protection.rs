@@ -41,7 +41,7 @@ fn patterns() -> &'static Vec<Regex> {
         r"\b(?:hf_[A-Za-z0-9]{30,}|gsk_[A-Za-z0-9]{40,}|xai-[A-Za-z0-9_-]{30,}|npm_[A-Za-z0-9]{30,})",
         r"\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}",
         r#"[A-Za-z][A-Za-z0-9+.-]*://[^\s:@/?#"'<>]*:([^\s@/?#"'<>]{4,})@"#,
-        r#"(?i)\b[A-Za-z0-9_.-]*(?:api[_-]?key|access[_-]?key|secret[_-]?key|private[_-]?key|access[_-]?token|auth[_-]?token|refresh[_-]?token|client[_-]?secret|secret|password|passwd|credential|token)["']?\s*[:=]\s*["']?(?P<assigned>[^\s"'`,;<>\[\]{}]{8,})"#,
+        r#"(?i)\b(?P<assigned_field>[A-Za-z0-9_.-]*(?:api[_-]?key|access[_-]?key|secret[_-]?key|private[_-]?key|access[_-]?token|auth[_-]?token|refresh[_-]?token|client[_-]?secret|secret|password|passwd|credential|token))["']?\s*[:=]\s*["']?(?P<assigned>[^\s"'`,;<>\[\]{}]{8,})"#,
         r#"(?i)\bBearer[ \t]+([A-Za-z0-9._~+/=-]{8,})"#,
         r#"(?i)(?:密码|密碼|口令|密钥|密鑰|秘钥|秘鑰|私钥|私鑰|金钥|金鑰|令牌|权杖|權杖|(?:^|[^A-Za-z0-9_])(?:api[ _-]?key|token|password))[ \t]*(?:为|為|是|[:：=])[ \t]*["'“「]?(?P<contextual>[A-Za-z0-9_./\\+=~!@#$%^&*()?-]{4,})"#,
     ]
@@ -61,6 +61,19 @@ fn credentials(text: &str) -> impl Iterator<Item = &str> {
                 .or_else(|| captures.get(1))
                 .or_else(|| captures.get(0))
                 .unwrap();
+            // Exempt short typed IDs only from the label rule, not other credential rules.
+            if captures.name("assigned_field").is_some_and(|field| {
+                let field = field.as_str().to_ascii_lowercase().replace(['_', '-'], "");
+                let id = found.as_str().as_bytes();
+                matches!(
+                    field.as_str(),
+                    "elementtoken" | "nodetoken" | "snapshottoken" | "handletoken"
+                ) && (2..=17).contains(&id.len())
+                    && id[0].is_ascii_alphabetic()
+                    && id[1..].iter().all(u8::is_ascii_hexdigit)
+            }) {
+                return None;
+            }
             if (assigned.is_some() || contextual.is_some())
                 && code_value(text, captures.get(0).unwrap().start(), found)
             {

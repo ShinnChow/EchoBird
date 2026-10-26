@@ -4,6 +4,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import * as api from '../../api/tauri';
 import * as kimiApi from '../../api/kimiAccounts';
+import * as codeArtsApi from '../../api/codeArtsAccounts';
 import { useToolsStore } from '../../stores/toolsStore';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { useAccountPrivacyStore } from '../../stores/accountPrivacyStore';
@@ -23,6 +24,10 @@ import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { TraeAccountSection } from './TraeAccountSection';
 
 vi.hoisted(() => vi.stubGlobal('__APP_EDITION__', 'full'));
+vi.mock('../../api/codeArtsAccounts', async (original) => ({
+  ...(await original<typeof import('../../api/codeArtsAccounts')>()),
+  listCodeArtsAccounts: vi.fn(),
+}));
 vi.mock('../../api/kimiAccounts', () => ({
   listKimiAccounts: vi.fn(),
   startKimiLogin: vi.fn(),
@@ -61,6 +66,8 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({
 }));
 vi.mock('../../api/tauri', () => {
   const names = [
+    'listDuMateAccounts',
+    'listDoubaoAccounts',
     'listOpenDesignAccounts',
     'startOpenDesignLogin',
     'pollOpenDesignLogin',
@@ -831,7 +838,8 @@ function mockAccountOrderStorage(raw?: string) {
     getItem: vi.fn((key: string) => values.get(key) ?? null),
     setItem: (key: string, value: string) => {
       if (key === 'echobird_account_card_order') setItem(key, value);
-      else cacheWrites(key, value);
+      else if (key === 'echobird_account_card_cache') cacheWrites(key, value);
+      else values.set(key, value);
     },
   };
   vi.stubGlobal('localStorage', storage);
@@ -1231,6 +1239,75 @@ function expectPassiveAccountNavigation() {
   expect(state.applyError).toBeNull();
   expect(applyErrorEvents.filter(Boolean)).toEqual([]);
 }
+
+it('Account Center: cached apps do not load native accounts before current detection confirms installation', async () => {
+  useToolsStore.setState({
+    detectedTools: ['codex', 'workbuddy'].map((id) => ({
+      id,
+      name: id,
+      category: 'Desktop',
+      installed: true,
+    })),
+    usingCachedTools: true,
+    hasScanned: false,
+  });
+  useNavigationStore.getState().setActivePage('accounts');
+  await act(async () => {
+    renderer = create(
+      <AppManagerProvider>
+        <Harness center />
+      </AppManagerProvider>
+    );
+  });
+  await tick();
+  expect(api.listCodexAccounts).not.toHaveBeenCalled();
+  expect(api.listWorkBuddyAccounts).not.toHaveBeenCalled();
+  act(() =>
+    useToolsStore.getState().setDetectedTools([
+      { id: 'codex', name: 'Codex', category: 'Desktop', installed: false },
+      { id: 'workbuddy', name: 'WorkBuddy', category: 'Desktop', installed: true },
+    ])
+  );
+  await tick();
+  expect(api.listCodexAccounts).not.toHaveBeenCalled();
+  expect(api.listWorkBuddyAccounts).toHaveBeenCalledTimes(1);
+  expectPassiveAccountNavigation();
+});
+
+it('Smart Access: cached apps wait for current detection before loading native accounts', async () => {
+  vi.mocked(api.listDuMateAccounts).mockResolvedValue([]);
+  vi.mocked(api.listDoubaoAccounts).mockResolvedValue([]);
+  vi.mocked(codeArtsApi.listCodeArtsAccounts).mockResolvedValue([]);
+  const tools = ['dumate', 'doubaowork', 'dola', 'codearts'].map((id) => ({
+    id,
+    name: id,
+    category: 'Desktop',
+    installed: true,
+  }));
+  useToolsStore.setState({ detectedTools: tools, usingCachedTools: true, hasScanned: false });
+  useNavigationStore.getState().setActivePage('freeModels');
+  await act(async () => {
+    renderer = create(
+      <AppManagerProvider>
+        <Harness />
+      </AppManagerProvider>
+    );
+  });
+  await tick();
+  expect(api.listDuMateAccounts).not.toHaveBeenCalled();
+  expect(api.listDoubaoAccounts).not.toHaveBeenCalled();
+  expect(codeArtsApi.listCodeArtsAccounts).not.toHaveBeenCalled();
+  act(() =>
+    useToolsStore
+      .getState()
+      .setDetectedTools(tools.map((tool) => ({ ...tool, installed: tool.id !== 'dola' })))
+  );
+  await tick();
+  expect(api.listDuMateAccounts).toHaveBeenCalledOnce();
+  expect(api.listDoubaoAccounts).toHaveBeenCalledExactlyOnceWith('doubaowork');
+  expect(codeArtsApi.listCodeArtsAccounts).toHaveBeenCalledOnce();
+  expectPassiveAccountNavigation();
+});
 
 it('Account Center: first load keeps the skeleton until all installed providers settle', async () => {
   const storage = mockAccountOrderStorage();

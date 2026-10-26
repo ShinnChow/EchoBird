@@ -402,10 +402,10 @@ const en: Translations = {
   'settings.closeToTray': 'Minimize to tray',
   'settings.easterEgg': 'Easter Egg',
   'settings.launchAtStartup': 'Launch at startup',
-  'settings.autoClaimRewards': 'Automatically claim rewards',
-  'settings.sensitiveInfoProtection': 'Sensitive information protection',
+  'settings.autoClaimRewards': 'Auto claim rewards',
+  'settings.sensitiveInfoProtection': 'Information protection',
   'settings.sensitiveInfoProtectionHint':
-    'Automatically identifies and protects sensitive information such as API keys, tokens and passwords to prevent direct disclosure. Mapping and storage stay on this device, preserving real-time interaction.',
+    'When using Smart Router, automatically identifies and protects private information such as API keys, tokens and passwords to prevent disclosure. Mapping and storage stay on this device without affecting model use.',
   'settings.sensitiveInfoProtectionError':
     'Unable to read or save protection settings. Reopen Settings and try again.',
   'settings.alwaysAsk': 'Always ask',

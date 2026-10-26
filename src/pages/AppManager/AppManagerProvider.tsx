@@ -62,7 +62,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     );
 
   // From stores (replaces drilled props)
-  const { detectedTools, setDetectedTools, isScanning, scanTools } = useToolsStore();
+  const { detectedTools, setDetectedTools, isScanning, scanTools, usingCachedTools } =
+    useToolsStore();
   const { activePage, goToMother } = useNavigationStore();
   const isActive = activePage === 'apps';
 
@@ -157,9 +158,10 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const accountsEnabled =
     isActive && detectedTools.some((tool) => tool.id === selectedTool && tool.installed);
   const accountGroupEnabled = (...ids: string[]) =>
-    activePage === 'accounts'
+    !usingCachedTools &&
+    (activePage === 'accounts'
       ? detectedTools.some((tool) => ids.includes(tool.id) && tool.installed)
-      : accountsEnabled && ids.includes(selectedTool ?? '');
+      : accountsEnabled && ids.includes(selectedTool ?? ''));
   const [isLaunching, setIsLaunching] = useState(false);
   const launchGeneration = useRef(0);
   const [applyError, setApplyError] = useState<string | null>(null);
@@ -399,7 +401,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   }, []);
   const dumateAccounts = useDuMateAccounts(
     accountGroupEnabled('dumate') ||
-      (activePage === 'freeModels' &&
+      (!usingCachedTools &&
+        activePage === 'freeModels' &&
         detectedTools.some((tool) => tool.id === 'dumate' && tool.installed)),
     clearDuMateModel,
     setApplyError,
@@ -415,7 +418,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const doubaoWorkAccounts = useDoubaoAccounts(
     'doubaowork',
     accountGroupEnabled('doubaowork') ||
-      (activePage === 'freeModels' &&
+      (!usingCachedTools &&
+        activePage === 'freeModels' &&
         detectedTools.some((tool) => tool.id === 'doubaowork' && tool.installed)),
     !!toolModelConfig.doubaowork,
     clearDoubaoWorkModel,
@@ -425,7 +429,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const dolaAccounts = useDoubaoAccounts(
     'dola',
     accountGroupEnabled('dola') ||
-      (activePage === 'freeModels' &&
+      (!usingCachedTools &&
+        activePage === 'freeModels' &&
         detectedTools.some((tool) => tool.id === 'dola' && tool.installed)),
     !!toolModelConfig.dola,
     clearDolaModel,
@@ -603,7 +608,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   );
   const codeArtsAccounts = useCodeArtsAccounts(
     accountGroupEnabled('codearts') ||
-      (activePage === 'freeModels' &&
+      (!usingCachedTools &&
+        activePage === 'freeModels' &&
         detectedTools.some((tool) => tool.id === 'codearts' && tool.installed)),
     !!toolModelConfig.codearts,
     () => setToolModelConfig((prev) => ({ ...prev, codearts: null })),
