@@ -170,6 +170,7 @@ export interface ApplyModelInput {
 // ─── App Settings Types ───
 
 export interface AppSettings {
+  sensitiveInfoProtection?: boolean;
   locale?: string;
   themeMode?: 'light' | 'dark';
   colorTheme?: string;

@@ -401,6 +401,11 @@ const en: Translations = {
   'settings.easterEgg': 'Easter Egg',
   'settings.launchAtStartup': 'Launch at startup',
   'settings.autoClaimRewards': 'Automatically claim rewards',
+  'settings.sensitiveInfoProtection': 'Sensitive information protection',
+  'settings.sensitiveInfoProtectionHint':
+    'Automatically identifies and protects sensitive information such as API keys, tokens and passwords to prevent direct disclosure. Mapping and storage stay on this device, preserving real-time interaction.',
+  'settings.sensitiveInfoProtectionError':
+    'Unable to read or save protection settings. Reopen Settings and try again.',
   'settings.alwaysAsk': 'Always ask',
   // Close Dialog
   'closeDialog.title': 'CLOSE BEHAVIOR',

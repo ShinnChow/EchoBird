@@ -7,7 +7,7 @@ import { useEasterEggStore } from '../stores/easterEggStore';
 import { useBackgroundStore } from '../stores/backgroundStore';
 import { useRewardClaimStore } from '../stores/rewardClaimStore';
 
-const mocks = vi.hoisted(() => ({ zoom: vi.fn(), save: vi.fn() }));
+const mocks = vi.hoisted(() => ({ zoom: vi.fn(), save: vi.fn(), get: vi.fn() }));
 vi.mock('@tauri-apps/api/app', () => ({ getVersion: async () => '' }));
 vi.mock('@tauri-apps/api/webview', () => ({ getCurrentWebview: () => ({ setZoom: mocks.zoom }) }));
 vi.mock('@tauri-apps/api/window', async (importOriginal) => ({
@@ -16,7 +16,7 @@ vi.mock('@tauri-apps/api/window', async (importOriginal) => ({
   getCurrentWindow: () => ({}),
 }));
 vi.mock('@tauri-apps/plugin-autostart', () => ({ isEnabled: async () => false }));
-vi.mock('../api/tauri', () => ({ getSettings: async () => ({}), saveSettings: mocks.save }));
+vi.mock('../api/tauri', () => ({ getSettings: mocks.get, saveSettings: mocks.save }));
 vi.mock('../hooks/useI18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 vi.mock('../stores/themeStore', () => ({
   useThemeStore: (select: (state: unknown) => unknown) =>
@@ -28,6 +28,8 @@ const props = { isOpen: true, onClose: vi.fn(), locale: 'en', onLocaleChange: vi
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.zoom.mockResolvedValue(undefined);
+  mocks.get.mockResolvedValue({});
+  mocks.save.mockResolvedValue(undefined);
   vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() });
   vi.stubGlobal('document', { addEventListener: vi.fn(), removeEventListener: vi.fn() });
   vi.stubGlobal('localStorage', { getItem: vi.fn(), setItem: vi.fn() });
@@ -149,8 +151,13 @@ it('places opt-in reward claiming below startup and preserves the setting throug
     toggles
       .findAllByType('span')
       .map((span) => span.props.children)
-      .filter((value) => typeof value === 'string')
-  ).toEqual(['settings.launchAtStartup', 'settings.easterEgg', 'settings.autoClaimRewards']);
+      .filter((value) => typeof value === 'string' && value !== '?')
+  ).toEqual([
+    'settings.launchAtStartup',
+    'settings.easterEgg',
+    'settings.autoClaimRewards',
+    'settings.sensitiveInfoProtection',
+  ]);
   expect(localStorage.setItem).not.toHaveBeenCalled();
   await act(async () => control().props.onClick());
   expect(useRewardClaimStore.getState().enabled).toBe(true);
@@ -167,6 +174,88 @@ function EasterEggObserver() {
   const enabled = useEasterEggStore((state) => state.enabled);
   return <span data-easter-egg-state>{String(enabled)}</span>;
 }
+
+function protectionSwitch() {
+  return view.root
+    .findAllByProps({ role: 'switch' })
+    .find((control) => control.props['aria-label'] === 'settings.sensitiveInfoProtection')!;
+}
+
+it('loads protection without writing and saves only an explicit toggle while retaining other settings', async () => {
+  const saved = {
+    locale: 'ja',
+    themeMode: 'dark',
+    colorTheme: 'oatgray',
+    closeToTray: true,
+    sensitiveInfoProtection: true,
+  };
+  mocks.get.mockResolvedValue(saved);
+  await act(async () => {
+    view = create(<SettingsDialog {...props} />);
+  });
+  expect(protectionSwitch().props['aria-checked']).toBe(true);
+  expect(mocks.save).not.toHaveBeenCalled();
+  await act(async () => protectionSwitch().props.onClick());
+  expect(mocks.save).toHaveBeenCalledExactlyOnceWith({ ...saved, sensitiveInfoProtection: false });
+  expect(protectionSwitch().props['aria-checked']).toBe(false);
+  mocks.get.mockResolvedValue({ ...saved, sensitiveInfoProtection: false });
+  await act(async () => view.update(<SettingsDialog {...props} isOpen={false} />));
+  await act(async () => view.update(<SettingsDialog {...props} />));
+  expect(protectionSwitch().props['aria-checked']).toBe(false);
+  expect(mocks.save).toHaveBeenCalledTimes(1);
+});
+
+it('keeps the saved protection state on failure and disables repeated writes while pending', async () => {
+  await act(async () => {
+    view = create(<SettingsDialog {...props} />);
+  });
+  expect(protectionSwitch().props['aria-checked']).toBe(false);
+  let finish!: () => void;
+  mocks.save.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+  );
+  await act(async () => protectionSwitch().props.onClick());
+  expect(protectionSwitch().props.disabled).toBe(true);
+  expect(protectionSwitch().props['aria-checked']).toBe(false);
+  await act(async () => protectionSwitch().props.onClick());
+  expect(mocks.save).toHaveBeenCalledTimes(1);
+  await act(async () => finish());
+  expect(protectionSwitch().props['aria-checked']).toBe(true);
+  mocks.save.mockRejectedValueOnce(new Error('unavailable'));
+  await act(async () => protectionSwitch().props.onClick());
+  expect(protectionSwitch().props['aria-checked']).toBe(true);
+  expect(view.root.findByProps({ role: 'alert' }).children).toContain(
+    'settings.sensitiveInfoProtectionError'
+  );
+  expect(protectionSwitch().props.disabled).toBe(false);
+});
+
+it('does not replace unreadable protection settings with defaults or use late loads from a closed dialog', async () => {
+  mocks.get.mockRejectedValueOnce(new Error('unreadable'));
+  await act(async () => {
+    view = create(<SettingsDialog {...props} />);
+  });
+  expect(protectionSwitch().props.disabled).toBe(true);
+  expect(mocks.save).not.toHaveBeenCalled();
+  let finish!: (value: object) => void;
+  mocks.get.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  await act(async () => view.update(<SettingsDialog {...props} isOpen={false} />));
+  await act(async () => view.update(<SettingsDialog {...props} />));
+  await act(async () => view.update(<SettingsDialog {...props} isOpen={false} />));
+  await act(async () => finish({ sensitiveInfoProtection: true }));
+  mocks.get.mockResolvedValue({ sensitiveInfoProtection: false });
+  await act(async () => view.update(<SettingsDialog {...props} />));
+  expect(protectionSwitch().props['aria-checked']).toBe(false);
+  expect(mocks.save).not.toHaveBeenCalled();
+});
 
 it('updates the shared Easter Egg setting and other consumers immediately from the existing switch', async () => {
   await act(async () => {

@@ -435,6 +435,11 @@ const ja: Partial<Translations> = {
   'settings.easterEgg': 'イースターエッグ',
   'settings.launchAtStartup': '起動時に開く',
   'settings.autoClaimRewards': '報酬を自動受け取り',
+  'settings.sensitiveInfoProtection': '機密情報の保護',
+  'settings.sensitiveInfoProtectionHint':
+    'APIキー、Token、パスワードなどの機密情報を自動で検出・保護し、直接の漏洩を防ぎます。対応付けと保存はこの端末内で行い、リアルタイムのやり取りを妨げません。',
+  'settings.sensitiveInfoProtectionError':
+    '保護設定を読み込みまたは保存できません。設定を開き直して再試行してください。',
   'closeDialog.title': 'ウィンドウの閉じ方',
   'closeDialog.hint':
     '注意：EchoBird のスマートルーターを使用している場合、終了するとアプリが使用できなくなります。',

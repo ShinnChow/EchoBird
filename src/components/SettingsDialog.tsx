@@ -12,6 +12,7 @@ import {
   Power,
   Monitor,
   Gift,
+  Shield,
 } from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
@@ -26,6 +27,7 @@ import { COLOR_THEMES, type ColorThemeId } from '../data/colorThemes';
 import { useUiScaleStore } from '../stores/uiScaleStore';
 import { useEasterEggStore } from '../stores/easterEggStore';
 import { useRewardClaimStore } from '../stores/rewardClaimStore';
+import { RoutingToggle } from './RoutingToggle';
 
 // All supported locales
 const LOCALE_OPTIONS = [
@@ -65,6 +67,10 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   >(null);
   const [installPct, setInstallPct] = useState(0);
   const [closeToTray, setCloseToTray] = useState<boolean | null>(false);
+  const [sensitiveInfoProtection, setSensitiveInfoProtection] = useState(false);
+  const [protectionReady, setProtectionReady] = useState(false);
+  const [protectionPending, setProtectionPending] = useState(false);
+  const [protectionError, setProtectionError] = useState(false);
   const easterEgg = useEasterEggStore((state) => state.enabled);
   const setEasterEgg = useEasterEggStore((state) => state.setEnabled);
   const autoClaimRewards = useRewardClaimStore((state) => state.enabled);
@@ -117,27 +123,60 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
   // Load backend settings each time the dialog opens.
   useEffect(() => {
+    let active = true;
     if (isOpen) {
+      void Promise.resolve().then(() => {
+        if (active) {
+          setProtectionReady(false);
+          setProtectionError(false);
+        }
+      });
       // Reflect the real OS autostart registration (may have been toggled
       // outside the app). Default to false if the query fails.
       isEnabled()
         .then(setLaunchAtStartup)
         .catch(() => {});
-      api.getSettings().then((settings) => {
-        // null ("always ask") is a real selectable value, not a missing
-        // field — the backend stores it as Option<bool>=None. When the user
-        // explicitly chose it (closeWindowBehaviorSet === true), preserve
-        // null so the dialog reflects their choice instead of resetting to
-        // "quit directly" (false). Only fall back to false for the genuinely
-        // unset case (never configured), matching the original default.
-        setCloseToTray(
-          settings.closeWindowBehaviorSet && settings.closeToTray === null
-            ? null
-            : (settings.closeToTray ?? false)
-        );
-      });
+      api
+        .getSettings()
+        .then((settings) => {
+          if (!active) return;
+          setSensitiveInfoProtection(settings.sensitiveInfoProtection === true);
+          setProtectionReady(true);
+          // null ("always ask") is a real selectable value, not a missing
+          // field — the backend stores it as Option<bool>=None. When the user
+          // explicitly chose it (closeWindowBehaviorSet === true), preserve
+          // null so the dialog reflects their choice instead of resetting to
+          // "quit directly" (false). Only fall back to false for the genuinely
+          // unset case (never configured), matching the original default.
+          setCloseToTray(
+            settings.closeWindowBehaviorSet && settings.closeToTray === null
+              ? null
+              : (settings.closeToTray ?? false)
+          );
+        })
+        .catch(() => {
+          if (active) setProtectionError(true);
+        });
     }
+    return () => {
+      active = false;
+    };
   }, [isOpen]);
+
+  const handleProtectionChange = async (value: boolean) => {
+    if (!protectionReady || protectionPending) return;
+    setProtectionPending(true);
+    setProtectionError(false);
+    try {
+      const settings = await api.getSettings();
+      await api.saveSettings({ ...settings, sensitiveInfoProtection: value });
+      setSensitiveInfoProtection(value);
+    } catch {
+      setProtectionError(true);
+    } finally {
+      setProtectionPending(false);
+    }
+  };
 
   // Toggle launch-at-startup: register/unregister the OS autostart entry.
   // The entry launches with --minimized so a boot start stays in the tray.
@@ -529,6 +568,30 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                       </span>
                     </div>
                     <ToggleSwitch checked={autoClaimRewards} onChange={setAutoClaimRewards} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Shield size={14} className="text-cyber-text-secondary shrink-0" />
+                        <span className="text-[14px] font-medium text-cyber-text-secondary">
+                          {t('settings.sensitiveInfoProtection')}
+                        </span>
+                      </div>
+                      <RoutingToggle
+                        label={t('settings.sensitiveInfoProtection')}
+                        hideLabel
+                        hint={t('settings.sensitiveInfoProtectionHint')}
+                        checked={sensitiveInfoProtection}
+                        disabled={!protectionReady}
+                        pending={protectionPending}
+                        onChange={(value) => void handleProtectionChange(value)}
+                      />
+                    </div>
+                    {protectionError && (
+                      <p role="alert" className="mt-1 text-xs text-red-400">
+                        {t('settings.sensitiveInfoProtectionError')}
+                      </p>
+                    )}
                   </div>
                 </div>
 

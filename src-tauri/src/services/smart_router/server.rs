@@ -45,6 +45,9 @@ pub(crate) use probe::{cancel_probe, probe_candidate, ProbeResult};
 #[path = "voice.rs"]
 mod voice;
 
+#[path = "content_protection.rs"]
+mod content_protection;
+
 const MAX_REQUEST_BODY_BYTES: usize = 64 * 1024 * 1024;
 const MAX_STREAM_PREFLIGHT_BYTES: usize = 1024 * 1024;
 const MAX_RESPONSE_BINDINGS: usize = 512;
@@ -185,6 +188,7 @@ pub(crate) fn public_activity() -> PublicActivity {
 #[derive(Clone)]
 struct AppState {
     config_path: PathBuf,
+    protection_settings_path: PathBuf,
     model_id: String,
     activity: Arc<Mutex<RouteActivity>>,
     http_client: reqwest::Client,
@@ -227,6 +231,7 @@ impl AppState {
         standby::register(&config_path, &standby);
         Ok(Self {
             config_path,
+            protection_settings_path: crate::utils::platform::echobird_dir().join("settings.json"),
             model_id: SMART_ROUTER_MODEL_ID.into(),
             activity: shared_activity(),
             http_client,
@@ -254,6 +259,8 @@ impl AppState {
             .map_err(|e| format!("reqwest client build failed: {e}"))?;
         Ok(Self {
             config_path: super::config_path(),
+            protection_settings_path: std::env::temp_dir()
+                .join(format!("router-settings-{}.json", uuid::Uuid::new_v4())),
             model_id: SMART_ROUTER_MODEL_ID.into(),
             activity: shared_activity(),
             http_client,
@@ -762,7 +769,68 @@ async fn handle_chat(
             return openai_error(StatusCode::NOT_FOUND, &error);
         }
     };
-    route_chat_with_candidates(&state, &headers, body, candidates).await
+    protected_route(&state, &headers, body, candidates, ClientProtocol::Chat).await
+}
+
+#[derive(Clone, Copy)]
+enum ClientProtocol {
+    Chat,
+    Responses,
+    Messages,
+}
+
+async fn protected_route(
+    state: &AppState,
+    headers: &HeaderMap,
+    mut body: Value,
+    candidates: Vec<Candidate>,
+    protocol: ClientProtocol,
+) -> Response {
+    let protection = match prepare_protection(state, &mut body) {
+        Ok(protection) => protection,
+        Err(error) => {
+            return match protocol {
+                ClientProtocol::Messages => anthropic_error(StatusCode::SERVICE_UNAVAILABLE, error),
+                _ => openai_error(StatusCode::SERVICE_UNAVAILABLE, error),
+            }
+        }
+    };
+    let response = match protocol {
+        ClientProtocol::Chat => route_chat_with_candidates(state, headers, body, candidates).await,
+        ClientProtocol::Responses => {
+            route_responses_with_candidates(state, headers, body, candidates).await
+        }
+        ClientProtocol::Messages => {
+            route_messages_with_candidates(state, headers, body, candidates).await
+        }
+    };
+    restore_protection(protection, response).await
+}
+
+fn prepare_protection(
+    state: &AppState,
+    body: &mut Value,
+) -> Result<Option<content_protection::Protection>, &'static str> {
+    if content_protection::enabled(&state.protection_settings_path)? {
+        content_protection::Protection::prepare(
+            body,
+            &state.config_path,
+            &state.protection_settings_path,
+        )
+        .map(Some)
+    } else {
+        Ok(None)
+    }
+}
+
+async fn restore_protection(
+    protection: Option<content_protection::Protection>,
+    response: Response,
+) -> Response {
+    match protection {
+        Some(protection) => protection.restore(response).await,
+        None => response,
+    }
 }
 
 fn is_supported_router_model(model_id: &str) -> bool {
@@ -831,7 +899,14 @@ async fn handle_responses(
         Ok(candidates) => candidates,
         Err(error) => return openai_error(StatusCode::NOT_FOUND, &error),
     };
-    route_responses_with_candidates(&state, &headers, body, candidates).await
+    protected_route(
+        &state,
+        &headers,
+        body,
+        candidates,
+        ClientProtocol::Responses,
+    )
+    .await
 }
 
 async fn handle_messages(
@@ -865,7 +940,7 @@ async fn handle_messages(
         Ok(candidates) => candidates,
         Err(error) => return anthropic_error(StatusCode::NOT_FOUND, &error),
     };
-    route_messages_with_candidates(&state, &headers, body, candidates).await
+    protected_route(&state, &headers, body, candidates, ClientProtocol::Messages).await
 }
 
 async fn route_messages_with_candidates(

@@ -413,6 +413,10 @@ const zhHant: Partial<Translations> = {
   'settings.easterEgg': '彩蛋',
   'settings.launchAtStartup': '開機啟動',
   'settings.autoClaimRewards': '自動領取獎勵',
+  'settings.sensitiveInfoProtection': '敏感資訊保護',
+  'settings.sensitiveInfoProtectionHint':
+    '自動識別並增強防護，避免你的敏感資訊直接洩露，例如：金鑰、Token、密碼等。僅在本機映射和儲存，不影響即時互動。',
+  'settings.sensitiveInfoProtectionError': '無法讀取或儲存保護設定，請重新開啟設定後再試。',
   'closeDialog.title': '視窗關閉方式',
   'closeDialog.hint': '注意：如果正在使用 EchoBird 的智能接入，結束會導致應用程式無法使用。',
   'btn.addModel': '新增模型',

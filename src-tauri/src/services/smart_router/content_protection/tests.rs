@@ -1,0 +1,498 @@
+use super::*;
+use axum::body::{Body, Bytes};
+use axum::http::header;
+use serde_json::json;
+
+const SECRET: &str = "sk-proj-1234567890abcdefghijklmnopqrstuv";
+
+fn engine() -> SharedEngine {
+    Arc::new(Mutex::new(Engine::new([17; 32], b"test-router")))
+}
+
+fn protect(value: &mut Value, engine: &SharedEngine) -> Protection {
+    Protection::with_engine(value, engine.clone()).unwrap()
+}
+
+fn token(engine: &SharedEngine) -> String {
+    engine.lock().unwrap().secrets[0].token.clone()
+}
+
+#[test]
+fn credentials_are_masked_everywhere_and_plain_personal_data_is_retained() {
+    let engine = engine();
+    let mut body = json!({"model":SECRET,"messages":[{"role":"user","content":format!("密钥为 {SECRET}，邮箱 user@example.com，电话 13800138000，主机 10.0.0.1")}]});
+    protect(&mut body, &engine);
+    assert_eq!(body["model"], SECRET);
+    let content = body["messages"][0]["content"].as_str().unwrap();
+    assert!(!content.contains(SECRET));
+    for preserved in ["user@example.com", "13800138000", "10.0.0.1"] {
+        assert!(content.contains(preserved));
+    }
+    assert_eq!(
+        engine.lock().unwrap().restore(content, false),
+        format!("密钥为 {SECRET}，邮箱 user@example.com，电话 13800138000，主机 10.0.0.1")
+    );
+}
+
+#[test]
+fn all_chosen_credential_types_have_positive_controls() {
+    for text in [
+        format!("API_KEY={SECRET}"),
+        "token=abcdEFGH12345678".into(),
+        "密码是 myP@ssw0rd".into(),
+        "Bearer abcdefgh12345678".into(),
+        "postgres://user:secret_password@host:5432/database".into(),
+        "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefgh12345678".into(),
+        "-----BEGIN RSA PRIVATE KEY-----\nabc123\n-----END RSA PRIVATE KEY-----".into(),
+    ] {
+        let engine = engine();
+        let mut body = json!({"messages":[{"content":text}]});
+        protect(&mut body, &engine);
+        let masked = body["messages"][0]["content"].as_str().unwrap();
+        assert_ne!(masked, text);
+        assert_eq!(engine.lock().unwrap().restore(masked, false), text);
+    }
+}
+
+#[test]
+fn multi_turn_values_and_discovery_after_first_occurrence_are_consistent() {
+    let engine = engine();
+    let mut first = json!({"messages":[{"content":"the value is abcdEFGH12345678"},{"content":"DB_PASSWORD=abcdEFGH12345678"}]});
+    protect(&mut first, &engine);
+    let expected = token(&engine);
+    assert_eq!(
+        first["messages"][0]["content"],
+        format!("the value is {expected}")
+    );
+    let mut second = json!({"messages":[{"content":"It is still abcdEFGH12345678, without its original label."}]});
+    protect(&mut second, &engine);
+    assert!(second.to_string().contains(&expected));
+    assert!(!second.to_string().contains("abcdEFGH12345678"));
+    let other = Arc::new(Mutex::new(Engine::new([17; 32], b"another-router")));
+    let mut body = json!({"messages":[{"content":"DB_PASSWORD=abcdEFGH12345678"}]});
+    protect(&mut body, &other);
+    assert_ne!(token(&other), expected);
+}
+
+#[test]
+fn previously_generated_tokens_are_not_masked_again_by_short_known_values() {
+    let engine = engine();
+    let mut body =
+        json!({"messages":[{"content":[{"type":"tool_use","input":{"password":"SECRET"}}]}]});
+    protect(&mut body, &engine);
+    let once = body.clone();
+    protect(&mut body, &engine);
+    assert_eq!(body, once);
+    let mut reply = json!({"content":body["messages"][0]["content"][0]["input"]["password"]});
+    stream::restore_value(&engine, &mut reply).unwrap();
+    assert_eq!(reply["content"], "SECRET");
+}
+
+#[test]
+fn chinese_token_labels_work_without_masking_questions_about_passwords() {
+    let engine = engine();
+    let mut body = json!({"messages":[{"content":"Token 是 9d8F7e6D5c4B3a21；API Key：abcDef12345xyz；密码是什么，Token 是什么意思？"}],
+        "input":[{"type":"tool_use","input":{"密码":"中文密码"}}]});
+    protect(&mut body, &engine);
+    let text = body["messages"][0]["content"].as_str().unwrap();
+    assert!(!text.contains("9d8F7e6D5c4B3a21"));
+    assert!(!text.contains("abcDef12345xyz"));
+    assert!(text.contains("密码是什么，Token 是什么意思？"));
+    assert_ne!(body["input"][0]["input"]["密码"], "中文密码");
+}
+
+#[test]
+fn structured_tool_arguments_do_not_inherit_protocol_field_exemptions() {
+    let engine = engine();
+    let args = json!({"password":"q\"uote\\line\n密码", "id":SECRET, "signature":SECRET});
+    let mut body = json!({"messages":[{"content":[{"type":"tool_use","id":"call_123","name":"write","input":args}]}],
+        "tools":[{"name":SECRET,"input_schema":{"enum":[SECRET]},"description":format!("Use {SECRET}")} ]});
+    protect(&mut body, &engine);
+    assert_eq!(body["messages"][0]["content"][0]["id"], "call_123");
+    assert_eq!(body["tools"][0]["name"], SECRET);
+    assert_eq!(body["tools"][0]["input_schema"]["enum"][0], SECRET);
+    assert!(!body["messages"].to_string().contains(SECRET));
+    assert_ne!(
+        body["messages"][0]["content"][0]["input"]["password"],
+        args["password"]
+    );
+    let mut encoded = json!({"messages":[{"tool_calls":[{"id":"call_123","function":{"name":"write","arguments":args.to_string()}}]}]});
+    protect(&mut encoded, &engine);
+    assert!(!encoded.to_string().contains(SECRET));
+    let mut response = json!({"choices":[{"message":{"tool_calls":[{"id":"call_123","function":{"name":"write","arguments":encoded["messages"][0]["tool_calls"][0]["function"]["arguments"]}}]}}]});
+    stream::restore_value(&engine, &mut response).unwrap();
+    let restored: Value = serde_json::from_str(
+        response["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(restored, args);
+}
+
+#[test]
+fn signed_content_and_media_are_not_rewritten_and_unsafe_signed_text_is_rejected() {
+    let engine = engine();
+    let mut body = json!({"messages":[{"content":[{"type":"thinking","thinking":"vendor text", "signature":SECRET},
+        {"type":"image","source":{"type":"base64","data":SECRET}}]}]});
+    let original = body.clone();
+    protect(&mut body, &engine);
+    assert_eq!(body, original);
+    let mut unsafe_body = json!({"messages":[{"content":[{"type":"thinking","thinking":SECRET,"signature":"sealed"}]}]});
+    assert!(Protection::with_engine(&mut unsafe_body, engine.clone()).is_err());
+    let mut plain = json!({"input":format!("API_KEY={SECRET}")});
+    protect(&mut plain, &engine);
+    let placeholder = token(&engine);
+    let mut response = json!({"content":[{"type":"thinking","thinking":placeholder,"signature":"sealed"},{"type":"text","text":placeholder},{"type":"reasoning.text","text":placeholder,"signature":"sealed"}]});
+    stream::restore_value(&engine, &mut response).unwrap();
+    assert_eq!(response["content"][0]["thinking"], placeholder);
+    assert_eq!(response["content"][1]["text"], SECRET);
+    assert_eq!(response["content"][2]["text"], placeholder);
+}
+
+#[test]
+fn settings_are_off_by_default_and_invalid_state_does_not_send_plaintext() {
+    let dir = std::env::temp_dir().join(format!("content-settings-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir(&dir).unwrap();
+    let path = dir.join("settings.json");
+    assert_eq!(enabled(&path), Ok(false));
+    for (content, expected) in [
+        ("{}", Ok(false)),
+        (r#"{"sensitiveInfoProtection":true}"#, Ok(true)),
+        (r#"{"sensitiveInfoProtection":false}"#, Ok(false)),
+        ("invalid", Err(FAILURE)),
+        (r#"{"sensitiveInfoProtection":"false"}"#, Err(FAILURE)),
+    ] {
+        std::fs::write(&path, content).unwrap();
+        assert_eq!(enabled(&path), expected);
+    }
+    std::fs::remove_file(&path).unwrap();
+    std::fs::remove_dir(&dir).unwrap();
+}
+
+fn chat_delta(choice: u64, text: &str) -> Vec<u8> {
+    format!(
+        "data: {}\n\n",
+        json!({"choices":[{"index":choice,"delta":{"content":text},"finish_reason":null}]})
+    )
+    .into_bytes()
+}
+
+fn joined_content(chunks: Vec<Bytes>, choice: u64) -> String {
+    let text: String = chunks
+        .into_iter()
+        .map(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
+        .collect();
+    text.split("\n\n")
+        .filter_map(|event| event.strip_prefix("data: "))
+        .filter_map(|data| serde_json::from_str::<Value>(data).ok())
+        .flat_map(|value| value["choices"].as_array().cloned().unwrap_or_default())
+        .filter(|value| value["index"] == choice)
+        .filter_map(|value| value["delta"]["content"].as_str().map(str::to_owned))
+        .collect()
+}
+
+#[test]
+fn streaming_restores_all_placeholder_splits_and_transport_byte_boundaries() {
+    let engine = engine();
+    protect(&mut json!({"input":SECRET}), &engine);
+    let placeholder = token(&engine);
+    for split in 1..placeholder.len() {
+        let mut events = stream::Events::new(engine.clone());
+        let bytes = [
+            chat_delta(0, &format!("中文 {}", &placeholder[..split])),
+            chat_delta(0, &format!("{} end", &placeholder[split..])),
+            b"data: [DONE]\n\n".to_vec(),
+        ]
+        .concat();
+        let mut output = Vec::new();
+        for byte in bytes {
+            output.extend(events.push(&[byte]).unwrap());
+        }
+        output.extend(events.finish().unwrap());
+        assert_eq!(joined_content(output, 0), format!("中文 {SECRET} end"));
+    }
+}
+
+#[test]
+fn interleaved_choices_keep_separate_carries_and_heartbeats_are_not_held() {
+    let engine = engine();
+    protect(&mut json!({"input":SECRET}), &engine);
+    let placeholder = token(&engine);
+    let mut events = stream::Events::new(engine.clone());
+    assert!(events
+        .push(&chat_delta(0, &placeholder[..13]))
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        events.push(b": single-line keepalive\n").unwrap(),
+        vec![Bytes::from_static(b": single-line keepalive\n")]
+    );
+    assert_eq!(events.push(b"\n").unwrap(), vec![Bytes::from_static(b"\n")]);
+    assert_eq!(
+        events.push(b": keepalive\n\n").unwrap(),
+        vec![Bytes::from_static(b": keepalive\n\n")]
+    );
+    let mut output = events.push(&chat_delta(1, "other choice")).unwrap();
+    output.extend(events.push(&chat_delta(0, &placeholder[13..])).unwrap());
+    output.extend(events.finish().unwrap());
+    assert_eq!(joined_content(output.clone(), 0), SECRET);
+    assert_eq!(joined_content(output, 1), "other choice");
+}
+
+#[tokio::test]
+async fn complete_responses_restore_text_and_arguments_and_remove_stale_lengths() {
+    let engine = engine();
+    let protection = protect(&mut json!({"input":SECRET}), &engine);
+    let placeholder = token(&engine);
+    let response = Response::builder().header(header::CONTENT_TYPE,"application/json")
+        .header(header::CONTENT_LENGTH,"1").header(header::ETAG,"old")
+        .body(Body::from(json!({"output":[{"type":"message","content":[{"type":"output_text","text":placeholder}]}]}).to_string())).unwrap();
+    let response = protection.restore(response).await;
+    assert!(!response.headers().contains_key(header::CONTENT_LENGTH));
+    assert!(!response.headers().contains_key(header::ETAG));
+    let body = axum::body::to_bytes(response.into_body(), 4096)
+        .await
+        .unwrap();
+    assert!(std::str::from_utf8(&body).unwrap().contains(SECRET));
+}
+
+#[test]
+fn unmatched_tokens_and_partial_tokens_at_eof_are_preserved() {
+    let engine = engine();
+    assert_eq!(
+        engine.lock().unwrap().restore("{{SECRET_unknown}}", false),
+        "{{SECRET_unknown}}"
+    );
+    let mut events = stream::Events::new(engine);
+    events.push(&chat_delta(0, "ordinary text {{SEC")).unwrap();
+    let output = events.finish().unwrap();
+    assert_eq!(joined_content(output, 0), "ordinary text {{SEC");
+}
+
+#[test]
+fn protocol_settings_are_preserved_while_unsigned_reasoning_and_business_fields_are_protected() {
+    let engine = engine();
+    let schema = json!({"format":{"type":"json_schema","schema":{"enum":[SECRET]}}});
+    let mut body = json!({"text":schema,"input":[{"type":"reasoning","summary":[{"type":"summary_text","text":SECRET}]}],
+        "messages":[{"content":[{"type":"tool_result","tool_use_id":"call_original","content":{"id":SECRET,"tools":[{"OPENAI_API_KEY":"custom-gateway-secret-12345"}],"source":{"type":"base64","media_type":"image/png","data":SECRET}}}]}]});
+    protect(&mut body, &engine);
+    assert_eq!(body["text"], schema);
+    assert_ne!(body["input"][0]["summary"][0]["text"], SECRET);
+    let result = &body["messages"][0]["content"][0];
+    assert_eq!(result["tool_use_id"], "call_original");
+    assert_ne!(result["content"]["id"], SECRET);
+    assert_ne!(
+        result["content"]["tools"][0]["OPENAI_API_KEY"],
+        "custom-gateway-secret-12345"
+    );
+    assert_eq!(result["content"]["source"]["data"], SECRET);
+    let mut restored = json!({"output":body["input"]});
+    stream::restore_value(&engine, &mut restored).unwrap();
+    assert_eq!(restored["output"][0]["summary"][0]["text"], SECRET);
+    let mut counts = json!({"input":"max_tokens=12345678 and total_tokens=87654321"});
+    let before = counts.clone();
+    protect(&mut counts, &engine);
+    assert_eq!(counts, before);
+}
+
+#[test]
+fn streamed_tool_arguments_restore_json_escaping_across_all_supported_event_shapes() {
+    for protocol in ["chat", "responses", "messages"] {
+        let engine = engine();
+        let args = json!({"password":"q\"uote\\line\n密码"});
+        let mut request = json!({"input":[{"type":"function_call","arguments":args.to_string()}]});
+        protect(&mut request, &engine);
+        let masked = request["input"][0]["arguments"].as_str().unwrap();
+        let split = masked.find(PREFIX).unwrap() + 15;
+        let mut events = stream::Events::new(engine);
+        let mut output = Vec::new();
+        for part in [&masked[..split], &masked[split..]] {
+            let event = match protocol {
+                "chat" => {
+                    json!({"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":part}}]}}]})
+                }
+                "responses" => {
+                    json!({"type":"response.function_call_arguments.delta","item_id":"call_1","output_index":0,"delta":part})
+                }
+                _ => {
+                    json!({"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":part}})
+                }
+            };
+            output.extend(
+                events
+                    .push(format!("data: {event}\n\n").as_bytes())
+                    .unwrap(),
+            );
+        }
+        output.extend(events.push(b"data: [DONE]\n\n").unwrap());
+        output.extend(events.finish().unwrap());
+        let wire: String = output
+            .into_iter()
+            .map(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
+            .collect();
+        let restored: String = wire
+            .split("\n\n")
+            .filter_map(|frame| frame.strip_prefix("data: "))
+            .filter_map(|data| serde_json::from_str::<Value>(data).ok())
+            .filter_map(|event| match protocol {
+                "chat" => event["choices"][0]["delta"]["tool_calls"][0]["function"]["arguments"]
+                    .as_str()
+                    .map(str::to_owned),
+                "responses" => event["delta"].as_str().map(str::to_owned),
+                _ => event["delta"]["partial_json"].as_str().map(str::to_owned),
+            })
+            .collect();
+        assert_eq!(serde_json::from_str::<Value>(&restored).unwrap(), args);
+    }
+}
+
+#[tokio::test]
+async fn local_upstream_sees_protected_content_on_all_three_protocols_and_auth_stays_intact() {
+    use super::super::{protected_route, AppState, Candidate, ClientProtocol};
+    use axum::{extract::Json, http::HeaderMap, routing::post, Router};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let token_pattern = Regex::new(r"\{\{SECRET_[a-f0-9]{32}\}\}").unwrap();
+    for enabled in [false, true] {
+        for protocol in [
+            ClientProtocol::Chat,
+            ClientProtocol::Responses,
+            ClientProtocol::Messages,
+        ] {
+            let root =
+                std::env::temp_dir().join(format!("router-protection-{}", uuid::Uuid::new_v4()));
+            std::fs::create_dir(&root).unwrap();
+            let mut state = AppState::for_tests().unwrap();
+            state.config_path = root.join("router.json");
+            state.protection_settings_path = root.join("settings.json");
+            std::fs::write(
+                &state.protection_settings_path,
+                json!({"sensitiveInfoProtection":enabled}).to_string(),
+            )
+            .unwrap();
+            let calls = Arc::new(AtomicUsize::new(0));
+            let captured = calls.clone();
+            let seen = Arc::new(Mutex::new(None::<String>));
+            let token_pattern = token_pattern.clone();
+            let app = Router::new().route("/v1/{*path}", post(move |headers: HeaderMap, Json(body): Json<Value>| {
+                let calls = captured.clone();
+                let seen = seen.clone();
+                async move {
+                    calls.fetch_add(1, Ordering::SeqCst);
+                    assert_eq!(headers[header::AUTHORIZATION], "Bearer upstream-auth-fixture");
+                    let encoded = body.to_string();
+                    let echo = if enabled {
+                        assert!(!encoded.contains(SECRET));
+                        token_pattern.find(&encoded).unwrap().as_str().to_owned()
+                    } else {
+                        assert!(encoded.contains(SECRET)); SECRET.into()
+                    };
+                    if enabled {
+                        let mut first = seen.lock().unwrap();
+                        if let Some(expected) = first.as_ref() { assert_eq!(expected,&echo); }
+                        else { *first = Some(echo.clone()); }
+                    }
+                    if body["model"] == "primary-model" {
+                        return (axum::http::StatusCode::SERVICE_UNAVAILABLE, Json(json!({"error":{"message":"temporarily unavailable","type":"server_error"}})));
+                    }
+                    (axum::http::StatusCode::OK, Json(match protocol {
+                        ClientProtocol::Responses => json!({"id":"resp_test","object":"response","status":"completed","output":[{"id":"msg_test","type":"message","role":"assistant","content":[{"type":"output_text","text":echo}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}),
+                        _ => json!({"id":"chat_test","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":echo},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}),
+                    }))
+                }
+            }));
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let task = tokio::spawn(async move {
+                axum::serve(listener, app).await.unwrap();
+            });
+            let candidate = Candidate {
+                internal_id: "fixture".into(),
+                model_id: "fixture-model".into(),
+                base_url: format!("http://{addr}/v1"),
+                api_key: "upstream-auth-fixture".into(),
+                account_source: None,
+                fingerprint: "fixture".into(),
+                attempt: None,
+            };
+            let body = match protocol {
+                ClientProtocol::Responses => json!({"model":"auto","input":SECRET,"stream":false}),
+                _ => {
+                    json!({"model":"auto","messages":[{"role":"user","content":SECRET}],"max_tokens":64,"stream":false})
+                }
+            };
+            let mut candidates = vec![candidate.clone()];
+            if enabled {
+                let mut primary = candidate;
+                primary.internal_id = "primary".into();
+                primary.model_id = "primary-model".into();
+                primary.fingerprint = "primary".into();
+                candidates.insert(0, primary);
+            }
+            let response =
+                protected_route(&state, &HeaderMap::new(), body, candidates, protocol).await;
+            assert_eq!(response.status(), axum::http::StatusCode::OK);
+            let bytes = axum::body::to_bytes(response.into_body(), 8192)
+                .await
+                .unwrap();
+            assert!(std::str::from_utf8(&bytes).unwrap().contains(SECRET));
+            assert!(!std::str::from_utf8(&bytes).unwrap().contains(PREFIX));
+            assert_eq!(calls.load(Ordering::SeqCst), if enabled { 2 } else { 1 });
+            assert_eq!(root.join("content-protection.key").exists(), enabled);
+            task.abort();
+            std::fs::remove_file(&state.protection_settings_path).unwrap();
+            if enabled {
+                std::fs::remove_file(root.join("content-protection.key")).unwrap();
+            }
+            std::fs::remove_dir(root).unwrap();
+        }
+    }
+}
+
+#[tokio::test]
+async fn unreadable_protection_fails_before_upstream_and_authentication_precedes_protection() {
+    use super::super::{handle_chat, protected_route, AppState, ClientProtocol};
+    use axum::{
+        extract::State,
+        http::{HeaderMap, HeaderValue, StatusCode},
+        Json,
+    };
+    let root =
+        std::env::temp_dir().join(format!("router-protection-fail-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir(&root).unwrap();
+    let mut state = AppState::for_tests().unwrap();
+    state.config_path = root.join("router.json");
+    state.protection_settings_path = root.join("settings.json");
+    std::fs::write(&state.protection_settings_path, "invalid").unwrap();
+    std::fs::write(
+        &state.config_path,
+        json!({"modelId":"auto","enabled":true,"apiKey":"local-fixture","candidateIds":[]})
+            .to_string(),
+    )
+    .unwrap();
+    let body = json!({"model":"auto","messages":[{"role":"user","content":SECRET}]});
+    let unauthorized = handle_chat(
+        State(state.clone()),
+        HeaderMap::new(),
+        Ok(Json(body.clone())),
+    )
+    .await;
+    assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED);
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::AUTHORIZATION,
+        HeaderValue::from_static("Bearer local-fixture"),
+    );
+    let unavailable =
+        protected_route(&state, &headers, body, Vec::new(), ClientProtocol::Chat).await;
+    assert_eq!(unavailable.status(), StatusCode::SERVICE_UNAVAILABLE);
+    let error = axum::body::to_bytes(unavailable.into_body(), 4096)
+        .await
+        .unwrap();
+    assert!(!std::str::from_utf8(&error).unwrap().contains(SECRET));
+    assert!(!root.join("content-protection.key").exists());
+    for path in [&state.config_path, &state.protection_settings_path] {
+        std::fs::remove_file(path).unwrap();
+    }
+    std::fs::remove_dir(root).unwrap();
+}

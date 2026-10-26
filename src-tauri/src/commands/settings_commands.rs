@@ -22,6 +22,12 @@ pub struct AppSettings {
     // settings.json small.
     #[serde(default, rename = "displayName")]
     pub display_name: Option<String>,
+    #[serde(
+        default,
+        rename = "sensitiveInfoProtection",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sensitive_info_protection: Option<bool>,
 }
 
 fn settings_path() -> std::path::PathBuf {
@@ -54,7 +60,8 @@ fn read_settings(path: &std::path::Path) -> AppSettings {
 
 /// Write app settings to ~/.echobird/settings.json
 #[tauri::command]
-pub fn save_settings(settings: AppSettings, app: tauri::AppHandle) -> Result<(), String> {
+pub fn save_settings(mut settings: AppSettings, app: tauri::AppHandle) -> Result<(), String> {
+    preserve_protection_setting(&settings_path(), &mut settings)?;
     let dir = echobird_dir();
     if !dir.exists() {
         std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -73,6 +80,30 @@ pub fn save_settings(settings: AppSettings, app: tauri::AppHandle) -> Result<(),
         }
     }
 
+    Ok(())
+}
+
+fn preserve_protection_setting(
+    path: &std::path::Path,
+    settings: &mut AppSettings,
+) -> Result<(), String> {
+    let bytes = match std::fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(_) => return Err("Unable to read settings".into()),
+    };
+    let saved: serde_json::Value =
+        serde_json::from_slice(&bytes).map_err(|_| "Invalid settings")?;
+    if saved
+        .get("sensitiveInfoProtection")
+        .is_some_and(|value| !value.is_boolean())
+    {
+        return Err("Invalid protection setting".into());
+    }
+    let saved: AppSettings = serde_json::from_value(saved).map_err(|_| "Invalid settings")?;
+    if settings.sensitive_info_protection.is_none() {
+        settings.sensitive_info_protection = saved.sensitive_info_protection;
+    }
     Ok(())
 }
 
@@ -169,6 +200,36 @@ pub fn get_avatar() -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::{read_my_projects, read_settings, save_my_projects_at};
+
+    #[test]
+    fn protection_is_opt_in_and_other_settings_cannot_drop_the_saved_flag() {
+        let root =
+            std::env::temp_dir().join(format!("protection-setting-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).unwrap();
+        let path = root.join("settings.json");
+        let default = super::AppSettings::default();
+        assert!(serde_json::to_value(default)
+            .unwrap()
+            .get("sensitiveInfoProtection")
+            .is_none());
+        std::fs::write(&path, r#"{"sensitiveInfoProtection":true,"locale":"ja"}"#).unwrap();
+        let mut update = super::AppSettings {
+            locale: Some("en".into()),
+            ..Default::default()
+        };
+        super::preserve_protection_setting(&path, &mut update).unwrap();
+        assert_eq!(update.sensitive_info_protection, Some(true));
+        update.sensitive_info_protection = Some(false);
+        super::preserve_protection_setting(&path, &mut update).unwrap();
+        assert_eq!(update.sensitive_info_protection, Some(false));
+        std::fs::write(&path, "invalid settings").unwrap();
+        assert!(super::preserve_protection_setting(&path, &mut update).is_err());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "invalid settings");
+        std::fs::write(&path, r#"{"sensitiveInfoProtection":null}"#).unwrap();
+        assert!(super::preserve_protection_setting(&path, &mut update).is_err());
+        std::fs::remove_file(path).unwrap();
+        std::fs::remove_dir(root).unwrap();
+    }
 
     #[test]
     fn project_registry_refuses_to_overwrite_unreadable_or_malformed_data() {

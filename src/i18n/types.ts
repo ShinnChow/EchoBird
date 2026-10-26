@@ -269,6 +269,9 @@ export type TKey =
   | 'settings.easterEgg'
   | 'settings.launchAtStartup'
   | 'settings.autoClaimRewards'
+  | 'settings.sensitiveInfoProtection'
+  | 'settings.sensitiveInfoProtectionHint'
+  | 'settings.sensitiveInfoProtectionError'
   // Close Dialog
   | 'closeDialog.title'
   | 'closeDialog.hint'
