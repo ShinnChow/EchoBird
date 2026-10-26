@@ -205,6 +205,7 @@ const ja: Partial<Translations> = {
   'nav.freeModels': 'スマートルーター',
   'nav.appManager': 'アプリデスクトップ',
   'nav.collapseSidebar': 'ナビゲーションを折りたたむ',
+  'nav.resizePanel': '中央と右側の領域の幅を調整',
   'nav.expandSidebar': 'ナビゲーションを展開',
   'nav.back': '戻る',
   'nav.forward': '進む',

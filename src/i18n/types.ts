@@ -188,6 +188,7 @@ export type TKey =
   | 'nav.freeModels'
   | 'nav.appManager'
   | 'nav.collapseSidebar'
+  | 'nav.resizePanel'
   | 'nav.expandSidebar'
   | 'nav.back'
   | 'nav.forward'

@@ -204,6 +204,7 @@ const en: Translations = {
   'nav.freeModels': 'Smart Router',
   'nav.appManager': 'App Desktop',
   'nav.collapseSidebar': 'Collapse sidebar',
+  'nav.resizePanel': 'Resize center and right panels',
   'nav.expandSidebar': 'Expand sidebar',
   'nav.back': 'Back',
   'nav.forward': 'Forward',

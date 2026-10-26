@@ -189,6 +189,7 @@ const zhHant: Partial<Translations> = {
   'nav.freeModels': '智能接入',
   'nav.appManager': '應用桌面',
   'nav.collapseSidebar': '收起導覽列',
+  'nav.resizePanel': '調整中間與右側區域寬度',
   'nav.expandSidebar': '展開導覽列',
   'nav.back': '返回上一頁',
   'nav.forward': '前往下一頁',

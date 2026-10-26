@@ -15,6 +15,7 @@ import { DownloadBar } from './components/DownloadBar';
 import { TitleBar } from './components/TitleBar';
 import { AppBackground } from './components/AppBackground';
 import { OnFirstVisit } from './components/OnFirstVisit';
+import { ResizablePanels } from './components/ResizablePanels';
 import { useModelNexus } from './pages/ModelNexus/context';
 import { getSettings, hideMainWindow } from './api/tauri';
 
@@ -385,10 +386,10 @@ function AppContent() {
                           <SidebarConnected onSettingsClick={() => setShowSettings(true)} />
 
                           {/* Main content wrapper — transparent against page bg, Claude-style */}
-                          <div className="flex-1 flex flex-col overflow-hidden">
+                          <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
                             {/* Main + Right panel row */}
-                            <div className="flex-1 flex gap-3 overflow-hidden">
-                              <main className="flex-1 flex flex-col overflow-hidden">
+                            <ResizablePanels>
+                              <main className="min-w-0 flex-1 flex flex-col overflow-hidden">
                                 <section className="flex-1 flex flex-col overflow-hidden pr-2">
                                   {/* Shared page title bar — fixed-height row so the title sits at the same baseline whether the page has tall action buttons or none */}
                                   <div className="page-title-bar mb-5 flex-shrink-0 flex items-center gap-3 h-10">
@@ -528,7 +529,7 @@ function AppContent() {
                                 </section>
                               </main>
 
-                              <aside className="w-80 flex flex-col">
+                              <aside className="flex flex-col">
                                 <div className={page(is('voice'))}>
                                   <OnFirstVisit active={is('voice')}>
                                     <VoiceInputPanel />
@@ -583,7 +584,7 @@ function AppContent() {
                                   </OnFirstVisit>
                                 </div>
                               </aside>
-                            </div>
+                            </ResizablePanels>
 
                             {/* Bottom bars — always mounted, CSS hidden */}
                             <div className={page(is('apps') || is('myProjects'))}>

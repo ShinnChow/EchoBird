@@ -187,6 +187,7 @@ const zhHans: Partial<Translations> = {
   'nav.freeModels': '智能接入',
   'nav.appManager': '应用桌面',
   'nav.collapseSidebar': '收起导航栏',
+  'nav.resizePanel': '调整中间和右侧区域宽度',
   'nav.expandSidebar': '展开导航栏',
   'nav.back': '返回上一页',
   'nav.forward': '前往下一页',
