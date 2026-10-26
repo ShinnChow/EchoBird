@@ -14,6 +14,9 @@
 > scale. Forks are welcome — honest attribution is enough.
 > The hard line is copying multiple UI surfaces side-by-side without
 > documented independent prior work.
+> The later Voice Input workflow, shared account/model access, and
+> selected-text Translation / Ask integrations are recorded with commit IDs
+> and timestamps in §3.
 >
 > EchoBird 的**首要保护**是 **UI / UX 商业外观(trade dress)** —— 四个
 > 用户界面与中央模型枢纽的关系,以及在产品里**嵌两个完整开源 AI 应用
@@ -25,6 +28,8 @@
 > 商业产品中复制 EchoBird 已记录的产品形态。Fork 欢迎 —— 诚实标注上游
 > 即可。硬底线只有一条:**在没有独立留存先创证据的情况下,在同一个产品
 > 里并列采用多个 EchoBird UI 界面**。
+> 语音输入打通账号与模型接入,以及划词翻译 / 提问的后续扩展,见 §3 的
+> 提交时间、Commit 与功能记录。
 
 ---
 
@@ -119,7 +124,8 @@ shipped:
 
 | **2026-05-20** | `05a35d13` | **My AI Projects / 我的AI项目** (`src/pages/MyProjects/`) — bundled with two complete reference applications (Reversi + AI Translator) as user-tutorial templates | — |
 
-**Current relationship diagram — including Account Management and Smart Router:**
+**Current relationship diagram — including Account Management, Smart Router,
+Voice Input and selected-text Translation / Ask:**
 
 ```mermaid
 flowchart TD
@@ -131,6 +137,10 @@ flowchart TD
     apps["App Manager"]
     agent["Mother Agent"]
     projects["My AI Projects"]
+    speech["Speech-model APIs<br/>model access"]
+    voice["Voice Input<br/>desktop island / dictation"]
+    selected["Selected text<br/>external applications"]
+    translation["Selection Translation<br/>original / translated text"]
 
     local --> nexus
     nexus --> router
@@ -143,14 +153,25 @@ flowchart TD
     nexus -.-> apps
     nexus -.-> agent
     nexus -.-> projects
+    accounts -->|supported accounts| voice
+    speech -->|speech recognition| voice
+    nexus -.->|text refinement / output translation| voice
+    selected -->|Translate| translation
+    nexus -.->|translation model| translation
+    selected -->|Ask - editable draft| agent
 ```
 
-Solid arrows show model supply and access; dashed arrows show direct model
-selection from Model Nexus, alongside Smart Router access. The central pool
+Solid arrows show source supply, access and content handoffs; dashed arrows
+show direct model selection from Model Nexus, alongside Smart Router access. The central pool
 still aggregates remote/user-configured and locally-deployed models. Local
 models are managed through Local Server and hidden in the Model Nexus page,
-but remain selectable by the three consumers. The dates above describe the
+but remain selectable by the original three consumer pages. The dates above describe the
 original architecture; the later-page milestones are recorded below.
+
+Speech recognition uses supported accounts or speech-model APIs; the text-model
+connection to Voice Input supplies optional refinement and output translation.
+Selected-text translation uses the chosen text model without requiring speech
+recognition. Ask only prefills a Mother Agent draft for the user to send manually.
 
 In the original four-surface architecture, the "configure once, used everywhere"
 relationship between Model Nexus and its consumers — combined with
@@ -163,9 +184,9 @@ originality being claimed. The asymmetric placement of Local Server
 above the pool (producer) and the other three surfaces below it
 (consumers) is part of the trade dress, not an incidental layout.
 
-**Later additions — Smart Router and Account Management.** Two further
+**Later additions — Smart Router, Account Management and Voice Input.** Three further
 pages extend this architecture: **Smart Router / 智能接入** (previously
-**智能路由**) and **Account Management / 账号管理**.
+**智能路由**), **Account Management / 账号管理** and **Voice Input / 语音输入**.
 **Orchestration Router / 多模型编排路由** is a view
 within the Smart Router page. These later milestones are recorded separately from
 the original four-surface combination referenced in §5 and [NOTICE](NOTICE).
@@ -219,6 +240,40 @@ combination of model nodes, a router hub and dashed routing links before
   showing identity, plan and quota, with refresh / delete actions and
   a right-hand provider directory for adding accounts. Quota refresh
   remains an explicit action; applying an account remains in App Manager.
+
+**Voice Input, selected-text Translation and Ask — commit record.**
+The following commits record these later integrations. The table distinguishes
+Git's **author time** from its **committer time in the current main-line
+history**; neither field is a server-side push
+timestamp. All times below use **UTC+08:00 (Asia/Singapore)**.
+
+| Author time | Main-line commit time | Commit | Milestone / source evidence |
+|---|---|---|---|
+| 2026-10-25 05:53:51 | 2026-10-26 23:17:47 | [`38ad0456`](https://github.com/edison7009/EchoBird/commit/38ad045601e0a89a3e190f949b2ab5160bce4294) | **Voice Input page and desktop island.** `src/pages/VoiceInput/` and `src-tauri/src/services/voice_input/` establish the page, floating microphone/waveform control, numbered source cards and account/API source configuration. |
+| 2026-10-26 02:52:03 | 2026-10-26 23:17:47 | [`da0b23d5`](https://github.com/edison7009/EchoBird/commit/da0b23d594e20396f8b17923517ccd263b6039dc) | **Selected-text Translation / Ask.** Adds `SelectionTranslation.tsx`, native selection handling and the Mother Agent draft handoff, including multilingual labels and caret placement without automatic sending. |
+| 2026-10-26 03:41:04 | 2026-10-26 23:17:48 | [`ed5efffd`](https://github.com/edison7009/EchoBird/commit/ed5efffd9bb33d2f21682dd40b7eb9eb0055e1e3) | **Shared saved-account and model access for speech.** Reuses account/model source selection and provider speech adapters; supported saved accounts and custom speech-model APIs feed the same ordered recognition workflow. |
+
+**The connected workflow recorded here:**
+
+- **Saved accounts / speech-model APIs → Voice Input.** Account access and
+  model access populate one ordered set of up to three draggable recognition
+  sources. The preview island, numbered cards and connecting paths show the
+  relationship and active source. Availability depends on each channel's speech
+  capabilities; a general text model is not automatically a speech model.
+- **Model Nexus → text refinement and selected-text translation.** Existing
+  model selection supplies the text-processing model for transcript refinement,
+  optional output translation and selected-text translation. This reuses the
+  model configuration instead of introducing a separate translation account pool.
+- **Selected text → Translation / Ask → Mother Agent.** The nearby floating
+  toolbar offers Translation and Ask. Translation displays the original text
+  and translated result; Ask opens AI Assistant / Mother Agent with a localized
+  “Question: / Selected text:” draft and the caret after “Question:”. The user
+  adds the question and sends manually; clicking Ask does not submit a model request.
+
+This entry records EchoBird's specific connected presentation and workflow,
+not exclusive ownership of dictation, translation, text selection, floating
+controls or waveform components in general. It does not change the original
+four-surface combination or the threshold in §5 and [NOTICE](NOTICE).
 
 ### 4. The reference-app pattern — the most unprecedented piece
 
@@ -625,7 +680,7 @@ rewrite to Tauri + Rust architecture」)在同一个 Tauri 桌面二进制里
 
 | **2026-05-20** | `05a35d13` | **我的AI项目 / My AI Projects**(`src/pages/MyProjects/`) —— 内置两个完整可运行的参考应用(黑白棋 + AI 翻译)作为用户教程模板 | — |
 
-**当前关系示意图 —— 包含账号管理与智能接入:**
+**当前关系示意图 —— 包含账号管理、智能接入、语音输入与划词翻译 / 提问:**
 
 ```mermaid
 flowchart TD
@@ -637,6 +692,10 @@ flowchart TD
     apps["应用管理 / App Manager"]
     agent["AI 助手 / Mother Agent"]
     projects["我的 AI 项目 / My AI Projects"]
+    speech["语音模型 API<br/>模型接入"]
+    voice["语音输入<br/>灵动岛 / 识别与回填"]
+    selected["选中文本<br/>来自外部应用"]
+    translation["划词翻译<br/>原文与译文"]
 
     local --> nexus
     nexus --> router
@@ -649,12 +708,22 @@ flowchart TD
     nexus -.-> apps
     nexus -.-> agent
     nexus -.-> projects
+    accounts -->|支持语音的账号| voice
+    speech -->|语音识别| voice
+    nexus -.->|文本优化 / 输出翻译| voice
+    selected -->|翻译| translation
+    nexus -.->|翻译模型| translation
+    selected -->|划词提问：预填草稿| agent
 ```
 
-实线表示模型供给与接入,虚线表示通过模型中心直接选择模型,与智能接入并行。
+实线表示来源供给、接入或内容交接,虚线表示通过模型中心直接选择模型,与智能接入并行。
 中央模型池仍聚合远程/用户配置和本地部署模型;本地模型由本地大模型页面管理,
-在模型中心页面隐藏,但仍可供三个消费页面选择。上方日期记录最初架构,
+在模型中心页面隐藏,但仍可供原有三个消费页面选择。上方日期记录最初架构,
 后续页面的里程碑见下文。
+
+语音识别使用支持语音的账号或语音模型 API;模型中心到语音输入的文本模型连接,
+用于可选的文本优化与输出翻译。划词翻译使用选定的文本模型,无需先进行语音识别。
+划词提问只向 AI 助手预填草稿,由用户手动发送。
 
 在最初四个界面的架构中,「**一处配置,四处生效**」—— Model Nexus 与其消费者之间的这种关系、
 **本地大模型作为唯一的生产者侧界面**向池子注入本地部署 LLM 的角色,
@@ -664,8 +733,9 @@ flowchart TD
 其他三个界面在池子下方(消费者)**的非对称布局,是 trade dress 的
 一部分,不是偶然排版。
 
-**后续扩展 —— 智能接入与账号管理。** 这套架构后来增加了**智能接入 /
-Smart Router**(原名**智能路由**)和**账号管理 / Account Management**两个页面。**多模型编排路由 /
+**后续扩展 —— 智能接入、账号管理与语音输入。** 这套架构后来增加了**智能接入 /
+Smart Router**(原名**智能路由**)、**账号管理 / Account Management**和**语音输入 /
+Voice Input**三个页面。**多模型编排路由 /
 Orchestration Router**是智能接入页面内的一个视图。以下里程碑单独记录这些后续
 扩展;§5 与 [NOTICE](NOTICE) 中的原始四界面组合仍指前述四个界面。
 下表日期按 Git 提交者时间戳的 **UTC+08:00** 日期记录,作为源码历史证据。
@@ -707,6 +777,34 @@ Orchestration Router**是智能接入页面内的一个视图。以下里程碑�
   生命周期。独立页面将多家厂商账号汇总在可排序卡片网格中,展示身份、套餐
   与额度,提供刷新 / 删除操作,并在右侧厂商目录中添加账号。额度刷新保持为
   显式操作;应用账号仍由应用管理页面执行。
+
+**语音输入、划词翻译与划词提问 —— Commit 记录。** 以下提交记录这些后续扩展。
+下表分别记录 Git 的**作者时间**和**当前主线历史中的提交者时间**,
+两者均不等于服务器收到推送的
+时间。以下时间统一使用 **UTC+08:00(Asia/Singapore)**。
+
+| 作者时间 | 主线提交时间 | Commit | 里程碑 / 源码证据 |
+|---|---|---|---|
+| 2026-10-25 05:53:51 | 2026-10-26 23:17:47 | [`38ad0456`](https://github.com/edison7009/EchoBird/commit/38ad045601e0a89a3e190f949b2ab5160bce4294) | **语音输入页面与桌面灵动岛。** `src/pages/VoiceInput/` 与 `src-tauri/src/services/voice_input/` 建立独立页面、悬浮话筒 / 音波控件、编号来源卡片,以及账号 / API 来源配置。 |
+| 2026-10-26 02:52:03 | 2026-10-26 23:17:47 | [`da0b23d5`](https://github.com/edison7009/EchoBird/commit/da0b23d594e20396f8b17923517ccd263b6039dc) | **划词翻译 / 提问。** 新增 `SelectionTranslation.tsx`、原生选区处理与 Mother Agent 草稿交接,包含多语言文案和光标定位,点击后不自动发送。 |
+| 2026-10-26 03:41:04 | 2026-10-26 23:17:48 | [`ed5efffd`](https://github.com/edison7009/EchoBird/commit/ed5efffd9bb33d2f21682dd40b7eb9eb0055e1e3) | **语音打通已存账号与模型接入。** 复用账号 / 模型来源选择与厂商语音适配器,让支持语音的已存账号和自定义语音模型 API 进入同一套有序识别流程。 |
+
+**本次记录的具体联动关系:**
+
+- **已存账号 / 语音模型 API → 语音输入。** 账号接入和模型接入汇入同一组
+  最多三个、可拖动排序的识别来源。演示灵动岛、编号卡片与连接线展示来源关系
+  和当前使用的渠道。实际能力取决于各渠道的语音支持,通用文本模型不会自动
+  变成语音模型。
+- **模型中心 → 文本优化与划词翻译。** 复用既有模型选择,为识别结果的文本
+  优化、可选输出翻译及划词翻译提供文本处理模型,无需另建一套翻译账号池。
+- **划词 → 翻译 / 提问 → Mother Agent。** 选区附近的浮条提供翻译和提问。
+  翻译展示原文与译文;提问打开 AI 助手 / Mother Agent,按界面语言预填
+  「提问：/ 划词内容：」草稿,光标位于「提问：」后。用户补充问题后手动发送,
+  点击提问本身不提交模型请求。
+
+本条记录 EchoBird 的具体组合界面与联动流程,不主张独占通用语音输入、翻译、
+划词、悬浮控件或音波组件。它不改变 §5 与 [NOTICE](NOTICE) 中原始四界面
+组合的定义或阈值。
 
 ### 4. 参考应用模板模式 —— 最前无古人的一笔
 
@@ -959,7 +1057,7 @@ store」这个产品形态成为行业标准的过程的一部分。**执行精�
 
 ---
 
-*Last updated / 最后更新: 2026-10-17*
+*Last updated / 最后更新: 2026-10-27*
 *This policy is non-binding promotional language; the MIT LICENSE
 file governs current (v5.x) code use, and the NOTICE file is the formal trade-dress
 declaration. This document tells the story behind both.*
