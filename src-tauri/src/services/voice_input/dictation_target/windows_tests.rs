@@ -124,8 +124,10 @@ fn automation_capture_accepts_only_the_original_window_even_with_the_same_proces
         let automation: IUIAutomation2 =
             CoCreateInstance(&CUIAutomation8, None, CLSCTX_INPROC_SERVER).unwrap();
         automation.SetAutoSetFocus(false).unwrap();
-        automation.SetConnectionTimeout(200).unwrap();
-        automation.SetTransactionTimeout(250).unwrap();
+        // Allow a cold UIA provider to start on a loaded runner. Production
+        // capture keeps its short deadlines; this fixture verifies ownership.
+        automation.SetConnectionTimeout(2_000).unwrap();
+        automation.SetTransactionTimeout(2_500).unwrap();
         let original = automation
             .ElementFromHandle(HWND(original as *mut _))
             .unwrap();
@@ -137,7 +139,7 @@ fn automation_capture_accepts_only_the_original_window_even_with_the_same_proces
         (ownership, AgileReference::new(&original).unwrap())
     });
     // Service only this test thread's hidden controls while UIA queries them.
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
     while !worker.is_finished() && std::time::Instant::now() < deadline {
         let mut message = MSG::default();
         unsafe {

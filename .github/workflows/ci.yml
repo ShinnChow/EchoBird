@@ -83,7 +83,7 @@ jobs:
     # Actions / dependency version bumps (config-only, no rust diff),
     # so the frontend job still runs and the rust job re-runs on the
     # merge commit to main.
-    if: always() && github.actor != 'dependabot[bot]' && needs.changes.outputs.rust != 'false'
+    if: ${{ !cancelled() && github.actor != 'dependabot[bot]' && needs.changes.outputs.rust != 'false' }}
     strategy:
       fail-fast: false
       matrix:
@@ -117,7 +117,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf gnome-keyring libsecret-tools libasound2-dev libxkbcommon-dev
+          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf gnome-keyring libsecret-tools libasound2-dev libxkbcommon-dev
 
       - name: Format check
         run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
@@ -130,6 +130,7 @@ jobs:
 
       - name: Verify macOS native credential storage
         if: runner.os == 'macOS'
+        timeout-minutes: 5
         shell: bash
         env:
           ECHOBIRD_NATIVE_CREDENTIAL_TEST: '1'
@@ -137,8 +138,19 @@ jobs:
           set -euo pipefail
           account='EchoBird Native Storage Test'
           service="$account Safe Storage"
-          trap 'security delete-generic-password -s "$service" -a "$account" >/dev/null 2>&1 || true' EXIT
-          security add-generic-password -s "$service" -a "$account" -w 'test-safe-storage-password' -T /usr/bin/security
+          fixture_keychain="$RUNNER_TEMP/echobird-native-test.keychain-db"
+          original_keychains=()
+          while IFS= read -r item; do
+            item="${item#*\"}"
+            item="${item%\"*}"
+            original_keychains+=("$item")
+          done < <(security list-keychains -d user)
+          security create-keychain -p 'fixture-keychain-password' "$fixture_keychain"
+          trap 'security list-keychains -d user -s "${original_keychains[@]}" || true; security delete-keychain "$fixture_keychain" >/dev/null 2>&1 || true' EXIT
+          security set-keychain-settings -lut 600 "$fixture_keychain"
+          security unlock-keychain -p 'fixture-keychain-password' "$fixture_keychain"
+          security list-keychains -d user -s "$fixture_keychain" "${original_keychains[@]}"
+          security add-generic-password -s "$service" -a "$account" -w 'test-safe-storage-password' -T /usr/bin/security "$fixture_keychain"
           cargo test --manifest-path src-tauri/Cargo.toml reads_native_os_credential_fixture -- --ignored
 
       - name: Verify Linux native credential storage
