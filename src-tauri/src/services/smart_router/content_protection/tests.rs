@@ -185,6 +185,68 @@ fn code_types_calls_and_operational_numbers_are_not_credentials() {
 }
 
 #[test]
+fn model_and_toolchain_names_remain_literal_beside_credentials() {
+    let text = format!(
+        "[providers]\ngroqAPIKey = \"{SECRET}\"\ngroqAPIModel = \"llama3-70b-8192\"\n\
+         claudeAPIModel = \"claude-3-5-sonnet-20241022\"\n\
+         --model mixtral-8x7b-32768\nchannel = \"nightly-2026-09-01\""
+    );
+    for (mut body, pointer) in [
+        (
+            json!({"model":"llama3-70b-8192","messages":[{"role":"user","content":text}]}),
+            "/messages/0/content",
+        ),
+        (
+            json!({"model":"claude-3-5-sonnet-20241022","messages":[{"role":"user","content":text}],"max_tokens":64}),
+            "/messages/0/content",
+        ),
+        (
+            json!({"model":"mixtral-8x7b-32768","input":[{"role":"user","content":[{"type":"input_text","text":text}]}]}),
+            "/input/0/content/0/text",
+        ),
+    ] {
+        let engine = engine();
+        let original = body.clone();
+        protect(&mut body, &engine);
+        assert_eq!(engine.lock().unwrap().secrets.len(), 1);
+        assert_eq!(
+            body.pointer(pointer).unwrap(),
+            &text.replace(SECRET, &token(&engine))
+        );
+        assert_eq!(body["model"], original["model"]);
+        stream::restore_value(&restorer(&engine), &mut body).unwrap();
+        assert_eq!(body, original);
+    }
+}
+
+#[test]
+fn explicit_credentials_are_not_exempted_by_model_or_toolchain_shaped_values() {
+    for value in [
+        "llama3-70b-8192",
+        "claude-3-5-sonnet-20241022",
+        "mixtral-8x7b-32768",
+        "nightly-2026-09-01",
+        "correct-horse-battery-staple",
+        "maple-4-river-77",
+    ] {
+        for mut body in [
+            json!({"input":format!("password = \"{value}\"")}),
+            json!({"messages":[{"content":[{"type":"tool_use","id":"call-1","name":"configure","input":{"password":value}}]}]}),
+        ] {
+            let engine = engine();
+            let original = body.clone();
+            protect(&mut body, &engine);
+            assert!(!body.to_string().contains(value));
+            let mut later = json!({"input":format!("Use the previously supplied value {value}")});
+            protect(&mut later, &engine);
+            assert!(!later.to_string().contains(value));
+            stream::restore_value(&restorer(&engine), &mut body).unwrap();
+            assert_eq!(body, original);
+        }
+    }
+}
+
+#[test]
 fn unquoted_credentials_need_code_context_before_they_can_be_exempted() {
     for (text, value) in [
         ("password=DemoPass987(654)", "DemoPass987(654)"),
