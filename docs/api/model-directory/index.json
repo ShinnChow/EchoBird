@@ -413,13 +413,6 @@
       "baseUrl": "https://grooroute.pro/v1",
       "anthropicUrl": "https://grooroute.pro",
       "region": "cn"
-    },
-    {
-      "name": "Sidrune AI",
-      "url": "https://sidrune.ai/register?source=github&campaign=github-echobird&promo=ECHOBIRD",
-      "baseUrl": "https://sidrune.ai/v1",
-      "anthropicUrl": "https://sidrune.ai",
-      "region": "cn"
     }
   ]
 }

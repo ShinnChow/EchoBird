@@ -49,15 +49,6 @@
       Thanks to <strong>GrooRoute Pro</strong> for sponsoring this project! Official Claude and GPT models are now available. We invite everyone with a curious mind to explore advanced AI, including GPT-6.1 Sol, Claude Opus 5.5, Claude Sonnet 5.5, Claude Fable 5.1, GPT-6 Sol, GPT-6 Astra, GPT-6 Luna, DeepSeek V4.1 Flash and Grok 4.7. Connect directly from mainland China and get started with a single line of configuration — <a href="https://grooroute.pro/sign-up?aff=FWGVPMYENJQ8">sign up here</a>.
     </td>
   </tr>
-  <tr>
-    <td width="150" align="center">
-      <a href="https://sidrune.ai/register?source=github&amp;campaign=github-echobird&amp;promo=ECHOBIRD"><img src="docs/sponsors/sidrune.png" width="92" alt="Sidrune AI" /></a>
-    </td>
-    <td>
-      <a href="https://sidrune.ai/register?source=github&amp;campaign=github-echobird&amp;promo=ECHOBIRD"><strong>Sidrune AI</strong></a><br/>
-      Sidrune AI helps individual developers and businesses access and manage leading AI models worldwide through a unified API. Dynamic routing across multiple upstream connections improves availability, with transparent model performance, response times, and costs. When using Fable 5.1, Sidrune AI can save up to approximately 90% compared with Claude's official API pricing.
-    </td>
-  </tr>
 </table>
 
 Sponsorship contact: [hi@echobird.ai](mailto:hi@echobird.ai)

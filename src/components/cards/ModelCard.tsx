@@ -92,7 +92,6 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
     // its own name only, so it never outranks a recognized model brand above.
     [['88api'], '88api'],
     [['grooroute'], 'grooroute'],
-    [['sidrune', 'fluxion'], 'sidrune'],
   ];
 
   for (const [keywords, icon] of iconMap) {
@@ -101,7 +100,6 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
       if (icon === 'ccvibe') return './icons/models/ccvibe.png';
       if (icon === '88api') return './icons/models/88api.png';
       if (icon === 'grooroute') return './icons/models/grooroute.png';
-      if (icon === 'sidrune') return './icons/models/sidrune.png';
       if (icon === 'byteplus') return './icons/models/byteplus.png';
       if (icon === 'qianwen') return './icons/models/qianwen.png';
       if (icon === 'meta') return './icons/models/meta.png';
