@@ -113,6 +113,19 @@ export function ApiModelFields({
       )
         return;
       const code = String(error);
+      if (code === 'UPSTREAM_MODELS_UNSUPPORTED' && !editing) {
+        const preset =
+          sameEndpoint(initial.baseUrl, input.baseUrl) &&
+          sameEndpoint(initial.anthropicUrl, input.anthropicUrl)
+            ? initial.options?.[0]
+            : undefined;
+        if (preset)
+          setForm((current) =>
+            JSON.stringify(catalogInput(current)) === source && !current.modelId
+              ? { ...current, modelId: preset }
+              : current
+          );
+      }
       const { t: translate, showToast: toast } = latest.current;
       const message =
         code === 'UPSTREAM_MODELS_UNSUPPORTED'
@@ -129,7 +142,7 @@ export function ApiModelFields({
         setPendingSource(null);
       }
     }
-  }, [active, validEndpoint, source, input, applyCatalog]);
+  }, [active, validEndpoint, source, input, applyCatalog, initial, editing, setForm]);
 
   useEffect(() => {
     const attempt = ++revision.current;
@@ -154,7 +167,9 @@ export function ApiModelFields({
     };
   }, [source, input, active, editing, validEndpoint, applyCatalog, refresh]);
 
-  const fallback = [...modelDirectory.providers, ...modelDirectory.relays].find(
+  const fallback = (
+    [...modelDirectory.providers, ...modelDirectory.relays] as api.ModelDirectoryEntry[]
+  ).find(
     (entry) =>
       (input.baseUrl || input.anthropicUrl) &&
       sameEndpoint(entry.baseUrl, input.baseUrl) &&

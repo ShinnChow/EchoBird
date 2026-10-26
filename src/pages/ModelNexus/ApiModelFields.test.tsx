@@ -287,6 +287,26 @@ it('uses authenticated catalog entries even when the upstream reports that a key
   expect(current.modelId).toBe('free-fixture');
 });
 
+it.each([
+  { editing: false, modelId: '', expected: 'stable-preset' },
+  { editing: false, modelId: 'my-manual-model', expected: 'my-manual-model' },
+  { editing: true, modelId: '', expected: '' },
+])(
+  'uses a preset only for unsupported discovery, preserving $modelId in Edit=$editing',
+  async ({ editing, modelId, expected }) => {
+    vi.mocked(api.fetchUpstreamModelCatalog).mockRejectedValue('UPSTREAM_MODELS_UNSUPPORTED');
+    await open({ modelId, modelIdOptions: ['stable-preset', 'other-preset'] }, { editing });
+    if (editing) await refresh();
+    else await advance();
+    expect(current.modelId).toBe(expected);
+    expect(field().props.options).toEqual(['stable-preset', 'other-preset']);
+    expect(showToast).toHaveBeenCalledExactlyOnceWith('error', 'model.catalogUnsupported');
+    expect(api.addModel).not.toHaveBeenCalled();
+    expect(api.updateModel).not.toHaveBeenCalled();
+    expect(api.queryModelUsage).not.toHaveBeenCalled();
+  }
+);
+
 it('does not restart automatic loading when only the display language changes', async () => {
   await open();
   await advance(400);

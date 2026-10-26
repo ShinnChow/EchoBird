@@ -329,12 +329,8 @@ type DirectoryEntry = {
   url: string;
   baseUrl: string;
   anthropicUrl: string;
-  modelId: string;
-  // Optional list of model ids this vendor serves on the same endpoint (e.g.
-  // Volcengine exposes many). When present (≥2), clicking the row surfaces a
-  // dropdown in the Add-Model modal so users pick instead of hand-typing.
-  // model id list is the same across the OpenAI/Anthropic endpoints, so no
-  // per-protocol split is needed.
+  // Optional presets for services that cannot list models.
+  modelId?: string;
   modelIds?: string[];
   region: 'cn' | 'global';
 };
@@ -418,14 +414,23 @@ export function ModelNexusPanel() {
 
   const handleAddFromEntry = useCallback(
     (entry: DirectoryEntry) => {
-      const options = entry.modelIds ?? [];
+      // Older remote/cache payloads can still contain obsolete model IDs.
+      const preset = [...BUNDLED_PROVIDERS, ...BUNDLED_RELAYS].find(
+        (preset) => preset.baseUrl === entry.baseUrl && preset.anthropicUrl === entry.anthropicUrl
+      );
+      const hasPreset = !!(preset?.modelId || preset?.modelIds?.length);
+      const candidates = hasPreset ? (entry.modelIds ?? preset?.modelIds ?? []) : [];
+      const defaultId = hasPreset ? entry.modelId || preset?.modelId : undefined;
+      const options = defaultId
+        ? [defaultId, ...candidates.filter((id) => id !== defaultId)]
+        : candidates;
       setNewModelForm({
         name: entry.name,
         baseUrl: entry.baseUrl,
         anthropicUrl: entry.anthropicUrl,
         apiKey: '',
-        // Default to the curated default, else the first listed id, else blank.
-        modelId: entry.modelId || options[0] || '',
+        // Discovery chooses the default; presets apply only when it is unsupported.
+        modelId: '',
         modelIdOptions: options,
       });
       setEditingModelId(null);
