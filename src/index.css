@@ -345,6 +345,12 @@
     height 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.settings-segment-tabs[data-sliding='true']::before {
+  bottom: 0;
+  height: auto;
+  transform: translateX(var(--view-mode-x));
+}
+
 .view-mode-tab[aria-pressed='true'],
 .view-mode-tab[aria-selected='true'],
 .view-mode-tabs[data-sliding='true']::before,
