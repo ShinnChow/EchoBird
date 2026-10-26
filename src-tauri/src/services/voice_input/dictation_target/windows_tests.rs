@@ -80,6 +80,39 @@ impl Drop for Field {
 }
 
 #[test]
+fn displayed_hint_values_are_not_safe_background_drafts() {
+    for hint in ["Type here", "在此输入", "在此輸入", "ここに入力"] {
+        assert!(ambiguous_value(hint, hint, ""));
+        assert!(ambiguous_value(hint, "Input", hint));
+        assert!(!ambiguous_value("", hint, hint));
+        let draft = format!("{hint}\nactual draft🙂");
+        assert!(!ambiguous_value(&draft, hint, hint));
+        assert!(!ambiguous_value(&draft, "", ""));
+    }
+}
+
+#[test]
+fn web_values_never_require_a_matching_placeholder_label_to_use_paste() {
+    assert!(!ambiguous_value("visible hint\n", "", ""));
+    assert!(web_editor("Chrome", "", ""));
+    assert!(web_editor("", "textbox", ""));
+    assert!(web_editor("", "", "Chrome_WidgetWin_1"));
+    assert!(web_editor("Chrome", "textbox", "Chrome_WidgetWin_1"));
+    assert!(!web_editor("Win32", "", "Edit"));
+    assert!(!web_editor("WPF", "", "HwndWrapper"));
+}
+
+#[test]
+fn real_text_matching_a_label_is_not_stripped_from_native_edit_controls() {
+    let field = Field::new("Type here");
+    field
+        .target(9, 9)
+        .insert(" — dictated text", &CancellationToken::new())
+        .unwrap();
+    assert_eq!(field.text(), "Type here — dictated text");
+}
+
+#[test]
 fn automation_capture_accepts_only_the_original_window_even_with_the_same_process() {
     let a = Field::new("original");
     let b = Field::new("other window");
@@ -97,10 +130,11 @@ fn automation_capture_accepts_only_the_original_window_even_with_the_same_proces
             .ElementFromHandle(HWND(original as *mut _))
             .unwrap();
         let other = automation.ElementFromHandle(HWND(other as *mut _)).unwrap();
-        (
+        let ownership = (
             automation_in_window(&automation, &original, owner),
             automation_in_window(&automation, &other, owner),
-        )
+        );
+        (ownership, AgileReference::new(&original).unwrap())
     });
     // Service only this test thread's hidden controls while UIA queries them.
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
@@ -115,7 +149,26 @@ fn automation_capture_accepts_only_the_original_window_even_with_the_same_proces
         std::thread::sleep(std::time::Duration::from_millis(1));
     }
     assert!(worker.is_finished(), "UIA fixture timed out");
-    assert_eq!(worker.join().unwrap(), (Some(()), None));
+    let (ownership, reference) = worker.join().unwrap();
+    assert_eq!(ownership, (Some(()), None));
+    let target = Target {
+        window: owner,
+        pid: std::process::id(),
+        control: Control::ForegroundOnly {
+            reference,
+            input: InputTarget {
+                window: owner,
+                focus: Some(original as u64),
+            },
+            original: "original".into(),
+        },
+    };
+    assert_eq!(
+        target.insert("must not reach another field", &CancellationToken::new()),
+        Err(UNAVAILABLE.into())
+    );
+    assert_eq!(a.text(), "original");
+    assert_eq!(b.text(), "other window");
 }
 
 #[test]

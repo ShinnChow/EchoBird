@@ -24,7 +24,7 @@ pub(super) struct Target {
 pub(super) fn capture(foreground: Option<InputTarget>) -> Option<Target> {
     let background = platform::capture(foreground);
     log::info!(
-        "[VoiceInput] input snapshot foreground_known={} background_supported={}",
+        "[VoiceInput] input snapshot foreground_known={} control_captured={}",
         foreground.is_some(),
         background.is_some()
     );
@@ -50,7 +50,7 @@ pub(super) fn insert(
     if let Some(background) = target.background {
         // A failed write may already have reached the provider. Never replay it
         // through keyboard input, which could duplicate text or write into B.
-        log::info!("[VoiceInput] input route=background");
+        log::info!("[VoiceInput] input route=captured_control");
         return background.insert(text, cancel);
     }
     #[cfg(not(target_os = "macos"))]

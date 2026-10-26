@@ -30,15 +30,27 @@ impl Drop for Apartment {
 }
 
 enum Control {
-    Edit { handle: u64, start: u32, end: u32 },
-    Automation(AgileReference<IUIAutomationElement>),
+    Edit {
+        handle: u64,
+        start: u32,
+        end: u32,
+        edit: Edit,
+    },
+    Automation {
+        reference: AgileReference<IUIAutomationElement>,
+        edit: Edit,
+    },
+    ForegroundOnly {
+        reference: AgileReference<IUIAutomationElement>,
+        input: InputTarget,
+        original: String,
+    },
 }
 
 pub(super) struct Target {
     window: u64,
     pid: u32,
     control: Control,
-    edit: Edit,
 }
 
 fn send(handle: u64, message: u32, wparam: WPARAM, lparam: LPARAM) -> Option<usize> {
@@ -70,6 +82,22 @@ fn value(handle: u64) -> Option<String> {
         LPARAM(text.as_mut_ptr() as isize),
     )?;
     String::from_utf16(text.get(..copied)?).ok()
+}
+
+fn ambiguous_value(value: &str, name: &str, help: &str) -> bool {
+    !value.is_empty() && (value == name || value == help)
+}
+
+fn web_editor(framework: &str, aria_role: &str, window_class: &str) -> bool {
+    framework.eq_ignore_ascii_case("Chrome")
+        || !aria_role.is_empty()
+        || window_class.starts_with("Chrome_")
+}
+
+fn class_name(handle: u64) -> String {
+    let mut class = [0_u16; 128];
+    let length = unsafe { GetClassNameW(HWND(handle as *mut _), &mut class) }.max(0) as usize;
+    String::from_utf16_lossy(&class[..length])
 }
 
 fn belongs_to_window(handle: HWND, window: u64) -> bool {
@@ -106,9 +134,7 @@ pub(super) fn capture(input: Option<InputTarget>) -> Option<Target> {
         if !belongs_to_window(HWND(handle as *mut _), input.window) {
             return None;
         }
-        let mut class = [0_u16; 128];
-        let length = unsafe { GetClassNameW(HWND(handle as *mut _), &mut class) }.max(0) as usize;
-        let class = String::from_utf16_lossy(&class[..length]);
+        let class = class_name(handle);
         if class.eq_ignore_ascii_case("Edit") || class.to_ascii_lowercase().starts_with("richedit")
         {
             let style = unsafe { GetWindowLongPtrW(HWND(handle as *mut _), GWL_STYLE) };
@@ -130,8 +156,12 @@ pub(super) fn capture(input: Option<InputTarget>) -> Option<Target> {
             return Some(Target {
                 window: input.window,
                 pid,
-                control: Control::Edit { handle, start, end },
-                edit,
+                control: Control::Edit {
+                    handle,
+                    start,
+                    end,
+                    edit,
+                },
             });
         }
     }
@@ -156,6 +186,47 @@ pub(super) fn capture(input: Option<InputTarget>) -> Option<Target> {
         let original = value.CurrentValue().ok()?.to_string();
         if original.len() > MAX_FIELD_BYTES {
             return None;
+        }
+        let name = element.CurrentName().ok().map(|text| text.to_string());
+        let help = element.CurrentHelpText().ok().map(|text| text.to_string());
+        let framework = element
+            .CurrentFrameworkId()
+            .ok()
+            .map(|text| text.to_string());
+        let aria_role = element.CurrentAriaRole().ok().map(|text| text.to_string());
+        let web = web_editor(
+            framework.as_deref().unwrap_or_default(),
+            aria_role.as_deref().unwrap_or_default(),
+            &class_name(input.window),
+        );
+        let ambiguous = ambiguous_value(
+            &original,
+            name.as_deref().unwrap_or_default(),
+            help.as_deref().unwrap_or_default(),
+        );
+        // Web values can include generated UI text even without a matching
+        // accessible label. A whole-value rewrite would make that text real.
+        if web || ambiguous {
+            log::info!(
+                "[VoiceInput] capture kind=foreground_only web_editor={} ambiguous_value={} value_chars={} name_chars={} help_chars={}",
+                web,
+                ambiguous,
+                original.chars().count(),
+                name.as_deref().unwrap_or_default().chars().count(),
+                help.as_deref().unwrap_or_default().chars().count()
+            );
+            if !input.matches(native::input_target()) {
+                return None;
+            }
+            return Some(Target {
+                window: input.window,
+                pid,
+                control: Control::ForegroundOnly {
+                    reference: AgileReference::new(&element).ok()?,
+                    input,
+                    original,
+                },
+            });
         }
         let mut node = element.clone();
         let walker = automation.ControlViewWalker().ok()?;
@@ -204,8 +275,10 @@ pub(super) fn capture(input: Option<InputTarget>) -> Option<Target> {
                     return Some(Target {
                         window: input.window,
                         pid,
-                        control: Control::Automation(AgileReference::new(&element).ok()?),
-                        edit,
+                        control: Control::Automation {
+                            reference: AgileReference::new(&element).ok()?,
+                            edit,
+                        },
                     });
                 }
             }
@@ -226,7 +299,12 @@ impl Target {
             return Err(UNAVAILABLE.into());
         }
         match self.control {
-            Control::Edit { handle, start, end } => {
+            Control::Edit {
+                handle,
+                start,
+                end,
+                edit,
+            } => {
                 if !belongs_to_window(HWND(handle as *mut _), self.window) {
                     return Err(UNAVAILABLE.into());
                 }
@@ -241,7 +319,7 @@ impl Target {
                     .replace("\r\n", "\n")
                     .replace('\r', "\n")
                     .replace('\n', "\r\n");
-                let expected = self.edit.replace(&current, &text)?;
+                let expected = edit.replace(&current, &text)?;
                 if cancel.is_cancelled() {
                     return Err("voice.error.cancelled".into());
                 }
@@ -258,7 +336,7 @@ impl Target {
                 );
                 verified
             }
-            Control::Automation(reference) => {
+            Control::Automation { reference, edit } => {
                 let _apartment = Apartment::new().ok_or(UNAVAILABLE)?;
                 unsafe {
                     let element = reference.resolve().map_err(|_| UNAVAILABLE)?;
@@ -273,7 +351,7 @@ impl Target {
                         return Err(UNAVAILABLE.into());
                     }
                     let current = value.CurrentValue().map_err(|_| UNAVAILABLE)?.to_string();
-                    let output = self.edit.replace(&current, text)?;
+                    let output = edit.replace(&current, text)?;
                     if cancel.is_cancelled() {
                         return Err("voice.error.cancelled".into());
                     }
@@ -288,6 +366,30 @@ impl Target {
                     );
                     confirmed
                 }
+            }
+            Control::ForegroundOnly {
+                reference,
+                input,
+                original,
+            } => {
+                if !input.matches(native::input_target()) {
+                    return Err(UNAVAILABLE.into());
+                }
+                let _apartment = Apartment::new().ok_or(UNAVAILABLE)?;
+                let element = reference.resolve().map_err(|_| UNAVAILABLE)?;
+                let value = unsafe {
+                    element.GetCurrentPatternAs::<IUIAutomationValuePattern>(UIA_ValuePatternId)
+                }
+                .map_err(|_| UNAVAILABLE)?;
+                if unsafe { value.CurrentValue() }.map_err(|_| UNAVAILABLE)? != original
+                    || !unsafe { element.CurrentHasKeyboardFocus() }
+                        .map_err(|_| UNAVAILABLE)?
+                        .as_bool()
+                {
+                    return Err(UNAVAILABLE.into());
+                }
+                log::info!("[VoiceInput] input route=foreground_automation");
+                native::insert(text, Some(input), cancel)
             }
         }
     }
