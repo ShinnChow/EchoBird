@@ -36,6 +36,7 @@ import { useAppManager } from '../AppManager/context';
 import { ToolCard } from '../../components';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { useToast } from '../../components/Toast';
+import '../ModelNexus/ModelNexus.css';
 
 // Placeholder examples shown inside the file-picker fields when nothing's
 // been chosen yet. Kept in English path style across all locales — the
@@ -144,7 +145,7 @@ export const MyProjectsMain: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="model-nexus-grid grid gap-4">
           {builtinEntries.map((p) => (
             <ProjectToolCard
               key={p.id}
