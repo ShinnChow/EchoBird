@@ -209,7 +209,7 @@ const zhHant: Partial<Translations> = {
   'nav.localServer': '本地大模型',
   'nav.smartRouter': '智能接入',
   'nav.motherAgent': 'AI 助理',
-  'nav.feedback': '推薦應用',
+  'nav.feedback': '意見回饋',
   'nav.changelog': '更新日誌',
   'changelog.loading': '載入中…',
   'changelog.error': '無法載入更新日誌，請檢查網路後重試。',
@@ -369,7 +369,7 @@ const zhHant: Partial<Translations> = {
   'aiCareer.noActivity': '無活動',
   'page.localServer': '本地大模型',
   'page.motherAgent': 'AI 助理',
-  'page.feedback': '推薦應用',
+  'page.feedback': '意見回饋',
   'feedback.title': '告訴我們，你想讓 EchoBird 支援什麼 AI 應用',
   'feedback.intro':
     '告訴我們應用名稱、官網連結，以及安裝、切換帳號或切換模型等需求。推薦應用可直接提交；回報使用問題時，請先複製最近 30 條日誌。',

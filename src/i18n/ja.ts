@@ -225,7 +225,7 @@ const ja: Partial<Translations> = {
   'nav.localServer': 'ローカル LLM',
   'nav.smartRouter': 'スマートルーター',
   'nav.motherAgent': 'AI アシスタント',
-  'nav.feedback': 'アプリを提案',
+  'nav.feedback': 'フィードバック',
   'nav.changelog': '更新履歴',
   'changelog.loading': '読み込み中…',
   'changelog.error': '更新履歴を読み込めませんでした。ネットワークを確認して再試行してください。',
@@ -390,7 +390,7 @@ const ja: Partial<Translations> = {
   'aiCareer.noActivity': 'アクティビティなし',
   'page.localServer': 'ローカル LLM',
   'page.motherAgent': 'AI アシスタント',
-  'page.feedback': 'アプリを提案',
+  'page.feedback': 'フィードバック',
   'feedback.title': 'EchoBird に対応してほしい AI アプリを教えてください',
   'feedback.intro':
     'アプリ名、公式サイト、インストール・アカウント切り替え・モデル切り替えなど必要な機能をお知らせください。アプリの提案はそのまま送信できます。不具合の報告時は、先に直近 30 行のログをコピーしてください。',

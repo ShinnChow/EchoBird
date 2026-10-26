@@ -213,7 +213,7 @@ const en: Translations = {
   'nav.localServer': 'Local LLM',
   'nav.smartRouter': 'Smart Router',
   'nav.motherAgent': 'AI Assistant',
-  'nav.feedback': 'Suggest an app',
+  'nav.feedback': 'Feedback',
   'nav.changelog': 'Changelog',
   'changelog.loading': 'Loading…',
   'changelog.error': "Couldn't load the changelog — check your connection and try again.",
@@ -356,7 +356,7 @@ const en: Translations = {
     'Removes this entry from your "My AI Projects" list only — the project files on your machine stay where they are.',
   'page.localServer': 'LOCAL LLM',
   'page.motherAgent': 'AI Assistant',
-  'page.feedback': 'SUGGEST AN APP',
+  'page.feedback': 'FEEDBACK',
   'feedback.title': 'Tell us which AI app you want EchoBird to support',
   'feedback.intro':
     'Share the app name, official website, and the features you need: installation, account switching, or model switching. Submit app suggestions directly. For a problem report, first copy the last 30 log lines.',

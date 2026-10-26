@@ -50,6 +50,7 @@ import {
   type AccountCardData,
   type AccountProvider,
 } from './accountCenterData';
+import '../ModelNexus/ModelNexus.css';
 
 export function AccountCard({
   provider,
@@ -363,7 +364,7 @@ export function AccountCenterMain() {
       autoScroll={false}
     >
       <SortableContext items={accounts.map((item) => item.id)} strategy={rectSortingStrategy}>
-        <div ref={gridRef} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 pb-2">
+        <div ref={gridRef} className="model-nexus-grid grid gap-4 pb-2">
           {accounts.map(({ id, provider, account }) => (
             <SortableCard
               key={id}
@@ -401,10 +402,7 @@ export function AccountCenterMain() {
       </DragOverlay>
     </DndContext>
   ) : loading ? (
-    <div
-      aria-label={t('accountCenter.loading')}
-      className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
-    >
+    <div aria-label={t('accountCenter.loading')} className="model-nexus-grid grid gap-4">
       {[0, 1, 2].map((index) => (
         <div key={index} className="h-44 animate-pulse rounded-card bg-cyber-surface/60" />
       ))}

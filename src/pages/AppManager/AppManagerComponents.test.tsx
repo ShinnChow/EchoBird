@@ -842,7 +842,7 @@ describe('ZCode model capability controls', () => {
       );
       for (const [label, checked] of [
         ['agent.codexWebSearchLabel', false],
-        ['image', true],
+        ['Image', true],
       ]) {
         const toggle = markup.match(new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`))?.[0];
         expect(toggle).toContain(`aria-checked="${checked}"`);
@@ -1009,7 +1009,7 @@ describe.each(['workbuddy', 'workbuddyai'])('%s image control', (client) => {
         </ModelNexusContext.Provider>
       </ConfirmDialogProvider>
     );
-    const toggle = markup.match(/<button[^>]*aria-label="image"[^>]*>/)?.[0];
+    const toggle = markup.match(/<button[^>]*aria-label="Image"[^>]*>/)?.[0];
     expect(toggle).toContain('aria-checked="false"');
     expect(toggle?.includes('disabled=""')).toBe(pending);
     expect(markup).toContain('aria-label="agent.imageInputHint"');
@@ -1043,7 +1043,7 @@ describe.each(['mimocode', 'mimodesktop'])('%s capability controls', (client) =>
         </ModelNexusContext.Provider>
       </ConfirmDialogProvider>
     );
-    for (const label of ['image', '1M']) {
+    for (const label of ['Image', '1M']) {
       const toggle = markup.match(new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`))?.[0];
       expect(toggle).toContain('aria-checked="true"');
       expect(toggle?.includes('disabled=""')).toBe(pending);
@@ -1085,7 +1085,7 @@ describe.each(['minimaxcode', 'minimaxdesktop'])('%s capability controls', (clie
         </ModelNexusContext.Provider>
       </ConfirmDialogProvider>
     );
-    for (const label of ['image', '1M']) {
+    for (const label of ['Image', '1M']) {
       const toggle = markup.match(new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`))?.[0];
       expect(toggle).toContain('aria-checked="true"');
       expect(toggle?.includes('disabled=""')).toBe(pending);
@@ -1127,7 +1127,7 @@ describe.each(['qoder', 'qodercn'])('%s capability controls', (client) => {
         </ModelNexusContext.Provider>
       </ConfirmDialogProvider>
     );
-    for (const label of ['image', '1M']) {
+    for (const label of ['Image', '1M']) {
       const toggle = markup.match(new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`))?.[0];
       expect(toggle).toContain('aria-checked="true"');
       expect(toggle?.includes('disabled=""')).toBe(pending);
@@ -1169,7 +1169,7 @@ describe.each(['dsh'])('%s capability controls', (client) => {
         </ModelNexusContext.Provider>
       </ConfirmDialogProvider>
     );
-    for (const label of ['image', '1M']) {
+    for (const label of ['Image', '1M']) {
       const toggle = markup.match(new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`))?.[0];
       expect(toggle).toContain('aria-checked="true"');
       expect(toggle?.includes('disabled=""')).toBe(pending);

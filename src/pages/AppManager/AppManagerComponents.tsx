@@ -1027,7 +1027,7 @@ export const AppManagerPanel: React.FC = () => {
       )}
       {showImageToggle && (
         <RoutingToggle
-          label="image"
+          label="Image"
           hint={t('agent.imageInputHint')}
           checked={
             isZCodeApp

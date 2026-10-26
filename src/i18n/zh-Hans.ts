@@ -196,7 +196,7 @@ const zhHans: Partial<Translations> = {
   'nav.localServer': '本地大模型',
   'nav.smartRouter': '智能接入',
   'nav.motherAgent': 'AI 助手',
-  'nav.feedback': '推荐应用',
+  'nav.feedback': '意见反馈',
   'nav.changelog': '更新日志',
   'changelog.loading': '加载中…',
   'changelog.error': '无法加载更新日志，请检查网络后重试。',
@@ -332,7 +332,7 @@ const zhHans: Partial<Translations> = {
   'myProjects.deleteConfirm': '仅从「我的AI项目」列表移除该项目，本机上的项目文件不会被删除。',
   'page.localServer': '本地大模型',
   'page.motherAgent': 'AI 助手',
-  'page.feedback': '推荐应用',
+  'page.feedback': '意见反馈',
   'feedback.title': '告诉我们，你想让 EchoBird 支持什么 AI 应用',
   'feedback.intro':
     '告诉我们应用名称、官网链接，以及安装、切换账号或切换模型等需求。推荐应用可直接提交；反馈使用问题时，请先复制最近 30 条日志。',

@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Users,
   Mic,
+  Download,
 } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { RoutingToggle } from './RoutingToggle';
@@ -80,7 +81,7 @@ function SidebarToggle({
         aria-checked={checked}
         aria-busy={pending}
         disabled={disabled || pending}
-        className={`flex w-full min-h-[calc(1.5em_+_1rem)] items-center justify-center rounded-lg transition-colors disabled:opacity-40 ${checked ? 'bg-cyber-accent/15 text-cyber-accent' : 'text-cyber-text-secondary hover:bg-cyber-elevated/50 hover:text-cyber-text'}`}
+        className={`mx-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors disabled:opacity-40 ${checked ? 'bg-cyber-accent/15 text-cyber-accent' : 'text-cyber-text-secondary hover:bg-cyber-elevated/50 hover:text-cyber-text'}`}
         onClick={() => {
           if (!disabled && !pending) return onChange(!checked);
         }}
@@ -153,13 +154,14 @@ export const Sidebar = ({
         {!collapsed && (
           <span className="brand-mark flex-shrink-0 text-cyber-text">{t('app.name')}</span>
         )}
-        {updateAvailable && (
+        {updateAvailable && !collapsed && (
           <button
+            type="button"
             onClick={onSettingsClick}
             aria-label={t('settings.updates')}
-            className={`${collapsed ? 'absolute right-0 top-0' : 'flex-shrink-0 text-[11px] font-mono'} text-red-400 hover:opacity-70 transition-opacity animate-pulse leading-none`}
+            className="flex-shrink-0 text-[11px] font-mono text-red-400 hover:opacity-70 transition-opacity animate-pulse leading-none"
           >
-            {collapsed ? <RefreshCw size={12} /> : t('settings.updates')}
+            {t('settings.updates')}
           </button>
         )}
       </div>
@@ -254,6 +256,20 @@ export const Sidebar = ({
 
       <div className="flex-shrink-0 pt-4 text-[14px] text-cyber-text-secondary">
         <div className="space-y-2 text-[15px] font-medium">
+          {collapsed && updateAvailable && (
+            <button
+              type="button"
+              aria-label={t('settings.updates')}
+              onClick={onSettingsClick}
+              className="mx-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-red-400 transition-colors hover:bg-cyber-elevated/50"
+            >
+              <Download
+                size={20}
+                aria-hidden="true"
+                className="animate-pulse motion-reduce:animate-none"
+              />
+            </button>
+          )}
           {hasVoiceChannels && (
             <SidebarToggle
               collapsed={collapsed}
