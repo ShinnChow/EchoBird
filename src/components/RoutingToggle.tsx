@@ -8,6 +8,7 @@ interface RoutingToggleProps {
   label: string;
   hideLabel?: boolean;
   hint?: string;
+  className?: string;
   checked: boolean;
   disabled?: boolean;
   pending?: boolean;
@@ -18,6 +19,7 @@ export function RoutingToggle({
   label,
   hideLabel = false,
   hint,
+  className = '',
   checked,
   disabled = false,
   pending = false,
@@ -82,7 +84,7 @@ export function RoutingToggle({
   };
 
   return (
-    <div className="flex items-center">
+    <div className={`flex items-center ${className}`}>
       {!hideLabel && (
         <span className="text-xs text-cyber-text-secondary mr-2 whitespace-nowrap">{label}</span>
       )}

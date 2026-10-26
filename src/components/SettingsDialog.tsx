@@ -578,6 +578,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                         </span>
                       </div>
                       <RoutingToggle
+                        className="flex-1 flex-row-reverse justify-between"
                         label={t('settings.sensitiveInfoProtection')}
                         hideLabel
                         hint={t('settings.sensitiveInfoProtectionHint')}
