@@ -236,6 +236,7 @@ where
         AccountProvider::GrokBot => grokbot_voice::validate_audio(request.audio, request.mime)?,
         AccountProvider::Devin => devin_voice::validate_audio(request.audio, request.mime)?,
         AccountProvider::Trae => trae_global_voice::validate_audio(request.audio, request.mime)?,
+        AccountProvider::Traecn => trae_voice::validate_audio(request.audio, request.mime)?,
         AccountProvider::CodeArts => codearts_voice::validate_audio(request.audio, request.mime)?,
         AccountProvider::DoubaoWork => doubao_voice::validate_audio(request.audio, request.mime)?,
         _ => {}

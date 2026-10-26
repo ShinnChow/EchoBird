@@ -15,8 +15,22 @@ use super::{protocol::WireProtocol, providers, ProxyError};
 use crate::models::model::AccountProvider;
 
 const MODEL_PATH: &str = "/api/ide/v1/get_detail_param";
+const BATCH_MODEL_PATH: &str = "/api/ide/v1/batch_get_detail_param";
+const CHAT_FUNCTIONS: &[&str] = &[
+    "chat_v3",
+    "solo_work_lite",
+    "solo_agent",
+    "solo_agent_lite",
+    "solo_coder",
+    "solo_work_remote",
+    "solo_agent_remote",
+];
 const CHAT_PATH: &str = "/api/agent/v3/llm_utils_chat";
 const API_VERSION_CODE: &str = "20260212";
+
+#[cfg(test)]
+#[path = "trae/compatibility_tests.rs"]
+mod compatibility_tests;
 
 #[cfg(test)]
 pub(super) fn stream_diagnostics_enabled() -> bool {
@@ -284,12 +298,13 @@ fn http_client() -> Result<&'static reqwest::Client, ProxyError> {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Model {
     function: String,
+    model_name: Option<String>,
     max_tokens: Option<u64>,
     multimodal: bool,
     reasoning: Vec<String>,
 }
 
-type Catalog = BTreeMap<String, Model>;
+type Catalog = BTreeMap<String, Vec<Model>>;
 type Catalogs = BTreeMap<String, Catalog>;
 
 fn visible_chat_model(id: &str) -> bool {
@@ -500,7 +515,9 @@ fn failure(event: &str, value: &Value, headers: &HeaderMap) -> Option<ProxyError
         .get("error")
         .filter(|value| value.is_object())
         .unwrap_or(value);
-    let code = detail["code"].as_u64();
+    let code = detail["code"]
+        .as_u64()
+        .or_else(|| detail["code"].as_str()?.parse().ok());
     if event != "error"
         && !code.is_some_and(|code| code >= 4000 || code == 1005)
         && !value.get("error").is_some_and(|value| !value.is_null())
@@ -553,6 +570,143 @@ fn failure(event: &str, value: &Value, headers: &HeaderMap) -> Option<ProxyError
     Some(error)
 }
 
+fn model_priority(model: &Model) -> (bool, bool, bool) {
+    (
+        model
+            .model_name
+            .as_deref()
+            .is_some_and(|name| name.ends_with("__dev")),
+        model.model_name.is_some(),
+        !model.reasoning.is_empty(),
+    )
+}
+
+fn add_models(models: &mut Catalog, provider: AccountProvider, function: &str, rows: &Value) {
+    for row in rows.as_array().into_iter().flatten() {
+        let Some(id) = row["config_name"].as_str().filter(|id| !id.is_empty()) else {
+            continue;
+        };
+        let display = if let Some(text) = row["display_config"].as_str() {
+            serde_json::from_str(text).unwrap_or(Value::Null)
+        } else {
+            row["display_config"].clone()
+        };
+        if !visible_chat_model(id)
+            || row["hidden"] == true
+            || row["disabled"] == true
+            || row["config_switch"] == false
+            || row["is_custom_model"] == true
+            || display["is_custom_model"] == true
+            || row["usage"]
+                .as_str()
+                .is_some_and(|usage| !usage.is_empty() && usage != "chat_completion")
+            || provider == AccountProvider::Trae && row["is_invisible_to_user"] == true
+        {
+            continue;
+        }
+        let details = row["model_detail_list"].as_array();
+        let detail = details
+            .and_then(|details| {
+                details
+                    .iter()
+                    .find(|detail| {
+                        detail["model_name"]
+                            .as_str()
+                            .is_some_and(|name| name.ends_with("__dev"))
+                    })
+                    .or_else(|| details.first())
+            })
+            .unwrap_or(&Value::Null);
+        let reasoning_config = row
+            .get("reasoning_effort_config")
+            .or_else(|| display.get("reasoning_effort_config"))
+            .or_else(|| detail.get("reasoning_effort_config"));
+        let options = if row["support_thinking"] == false || display["support_thinking"] == false {
+            None
+        } else if let Some(config) = reasoning_config {
+            config["options"].as_array()
+        } else {
+            detail["reasoning_effort_options"]
+                .as_array()
+                .or_else(|| row["reasoning_effort_options"].as_array())
+        };
+        let metadata = Model {
+            function: function.into(),
+            model_name: detail["model_name"]
+                .as_str()
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .map(str::to_string),
+            max_tokens: if detail["model_name"]
+                .as_str()
+                .is_some_and(|name| !name.trim().is_empty())
+            {
+                detail["max_tokens"].as_u64().filter(|limit| *limit > 0)
+            } else {
+                native_output_limit(row)
+            },
+            multimodal: row["multimodal"] == true
+                || detail["multimodal"] == true
+                || row["metadata"]["capabilities"]["vision"] == true,
+            reasoning: options
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .collect(),
+        };
+        let choices = models.entry(id.into()).or_default();
+        if let Some(existing) = choices.iter_mut().find(|model| model.function == function) {
+            if model_priority(&metadata) > model_priority(existing) {
+                *existing = metadata;
+            }
+        } else {
+            choices.push(metadata);
+        }
+        choices.sort_by_key(|model| std::cmp::Reverse(model_priority(model)));
+    }
+}
+
+async fn directory_request(
+    client: &reqwest::Client,
+    credentials: &Value,
+    base: &str,
+    path: &str,
+    body: Value,
+) -> Result<Value, ProxyError> {
+    let response = client
+        .post(format!("{base}{path}"))
+        .headers(headers(credentials, true)?)
+        .json(&body)
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .map_err(ProxyError::upstream)?;
+    let status = response.status();
+    let response_headers = response.headers().clone();
+    if status.is_redirection() {
+        return Err(ProxyError::new(
+            StatusCode::BAD_GATEWAY,
+            "Trae model directory returned an unexpected redirect",
+        ));
+    }
+    if !status.is_success() {
+        let mut error = ProxyError::new(status, "Trae model directory request failed");
+        error.retry_after = response_headers.get(header::RETRY_AFTER).cloned();
+        return Err(error);
+    }
+    let value = response
+        .json::<Value>()
+        .await
+        .map_err(ProxyError::upstream)?;
+    if let Some(error) = failure("", &value, &response_headers) {
+        return Err(error);
+    }
+    Ok(value)
+}
+
 async fn catalog(
     provider: AccountProvider,
     credentials: &Value,
@@ -560,40 +714,50 @@ async fn catalog(
 ) -> Result<Catalog, ProxyError> {
     let client = http_client()?;
     let base = base(provider, credentials)?;
-    let mut functions = vec![
-        "solo_work_remote",
-        "solo_work_lite",
-        "solo_agent_remote",
-        "chat_v3",
-    ];
-    if provider == AccountProvider::Traecn {
-        functions.push("solo_coder");
-    }
-    let requests = functions.iter().map(|function| {
-        let request = client.post(format!("{base}{MODEL_PATH}")).json(&json!({"function":function,"config_names":null,"need_prompt":false,"current_config_info":null,"poly_prompt":true,"mode_type":null,"agent_type":null})).timeout(Duration::from_secs(30));
-        async move {
-            let request_headers = headers(credentials, true)?;
-            #[cfg(test)]
-            let revision = request_headers.get("x-ide-version-code").and_then(|value| value.to_str().ok()).unwrap_or("absent").to_string();
-            let response = request.headers(request_headers).send().await.map_err(ProxyError::upstream)?;
-            let status = response.status();
-            let response_headers = response.headers().clone();
-            if status.is_redirection() { return Err(ProxyError::new(StatusCode::BAD_GATEWAY, "Trae model directory returned an unexpected redirect")); }
-            if !status.is_success() { return Err(ProxyError::new(status, "Trae model directory request failed")); }
-            let value = response.json::<Value>().await.map_err(ProxyError::upstream)?;
-            #[cfg(test)]
-            if std::env::var("ECHOBIRD_LIVE_TRAE_CATALOG_DIAGNOSTICS").as_deref() == Ok("1") {
-                for row in value["config_info_list"].as_array().into_iter().flatten().filter(|row| matches!(row["config_name"].as_str(), Some("doubao-for-auto" | "DeepSeek-V4-Flash" | "glm-5"))) {
-                    eprintln!("Trae catalog function={function} revision={revision} shape={}", catalog_row_shape(row));
+    let mut models = Catalog::new();
+    let mut listed = Vec::new();
+    let mut last_error = None;
+    let batch = directory_request(client, credentials, &base, BATCH_MODEL_PATH, json!({
+        "functions":CHAT_FUNCTIONS,"agent_type":"","current_config_info":{"config_name":"","is_custom_model":false},
+        "mode_type":0,"access_type":0,"ab_force_vids":"","ab_autotest_advanced_mode":0,"show_custom_model":true
+    })).await;
+    match batch {
+        Ok(value) => {
+            let groups = value
+                .get("function_configs")
+                .or_else(|| value["data"].get("function_configs"));
+            for group in groups.and_then(Value::as_array).into_iter().flatten() {
+                let Some(function) = group["function"]
+                    .as_str()
+                    .filter(|function| CHAT_FUNCTIONS.contains(function))
+                else {
+                    continue;
+                };
+                if group["config_info_list"].is_array() {
+                    listed.push(function.to_string());
+                    add_models(&mut models, provider, function, &group["config_info_list"]);
                 }
             }
-            if let Some(error) = failure("", &value, &response_headers) { return Err(error); }
-            Ok(value)
         }
-    });
-    let results = futures_util::future::join_all(requests).await;
-    let mut models = Catalog::new();
-    let mut last_error = None;
+        Err(error)
+            if matches!(
+                error.status,
+                StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN | StatusCode::TOO_MANY_REQUESTS
+            ) =>
+        {
+            return Err(error)
+        }
+        Err(error) => last_error = Some(error),
+    }
+    let functions: Vec<_> = CHAT_FUNCTIONS
+        .iter()
+        .copied()
+        .filter(|function| !listed.iter().any(|listed| listed == function))
+        .collect();
+    let results = futures_util::future::join_all(functions.iter().map(|function| {
+        directory_request(client, credentials, &base, MODEL_PATH,
+            json!({"function":function,"config_names":null,"need_prompt":false,"current_config_info":null,"poly_prompt":true,"mode_type":null,"agent_type":null}))
+    })).await;
     for (function, result) in functions.into_iter().zip(results) {
         let value = match result {
             Ok(value) => value,
@@ -610,31 +774,24 @@ async fn catalog(
                 continue;
             }
         };
-        for row in value["config_info_list"].as_array().into_iter().flatten() {
-            let Some(id) = row["config_name"].as_str().filter(|id| !id.is_empty()) else {
-                continue;
-            };
-            if !visible_chat_model(id) || row["hidden"] == true || row["disabled"] == true {
-                continue;
+        let rows = value
+            .get("config_info_list")
+            .unwrap_or(&value["data"]["config_info_list"]);
+        #[cfg(test)]
+        if std::env::var("ECHOBIRD_LIVE_TRAE_CATALOG_DIAGNOSTICS").as_deref() == Ok("1") {
+            for row in rows.as_array().into_iter().flatten().filter(|row| {
+                matches!(
+                    row["config_name"].as_str(),
+                    Some("doubao-for-auto" | "DeepSeek-V4-Flash" | "glm-5")
+                )
+            }) {
+                eprintln!(
+                    "Trae catalog function={function} shape={}",
+                    catalog_row_shape(row)
+                );
             }
-            let detail = &row["model_detail_list"][0];
-            let reasoning = detail["reasoning_effort_options"]
-                .as_array()
-                .or_else(|| row["reasoning_effort_options"].as_array())
-                .into_iter()
-                .flatten()
-                .filter_map(Value::as_str)
-                .map(str::to_string)
-                .collect();
-            models.entry(id.into()).or_insert_with(|| Model {
-                function: function.into(),
-                max_tokens: native_output_limit(row),
-                multimodal: row["multimodal"] == true
-                    || detail["multimodal"] == true
-                    || row["metadata"]["capabilities"]["vision"] == true,
-                reasoning,
-            });
         }
+        add_models(&mut models, provider, function, rows);
     }
     if models.is_empty() {
         return Err(last_error.unwrap_or_else(|| {
@@ -781,6 +938,9 @@ fn prepare(body: &Value, id: &str, model: &Model) -> Result<Value, ProxyError> {
         }
     }
     let mut output = json!({"messages":messages,"model":id,"config_name":id,"function":model.function,"stream":true});
+    if let Some(name) = &model.model_name {
+        output["model_name"] = json!(name);
+    }
     if tools_allowed {
         let mut tools = body["tools"].as_array().cloned().unwrap_or_default();
         for tool in &mut tools {
@@ -816,12 +976,76 @@ fn prepare(body: &Value, id: &str, model: &Model) -> Result<Value, ProxyError> {
         .as_str()
         .or_else(|| body["reasoning"]["effort"].as_str())
     {
-        if !model.reasoning.iter().any(|value| value == effort) {
-            return Err(unsupported("reasoning_effort"));
+        let alias = match effort {
+            "low" => "light",
+            "light" => "low",
+            "xhigh" => "extra_high",
+            "extra_high" => "xhigh",
+            other => other,
+        };
+        if let Some(native) = model
+            .reasoning
+            .iter()
+            .find(|value| value.as_str() == effort)
+            .or_else(|| model.reasoning.iter().find(|value| value.as_str() == alias))
+        {
+            output["reasoning_effort"] = json!(native);
         }
-        output["reasoning_effort"] = json!(effort);
     }
     Ok(output)
+}
+
+fn retry_function(error: &ProxyError) -> bool {
+    !matches!(
+        error.status,
+        StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN | StatusCode::TOO_MANY_REQUESTS
+    ) && matches!(
+        error.error_code.as_deref(),
+        Some("trae_4001" | "trae_4023" | "trae_1005")
+    )
+}
+
+async fn check_stream_start(response: reqwest::Response) -> Result<reqwest::Response, ProxyError> {
+    use futures_util::StreamExt;
+    let status = response.status();
+    let headers = response.headers().clone();
+    let mut upstream = response.bytes_stream();
+    let mut parser = super::protocol::SseParser::default();
+    let mut buffered = Vec::new();
+    let mut size = 0;
+    while let Some(chunk) = upstream.next().await {
+        let chunk = chunk.map_err(ProxyError::upstream)?;
+        size += chunk.len();
+        let frames = parser.push(&chunk);
+        buffered.push(chunk);
+        let mut output_started = false;
+        for (event, data) in frames {
+            if let Some(error) = stream_error(&event, &data, &headers) {
+                if !output_started {
+                    return Err(error);
+                }
+                break;
+            }
+            if !matches!(
+                event.as_str(),
+                "metadata" | "request_wait_in_queue" | "progress_notice"
+            ) {
+                output_started = true;
+            }
+        }
+        // Keep only a bounded prelude; once output starts the original stream is never replayed.
+        if output_started || size >= 64 * 1024 {
+            break;
+        }
+    }
+    let body = reqwest::Body::wrap_stream(
+        futures_util::stream::iter(buffered.into_iter().map(Ok::<_, reqwest::Error>))
+            .chain(upstream),
+    );
+    let mut replay = axum::http::Response::new(body);
+    *replay.status_mut() = status;
+    *replay.headers_mut() = headers;
+    Ok(replay.into())
 }
 
 pub(super) async fn route(
@@ -861,102 +1085,159 @@ pub(super) async fn route(
     let streaming = body["stream"].as_bool().unwrap_or(false);
     let tools_allowed = body["tool_choice"] != "none";
     super::strip_response_metadata(&mut body);
-    let request = prepare(&body, model, &metadata)?;
-    #[cfg(test)]
-    let request = {
-        let mut request = request;
-        if std::env::var("ECHOBIRD_LIVE_TRAE_PHYSICAL_MODEL").as_deref() == Ok("1")
-            && matches!(model, "doubao-for-auto" | "glm-5" | "DeepSeek-V4-Flash")
-        {
-            request["model"] = json!(format!("{model}__dev"));
-        }
-        if std::env::var("ECHOBIRD_LIVE_TRAE_REQUEST_CONTEXT").as_deref() == Ok("1") {
-            let context = uuid::Uuid::new_v4().to_string();
-            request["request_id"] = json!(context);
-            request["session_id"] = json!(context);
-        }
-        if let Ok(function) = std::env::var("ECHOBIRD_LIVE_TRAE_FUNCTION") {
-            if matches!(
-                function.as_str(),
-                "solo_work_lite" | "solo_coder" | "chat_v3" | "inline_chat"
-            ) {
-                request["function"] = json!(function);
+    let session_id = uuid::Uuid::new_v4().to_string();
+    let mut last_error = None;
+    let alternatives = metadata.len() > 1;
+    for choice in &metadata {
+        let mut request = match prepare(&body, model, choice) {
+            Ok(request) => request,
+            Err(error) => {
+                last_error = Some(error);
+                continue;
             }
-        }
-        if let Some(limit) = std::env::var("ECHOBIRD_LIVE_TRAE_MAX_TOKENS")
-            .ok()
-            .and_then(|value| value.parse::<u64>().ok())
-            .filter(|value| (1..=32).contains(value))
-        {
-            request["max_tokens"] = json!(limit);
-        }
-        request
-    };
-    #[cfg(test)]
-    if stream_diagnostics_enabled() {
-        eprintln!(
+        };
+        request["session_id"] = json!(session_id);
+        request["request_id"] = json!(uuid::Uuid::new_v4().to_string());
+        #[cfg(test)]
+        let request = {
+            let mut request = request;
+            if std::env::var("ECHOBIRD_LIVE_TRAE_PHYSICAL_MODEL").as_deref() == Ok("1")
+                && matches!(model, "doubao-for-auto" | "glm-5" | "DeepSeek-V4-Flash")
+            {
+                request["model"] = json!(format!("{model}__dev"));
+            }
+            if std::env::var("ECHOBIRD_LIVE_TRAE_REQUEST_CONTEXT").as_deref() == Ok("1") {
+                let context = uuid::Uuid::new_v4().to_string();
+                request["request_id"] = json!(context);
+                request["session_id"] = json!(context);
+            }
+            if let Ok(function) = std::env::var("ECHOBIRD_LIVE_TRAE_FUNCTION") {
+                if matches!(
+                    function.as_str(),
+                    "solo_work_lite" | "solo_coder" | "chat_v3" | "inline_chat"
+                ) {
+                    request["function"] = json!(function);
+                }
+            }
+            if let Some(limit) = std::env::var("ECHOBIRD_LIVE_TRAE_MAX_TOKENS")
+                .ok()
+                .and_then(|value| value.parse::<u64>().ok())
+                .filter(|value| (1..=32).contains(value))
+            {
+                request["max_tokens"] = json!(limit);
+            }
+            request
+        };
+        #[cfg(test)]
+        if stream_diagnostics_enabled() {
+            eprintln!(
             "Trae stream request model={model} function={} native_output_limit={:?} request_id_present={} session_id_present={}",
-            request["function"].as_str().unwrap_or_default(), metadata.max_tokens,
+            request["function"].as_str().unwrap_or_default(), choice.max_tokens,
             request.get("request_id").is_some(), request.get("session_id").is_some()
         );
-    }
-    #[cfg(test)]
-    let request_started = std::time::Instant::now();
-    let response = http_client()?
-        .post(format!("{base}{CHAT_PATH}"))
-        .headers(headers(&credentials, false)?)
-        .json(&request)
-        .send()
-        .await
-        .map_err(ProxyError::upstream)?;
-    let status = response.status();
-    #[cfg(test)]
-    if stream_diagnostics_enabled() {
-        let content_type = match response
+        }
+        #[cfg(test)]
+        let request_started = std::time::Instant::now();
+        let response = http_client()?
+            .post(format!("{base}{CHAT_PATH}"))
+            .headers(headers(&credentials, false)?)
+            .json(&request)
+            .send()
+            .await
+            .map_err(ProxyError::upstream)?;
+        let status = response.status();
+        #[cfg(test)]
+        if stream_diagnostics_enabled() {
+            let content_type = match response
+                .headers()
+                .get(header::CONTENT_TYPE)
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| value.split(';').next())
+            {
+                Some("text/event-stream") => "text/event-stream",
+                Some("application/json") => "application/json",
+                None => "missing",
+                _ => "other",
+            };
+            eprintln!(
+                "Trae stream headers status={} content_type={content_type} elapsed_ms={}",
+                status.as_u16(),
+                request_started.elapsed().as_millis()
+            );
+        }
+        if status.is_redirection() {
+            return Err(ProxyError::new(
+                StatusCode::BAD_GATEWAY,
+                "Trae account request returned an unexpected redirect",
+            ));
+        }
+        let is_json = response
             .headers()
             .get(header::CONTENT_TYPE)
             .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.split(';').next())
-        {
-            Some("text/event-stream") => "text/event-stream",
-            Some("application/json") => "application/json",
-            None => "missing",
-            _ => "other",
-        };
-        eprintln!(
-            "Trae stream headers status={} content_type={content_type} elapsed_ms={}",
-            status.as_u16(),
-            request_started.elapsed().as_millis()
-        );
-    }
-    if status.is_redirection() {
-        return Err(ProxyError::new(
-            StatusCode::BAD_GATEWAY,
-            "Trae account request returned an unexpected redirect",
-        ));
-    }
-    if !status.is_success() {
-        let response_headers = response.headers().clone();
-        let value = response.json::<Value>().await.unwrap_or(Value::Null);
-        let mut error = if value["code"].is_u64()
-            && !matches!(status, StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN)
-        {
-            failure("error", &value, &response_headers)
-                .unwrap_or_else(|| ProxyError::new(status, "Trae account request failed"))
+            .is_some_and(|value| value.contains("application/json"));
+        if !status.is_success() || is_json {
+            let response_headers = response.headers().clone();
+            let value = response.json::<Value>().await.unwrap_or(Value::Null);
+            let mut error = if matches!(
+                status,
+                StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN | StatusCode::TOO_MANY_REQUESTS
+            ) {
+                ProxyError::new(status, "Trae account request failed")
+            } else {
+                failure("", &value, &response_headers).unwrap_or_else(|| {
+                    ProxyError::new(
+                        if status.is_success() {
+                            StatusCode::BAD_GATEWAY
+                        } else {
+                            status
+                        },
+                        "Trae account request failed",
+                    )
+                })
+            };
+            error.retry_after = response_headers.get(header::RETRY_AFTER).cloned();
+            if retry_function(&error) {
+                last_error = Some(error);
+                continue;
+            }
+            return Err(error);
+        }
+        let response = if alternatives {
+            match check_stream_start(response).await {
+                Ok(response) => response,
+                Err(error) if retry_function(&error) => {
+                    last_error = Some(error);
+                    continue;
+                }
+                Err(error) => return Err(error),
+            }
         } else {
-            ProxyError::new(status, "Trae account request failed")
+            response
         };
-        error.retry_after = response_headers.get(header::RETRY_AFTER).cloned();
-        return Err(error);
+        if let Ok(mut saved) = cache().lock() {
+            if let Some(choices) = saved
+                .get_mut(&key)
+                .and_then(|catalog| catalog.get_mut(model))
+            {
+                if let Some(index) = choices
+                    .iter()
+                    .position(|model| model.function == choice.function)
+                {
+                    choices.swap(0, index);
+                }
+            }
+        }
+        return providers::converted(
+            response,
+            WireProtocol::Trae,
+            model,
+            streaming,
+            tools_allowed,
+        )
+        .await;
     }
-    providers::converted(
-        response,
-        WireProtocol::Trae,
-        model,
-        streaming,
-        tools_allowed,
-    )
-    .await
+    Err(last_error.unwrap_or_else(|| unsupported("the requested model")))
 }
 
 #[cfg(test)]
@@ -997,6 +1278,7 @@ mod tests {
     fn metadata() -> Model {
         Model {
             function: "solo_work_remote".into(),
+            model_name: None,
             max_tokens: Some(32000),
             multimodal: false,
             reasoning: vec!["high".into()],
@@ -1359,7 +1641,6 @@ mod tests {
             ("tool_choice", json!("required")),
             ("response_format", json!({"type":"json_object"})),
             ("max_tokens", json!(128)),
-            ("reasoning_effort", json!("low")),
         ] {
             let mut body = json!({"messages":[]});
             body[name] = value;
@@ -1483,7 +1764,7 @@ mod tests {
             assert!(error.message.contains("redirect"));
             cache().lock().unwrap().insert(
                 key(AccountProvider::Trae, &credentials, &base).unwrap(),
-                BTreeMap::from([("test-model".into(), metadata())]),
+                BTreeMap::from([("test-model".into(), vec![metadata()])]),
             );
             let error = route(
                 AccountProvider::Trae,
@@ -1534,7 +1815,7 @@ mod tests {
                 .iter()
                 .filter(|capture| capture.0 == MODEL_PATH)
                 .count(),
-            4
+            CHAT_FUNCTIONS.len()
         );
         let mut other = first.clone();
         other["userId"] = json!("other-account");
@@ -1565,12 +1846,12 @@ mod tests {
                 .iter()
                 .filter(|request| request.0 == MODEL_PATH)
                 .count(),
-            13
+            CHAT_FUNCTIONS.len() * 3
         );
         let serialized = serde_json::to_string(&*cache().lock().unwrap()).unwrap();
         let restored: Catalogs = serde_json::from_str(&serialized).unwrap();
         assert_eq!(
-            restored[&first_key]["test-model"].function,
+            restored[&first_key]["test-model"][0].function,
             "solo_work_remote"
         );
     }
@@ -1597,7 +1878,7 @@ mod tests {
             let key = key(provider, &credentials, &base).unwrap();
             let mut saved = cache().lock().unwrap().get(&key).unwrap().clone();
             for id in INTERNAL_FIXTURE_IDS {
-                saved.insert((*id).into(), metadata());
+                saved.insert((*id).into(), vec![metadata()]);
             }
             let restored: Catalog =
                 serde_json::from_str(&serde_json::to_string(&saved).unwrap()).unwrap();

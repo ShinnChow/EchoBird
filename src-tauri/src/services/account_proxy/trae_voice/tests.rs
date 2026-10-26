@@ -1,7 +1,7 @@
 use super::*;
 use axum::{http::HeaderMap, routing::post, Json, Router};
 use std::sync::{Arc, Mutex};
-use tokio_tungstenite::tungstenite::handshake::server::{Request, Response};
+use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
 
 #[derive(Default)]
 struct Record {
@@ -46,13 +46,25 @@ async fn server(mode: &'static str) -> Server {
     let ws_task = tokio::spawn(async move {
         let (tcp, _) = ws_listener.accept().await.unwrap();
         let captured = observed.clone();
-        let mut socket =
+        let socket =
             tokio_tungstenite::accept_hdr_async(tcp, move |req: &Request, res: Response| {
                 captured.lock().unwrap().uri = req.uri().to_string();
+                if mode == "ws401" || mode == "ws429" {
+                    let mut error = ErrorResponse::new(Some("private speech grant".into()));
+                    *error.status_mut() = if mode == "ws401" {
+                        StatusCode::UNAUTHORIZED
+                    } else {
+                        StatusCode::TOO_MANY_REQUESTS
+                    };
+                    error
+                        .headers_mut()
+                        .insert("retry-after", "7".parse().unwrap());
+                    return Err(error);
+                }
                 Ok(res)
             })
-            .await
-            .unwrap();
+            .await;
+        let Ok(mut socket) = socket else { return };
         while let Some(Ok(message)) = socket.next().await {
             let Message::Binary(bytes) = message else {
                 break;
@@ -119,6 +131,63 @@ fn wav() -> Bytes {
 
 fn credentials(server: &Server) -> Value {
     json!({"edition":"traecn","region":"CN","accessToken":"selected-account-token","baseUrl":"https://untrusted.invalid","_voice_test_endpoint":server.http,"_voice_test_ws_endpoint":server.ws})
+}
+
+#[tokio::test]
+async fn trae_compatibility_websocket_auth_status_reaches_the_refresh_path() {
+    for (mode, expected) in [
+        ("ws401", StatusCode::UNAUTHORIZED),
+        ("ws429", StatusCode::TOO_MANY_REQUESTS),
+    ] {
+        let server = server(mode).await;
+        let error = transcribe(
+            &reqwest::Client::new(),
+            &credentials(&server),
+            &wav(),
+            "speech.wav",
+            "audio/wav",
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.status, expected);
+        assert_eq!(error.retry_after.unwrap(), "7");
+        assert!(!error.message.contains("private speech grant"));
+    }
+}
+
+#[tokio::test]
+async fn cn_speech_refreshes_once_after_rejected_connection_and_returns_the_complete_result() {
+    use super::super::voice::{transcribe_with, SpeechRequest};
+    let expired = server("ws401").await;
+    let refreshed = server("ok").await;
+    let initial = credentials(&expired);
+    let renewed = credentials(&refreshed);
+    let mut calls = Vec::new();
+    let selector = format!("traecn:{}", "a".repeat(64));
+    let audio = wav();
+    let result = transcribe_with(
+        &reqwest::Client::new(),
+        SpeechRequest {
+            selector: &selector,
+            audio: &audio,
+            filename: "speech.wav",
+            mime: "audio/wav",
+        },
+        |rejected| {
+            calls.push(rejected.is_some());
+            std::future::ready(Ok(if rejected.is_some() {
+                renewed.clone()
+            } else {
+                initial.clone()
+            }))
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(calls, [false, true]);
+    assert_eq!(result, "最终全文。");
+    assert_eq!(expired.record.lock().unwrap().grants.len(), 1);
+    assert_eq!(refreshed.record.lock().unwrap().grants.len(), 1);
 }
 
 #[tokio::test]

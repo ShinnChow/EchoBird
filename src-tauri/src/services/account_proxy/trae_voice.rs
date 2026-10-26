@@ -8,6 +8,15 @@ use tokio_tungstenite::tungstenite::{Error, Message};
 const BASE: &str = "https://api.trae.com.cn";
 const SPEECH_URL: &str = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel";
 
+pub(super) fn validate_audio(audio: &Bytes, mime: &str) -> Result<(), ProxyError> {
+    if !matches!(mime, "audio/wav" | "audio/x-wav") {
+        return Err(invalid_audio());
+    }
+    claude_voice::pcm(audio)
+        .map(|_| ())
+        .map_err(|_| invalid_audio())
+}
+
 pub(crate) async fn transcribe(
     client: &reqwest::Client,
     credentials: &Value,
@@ -18,9 +27,7 @@ pub(crate) async fn transcribe(
     if credentials["edition"] != "traecn" || credentials["region"] != "CN" {
         return Err(login_required());
     }
-    if !matches!(mime, "audio/wav" | "audio/x-wav") {
-        return Err(invalid_audio());
-    }
+    validate_audio(audio, mime)?;
     let pcm = claude_voice::pcm(audio).map_err(|_| invalid_audio())?;
     tokio::time::timeout(
         super::voice::media_timeout(pcm.len()),
@@ -144,7 +151,7 @@ async fn recognize(
         #[cfg(test)]
         trace_ws_error(&error);
         match error {
-            Error::Http(response) if response.status() == StatusCode::TOO_MANY_REQUESTS => {
+            Error::Http(response) => {
                 let mut error = ProxyError::new(response.status(), "TRAE speech connection failed");
                 error.retry_after = response.headers().get("retry-after").cloned();
                 error

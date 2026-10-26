@@ -3,6 +3,33 @@ use axum::{extract::State, http::HeaderMap, routing::post, Json, Router};
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 
+#[tokio::test]
+async fn trae_compatibility_invalid_cn_audio_does_not_load_or_refresh_credentials() {
+    let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let observed = calls.clone();
+    let selector = format!("traecn:{}", "a".repeat(64));
+    let audio = Bytes::from_static(b"not a wave file");
+    let error = transcribe_with(
+        &reqwest::Client::new(),
+        SpeechRequest {
+            selector: &selector,
+            audio: &audio,
+            filename: "speech.wav",
+            mime: "audio/wav",
+        },
+        move |_| {
+            observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            std::future::ready(Ok(
+                json!({"edition":"traecn","region":"CN","accessToken":"fixture"}),
+            ))
+        },
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.status, StatusCode::BAD_REQUEST);
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+}
+
 #[test]
 fn paced_sources_keep_a_server_budget_after_replaying_the_longest_recording() {
     let longest_wav = 44 + 60 * 32_000;
