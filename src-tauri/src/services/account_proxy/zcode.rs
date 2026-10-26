@@ -5,6 +5,7 @@ use std::{
 
 use axum::{http::StatusCode, response::Response};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 
 use super::{protocol, providers, ProxyError};
 use crate::models::model::AccountProvider;
@@ -12,6 +13,68 @@ use crate::models::model::AccountProvider;
 const ORIGIN: &str = "https://zcode.z.ai";
 const APP_VERSION: &str = "3.14.3";
 const START_MODELS: [&str; 3] = ["GLM-5.3-Flash", "GLM-5.2", "GLM-5-Turbo"];
+const SESSION_HINT: &str = "_echobird_zcode_session";
+
+pub(crate) fn bind_session(body: &mut Value, headers: &axum::http::HeaderMap) {
+    let session = [
+        "x-session-id",
+        "x-session-affinity",
+        "conversation-id",
+        "x-opencode-session-id",
+        "x-opencode-session",
+    ]
+    .iter()
+    .find_map(|name| {
+        headers
+            .get(*name)
+            .and_then(|value| value.to_str().ok())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+    });
+    if let (Some(body), Some(session)) = (body.as_object_mut(), session) {
+        body.insert(SESSION_HINT.into(), json!(session));
+    }
+}
+
+fn session_id(credentials: &Value, body: &Value) -> Result<String, ProxyError> {
+    let original = body.get(super::tools::RESPONSES_REQUEST).unwrap_or(body);
+    let signal = [
+        &body[SESSION_HINT],
+        &original[SESSION_HINT],
+        &body["metadata"]["session_id"],
+        &original["metadata"]["session_id"],
+        &body["session_id"],
+        &original["session_id"],
+        &body["conversation_id"],
+        &original["conversation_id"],
+        &body["prompt_cache_key"],
+        &original["prompt_cache_key"],
+    ]
+    .into_iter()
+    .find_map(|value| {
+        value
+            .as_str()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+    });
+    if let Some(id) = signal.and_then(|id| uuid::Uuid::parse_str(id).ok()) {
+        return Ok(id.to_string());
+    }
+    let mut hash = Sha256::new();
+    hash.update(b"echobird/zcode/session\0");
+    if let Some(signal) = signal {
+        hash.update(b"conversation\0");
+        hash.update(signal);
+    } else {
+        hash.update(b"device\0");
+        hash.update(device(credentials)?);
+    }
+    let mut bytes = [0u8; 16];
+    bytes.copy_from_slice(&hash.finalize()[..16]);
+    bytes[6] = (bytes[6] & 0x0f) | 0x80;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    Ok(uuid::Uuid::from_bytes(bytes).to_string())
+}
 
 fn platform() -> String {
     let os = if cfg!(target_os = "windows") {
@@ -252,7 +315,11 @@ async fn start_models(credentials: &Value, client: &reqwest::Client) -> Vec<Stri
     remote.unwrap_or_else(|| START_MODELS.iter().map(|id| (*id).to_string()).collect())
 }
 
-fn prepare_request(request: &mut Value, credentials: &Value) -> Result<(), ProxyError> {
+fn prepare_request(
+    request: &mut Value,
+    credentials: &Value,
+    session: &str,
+) -> Result<(), ProxyError> {
     static PROMPT: OnceLock<Value> = OnceLock::new();
     let prompt = PROMPT.get_or_init(|| {
         serde_json::from_str(include_str!("zcode_prompt.json"))
@@ -368,7 +435,7 @@ fn prepare_request(request: &mut Value, credentials: &Value) -> Result<(), Proxy
             }
         }
     }
-    request["metadata"] = json!({"user_id": json!({"device_id":device(credentials)?,"account_uuid":"","session_id":""}).to_string()});
+    request["metadata"] = json!({"user_id": json!({"device_id":device(credentials)?,"account_uuid":"","session_id":session}).to_string()});
     Ok(())
 }
 
@@ -409,8 +476,9 @@ pub(super) async fn route(
         .find(|known| known.eq_ignore_ascii_case(model))
         .copied()
         .unwrap_or(model);
+    let session = session_id(&credentials, &body)?;
     let mut request = providers::anthropic_request(&body, model);
-    prepare_request(&mut request, &credentials)?;
+    prepare_request(&mut request, &credentials, &session)?;
     let platform = if cfg!(target_os = "windows") {
         "win32"
     } else if cfg!(target_os = "macos") {
@@ -453,6 +521,7 @@ pub(super) async fn route(
         .header("x-os-category", os)
         .header("x-os-version", os_version())
         .header("x-request-id", uuid::Uuid::new_v4().to_string())
+        .header("x-session-id", &session)
         .header("x-zcode-session-type", "main")
         .header("x-zcode-trace-id", uuid::Uuid::new_v4().to_string())
         .json(&request)
@@ -511,7 +580,72 @@ mod tests {
     #[derive(Clone, Default)]
     struct Seen(Arc<Mutex<Vec<(String, String, Value)>>>);
 
+    #[test]
+    fn session_keys_are_stable_distinct_and_preserve_headers_through_responses_conversion() {
+        let credentials = json!({"deviceMid":"fixture-device"});
+        let first =
+            super::session_id(&credentials, &json!({"metadata":{"session_id":"one"}})).unwrap();
+        assert_eq!(first,super::session_id(&credentials,&json!({"metadata":{"session_id":"one"},"messages":[{"role":"user","content":"another turn"}]})).unwrap());
+        assert_ne!(
+            first,
+            super::session_id(&credentials, &json!({"metadata":{"session_id":"two"}})).unwrap()
+        );
+        let missing = super::session_id(&credentials, &json!({})).unwrap();
+        assert_eq!(
+            missing,
+            super::session_id(
+                &credentials,
+                &json!({"messages":[{"role":"user","content":"new"}]})
+            )
+            .unwrap()
+        );
+        assert_ne!(
+            missing,
+            super::session_id(&json!({"deviceMid":"other-device"}), &json!({})).unwrap()
+        );
+        let uuid = "AABBCCDD-0123-4567-89AB-0123456789AB";
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert("x-session-id", uuid.parse().unwrap());
+        let mut body = json!({"input":"hello","metadata":{"session_id":"body-session"}});
+        super::bind_session(&mut body, &headers);
+        let chat = super::super::responses_to_chat(&body).unwrap();
+        assert_eq!(
+            super::session_id(&credentials, &chat).unwrap(),
+            uuid.to_lowercase()
+        );
+        assert_eq!(body["metadata"]["session_id"], "body-session");
+    }
+
+    #[tokio::test]
+    async fn protocol_regression_session_affinity_survives_followup_turns() {
+        let seen = Seen::default();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let app = Router::new()
+            .fallback(any(upstream))
+            .with_state(seen.clone());
+        let task = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let credentials =
+            json!({"baseUrl":base,"jwtToken":"fixture-jwt","deviceMid":"fixture-device"});
+        for text in ["hello", "follow up"] {
+            route(credentials.clone(),"glm-5.3-flash",json!({"metadata":{"session_id":"conversation-one"},"messages":[{"role":"user","content":text}]}), &reqwest::Client::new()).await.unwrap();
+        }
+        let requests = seen.0.lock().unwrap();
+        let first: Value =
+            serde_json::from_str(requests[0].2["metadata"]["user_id"].as_str().unwrap()).unwrap();
+        let second: Value =
+            serde_json::from_str(requests[1].2["metadata"]["user_id"].as_str().unwrap()).unwrap();
+        assert!(uuid::Uuid::parse_str(first["session_id"].as_str().unwrap()).is_ok());
+        assert_eq!(first["session_id"], second["session_id"]);
+        task.abort();
+    }
+
     async fn upstream(State(seen): State<Seen>, request: Request) -> axum::response::Response {
+        let session = request
+            .headers()
+            .get("x-session-id")
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_owned);
         let path = request.uri().path().to_string();
         let host = request.headers()[header::HOST]
             .to_str()
@@ -531,6 +665,12 @@ mod tests {
         }
         let body = to_bytes(request.into_body(), 1024 * 1024).await.unwrap();
         let body = serde_json::from_slice(&body).unwrap_or(Value::Null);
+        if path.ends_with("/anthropic/v1/messages") {
+            let identity: Value =
+                serde_json::from_str(body["metadata"]["user_id"].as_str().unwrap()).unwrap();
+            assert_eq!(identity["session_id"].as_str(), session.as_deref());
+            assert!(uuid::Uuid::parse_str(session.as_deref().unwrap()).is_ok());
+        }
         let message = body["messages"][1]["content"][0]["text"]
             .as_str()
             .unwrap_or_default()
@@ -560,7 +700,7 @@ mod tests {
         if message == "quota" {
             return super::super::json_response(&json!({"code":1005,"msg":"exceed quota limit"}));
         }
-        if message == "hello" {
+        if matches!(message.as_str(), "hello" | "follow up") {
             let events = [
                 json!({"type":"message_start","message":{"usage":{"input_tokens":1,"output_tokens":0}}}),
                 json!({"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"accepted"}}),

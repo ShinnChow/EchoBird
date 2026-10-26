@@ -1120,6 +1120,9 @@ async fn send_candidate(
         return Ok(response);
     }
     if let Some(source) = &candidate.account_source {
+        if source.provider == crate::models::model::AccountProvider::Zcode {
+            crate::services::account_proxy::bind_zcode_session(&mut body, headers);
+        }
         let credentials = match refreshed_credentials {
             Some(credentials) => credentials,
             None => {

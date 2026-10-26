@@ -10,7 +10,7 @@ use axum::{
 };
 use bytes::Bytes;
 use futures_util::StreamExt;
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -26,8 +26,8 @@ struct Decoder {
     calls: BTreeMap<String, Call>,
     indices: BTreeMap<u64, String>,
     allowed: Vec<String>,
-    text: String,
-    in_call: bool,
+    text: super::text_calls::TextCalls,
+    tools: Value,
     usage: Option<Value>,
     reason: String,
     started: bool,
@@ -48,8 +48,12 @@ impl Decoder {
                     .filter_map(|t| t["function"]["name"].as_str().map(str::to_string))
                     .collect()
             },
-            text: String::new(),
-            in_call: false,
+            text: super::text_calls::TextCalls::default(),
+            tools: if body["tool_choice"] == "none" {
+                json!([])
+            } else {
+                body["tools"].clone()
+            },
             usage: None,
             reason: "stop".into(),
             started: false,
@@ -178,49 +182,25 @@ impl Decoder {
         self.emit(json!({"tool_calls":[normalized]}))
     }
     fn feed_text(&mut self, text: &str) -> Result<Vec<Bytes>, ProxyError> {
-        const OPEN: &str = "<tool_call>";
-        const CLOSE: &str = "</tool_call>";
-        self.text.push_str(text);
+        self.feed_text_at(text, false)
+    }
+    fn feed_text_at(&mut self, text: &str, finish: bool) -> Result<Vec<Bytes>, ProxyError> {
         let mut out = vec![];
-        loop {
-            if self.in_call {
-                let Some(end) = self.text.find(CLOSE) else {
-                    break;
-                };
-                let call = self.text[..end].to_string();
-                self.text.drain(..end + CLOSE.len());
-                self.in_call = false;
-                let (name, args) = parse_call(&call)?;
-                let index = self.calls.len();
-                out.extend(self.native_call(&json!({"id":format!("call_{}",uuid::Uuid::new_v4().simple()),"index":(u64::MAX-index as u64),"type":"function","function":{"name":name,"arguments":args.to_string()}}))?);
-            } else if let Some(start) = self.text.find(OPEN) {
-                let text = self.text[..start].to_string();
-                self.text.drain(..start + OPEN.len());
-                self.in_call = true;
-                if !text.is_empty() {
-                    out.extend(self.emit(json!({"content":text}))?);
+        for part in self.text.feed(text, &self.tools, finish)? {
+            match part {
+                super::text_calls::Part::Text(text) => {
+                    out.extend(self.emit(json!({"content":text}))?)
                 }
-            } else {
-                let keep = (1..OPEN.len())
-                    .rev()
-                    .find(|n| self.text.ends_with(&OPEN[..*n]))
-                    .unwrap_or(0);
-                let text = self.text[..self.text.len() - keep].to_string();
-                self.text.drain(..self.text.len() - keep);
-                if !text.is_empty() {
-                    out.extend(self.emit(json!({"content":text}))?);
+                super::text_calls::Part::Call(name, args) => {
+                    let index = self.calls.len();
+                    out.extend(self.native_call(&json!({"id":format!("call_{}",uuid::Uuid::new_v4().simple()),"index":(u64::MAX-index as u64),"type":"function","function":{"name":name,"arguments":args.to_string()}}))?);
                 }
-                break;
             }
         }
         Ok(out)
     }
     fn complete(&mut self) -> Result<Vec<Bytes>, ProxyError> {
-        if self.in_call {
-            return Err(ProxyError::upstream(
-                "Qoder ended with an incomplete tool call",
-            ));
-        }
+        let mut out = self.feed_text_at("", true)?;
         for call in self.calls.values() {
             if call.name.is_empty()
                 || !serde_json::from_str::<Value>(&call.arguments).is_ok_and(|v| v.is_object())
@@ -232,11 +212,6 @@ impl Decoder {
         }
         if self.reason == "tool_calls" && self.calls.is_empty() {
             return Err(ProxyError::upstream("Qoder ended with missing tool calls"));
-        }
-        let mut out = vec![];
-        if !self.text.is_empty() {
-            let text = std::mem::take(&mut self.text);
-            out.extend(self.emit(json!({"content":text}))?);
         }
         if let Some(usage) = &self.usage {
             out.extend(
@@ -266,51 +241,6 @@ impl Decoder {
         );
         Ok(out)
     }
-}
-fn parse_call(text: &str) -> Result<(String, Value), ProxyError> {
-    if let Ok(v) = serde_json::from_str::<Value>(text) {
-        if let (Some(name), Some(args)) = (
-            v["name"].as_str().filter(|s| !s.is_empty()),
-            v.get("arguments").filter(|a| a.is_object()),
-        ) {
-            return Ok((name.into(), args.clone()));
-        }
-    }
-    let text = text.trim();
-    let after = text
-        .strip_prefix("<function=")
-        .ok_or_else(|| ProxyError::upstream("Invalid Qoder XML tool call"))?;
-    let (name, body) = after
-        .split_once('>')
-        .ok_or_else(|| ProxyError::upstream("Invalid Qoder tool name"))?;
-    let mut body = body
-        .strip_suffix("</function>")
-        .ok_or_else(|| ProxyError::upstream("Incomplete Qoder XML function"))?
-        .trim();
-    let mut args = Map::new();
-    while !body.is_empty() {
-        let rest = body
-            .strip_prefix("<parameter=")
-            .ok_or_else(|| ProxyError::upstream("Invalid Qoder XML parameter"))?;
-        let (key, rest) = rest
-            .split_once('>')
-            .ok_or_else(|| ProxyError::upstream("Invalid Qoder parameter name"))?;
-        let (value, rest) = rest
-            .split_once("</parameter>")
-            .ok_or_else(|| ProxyError::upstream("Incomplete Qoder parameter"))?;
-        if key.trim().is_empty() || args.contains_key(key.trim()) {
-            return Err(ProxyError::upstream("Invalid duplicate Qoder parameter"));
-        }
-        args.insert(
-            key.trim().into(),
-            serde_json::from_str(value.trim()).unwrap_or_else(|_| json!(value.trim())),
-        );
-        body = rest.trim();
-    }
-    if name.trim().is_empty() {
-        return Err(ProxyError::upstream("Empty Qoder tool name"));
-    }
-    Ok((name.trim().into(), Value::Object(args)))
 }
 pub(super) async fn convert(
     response: reqwest::Response,
@@ -393,6 +323,69 @@ mod tests {
     }
     fn tools() -> Value {
         json!({"tools":[{"type":"function","function":{"name":"read"}}]})
+    }
+    #[test]
+    fn protocol_regression_bare_calls_and_schema_strings() {
+        let request = json!({"tools":[{"type":"function","function":{"name":"read","parameters":{"type":"object","properties":{"path":{"type":"string"}}}}}]});
+        for (open, close) in [
+            ("<function=read><parameter=path>", "</parameter></function>"),
+            (
+                "<function_calls><invoke name=\"read\"><parameter name=\"path\">",
+                "</parameter></invoke></function_calls>",
+            ),
+            (
+                "<antml:function_calls><antml:invoke name=\"read\"><antml:parameter name=\"path\">",
+                "</antml:parameter></antml:invoke></antml:function_calls>",
+            ),
+            (
+                "<tool_call><function=read><parameter=path>",
+                "</parameter></function></tool_call>",
+            ),
+        ] {
+            let source = format!("开始{open}[1, 2]{close}结束");
+            for size in [1, 2, 3, 7, source.len()] {
+                let mut d = Decoder::new("model", &request);
+                let chars: Vec<_> = source.chars().collect();
+                for chunk in chars.chunks(size) {
+                    d.feed_text(&chunk.iter().collect::<String>()).unwrap();
+                }
+                d.complete().unwrap();
+                let result = d.chat.collected();
+                let message = &result["choices"][0]["message"];
+                assert_eq!(message["content"], "开始结束", "{size}: {source}");
+                assert_eq!(
+                    message["tool_calls"][0]["function"]["arguments"],
+                    r#"{"path":"[1, 2]"}"#
+                );
+                assert_eq!(result["choices"][0]["finish_reason"], "tool_calls");
+            }
+        }
+    }
+    #[test]
+    fn protocol_regression_text_examples_and_truncation() {
+        for source in [
+            "`<function=read><parameter=path>x</parameter></function>`",
+            "```xml\n<function_calls><invoke name=\"read\"></invoke></function_calls>\n```",
+            "<function=unknown><parameter=path>x</parameter></function>",
+        ] {
+            let mut d = Decoder::new("model", &tools());
+            for ch in source.chars() {
+                d.feed_text(&ch.to_string()).unwrap();
+            }
+            d.complete().unwrap();
+            let result = d.chat.collected();
+            assert_eq!(result["choices"][0]["message"]["content"], source);
+            assert!(result["choices"][0]["message"]["tool_calls"].is_null());
+        }
+        for source in [
+            "<function=read><parameter=path>x",
+            "<function_calls><invoke name=\"read\">",
+        ] {
+            let mut d = Decoder::new("model", &tools());
+            d.feed_text(source).unwrap();
+            assert!(d.complete().is_err());
+            assert!(!d.chat.finished);
+        }
     }
     #[test]
     fn native_parallel_fragments_keep_ids_and_usage_after_finish() {

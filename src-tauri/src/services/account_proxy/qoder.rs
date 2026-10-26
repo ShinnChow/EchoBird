@@ -1,5 +1,6 @@
 mod codec;
 mod stream;
+mod text_calls;
 
 use super::{protocol, stream_response, ProxyError};
 use crate::{models::model::AccountProvider, services::qoder_accounts::Edition};
@@ -426,7 +427,7 @@ fn prepare(body: &Value, model: &Value) -> Result<Value, ProxyError> {
     {
         return Err(unsupported("tool_choice"));
     }
-    let tools = match body.get("tools").filter(|v| !v.is_null()) {
+    let mut tools = match body.get("tools").filter(|v| !v.is_null()) {
         Some(value) => value
             .as_array()
             .cloned()
@@ -439,6 +440,14 @@ fn prepare(body: &Value, model: &Value) -> Result<Value, ProxyError> {
             || tool["function"]["strict"] == true
         {
             return Err(unsupported("tools"));
+        }
+    }
+    for tool in &mut tools {
+        if let Some(parameters) = tool
+            .get_mut("function")
+            .and_then(|function| function.get_mut("parameters"))
+        {
+            super::tools::type_object_unions(parameters);
         }
     }
     let mut system=vec!["You are a Qoder agent. Use the instructions below and the tools available to you to assist the user.".to_string()];
@@ -662,6 +671,16 @@ fn failure(status: StatusCode, headers: &HeaderMap, value: &Value) -> ProxyError
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn protocol_regression_object_unions_keep_their_contract() {
+        let schema = json!({"type":"object","properties":{"choice":{"$ref":"#/$defs/Choice"}},"$defs":{"Choice":{"oneOf":[{"type":"object","properties":{"a":{"type":"string"}}},{"type":"object","properties":{"b":{"type":"number"}}}]}},"examples":[{"oneOf":[{"type":"object"}]}]});
+        let original = json!({"messages":[{"role":"user","content":"hello"}],"tools":[{"type":"function","function":{"name":"read","parameters":schema}}]});
+        let prepared = prepare(&original, &json!({})).unwrap();
+        let actual = &prepared["tools"][0]["function"]["parameters"];
+        assert_eq!(actual["$defs"]["Choice"]["type"], "object");
+        assert_eq!(actual["examples"], schema["examples"]);
+        assert_eq!(original["tools"][0]["function"]["parameters"], schema);
+    }
     use axum::body::Body;
     use axum::{
         extract::{Request, State},

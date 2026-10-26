@@ -27,6 +27,20 @@ struct Device {
     interval: Duration,
 }
 
+enum FormFailure {
+    Transport,
+    Response(reqwest::StatusCode),
+}
+impl From<FormFailure> for String {
+    fn from(error: FormFailure) -> Self {
+        match error {
+            FormFailure::Transport => "accountError.network",
+            FormFailure::Response(_) => "accountError.authResponse",
+        }
+        .into()
+    }
+}
+
 pub(super) fn client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
@@ -39,19 +53,19 @@ async fn form(
     client: &reqwest::Client,
     url: &str,
     fields: &[(&str, &str)],
-) -> Result<(reqwest::StatusCode, Value), String> {
+) -> Result<(reqwest::StatusCode, Value), FormFailure> {
     let response = client
         .post(url)
         .form(fields)
         .header("accept", "application/json")
         .send()
         .await
-        .map_err(|_| "accountError.network")?;
+        .map_err(|_| FormFailure::Transport)?;
     let status = response.status();
     let body = response
         .json()
         .await
-        .map_err(|_| "accountError.authResponse")?;
+        .map_err(|_| FormFailure::Response(status))?;
     Ok((status, body))
 }
 
@@ -262,10 +276,12 @@ async fn poll_device(
     host: &str,
     mut device: Device,
 ) -> Result<Credentials, String> {
+    let mut failures = 0;
+    let mut delay = device.interval;
     loop {
-        tokio::time::sleep(device.interval).await;
+        tokio::time::sleep(delay).await;
         validate(attempt)?;
-        let (status, body) = form(
+        let response = form(
             client,
             &format!("{host}/oauth2/token"),
             &[
@@ -282,12 +298,55 @@ async fn poll_device(
                 ("code_verifier", &device.verifier),
             ],
         )
-        .await?;
+        .await;
+        let retry_status = |status: reqwest::StatusCode| {
+            matches!(status.as_u16(), 408 | 429) || status.is_server_error()
+        };
+        let transient = match &response {
+            Err(FormFailure::Transport) => true,
+            Err(FormFailure::Response(status)) => {
+                status.is_success()
+                    || *status == reqwest::StatusCode::BAD_REQUEST
+                    || retry_status(*status)
+            }
+            Ok((status, body)) => {
+                retry_status(*status)
+                    && !matches!(
+                        text(body, "error").or_else(|| text(body, "status")),
+                        Some(
+                            "invalid_grant"
+                                | "access_denied"
+                                | "denied"
+                                | "expired_token"
+                                | "expired"
+                                | "invalid_client"
+                                | "unauthorized_client"
+                        )
+                    )
+            }
+        };
+        if transient {
+            failures += 1;
+            if failures > 3 {
+                return Err("accountError.network".into());
+            }
+            delay = device
+                .interval
+                .max(Duration::from_millis(250))
+                .saturating_mul(1 << failures)
+                .min(Duration::from_secs(30))
+                .max(device.interval);
+            continue;
+        }
+        failures = 0;
+        delay = device.interval;
+        let (status, body) = response.map_err(String::from)?;
         let state = text(&body, "error").or_else(|| text(&body, "status"));
         match state {
             Some("authorization_pending" | "pending") => continue,
             Some("slow_down") => {
                 device.interval += Duration::from_secs(5);
+                delay = device.interval;
                 continue;
             }
             Some("expired" | "expired_token") => return Err("accountError.expired".into()),

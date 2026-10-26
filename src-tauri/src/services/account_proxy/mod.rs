@@ -44,6 +44,7 @@ use serde_json::{json, Value};
 use crate::models::model::AccountProvider;
 
 pub(crate) use codearts::signed_headers as codearts_signed_headers;
+pub(crate) use zcode::bind_session as bind_zcode_session;
 
 pub(crate) fn connection_base(
     provider: AccountProvider,

@@ -1178,6 +1178,9 @@ async fn wire(
             "/v1internal:streamGenerateContent?alt=sse",
         ));
     }
+    if provider == AccountProvider::WorkBuddy && model.to_ascii_lowercase().starts_with("claude-") {
+        return Ok((WireProtocol::Anthropic, "/v1/messages"));
+    }
     if provider != AccountProvider::Copilot {
         return Ok((
             WireProtocol::Chat,
@@ -1335,6 +1338,22 @@ pub(super) async fn route(
     client: &reqwest::Client,
 ) -> Result<Response, ProxyError> {
     let streaming = body["stream"].as_bool().unwrap_or(false);
+    if matches!(
+        provider,
+        AccountProvider::WorkBuddy | AccountProvider::WorkBuddyAi
+    ) {
+        workbuddy_tool_choice(&mut body)?;
+        if let Some(tools) = body.get_mut("tools").and_then(Value::as_array_mut) {
+            for tool in tools {
+                if let Some(parameters) = tool
+                    .get_mut("function")
+                    .and_then(|function| function.get_mut("parameters"))
+                {
+                    super::tools::type_object_unions(parameters);
+                }
+            }
+        }
+    }
     let (protocol, path) = wire(provider, &credentials, model, client).await?;
     if matches!(protocol, WireProtocol::CodeAssist | WireProtocol::Anthropic) {
         protocol::reject_structured_output(&body)?;
@@ -1349,7 +1368,7 @@ pub(super) async fn route(
         }
         WireProtocol::Anthropic => {
             let mut request = anthropic_request(&body, model);
-            if provider == AccountProvider::Kimi {
+            if matches!(provider, AccountProvider::Kimi | AccountProvider::WorkBuddy) {
                 if let Some(effort) = body["reasoning_effort"].as_str() {
                     if effort == "none" {
                         request["thinking"] = json!({"type":"disabled"});
@@ -1357,6 +1376,26 @@ pub(super) async fn route(
                         request["thinking"] = json!({"type":"adaptive"});
                         request["output_config"] = json!({"effort":effort});
                     }
+                }
+            }
+            if provider == AccountProvider::WorkBuddy {
+                if let Some(cap) = body
+                    .get("max_completion_tokens")
+                    .filter(|cap| !cap.is_null())
+                {
+                    request["max_tokens"] = cap.clone();
+                }
+                for key in ["temperature", "top_p"] {
+                    if let Some(value) = body.get(key) {
+                        request[key] = value.clone();
+                    }
+                }
+                if let Some(stop) = body.get("stop").filter(|value| !value.is_null()) {
+                    request["stop_sequences"] = if stop.is_string() {
+                        json!([stop])
+                    } else {
+                        stop.clone()
+                    };
                 }
             }
             request
@@ -1369,7 +1408,6 @@ pub(super) async fn route(
                 provider,
                 AccountProvider::WorkBuddy | AccountProvider::WorkBuddyAi
             ) {
-                workbuddy_tool_choice(&mut body)?;
                 if let Some(messages) = body["messages"].as_array_mut() {
                     if messages
                         .first()
@@ -2592,6 +2630,9 @@ mod tests {
         if path == "/v2/chat/completions" {
             return stream_response(Body::from("data: {\"choices\":[{\"delta\":{\"content\":\"ok\"},\"finish_reason\":null}]}\n\ndata: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"));
         }
+        if path == "/v1/messages" {
+            return stream_response(Body::from("event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_fixture\",\"role\":\"assistant\",\"usage\":{\"input_tokens\":1,\"output_tokens\":0}}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ok\"}}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":1}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"));
+        }
         let mut response = json_response(
             &json!({"error":{"message":"account quota","code":"rate_limit_exceeded","type":"rate_limit_error","scope":"model"}}),
         );
@@ -2848,6 +2889,108 @@ mod tests {
         assert_eq!(recorded[1].1["x-domain"], "fixture-domain");
         assert_eq!(recorded[1].2["messages"][0]["role"], "system");
         assert_eq!(recorded[1].2["messages"][1]["content"], "hello");
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn protocol_regression_workbuddy_claude_uses_messages_and_effort() {
+        let (base, requests, server) = fixture().await;
+        let client = reqwest::Client::new();
+        let credentials = json!({"accessToken":"fixture","uid":"own-uid","baseUrl":base});
+        for (provider, model, effort) in [
+            (AccountProvider::WorkBuddy, "claude-sonnet-test", "max"),
+            (AccountProvider::WorkBuddy, "claude-sonnet-test", "none"),
+            (AccountProvider::WorkBuddyAi, "claude-sonnet-test", "max"),
+            (AccountProvider::WorkBuddy, "kimi-test", "max"),
+        ] {
+            let response = route(
+                provider,
+                credentials.clone(),
+                model,
+                json!({"messages":[{"role":"user","content":"hello"}],"reasoning_effort":effort}),
+                &client,
+            )
+            .await
+            .unwrap();
+            let output: Value = serde_json::from_slice(
+                &axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                    .await
+                    .unwrap(),
+            )
+            .unwrap();
+            assert_eq!(output["choices"][0]["message"]["content"], "ok");
+        }
+        let calls = requests.lock().await;
+        assert_eq!(calls[0].0, "/v1/messages");
+        assert_eq!(calls[0].2["thinking"]["type"], "adaptive");
+        assert_eq!(calls[0].2["output_config"]["effort"], "max");
+        assert_eq!(calls[0].1["x-user-id"], "own-uid");
+        assert_eq!(calls[0].1["anthropic-version"], "2023-06-01");
+        assert_eq!(calls[1].2["thinking"]["type"], "disabled");
+        for call in &calls[2..] {
+            assert_eq!(call.0, "/v2/chat/completions");
+        }
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn protocol_regression_workbuddy_object_unions() {
+        let (base, requests, server) = fixture().await;
+        let client = reqwest::Client::new();
+        let schema = json!({"type":"object","properties":{"choice":{"oneOf":[{"type":"object"},{"type":"object"}]}},"default":{"oneOf":[{"type":"object"}]}});
+        for provider in [AccountProvider::WorkBuddy, AccountProvider::WorkBuddyAi] {
+            route(provider, json!({"accessToken":"fixture","uid":"fixture","baseUrl":base}), "kimi-test", json!({"messages":[{"role":"user","content":"hello"}],"tools":[{"type":"function","function":{"name":"read","parameters":schema}}]}), &client).await.unwrap();
+        }
+        for call in requests.lock().await.iter() {
+            let actual = &call.2["tools"][0]["function"]["parameters"];
+            assert_eq!(actual["properties"]["choice"]["type"], "object");
+            assert_eq!(actual["default"], schema["default"]);
+        }
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn protocol_regression_workbuddy_messages_preserve_tools_history_and_controls() {
+        let (base, requests, server) = fixture().await;
+        let client = reqwest::Client::new();
+        let schema = json!({"type":"object","properties":{"choice":{"oneOf":[{"type":"object"},{"type":"object"}]}}});
+        let body = json!({"messages":[{"role":"system","content":"Original instructions"},{"role":"assistant","content":null,"tool_calls":[{"id":"previous","type":"function","function":{"name":"read","arguments":"{}"}}]},{"role":"tool","tool_call_id":"previous","content":"previous result"}],"tools":[{"type":"function","function":{"name":"read","parameters":schema}}],"tool_choice":{"type":"function","function":{"name":"read"}},"max_completion_tokens":4096,"temperature":0.2,"top_p":0.8,"stop":["STOP"],"parallel_tool_calls":false});
+        route(
+            AccountProvider::WorkBuddy,
+            json!({"accessToken":"fixture","uid":"fixture","baseUrl":base}),
+            "claude-sonnet-test",
+            body.clone(),
+            &client,
+        )
+        .await
+        .unwrap();
+        let calls = requests.lock().await;
+        assert_eq!(calls.len(), 1);
+        let actual = &calls[0].2;
+        assert_eq!(actual["system"], "Original instructions");
+        assert_eq!(actual["messages"][0]["content"][0]["id"], "previous");
+        assert_eq!(
+            actual["messages"][1]["content"][0]["tool_use_id"],
+            "previous"
+        );
+        assert_eq!(
+            actual["messages"][1]["content"][0]["content"],
+            "previous result"
+        );
+        assert_eq!(
+            actual["tool_choice"],
+            json!({"type":"any","disable_parallel_tool_use":true})
+        );
+        assert_eq!(
+            actual["tools"][0]["input_schema"]["properties"]["choice"]["type"],
+            "object"
+        );
+        for key in ["temperature", "top_p"] {
+            assert_eq!(actual[key], body[key]);
+        }
+        assert_eq!(actual["max_tokens"], 4096);
+        assert_eq!(actual["stop_sequences"], body["stop"]);
+        assert_eq!(body["tools"][0]["function"]["parameters"], schema);
         server.abort();
     }
 

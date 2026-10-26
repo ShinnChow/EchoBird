@@ -4,6 +4,130 @@ use serde_json::json;
 use std::sync::atomic::{AtomicUsize, Ordering};
 static TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
+fn poll_attempt() -> Attempt {
+    Attempt {
+        id: "fixture".into(),
+        region: Region::Cn,
+        expires: chrono::Utc::now().timestamp() + 15,
+        cancel: CancellationToken::new(),
+        outcome: Mutex::new(None),
+    }
+}
+fn poll_fixture_device() -> Device {
+    Device {
+        verifier: "fixture".into(),
+        code: "fixture".into(),
+        by_user: false,
+        interval: Duration::from_millis(1),
+    }
+}
+
+#[tokio::test]
+async fn protocol_regression_device_poll_recovers_from_transient_http_failures() {
+    for (status, malformed) in [
+        (408, false),
+        (429, false),
+        (503, false),
+        (503, true),
+        (200, true),
+    ] {
+        let count = Arc::new(AtomicUsize::new(0));
+        let seen = count.clone();
+        let server = MockServer::start(move |_| { let seen=seen.clone(); async move {
+            if seen.fetch_add(1, Ordering::SeqCst)==0 {
+                if malformed { axum::response::Response::builder().status(status).body(axum::body::Body::from("{broken")).unwrap() }
+                else { json(status,json!({"error":"temporarily_unavailable"})) }
+            }
+            else { json(200,json!({"access_token":jwt("user","new"),"refresh_token":"new","expires_in":3600})) }
+        }}).await;
+        let result = tokio::time::timeout(
+            Duration::from_secs(8),
+            poll_device(
+                &client().unwrap(),
+                &poll_attempt(),
+                &server.url,
+                poll_fixture_device(),
+            ),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(result.user_id, "user");
+        assert_eq!(count.load(Ordering::SeqCst), 2);
+    }
+}
+
+#[tokio::test]
+async fn protocol_regression_device_poll_bounds_retries_and_keeps_permanent_errors_terminal() {
+    for (status, error, expected) in [
+        (503, "temporarily_unavailable", 4),
+        (401, "invalid_client", 1),
+        (503, "invalid_grant", 1),
+        (200, "access_denied", 1),
+    ] {
+        let count = Arc::new(AtomicUsize::new(0));
+        let seen = count.clone();
+        let server = MockServer::start(move |_| {
+            let seen = seen.clone();
+            async move {
+                seen.fetch_add(1, Ordering::SeqCst);
+                json(status, json!({"error":error}))
+            }
+        })
+        .await;
+        assert!(tokio::time::timeout(
+            Duration::from_secs(8),
+            poll_device(
+                &client().unwrap(),
+                &poll_attempt(),
+                &server.url,
+                poll_fixture_device()
+            )
+        )
+        .await
+        .unwrap()
+        .is_err());
+        assert_eq!(count.load(Ordering::SeqCst), expected);
+    }
+    let count = Arc::new(AtomicUsize::new(0));
+    let seen = count.clone();
+    let server = MockServer::start(move |_| {
+        let seen = seen.clone();
+        async move {
+            seen.fetch_add(1, Ordering::SeqCst);
+            json(200, json!({"status":"pending"}))
+        }
+    })
+    .await;
+    let cancelled = poll_attempt();
+    cancelled.cancel.cancel();
+    assert_eq!(
+        poll_device(
+            &client().unwrap(),
+            &cancelled,
+            &server.url,
+            poll_fixture_device()
+        )
+        .await
+        .unwrap_err(),
+        "accountError.cancelled"
+    );
+    let mut expired = poll_attempt();
+    expired.expires = chrono::Utc::now().timestamp() - 1;
+    assert_eq!(
+        poll_device(
+            &client().unwrap(),
+            &expired,
+            &server.url,
+            poll_fixture_device()
+        )
+        .await
+        .unwrap_err(),
+        "accountError.expired"
+    );
+    assert_eq!(count.load(Ordering::SeqCst), 0);
+}
+
 #[tokio::test]
 async fn device_pkce_login_has_a_positive_control_and_is_cancellable() {
     let _guard = TEST_LOCK.lock().await;
