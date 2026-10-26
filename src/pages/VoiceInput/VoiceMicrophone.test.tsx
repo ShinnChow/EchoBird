@@ -1618,7 +1618,7 @@ function systemAppearanceFixture(dark: boolean) {
 
 describe('independent island appearance', () => {
   it.each(['zh-Hans', 'zh-Hant', 'en', 'ja'])(
-    'offers app/dark/light/system in order in %s',
+    'offers the existing appearance modes and the new iridescent mode in %s',
     (locale) => {
       localization.locale = locale;
       act(() => {
@@ -1631,7 +1631,7 @@ describe('independent island appearance', () => {
             tabs.props.options.some((option: { value: string }) => option.value === 'auto')
           )!.props.options
       ).toEqual(
-        ['auto', 'dark', 'light', 'system'].map((mode) => ({
+        ['auto', 'iridescent', 'dark', 'light', 'system'].map((mode) => ({
           value: mode,
           label: translate(`voice.${mode}` as TKey, locale),
         }))
@@ -1640,27 +1640,30 @@ describe('independent island appearance', () => {
     }
   );
 
-  it('saves the independent system choice through the existing config without changing the app theme', async () => {
-    systemAppearanceFixture(false);
-    const config = voiceSnapshot().config;
-    vi.mocked(api.saveVoiceConfig).mockImplementation(async (saved) =>
-      voiceSnapshot({ config: saved, revision: 2 })
-    );
-    act(() => {
-      renderer = create(<VoiceInputMain />);
-    });
-    await act(async () => button('voice.system').props.onClick());
-    expect(api.saveVoiceConfig).toHaveBeenCalledExactlyOnceWith({
-      ...config,
-      islandTheme: 'system',
-    });
-    expect(renderer.root.findByProps({ 'data-error': false }).props.className).toBe(
-      'voice-island voice-theme-light'
-    );
-    expect(appAppearance.resolved).toBe('dark');
-    expect(themeSync).not.toHaveBeenCalled();
-    expect(api.startVoice).not.toHaveBeenCalled();
-  });
+  it.each(['system', 'iridescent'] as const)(
+    'saves the independent %s choice without changing the app theme',
+    async (mode) => {
+      systemAppearanceFixture(false);
+      const config = voiceSnapshot().config;
+      vi.mocked(api.saveVoiceConfig).mockImplementation(async (saved) =>
+        voiceSnapshot({ config: saved, revision: 2 })
+      );
+      act(() => {
+        renderer = create(<VoiceInputMain />);
+      });
+      await act(async () => button(`voice.${mode}`).props.onClick());
+      expect(api.saveVoiceConfig).toHaveBeenCalledExactlyOnceWith({
+        ...config,
+        islandTheme: mode,
+      });
+      expect(renderer.root.findByProps({ 'data-error': false }).props.className).toBe(
+        `voice-island voice-theme-${mode === 'system' ? 'light' : 'iridescent'}`
+      );
+      expect(appAppearance.resolved).toBe('dark');
+      expect(themeSync).not.toHaveBeenCalled();
+      expect(api.startVoice).not.toHaveBeenCalled();
+    }
+  );
 
   it('tracks live OS appearance independently and cleans its media subscription without writes', () => {
     const system = systemAppearanceFixture(false);
@@ -1711,35 +1714,43 @@ describe('independent island appearance', () => {
     expect(api.saveVoiceConfig).not.toHaveBeenCalled();
   });
 
-  it.each(['dark', 'light'] as const)('keeps forced %s independent of OS changes', (mode) => {
-    const system = systemAppearanceFixture(mode !== 'dark');
-    appAppearance.resolved = mode === 'dark' ? 'light' : 'dark';
-    const config = { ...voiceSnapshot().config, islandTheme: mode };
-    act(() => {
-      renderer = create(<IslandContent snapshot={voiceSnapshot({ config })} preview />);
-    });
-    expect(renderer.root.findByProps({ 'data-error': false }).props.className).toBe(
-      `voice-island voice-theme-${mode}`
-    );
-    system.change(mode === 'dark');
-    expect(renderer.root.findByProps({ 'data-error': false }).props.className).toBe(
-      `voice-island voice-theme-${mode}`
-    );
-    expect(api.saveVoiceConfig).not.toHaveBeenCalled();
-  });
-
-  it('updates the active waveform contrast in place when system appearance changes', () => {
-    const system = systemAppearanceFixture(false);
-    const config = { ...voiceSnapshot().config, islandTheme: 'system' as const };
-    act(() => {
-      renderer = create(
-        <IslandContent snapshot={voiceSnapshot({ config, phase: 'recording', level: 0.5 })} />
+  it.each(['dark', 'light', 'iridescent'] as const)(
+    'keeps forced %s independent of OS changes',
+    (mode) => {
+      const system = systemAppearanceFixture(mode !== 'dark');
+      appAppearance.resolved = mode === 'dark' ? 'light' : 'dark';
+      const config = { ...voiceSnapshot().config, islandTheme: mode };
+      act(() => {
+        renderer = create(<IslandContent snapshot={voiceSnapshot({ config })} preview />);
+      });
+      expect(renderer.root.findByProps({ 'data-error': false }).props.className).toBe(
+        `voice-island voice-theme-${mode}`
       );
-    });
-    expect(renderer.root.findByType(VoiceFlow).props.theme).toBe('light');
-    system.change(true);
-    expect(renderer.root.findByType(VoiceFlow).props.theme).toBe('dark');
-    expect(api.recordVoice).not.toHaveBeenCalled();
-    expect(api.saveVoiceConfig).not.toHaveBeenCalled();
-  });
+      system.change(mode === 'dark');
+      expect(renderer.root.findByProps({ 'data-error': false }).props.className).toBe(
+        `voice-island voice-theme-${mode}`
+      );
+      expect(api.saveVoiceConfig).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['system', 'iridescent'] as const)(
+    'keeps the active waveform contrast correct for %s when OS appearance changes',
+    (mode) => {
+      const system = systemAppearanceFixture(false);
+      const config = { ...voiceSnapshot().config, islandTheme: mode };
+      act(() => {
+        renderer = create(
+          <IslandContent snapshot={voiceSnapshot({ config, phase: 'recording', level: 0.5 })} />
+        );
+      });
+      expect(renderer.root.findByType(VoiceFlow).props.theme).toBe('light');
+      system.change(true);
+      expect(renderer.root.findByType(VoiceFlow).props.theme).toBe(
+        mode === 'system' ? 'dark' : 'light'
+      );
+      expect(api.recordVoice).not.toHaveBeenCalled();
+      expect(api.saveVoiceConfig).not.toHaveBeenCalled();
+    }
+  );
 });

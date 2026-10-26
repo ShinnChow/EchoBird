@@ -42,6 +42,7 @@ const en: Translations = {
   'voice.system': 'System',
   'voice.dark': 'Dark',
   'voice.light': 'Light',
+  'voice.iridescent': 'Prism',
   'voice.palette': 'Colors',
   'voice.palette.white': 'Default',
   'voice.palette.aurora': 'Aurora',

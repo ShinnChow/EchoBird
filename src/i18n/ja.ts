@@ -43,6 +43,7 @@ const ja: Partial<Translations> = {
   'voice.system': 'システム',
   'voice.dark': 'ダーク',
   'voice.light': 'ライト',
+  'voice.iridescent': '虹彩',
   'voice.palette': '配色',
   'voice.palette.white': '標準',
   'voice.palette.aurora': 'オーロラ',

@@ -42,6 +42,7 @@ const zhHant: Partial<Translations> = {
   'voice.system': '跟隨',
   'voice.dark': '深色',
   'voice.light': '淺色',
+  'voice.iridescent': '流彩',
   'voice.palette': '配色',
   'voice.palette.white': '預設',
   'voice.palette.aurora': '極光',

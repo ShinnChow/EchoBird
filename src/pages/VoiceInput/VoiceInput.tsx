@@ -262,10 +262,12 @@ export function VoiceInputMain() {
                 <ViewModeTabs
                   value={config.islandTheme}
                   onChange={(value) => update('islandTheme', value)}
-                  options={(['auto', 'dark', 'light', 'system'] as const).map((theme) => ({
-                    value: theme,
-                    label: t(`voice.${theme}` as TKey),
-                  }))}
+                  options={(['auto', 'iridescent', 'dark', 'light', 'system'] as const).map(
+                    (theme) => ({
+                      value: theme,
+                      label: t(`voice.${theme}` as TKey),
+                    })
+                  )}
                 />
               </div>
               <div className="voice-row">

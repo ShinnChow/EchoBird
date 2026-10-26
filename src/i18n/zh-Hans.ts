@@ -40,6 +40,7 @@ const zhHans: Partial<Translations> = {
   'voice.system': '跟随',
   'voice.dark': '深色',
   'voice.light': '浅色',
+  'voice.iridescent': '流彩',
   'voice.palette': '配色',
   'voice.palette.white': '默认',
   'voice.palette.aurora': '极光',

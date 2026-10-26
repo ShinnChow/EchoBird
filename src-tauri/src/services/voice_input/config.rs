@@ -163,7 +163,7 @@ impl Config {
         }
         if !matches!(
             self.island_theme.as_str(),
-            "auto" | "dark" | "light" | "system"
+            "auto" | "dark" | "light" | "system" | "iridescent"
         ) || !matches!(
             self.island_palette.as_str(),
             "white" | "aurora" | "ocean" | "sunset" | "iris"

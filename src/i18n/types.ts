@@ -43,6 +43,7 @@ export type TKey =
   | 'voice.system'
   | 'voice.dark'
   | 'voice.light'
+  | 'voice.iridescent'
   | 'voice.palette'
   | 'voice.palette.white'
   | 'voice.palette.aurora'

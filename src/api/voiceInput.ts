@@ -49,7 +49,7 @@ export interface VoiceConfig {
   hotkeyEnabled: boolean;
   hotkeyMode?: 'hold' | 'toggle';
   shortcut: VoiceBinding;
-  islandTheme: 'auto' | 'dark' | 'light' | 'system';
+  islandTheme: 'auto' | 'dark' | 'light' | 'system' | 'iridescent';
   islandPalette: VoicePalette;
   optimizationEnabled: boolean;
   optimizationModel: string | null;

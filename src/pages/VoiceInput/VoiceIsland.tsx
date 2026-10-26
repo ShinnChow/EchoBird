@@ -37,7 +37,10 @@ export function IslandContent({
   const islandTheme =
     config.islandTheme === 'system' ? (systemDark ? 'dark' : 'light') : config.islandTheme;
   const palette = config.islandPalette ?? 'white';
-  const light = islandTheme === 'light' || (islandTheme === 'auto' && resolvedTheme === 'light');
+  const light =
+    islandTheme === 'light' ||
+    islandTheme === 'iridescent' ||
+    (islandTheme === 'auto' && resolvedTheme === 'light');
   const phase = preview ? 'idle' : snapshot.phase;
   const recording = phase === 'recording';
   const ready = !voiceBusy(phase);

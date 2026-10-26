@@ -608,7 +608,7 @@ fn voice_palettes_round_trip_and_legacy_styles_default_to_plain_bars() {
 #[test]
 fn voice_theme_modes_preserve_app_following_and_round_trip_system_following() {
     assert_eq!(config::Config::default().island_theme, "auto");
-    for theme in ["auto", "dark", "light", "system"] {
+    for theme in ["auto", "dark", "light", "system", "iridescent"] {
         let saved = Saved {
             config: config::Config {
                 island_theme: theme.into(),
