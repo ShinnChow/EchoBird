@@ -1307,6 +1307,8 @@ export const AppManagerBottom: React.FC = () => {
   } = useAppManager();
 
   const noModelConfig = !!selectedToolData?.noModelConfig;
+  // This preview has no desktop installer or native launch integration yet.
+  const isCatalogOnly = selectedTool === 'claudeduet';
   // An uninstalled tool flips the primary action to "一键安装" — one click
   // walks the user to the One-Click Install (Mother) page prefilled with the
   // install prompt. Model config / launch are meaningless until the tool is
@@ -1402,22 +1404,25 @@ export const AppManagerBottom: React.FC = () => {
         <PageAwareHint />
         {/* Launch button */}
         <div className="relative w-64 h-14 flex-shrink-0">
-          <button
-            onClick={handlePrimaryClick}
-            disabled={buttonDisabled}
-            className={`w-full h-14 text-lg font-bold font-mono tracking-widest transition-colors rounded-lg cjk-btn border shadow-lg ${
-              buttonDisabled
-                ? 'bg-cyber-border text-cyber-text-secondary border-transparent shadow-none cursor-not-allowed'
-                : 'bg-cyber-accent text-white border-cyber-accent hover:bg-cyber-accent-secondary hover:border-cyber-accent-secondary shadow-cyber-accent/30'
-            }`}
-          >
-            {isInstallAction
-              ? t('btn.installOneClick')
-              : willLaunch
-                ? t('btn.launchApp')
-                : t('btn.modifyOnly')}
-          </button>
+          {!isCatalogOnly && (
+            <button
+              onClick={handlePrimaryClick}
+              disabled={buttonDisabled}
+              className={`w-full h-14 text-lg font-bold font-mono tracking-widest transition-colors rounded-lg cjk-btn border shadow-lg ${
+                buttonDisabled
+                  ? 'bg-cyber-border text-cyber-text-secondary border-transparent shadow-none cursor-not-allowed'
+                  : 'bg-cyber-accent text-white border-cyber-accent hover:bg-cyber-accent-secondary hover:border-cyber-accent-secondary shadow-cyber-accent/30'
+              }`}
+            >
+              {isInstallAction
+                ? t('btn.installOneClick')
+                : willLaunch
+                  ? t('btn.launchApp')
+                  : t('btn.modifyOnly')}
+            </button>
+          )}
           {activePage === 'apps' &&
+            !isCatalogOnly &&
             selectedToolData?.installed &&
             !isInstallAction &&
             !isBuiltInApp && (
@@ -1444,7 +1449,7 @@ export const AppManagerBottom: React.FC = () => {
             Apps without model configuration keep the controls visible but disabled. */}
         <div
           className={`flex flex-col gap-2 ${
-            isInstallAction
+            isCatalogOnly || isInstallAction
               ? 'invisible pointer-events-none'
               : noModelConfig
                 ? 'opacity-40 pointer-events-none'
