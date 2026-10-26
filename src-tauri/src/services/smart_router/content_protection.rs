@@ -7,7 +7,12 @@ use sha2::Sha256;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Duration;
+use tokio::time::{timeout_at, Instant};
 
+#[cfg(test)]
+#[path = "content_protection/availability_tests.rs"]
+mod availability_tests;
 #[path = "content_protection/stream.rs"]
 mod stream;
 #[cfg(test)]
@@ -17,10 +22,13 @@ mod tests;
 const PREFIX: &str = "{{SECRET_";
 const MAX_VALUES: usize = 8192;
 const MAX_SECRET_BYTES: usize = 16 * 1024 * 1024;
+const PROCESS_TIMEOUT: Duration = Duration::from_secs(10);
 pub(super) const FAILURE: &str = "Sensitive information protection could not safely process this request. Nothing was sent. Retry or start a new conversation.";
 
 type SharedEngine = Arc<Mutex<Engine>>;
-static ENGINES: OnceLock<Mutex<HashMap<(PathBuf, PathBuf), SharedEngine>>> = OnceLock::new();
+type SharedRestorer = Arc<Restorer>;
+type EngineSlot = Arc<tokio::sync::Mutex<Option<SharedEngine>>>;
+static ENGINES: OnceLock<Mutex<HashMap<(PathBuf, PathBuf), EngineSlot>>> = OnceLock::new();
 static PATTERNS: OnceLock<Vec<Regex>> = OnceLock::new();
 fn patterns() -> &'static Vec<Regex> {
     PATTERNS.get_or_init(|| {
@@ -139,12 +147,19 @@ fn numeric_unit(text: &str) -> bool {
         )
 }
 
-pub(super) fn enabled(path: &Path) -> Result<bool, &'static str> {
-    let bytes = match std::fs::read(path) {
+pub(super) async fn enabled(path: &Path) -> Result<bool, &'static str> {
+    let deadline = Instant::now() + PROCESS_TIMEOUT;
+    let bytes = match timeout_at(deadline, tokio::fs::read(path))
+        .await
+        .map_err(|_| FAILURE)?
+    {
         Ok(bytes) => bytes,
         Err(error)
             if error.kind() == std::io::ErrorKind::NotFound
-                && std::fs::symlink_metadata(path).is_err() =>
+                && timeout_at(deadline, tokio::fs::symlink_metadata(path))
+                    .await
+                    .map_err(|_| FAILURE)?
+                    .is_err() =>
         {
             return Ok(false)
         }
@@ -161,21 +176,67 @@ pub(super) fn enabled(path: &Path) -> Result<bool, &'static str> {
     }
 }
 
-pub(super) struct Protection(SharedEngine);
+struct AbortWork(tokio::task::AbortHandle);
+
+impl Drop for AbortWork {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
+async fn blocking<T: Send + 'static>(
+    deadline: Instant,
+    work: impl FnOnce() -> Result<T, &'static str> + Send + 'static,
+) -> Result<T, &'static str> {
+    let task = tokio::task::spawn_blocking(move || {
+        if Instant::now() >= deadline {
+            return Err(FAILURE);
+        }
+        work()
+    });
+    let _abort = AbortWork(task.abort_handle());
+    timeout_at(deadline, task)
+        .await
+        .map_err(|_| FAILURE)?
+        .map_err(|_| FAILURE)?
+}
+
+pub(super) struct Protection(SharedRestorer);
 
 impl Protection {
-    pub(super) fn prepare(
+    pub(super) async fn prepare(
         body: &mut Value,
         scope: &Path,
         settings: &Path,
     ) -> Result<Self, &'static str> {
-        let engine = {
+        Self::prepare_until(body, scope, settings, Instant::now() + PROCESS_TIMEOUT).await
+    }
+
+    async fn prepare_until(
+        body: &mut Value,
+        scope: &Path,
+        settings: &Path,
+        deadline: Instant,
+    ) -> Result<Self, &'static str> {
+        let slot = {
             let mut engines = ENGINES
                 .get_or_init(|| Mutex::new(HashMap::new()))
                 .lock()
                 .map_err(|_| FAILURE)?;
             let identity = (scope.to_path_buf(), settings.to_path_buf());
-            if let Some(engine) = engines.get(&identity) {
+            engines
+                .entry(identity)
+                .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(None)))
+                .clone()
+        };
+        let mut slot = timeout_at(deadline, slot.lock_owned())
+            .await
+            .map_err(|_| FAILURE)?;
+        let mut input = std::mem::take(body);
+        let scope = scope.to_path_buf();
+        let settings = settings.to_path_buf();
+        let (input, protection) = blocking(deadline, move || {
+            let engine = if let Some(engine) = slot.as_ref() {
                 engine.clone()
             } else {
                 let path = settings.with_file_name("content-protection.key");
@@ -196,25 +257,47 @@ impl Protection {
                     key,
                     scope.to_string_lossy().as_bytes(),
                 )));
-                engines.insert(identity, engine.clone());
+                *slot = Some(engine.clone());
                 engine
-            }
-        };
-        Self::with_engine(body, engine)
+            };
+            let protection = Self::with_engine_until(&mut input, engine, deadline)?;
+            Ok((input, protection))
+        })
+        .await?;
+        *body = input;
+        Ok(protection)
     }
 
+    #[cfg(test)]
     fn with_engine(body: &mut Value, engine: SharedEngine) -> Result<Self, &'static str> {
-        {
+        Self::with_engine_until(body, engine, Instant::now() + PROCESS_TIMEOUT)
+    }
+
+    fn with_engine_until(
+        body: &mut Value,
+        engine: SharedEngine,
+        deadline: Instant,
+    ) -> Result<Self, &'static str> {
+        let restorer = {
             let mut store = engine.lock().map_err(|_| FAILURE)?;
             let mut result = Ok(());
             request_strings(body, false, false, true, &mut |key, text, signed| {
                 if !signed && result.is_ok() {
-                    result = store.discover(key, text);
+                    result = store.discover(key, text, deadline);
                 }
             });
             result?;
             request_strings(body, false, false, true, &mut |_, text, signed| {
-                let masked = store.mask(text);
+                if result.is_err() {
+                    return;
+                }
+                let masked = match store.mask(text, deadline) {
+                    Ok(masked) => masked,
+                    Err(error) => {
+                        result = Err(error);
+                        return;
+                    }
+                };
                 if signed {
                     if masked != *text || credentials(text).next().is_some() {
                         result = Err(FAILURE);
@@ -224,8 +307,9 @@ impl Protection {
                 }
             });
             result?;
-        }
-        Ok(Self(engine))
+            store.restorer.clone()
+        };
+        Ok(Self(restorer))
     }
 
     pub(super) async fn restore(self, response: Response) -> Response {
@@ -234,7 +318,7 @@ impl Protection {
 }
 
 struct Secret {
-    value: String,
+    value: Arc<str>,
     token: String,
 }
 
@@ -243,7 +327,7 @@ struct Engine {
     scope: Vec<u8>,
     secrets: Vec<Secret>,
     prefixes: HashMap<[u8; 4], Vec<usize>>,
-    tokens: HashMap<String, usize>,
+    restorer: SharedRestorer,
     bytes: usize,
 }
 
@@ -254,7 +338,7 @@ impl Engine {
             scope: scope.into(),
             secrets: Vec::new(),
             prefixes: HashMap::new(),
-            tokens: HashMap::new(),
+            restorer: Arc::new(Restorer::default()),
             bytes: 0,
         }
     }
@@ -269,8 +353,8 @@ impl Engine {
         hash.update(value.as_bytes());
         let digest = hash.finalize().into_bytes();
         let token = [PREFIX, &hex::encode(&digest[..16]), "}}"].concat();
-        if let Some(index) = self.tokens.get(&token) {
-            return if self.secrets[*index].value == value {
+        if let Some(existing) = self.restorer.values.get(&token) {
+            return if existing.as_ref() == value {
                 Ok(())
             } else {
                 Err(FAILURE)
@@ -287,34 +371,47 @@ impl Engine {
             .or_default()
             .push(index);
         self.bytes += value.len();
-        self.tokens.insert(token.clone(), index);
-        self.secrets.push(Secret {
-            value: value.into(),
-            token,
-        });
+        let value: Arc<str> = value.into();
+        Arc::make_mut(&mut self.restorer)
+            .values
+            .insert(token.clone(), value.clone());
+        self.secrets.push(Secret { value, token });
         Ok(())
     }
 
-    fn discover(&mut self, key: &str, text: &str) -> Result<(), &'static str> {
+    fn discover(&mut self, key: &str, text: &str, deadline: Instant) -> Result<(), &'static str> {
+        if Instant::now() >= deadline {
+            return Err(FAILURE);
+        }
         if secret_field(key) {
             self.remember(text)?;
         }
         for value in credentials(text) {
+            if Instant::now() >= deadline {
+                return Err(FAILURE);
+            }
             self.remember(value)?;
         }
         Ok(())
     }
 
-    fn mask(&self, text: &str) -> String {
+    fn mask(&self, text: &str, deadline: Instant) -> Result<String, &'static str> {
         let mut result = String::new();
         let mut cursor = 0;
         let mut copied = 0;
+        let mut check_at = 0;
         while cursor + 4 <= text.len() {
+            if cursor >= check_at {
+                if Instant::now() >= deadline {
+                    return Err(FAILURE);
+                }
+                check_at = cursor.saturating_add(1024);
+            }
             if let Some(token) = text
                 .get(cursor..cursor + PREFIX.len() + 34)
                 .filter(|token| token.starts_with(PREFIX))
             {
-                if self.tokens.contains_key(token) {
+                if self.restorer.values.contains_key(token) {
                     cursor += token.len();
                     continue;
                 }
@@ -338,12 +435,24 @@ impl Engine {
             }
         }
         if copied == 0 {
-            return text.into();
+            return Ok(text.into());
         }
         result.push_str(&text[copied..]);
-        result
+        Ok(result)
     }
 
+    #[cfg(test)]
+    fn restore(&self, text: &str, escaped: bool) -> String {
+        self.restorer.restore(text, escaped)
+    }
+}
+
+#[derive(Clone, Default)]
+struct Restorer {
+    values: HashMap<String, Arc<str>>,
+}
+
+impl Restorer {
     fn restore(&self, text: &str, escaped: bool) -> String {
         let mut output = String::new();
         let mut rest = text;
@@ -352,10 +461,9 @@ impl Engine {
             rest = &rest[start..];
             let Some(end) = rest.find("}}") else { break };
             let token = &rest[..end + 2];
-            if let Some(index) = self.tokens.get(token) {
-                let value = &self.secrets[*index].value;
+            if let Some(value) = self.values.get(token) {
                 if escaped {
-                    let json = serde_json::to_string(value).expect("string JSON");
+                    let json = serde_json::to_string(value.as_ref()).expect("string JSON");
                     output.push_str(&json[1..json.len() - 1]);
                 } else {
                     output.push_str(value);

@@ -17,6 +17,10 @@ fn token(engine: &SharedEngine) -> String {
     engine.lock().unwrap().secrets[0].token.clone()
 }
 
+fn restorer(engine: &SharedEngine) -> SharedRestorer {
+    engine.lock().unwrap().restorer.clone()
+}
+
 #[test]
 fn credentials_are_masked_everywhere_and_plain_personal_data_is_retained() {
     let engine = engine();
@@ -84,7 +88,7 @@ fn previously_generated_tokens_are_not_masked_again_by_short_known_values() {
     protect(&mut body, &engine);
     assert_eq!(body, once);
     let mut reply = json!({"content":body["messages"][0]["content"][0]["input"]["password"]});
-    stream::restore_value(&engine, &mut reply).unwrap();
+    stream::restore_value(&restorer(&engine), &mut reply).unwrap();
     assert_eq!(reply["content"], "SECRET");
 }
 
@@ -244,7 +248,7 @@ fn structured_tool_arguments_do_not_inherit_protocol_field_exemptions() {
     protect(&mut encoded, &engine);
     assert!(!encoded.to_string().contains(SECRET));
     let mut response = json!({"choices":[{"message":{"tool_calls":[{"id":"call_123","function":{"name":"write","arguments":encoded["messages"][0]["tool_calls"][0]["function"]["arguments"]}}]}}]});
-    stream::restore_value(&engine, &mut response).unwrap();
+    stream::restore_value(&restorer(&engine), &mut response).unwrap();
     let restored: Value = serde_json::from_str(
         response["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
             .as_str()
@@ -268,18 +272,18 @@ fn signed_content_and_media_are_not_rewritten_and_unsafe_signed_text_is_rejected
     protect(&mut plain, &engine);
     let placeholder = token(&engine);
     let mut response = json!({"content":[{"type":"thinking","thinking":placeholder,"signature":"sealed"},{"type":"text","text":placeholder},{"type":"reasoning.text","text":placeholder,"signature":"sealed"}]});
-    stream::restore_value(&engine, &mut response).unwrap();
+    stream::restore_value(&restorer(&engine), &mut response).unwrap();
     assert_eq!(response["content"][0]["thinking"], placeholder);
     assert_eq!(response["content"][1]["text"], SECRET);
     assert_eq!(response["content"][2]["text"], placeholder);
 }
 
-#[test]
-fn settings_are_off_by_default_and_invalid_state_does_not_send_plaintext() {
+#[tokio::test]
+async fn settings_are_off_by_default_and_invalid_state_does_not_send_plaintext() {
     let dir = std::env::temp_dir().join(format!("content-settings-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir(&dir).unwrap();
     let path = dir.join("settings.json");
-    assert_eq!(enabled(&path), Ok(false));
+    assert_eq!(enabled(&path).await, Ok(false));
     for (content, expected) in [
         ("{}", Ok(false)),
         (r#"{"sensitiveInfoProtection":true}"#, Ok(true)),
@@ -288,7 +292,7 @@ fn settings_are_off_by_default_and_invalid_state_does_not_send_plaintext() {
         (r#"{"sensitiveInfoProtection":"false"}"#, Err(FAILURE)),
     ] {
         std::fs::write(&path, content).unwrap();
-        assert_eq!(enabled(&path), expected);
+        assert_eq!(enabled(&path).await, expected);
     }
     std::fs::remove_file(&path).unwrap();
     std::fs::remove_dir(&dir).unwrap();
@@ -322,7 +326,7 @@ fn streaming_restores_all_placeholder_splits_and_transport_byte_boundaries() {
     protect(&mut json!({"input":SECRET}), &engine);
     let placeholder = token(&engine);
     for split in 1..placeholder.len() {
-        let mut events = stream::Events::new(engine.clone());
+        let mut events = stream::Events::new(restorer(&engine));
         let bytes = [
             chat_delta(0, &format!("中文 {}", &placeholder[..split])),
             chat_delta(0, &format!("{} end", &placeholder[split..])),
@@ -343,7 +347,7 @@ fn interleaved_choices_keep_separate_carries_and_heartbeats_are_not_held() {
     let engine = engine();
     protect(&mut json!({"input":SECRET}), &engine);
     let placeholder = token(&engine);
-    let mut events = stream::Events::new(engine.clone());
+    let mut events = stream::Events::new(restorer(&engine));
     assert!(events
         .push(&chat_delta(0, &placeholder[..13]))
         .unwrap()
@@ -388,7 +392,7 @@ fn unmatched_tokens_and_partial_tokens_at_eof_are_preserved() {
         engine.lock().unwrap().restore("{{SECRET_unknown}}", false),
         "{{SECRET_unknown}}"
     );
-    let mut events = stream::Events::new(engine);
+    let mut events = stream::Events::new(restorer(&engine));
     events.push(&chat_delta(0, "ordinary text {{SEC")).unwrap();
     let output = events.finish().unwrap();
     assert_eq!(joined_content(output, 0), "ordinary text {{SEC");
@@ -412,7 +416,7 @@ fn protocol_settings_are_preserved_while_unsigned_reasoning_and_business_fields_
     );
     assert_eq!(result["content"]["source"]["data"], SECRET);
     let mut restored = json!({"output":body["input"]});
-    stream::restore_value(&engine, &mut restored).unwrap();
+    stream::restore_value(&restorer(&engine), &mut restored).unwrap();
     assert_eq!(restored["output"][0]["summary"][0]["text"], SECRET);
     let mut counts = json!({"input":"max_tokens=12345678 and total_tokens=87654321"});
     let before = counts.clone();
@@ -429,7 +433,7 @@ fn streamed_tool_arguments_restore_json_escaping_across_all_supported_event_shap
         protect(&mut request, &engine);
         let masked = request["input"][0]["arguments"].as_str().unwrap();
         let split = masked.find(PREFIX).unwrap() + 15;
-        let mut events = stream::Events::new(engine);
+        let mut events = stream::Events::new(restorer(&engine));
         let mut output = Vec::new();
         for part in [&masked[..split], &masked[split..]] {
             let event = match protocol {

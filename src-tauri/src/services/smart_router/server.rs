@@ -786,7 +786,7 @@ async fn protected_route(
     candidates: Vec<Candidate>,
     protocol: ClientProtocol,
 ) -> Response {
-    let protection = match prepare_protection(state, &mut body) {
+    let protection = match prepare_protection(state, &mut body).await {
         Ok(protection) => protection,
         Err(error) => {
             return match protocol {
@@ -807,16 +807,17 @@ async fn protected_route(
     restore_protection(protection, response).await
 }
 
-fn prepare_protection(
+async fn prepare_protection(
     state: &AppState,
     body: &mut Value,
 ) -> Result<Option<content_protection::Protection>, &'static str> {
-    if content_protection::enabled(&state.protection_settings_path)? {
+    if content_protection::enabled(&state.protection_settings_path).await? {
         content_protection::Protection::prepare(
             body,
             &state.config_path,
             &state.protection_settings_path,
         )
+        .await
         .map(Some)
     } else {
         Ok(None)

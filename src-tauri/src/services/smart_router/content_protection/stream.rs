@@ -1,4 +1,4 @@
-use super::{protocol_field, signed_block, SharedEngine, PREFIX};
+use super::{blocking, protocol_field, signed_block, SharedRestorer, PREFIX, PROCESS_TIMEOUT};
 use axum::body::{Body, Bytes};
 use axum::http::{header, StatusCode};
 use axum::response::Response;
@@ -14,7 +14,7 @@ fn error() -> io::Error {
     io::Error::other("Sensitive information response processing failed")
 }
 
-pub(super) async fn restore(engine: SharedEngine, response: Response) -> Response {
+pub(super) async fn restore(engine: SharedRestorer, response: Response) -> Response {
     let content_type = response
         .headers()
         .get(header::CONTENT_TYPE)
@@ -53,18 +53,18 @@ pub(super) async fn restore(engine: SharedEngine, response: Response) -> Respons
             },
         ))
     } else {
-        match axum::body::to_bytes(body, LIMIT)
-            .await
-            .ok()
-            .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        let Ok(bytes) = axum::body::to_bytes(body, LIMIT).await else {
+            return processing_error();
+        };
+        match blocking(tokio::time::Instant::now() + PROCESS_TIMEOUT, move || {
+            let mut value = serde_json::from_slice::<Value>(&bytes).map_err(|_| super::FAILURE)?;
+            restore_value(&engine, &mut value).map_err(|_| super::FAILURE)?;
+            serde_json::to_vec(&value).map_err(|_| super::FAILURE)
+        })
+        .await
         {
-            Some(mut value) => {
-                if restore_value(&engine, &mut value).is_err() {
-                    return processing_error();
-                }
-                Body::from(serde_json::to_vec(&value).expect("response JSON"))
-            }
-            None => return processing_error(),
+            Ok(bytes) => Body::from(bytes),
+            Err(_) => return processing_error(),
         }
     };
     Response::from_parts(parts, body)
@@ -80,8 +80,7 @@ fn argument_field(key: &str, kind: &str) -> bool {
     matches!(key, "arguments" | "partial_json") || key == "delta" && kind.contains("arguments")
 }
 
-pub(super) fn restore_value(engine: &SharedEngine, value: &mut Value) -> Result<(), io::Error> {
-    let store = engine.lock().map_err(|_| error())?;
+pub(super) fn restore_value(store: &SharedRestorer, value: &mut Value) -> Result<(), io::Error> {
     fields(
         value,
         &mut Vec::new(),
@@ -202,7 +201,7 @@ struct Pending {
 }
 
 pub(super) struct Events {
-    engine: SharedEngine,
+    engine: SharedRestorer,
     buffer: Vec<u8>,
     frames: VecDeque<Frame>,
     pending: HashMap<String, Pending>,
@@ -211,7 +210,7 @@ pub(super) struct Events {
 }
 
 impl Events {
-    pub(super) fn new(engine: SharedEngine) -> Self {
+    pub(super) fn new(engine: SharedRestorer) -> Self {
         Self {
             engine,
             buffer: Vec::new(),
@@ -297,7 +296,7 @@ impl Events {
             frame.modified = before != frame.value;
         } else {
             let context = frame.value.clone();
-            let store = self.engine.lock().map_err(|_| error())?;
+            let store = &self.engine;
             fields(
                 &mut frame.value,
                 &mut Vec::new(),
@@ -360,7 +359,7 @@ impl Events {
     }
 
     fn flush(&mut self) -> Result<Vec<Bytes>, io::Error> {
-        let store = self.engine.lock().map_err(|_| error())?;
+        let store = &self.engine;
         for (_, pending) in self.pending.drain() {
             if let Some(frame) = self.frames.iter_mut().find(|frame| frame.id == pending.id) {
                 let value = at(&mut frame.value, &pending.path);
