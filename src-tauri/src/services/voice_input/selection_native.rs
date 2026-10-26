@@ -299,7 +299,7 @@ fn platform(window: u64) -> Reading {
             None
         };
         let owner = connection
-            .get_selection_owner(AtomEnum::PRIMARY)
+            .get_selection_owner(AtomEnum::PRIMARY.into())
             .ok()?
             .reply()
             .ok()?
@@ -332,7 +332,7 @@ fn platform(window: u64) -> Reading {
             .check()
             .ok()?;
         connection
-            .convert_selection(receiver, AtomEnum::PRIMARY, utf8, property, 0_u32)
+            .convert_selection(receiver, AtomEnum::PRIMARY.into(), utf8, property, 0_u32)
             .ok()?
             .check()
             .ok()?;

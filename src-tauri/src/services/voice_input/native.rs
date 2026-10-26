@@ -50,11 +50,8 @@ pub fn foreground() -> Option<u64> {
             .ok()?
             .reply()
             .ok()?;
-        property
-            .value32()?
-            .next()
-            .map(u64::from)
-            .filter(|id| *id != 0)
+        let window = property.value32()?.next().map(u64::from);
+        window.filter(|id| *id != 0)
     }
 }
 

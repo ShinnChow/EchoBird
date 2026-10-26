@@ -261,7 +261,8 @@ fn native_icon(window: u64) -> Option<DynamicImage> {
         .ok()?
         .reply()
         .ok()?;
-    x11_icon(&property.value32()?.collect::<Vec<_>>()).map(DynamicImage::ImageRgba8)
+    let values = property.value32()?.collect::<Vec<_>>();
+    x11_icon(&values).map(DynamicImage::ImageRgba8)
 }
 
 #[cfg(any(target_os = "linux", test))]
