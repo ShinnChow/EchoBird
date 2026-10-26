@@ -299,7 +299,7 @@ pub async fn run_agent(
         &request.message,
     ) {
         Ok(records) if !records.is_empty() => {
-            agent_tools::memory_records_json(records).unwrap_or_default()
+            agent_tools::memory_index_json(records).unwrap_or_default()
         }
         Ok(_) => String::new(),
         Err(error) => {

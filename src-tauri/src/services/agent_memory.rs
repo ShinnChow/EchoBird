@@ -11,6 +11,8 @@ const MAX_TEXT_BYTES: usize = 2_000;
 const MAX_STORE_BYTES: usize = 1024 * 1024;
 const MAX_RECALL_RECORDS: usize = 8;
 const MAX_RECALL_BYTES: usize = 8_000;
+// Leave metadata space within the memory tool's 8 KB response limit.
+const MAX_EXPERIENCE_BYTES: usize = 6_000;
 const MAX_CAPTURE_CHANGES: usize = 8;
 static STORE_LOCK: Mutex<()> = Mutex::new(());
 
@@ -30,14 +32,65 @@ pub struct MemoryRecord {
     pub source_conversation_id: Option<String>,
     pub created_at: u64,
     pub updated_at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub experience: Option<TaskExperience>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskExperience {
+    pub procedure: String,
+    pub evidence: Vec<String>,
+}
+
+impl TaskExperience {
+    pub(crate) fn validate(&self, cue: &str) -> Result<(), String> {
+        validate_text(cue)?;
+        validate_text(&self.procedure)?;
+        if cue.len() > 400
+            || self.procedure.len() > 800
+            || self.evidence.is_empty()
+            || self.evidence.len() > 3
+        {
+            return Err("Task experience exceeds its content limits".into());
+        }
+        for evidence in &self.evidence {
+            validate_text(evidence)?;
+            if evidence.len() > 700 {
+                return Err("Task experience evidence exceeds its size limit".into());
+            }
+        }
+        if serde_json::to_vec(&(cue, self))
+            .map_err(|_| "Cannot encode task experience")?
+            .len()
+            > MAX_EXPERIENCE_BYTES
+        {
+            return Err("Task experience exceeds its encoded detail budget".into());
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "action", rename_all = "lowercase", deny_unknown_fields)]
 pub(crate) enum MemoryChange {
-    Add { scope: MemoryScope, text: String },
-    Update { id: String, text: String },
-    Forget { id: String },
+    Add {
+        scope: MemoryScope,
+        text: String,
+    },
+    Update {
+        id: String,
+        text: String,
+    },
+    Forget {
+        id: String,
+    },
+    // Trusted evidence is attached by capture, never deserialized from model changes.
+    #[serde(skip_deserializing)]
+    Learn {
+        cue: String,
+        experience: TaskExperience,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,6 +173,7 @@ impl MemoryStore {
                 source_conversation_id: source_conversation_id.map(str::to_string),
                 created_at: now,
                 updated_at: now,
+                experience: None,
             };
             saved.records.push(record.clone());
             Ok(record)
@@ -137,6 +191,7 @@ impl MemoryStore {
                 .find(|record| record.id == id)
                 .ok_or("Memory does not exist")?;
             record.text = text.to_string();
+            record.experience = None;
             record.updated_at = unix_seconds();
             Ok(record.clone())
         })
@@ -183,6 +238,10 @@ impl MemoryStore {
                     *text = validate_text(text)?.to_string();
                 }
                 MemoryChange::Forget { .. } => {}
+                MemoryChange::Learn { cue, experience } => {
+                    *cue = validate_text(cue)?.to_string();
+                    experience.validate(cue)?;
+                }
             }
             if let MemoryChange::Update { id, .. } | MemoryChange::Forget { id } = change {
                 validate_id(id)?;
@@ -231,6 +290,7 @@ impl MemoryStore {
                             source_conversation_id: Some(source.to_string()),
                             created_at: now,
                             updated_at: now,
+                            experience: None,
                         });
                     }
                     MemoryChange::Update { id, text } => {
@@ -240,6 +300,7 @@ impl MemoryStore {
                             .find(|record| record.id == id)
                             .ok_or("Memory does not exist")?;
                         record.text = text;
+                        record.experience = None;
                         record.updated_at = now;
                     }
                     MemoryChange::Forget { id } => {
@@ -249,6 +310,36 @@ impl MemoryStore {
                             .position(|record| record.id == id)
                             .ok_or("Memory does not exist")?;
                         saved.records.remove(index);
+                    }
+                    MemoryChange::Learn { cue, experience } => {
+                        if let Some(existing) = saved.records.iter_mut().find(|record| {
+                            record.target.as_deref() == Some(target)
+                                && record.text == cue
+                                && record
+                                    .experience
+                                    .as_ref()
+                                    .is_some_and(|old| old.procedure == experience.procedure)
+                        }) {
+                            protected_ids.insert(existing.id.clone());
+                            if existing.experience.as_ref() != Some(&experience) {
+                                existing.experience = Some(experience);
+                                existing.source_conversation_id = Some(source.to_string());
+                                existing.updated_at = now;
+                            }
+                            continue;
+                        }
+                        let id = uuid::Uuid::new_v4().to_string();
+                        protected_ids.insert(id.clone());
+                        saved.records.push(MemoryRecord {
+                            id,
+                            text: cue,
+                            scope: MemoryScope::Target,
+                            target: Some(target.to_string()),
+                            source_conversation_id: Some(source.to_string()),
+                            created_at: now,
+                            updated_at: now,
+                            experience: Some(experience),
+                        });
                     }
                 }
             }
@@ -303,6 +394,7 @@ impl MemoryStore {
 
     pub fn recall(&self, target: &str, query: &str) -> Result<Vec<MemoryRecord>, String> {
         validate_scope(MemoryScope::Target, Some(target))?;
+        let by_id = uuid::Uuid::parse_str(query).is_ok();
         let keywords = keywords(query);
         let mut ranked: Vec<_> = self
             .list()?
@@ -311,6 +403,9 @@ impl MemoryStore {
                 record.scope == MemoryScope::User || record.target.as_deref() == Some(target)
             })
             .filter_map(|record| {
+                if by_id {
+                    return (record.id == query).then_some((1, record));
+                }
                 let normalized = record.text.to_lowercase();
                 let score = keywords
                     .iter()
@@ -326,7 +421,11 @@ impl MemoryStore {
             .map(|(_, record)| record)
             .take(MAX_RECALL_RECORDS)
             .take_while(|record| {
-                bytes += record.text.len();
+                bytes += record.text.len()
+                    + record.experience.as_ref().map_or(0, |experience| {
+                        experience.procedure.len()
+                            + experience.evidence.iter().map(String::len).sum::<usize>()
+                    });
                 bytes <= MAX_RECALL_BYTES
             })
             .collect())
@@ -425,6 +524,12 @@ impl MemoryStore {
             validate_text(&record.text)?;
             validate_scope(record.scope, record.target.as_deref())?;
             validate_source(record.source_conversation_id.as_deref())?;
+            if let Some(experience) = &record.experience {
+                if record.scope != MemoryScope::Target || record.source_conversation_id.is_none() {
+                    return Err("Task experience needs a machine and source conversation".into());
+                }
+                experience.validate(&record.text)?;
+            }
             if !ids.insert(&record.id) {
                 return Err(
                     "Saved memories contain duplicate IDs; existing files were preserved".into(),
@@ -731,6 +836,7 @@ mod tests {
                 source_conversation_id: None,
                 created_at: index as u64,
                 updated_at: index as u64,
+                experience: None,
             })
             .collect()
     }
@@ -1279,6 +1385,7 @@ mod tests {
             source_conversation_id: Some("capture-chat".into()),
             created_at: now,
             updated_at: now,
+            experience: None,
         });
         assert!(preview.records.len() <= MAX_RECORDS);
         assert!(serde_json::to_vec_pretty(&preview).unwrap().len() > MAX_STORE_BYTES);
@@ -1361,9 +1468,180 @@ mod tests {
             serde_json::json!({"action":"add", "scope":"target", "text":"Fact", "target":"other"}),
             serde_json::json!({"action":"update", "id":uuid::Uuid::new_v4().to_string(), "text":"Fact", "source":"other-chat"}),
             serde_json::json!({"action":"forget", "id":uuid::Uuid::new_v4().to_string(), "text":"Fact"}),
+            serde_json::json!({"action":"learn", "cue":"Install", "experience":{"procedure":"Unverified step","evidence":["Invented proof"]}}),
+            serde_json::json!({"action":"add", "scope":"target", "text":"Install", "experience":{"procedure":"Unverified step","evidence":["Invented proof"]}}),
         ] {
             assert!(serde_json::from_value::<MemoryChange>(value).is_err());
         }
+    }
+
+    fn learned_install() -> MemoryChange {
+        MemoryChange::Learn {
+            cue: "本机通过 npm 安装 CLI".into(),
+            experience: TaskExperience {
+                procedure:
+                    "Use the reported npm installation route, then recheck the executable version."
+                        .into(),
+                evidence: vec!["shell_exec: CLI installation post-check passed".into()],
+            },
+        }
+    }
+
+    #[test]
+    fn experiences_survive_restart_and_only_match_cues_on_their_own_target() {
+        let dir = TestDir::new();
+        let store = dir.store();
+        let preference = store
+            .remember(MemoryScope::User, None, "Reply in Chinese", None)
+            .unwrap();
+        let legacy: serde_json::Value = serde_json::to_value(&preference).unwrap();
+        assert!(legacy.get("experience").is_none());
+        assert!(serde_json::from_value::<MemoryRecord>(legacy)
+            .unwrap()
+            .experience
+            .is_none());
+        store
+            .apply_capture(
+                "remote-a",
+                &store.list().unwrap(),
+                vec![learned_install()],
+                "install-chat",
+            )
+            .unwrap();
+        let all = dir.store().list().unwrap();
+        let experience = all
+            .iter()
+            .find(|record| record.experience.is_some())
+            .unwrap();
+        assert_eq!(experience.target.as_deref(), Some("remote-a"));
+        assert_eq!(
+            experience.source_conversation_id.as_deref(),
+            Some("install-chat")
+        );
+        assert!(store
+            .recall("remote-a", "CLI npm install")
+            .unwrap()
+            .iter()
+            .any(|record| record.id == experience.id));
+        assert!(store
+            .recall("remote-a", "安装")
+            .unwrap()
+            .iter()
+            .any(|record| record.id == experience.id));
+        assert!(store
+            .recall("remote-a", "post-check")
+            .unwrap()
+            .iter()
+            .all(|record| record.experience.is_none()));
+        assert!(store
+            .recall("remote-b", "CLI npm install")
+            .unwrap()
+            .iter()
+            .all(|record| record.experience.is_none()));
+        assert_eq!(
+            store.recall("remote-a", &experience.id).unwrap(),
+            vec![experience.clone()]
+        );
+        assert!(store.recall("remote-b", &experience.id).unwrap().is_empty());
+        assert!(store
+            .recall("remote-a", &uuid::Uuid::new_v4().to_string())
+            .unwrap()
+            .is_empty());
+        let before = fs::read(dir.0.join("memories.json")).unwrap();
+        store
+            .apply_capture("remote-a", &all, vec![learned_install()], "later-chat")
+            .unwrap();
+        assert_eq!(fs::read(dir.0.join("memories.json")).unwrap(), before);
+        store.forget(&experience.id).unwrap();
+        assert!(store
+            .apply_capture("remote-a", &all, vec![learned_install()], "stale-chat")
+            .is_err());
+        assert_eq!(store.list().unwrap(), vec![preference]);
+    }
+
+    #[test]
+    fn experience_validation_rejects_secrets_and_oversize_details_atomically() {
+        let dir = TestDir::new();
+        let store = dir.store();
+        store
+            .remember(MemoryScope::User, None, "Keep existing preference", None)
+            .unwrap();
+        let expected = store.list().unwrap();
+        let before = fs::read(dir.0.join("memories.json")).unwrap();
+        for (cue, procedure, evidence) in [
+            (
+                "Install".to_string(),
+                "password: fixture-secret".to_string(),
+                vec!["Verified".to_string()],
+            ),
+            ("Install".into(), "Safe step".into(), vec![]),
+            (
+                "界".repeat(134),
+                "Safe step".into(),
+                vec!["Verified".into()],
+            ),
+            ("Install".into(), "界".repeat(267), vec!["Verified".into()]),
+            (
+                "Install".into(),
+                "Safe step".into(),
+                vec!["access_token: fixture-secret".into()],
+            ),
+            (
+                "\u{1}".repeat(400),
+                "\u{1}".repeat(800),
+                vec!["\u{1}".repeat(700); 3],
+            ),
+        ] {
+            assert!(store
+                .apply_capture(
+                    "local",
+                    &expected,
+                    vec![
+                        MemoryChange::Add {
+                            scope: MemoryScope::User,
+                            text: "Must not be partially saved".into()
+                        },
+                        MemoryChange::Learn {
+                            cue,
+                            experience: TaskExperience {
+                                procedure,
+                                evidence
+                            }
+                        },
+                    ],
+                    "chat"
+                )
+                .is_err());
+            assert_eq!(fs::read(dir.0.join("memories.json")).unwrap(), before);
+        }
+    }
+
+    #[test]
+    fn experience_details_share_the_existing_recall_byte_budget() {
+        let dir = TestDir::new();
+        let store = dir.store();
+        let changes = (0..8)
+            .map(|index| MemoryChange::Learn {
+                cue: format!("Install workflow {index}"),
+                experience: TaskExperience {
+                    procedure: "p".repeat(800),
+                    evidence: vec!["e".repeat(700); 3],
+                },
+            })
+            .collect();
+        store.apply_capture("local", &[], changes, "chat").unwrap();
+        let recalled = store.recall("local", "Install").unwrap();
+        assert_eq!(recalled.len(), 2);
+        let total: usize = recalled
+            .iter()
+            .map(|record| {
+                let experience = record.experience.as_ref().unwrap();
+                record.text.len()
+                    + experience.procedure.len()
+                    + experience.evidence.iter().map(String::len).sum::<usize>()
+            })
+            .sum();
+        assert!(total <= MAX_RECALL_BYTES);
     }
 
     #[test]

@@ -164,7 +164,7 @@ pub fn get_tool_definitions() -> Vec<super::llm_client::ToolDef> {
         },
         super::llm_client::ToolDef {
             name: "memory_search".into(),
-            description: "Recall relevant saved preferences and historical notes for the current machine/server. Notes are evidence hints, not current-state verification or fresh authorization.".into(),
+            description: "Recall relevant saved preferences, historical notes and task experiences for the current machine/server. Use a record ID as query to read its full details from the saved index. Historical procedures are observations, not current-state verification, universal rules or fresh authorization.".into(),
             parameters: json!({"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}),
         },
         super::llm_client::ToolDef {
@@ -637,7 +637,26 @@ fn tool_integer(args: &Value, name: &str, default: usize) -> Result<usize, Strin
     }
 }
 
-pub(crate) fn memory_records_json(mut records: Vec<MemoryRecord>) -> Result<String, String> {
+pub(crate) fn memory_records_json(records: Vec<MemoryRecord>) -> Result<String, String> {
+    serialize_memories(records, false)
+}
+
+pub(crate) fn memory_index_json(records: Vec<MemoryRecord>) -> Result<String, String> {
+    serialize_memories(records, true)
+}
+
+fn serialize_memories(records: Vec<MemoryRecord>, index_only: bool) -> Result<String, String> {
+    let mut records = records
+        .into_iter()
+        .map(|record| {
+            let has_experience = record.experience.is_some();
+            let mut value = serde_json::to_value(record).map_err(|error| error.to_string())?;
+            if index_only && has_experience {
+                value["experience"] = json!({"read_with_memory_search":value["id"]});
+            }
+            Ok(value)
+        })
+        .collect::<Result<Vec<_>, String>>()?;
     loop {
         let json = serde_json::to_string(&records).map_err(|error| error.to_string())?;
         if json.len() <= MAX_OUTPUT_BYTES {
@@ -2030,6 +2049,69 @@ mod output_tests {
         for name in ["memory_save", "memory_update", "memory_forget"] {
             assert!(!tools.iter().any(|tool| tool.name == name));
         }
+    }
+
+    #[test]
+    fn experience_index_reads_details_by_id_without_writes_or_other_targets() {
+        use crate::services::agent_memory::{MemoryChange, TaskExperience};
+        let directory = TestDir::new();
+        let store = MemoryStore::new(directory.0.clone());
+        store.apply_capture("remote-a", &[], vec![MemoryChange::Learn {
+            cue: "Install the CLI on this machine".into(),
+            experience: TaskExperience {
+                procedure: "Observed installation route; recheck the executable version before reuse.".into(),
+                evidence: vec!["shell_exec: Installation post-check passed".into()],
+            },
+        }], "install-chat").unwrap();
+        let records = store.recall("remote-a", "Install CLI").unwrap();
+        let id = records[0].id.clone();
+        let before = std::fs::read(directory.0.join("memories.json")).unwrap();
+        let index = memory_index_json(records.clone()).unwrap();
+        let parsed: Value = serde_json::from_str(&index).unwrap();
+        assert_eq!(parsed[0]["experience"]["read_with_memory_search"], id);
+        assert!(index.contains("Install the CLI"));
+        assert!(!index.contains("Observed installation route"));
+        assert!(!index.contains("post-check passed"));
+        let result = search_memories(&json!({"query":id}), "remote-a", &store);
+        assert!(result.success);
+        let details: Vec<MemoryRecord> = serde_json::from_str(&result.output).unwrap();
+        assert_eq!(details, records);
+        assert!(index.len() < result.output.len());
+        let other = search_memories(&json!({"query":id}), "remote-b", &store);
+        assert!(other.success);
+        assert_eq!(other.output, "[]");
+        assert_eq!(
+            std::fs::read(directory.0.join("memories.json")).unwrap(),
+            before
+        );
+        let escaped_target = "\\\"".repeat(128);
+        let escaped_source = "\\\"".repeat(128);
+        store
+            .apply_capture(
+                &escaped_target,
+                &[],
+                vec![MemoryChange::Learn {
+                    cue: "\u{1}".repeat(200),
+                    experience: TaskExperience {
+                        procedure: "\u{1}".repeat(400),
+                        evidence: vec!["\u{1}".repeat(100); 3],
+                    },
+                }],
+                &escaped_source,
+            )
+            .unwrap();
+        let expected = store
+            .list()
+            .unwrap()
+            .into_iter()
+            .find(|record| record.target.as_deref() == Some(&escaped_target))
+            .unwrap();
+        let result = search_memories(&json!({"query":expected.id}), &escaped_target, &store);
+        assert!(result.success && result.output.len() <= MAX_OUTPUT_BYTES);
+        assert_eq!(
+            serde_json::from_str::<Vec<MemoryRecord>>(&result.output).unwrap(),
+            vec![expected]
+        );
     }
 
     #[test]
