@@ -102,6 +102,130 @@ fn chinese_token_labels_work_without_masking_questions_about_passwords() {
 }
 
 #[test]
+fn additional_key_formats_and_private_key_labels_are_protected() {
+    for (text, value) in [
+        (
+            "PRIVATE_KEY=demoSigningCredential98765",
+            "demoSigningCredential98765",
+        ),
+        (
+            "{\"private_key\":\"demoSigningCredential98765\"}",
+            "demoSigningCredential98765",
+        ),
+        (
+            "Use gw_sk_demoRelayCredential987654321",
+            "gw_sk_demoRelayCredential987654321",
+        ),
+        (
+            "Use sk_demoServiceCredential987654321",
+            "sk_demoServiceCredential987654321",
+        ),
+        ("秘钥为 Abc123Signing987", "Abc123Signing987"),
+        ("私钥是 Abc123Signing987", "Abc123Signing987"),
+        ("私鑰為 Abc123Signing987", "Abc123Signing987"),
+        ("token 为 Abc123Signing987", "Abc123Signing987"),
+        ("API Key：Abc123Signing987", "Abc123Signing987"),
+        ("密钥为 67382910", "67382910"),
+        ("password: DemoPassword987\nuser: sample", "DemoPassword987"),
+        ("TOKEN=Abc123Signing987", "Abc123Signing987"),
+        ("token: \"Uint8Array\"", "Uint8Array"),
+        ("token 是 \"expired\"", "expired"),
+        ("密钥为 '4826'", "4826"),
+        ("password:\n  \"DemoPassword987\"", "DemoPassword987"),
+        ("password=longletterssecret", "longletterssecret"),
+        ("token 是 abcdefghijklmnop", "abcdefghijklmnop"),
+        ("密码是 4826", "4826"),
+    ] {
+        // A new engine per case prevents a previous match from hiding a missed rule.
+        let engine = engine();
+        let mut body = json!({"input":text});
+        protect(&mut body, &engine);
+        let masked = body["input"].as_str().unwrap();
+        assert!(
+            !masked.contains(value),
+            "credential was left unchanged: {text}"
+        );
+        assert_eq!(engine.lock().unwrap().restore(masked, false), text);
+    }
+}
+
+#[test]
+fn code_types_calls_and_operational_numbers_are_not_credentials() {
+    for text in [
+        "interface Auth { token: Uint8Array; }",
+        "const token = createSessionToken(options)",
+        "const password = hashPassword (input)",
+        "submit({ token: state.currentToken, enabled: true })",
+        "const keys = { private_key: credentials.signingKey, };",
+        "interface Keys { secretKey: Uint8Array; }",
+        "token 是 expired",
+        "token 是 3600000 ms",
+        "RSA 密钥为 2048 位",
+        "密钥为 4096000 位",
+        "令牌是 900000 毫秒",
+        "生日：2026-10-26，deadline 2026-11-01，timestamp: 1792903687",
+        "max_tokens=12345678 and total_tokens=87654321",
+        "请输入密钥，密码是什么？",
+        "密钥为 ${API_KEY}",
+    ] {
+        let engine = engine();
+        let mut body = json!({"input":text});
+        let original = body.clone();
+        protect(&mut body, &engine);
+        assert_eq!(body, original, "non-credential text was changed: {text}");
+        let mut signed = json!({"messages":[{"content":[{"type":"thinking","thinking":text,"signature":"sealed"}]}]});
+        let original = signed.clone();
+        protect(&mut signed, &engine);
+        assert_eq!(signed, original);
+    }
+}
+
+#[test]
+fn unquoted_credentials_need_code_context_before_they_can_be_exempted() {
+    for (text, value) in [
+        ("password=DemoPass987(654)", "DemoPass987(654)"),
+        ("password: DemoPass987, user=demo", "DemoPass987"),
+        ("password: demo.secret987, user=demo", "demo.secret987"),
+        (
+            "private_key: credentials.signingKey,",
+            "credentials.signingKey",
+        ),
+        ("secretKey: Uint8Array;", "Uint8Array"),
+    ] {
+        let memory = engine();
+        let mut body = json!({"input":text});
+        protect(&mut body, &memory);
+        let masked = body["input"].as_str().unwrap();
+        assert!(
+            !masked.contains(value),
+            "ambiguous literal was exempted: {text}"
+        );
+        assert_eq!(memory.lock().unwrap().restore(masked, false), text);
+        let mut sealed =
+            json!({"input":[{"type":"thinking","thinking":text,"signature":"sealed"}]});
+        assert!(Protection::with_engine(&mut sealed, engine()).is_err());
+    }
+}
+
+#[test]
+fn english_credential_labels_can_follow_chinese_without_a_space() {
+    for text in [
+        "我的token是Abc123Signing987",
+        "这个API Key为Abc123Signing987",
+    ] {
+        let memory = engine();
+        let mut body = json!({"input":text});
+        protect(&mut body, &memory);
+        let masked = body["input"].as_str().unwrap();
+        assert!(!masked.contains("Abc123Signing987"));
+        assert_eq!(memory.lock().unwrap().restore(masked, false), text);
+        let mut sealed =
+            json!({"input":[{"type":"thinking","thinking":text,"signature":"sealed"}]});
+        assert!(Protection::with_engine(&mut sealed, engine()).is_err());
+    }
+}
+
+#[test]
 fn structured_tool_arguments_do_not_inherit_protocol_field_exemptions() {
     let engine = engine();
     let args = json!({"password":"q\"uote\\line\n密码", "id":SECRET, "signature":SECRET});

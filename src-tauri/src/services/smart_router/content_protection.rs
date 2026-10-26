@@ -26,21 +26,117 @@ fn patterns() -> &'static Vec<Regex> {
     PATTERNS.get_or_init(|| {
     [
         r"(?s)-----BEGIN (?:[A-Z0-9]+ )?PRIVATE KEY-----.*?-----END (?:[A-Z0-9]+ )?PRIVATE KEY-----",
-        r"\bsk-(?:ant-|proj-|or-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}",
+        r"\b(?:sk[-_](?:ant-|proj-|or-|svcacct-|admin-)?|[A-Za-z]{2,4}_sk_)[A-Za-z0-9_-]{20,}",
         r"\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|glpat-[A-Za-z0-9_-]{20,})",
         r"\b(?:AIza[0-9A-Za-z_-]{35}|(?:AKIA|ASIA)[A-Z0-9]{16})\b",
         r"\b(?:xox[abposr]-[A-Za-z0-9-]{10,}|(?:sk|rk)_live_[A-Za-z0-9]{20,})",
         r"\b(?:hf_[A-Za-z0-9]{30,}|gsk_[A-Za-z0-9]{40,}|xai-[A-Za-z0-9_-]{30,}|npm_[A-Za-z0-9]{30,})",
         r"\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}",
         r#"[A-Za-z][A-Za-z0-9+.-]*://[^\s:@/?#"'<>]*:([^\s@/?#"'<>]{4,})@"#,
-        r#"(?i)\b[A-Za-z0-9_.-]*(?:api[_-]?key|access[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|refresh[_-]?token|client[_-]?secret|secret|password|passwd|credential|token)["']?\s*[:=]\s*["']?([^\s"'`,;<>\[\]{}]{8,})"#,
+        r#"(?i)\b[A-Za-z0-9_.-]*(?:api[_-]?key|access[_-]?key|secret[_-]?key|private[_-]?key|access[_-]?token|auth[_-]?token|refresh[_-]?token|client[_-]?secret|secret|password|passwd|credential|token)["']?\s*[:=]\s*["']?(?P<assigned>[^\s"'`,;<>\[\]{}]{8,})"#,
         r#"(?i)\bBearer[ \t]+([A-Za-z0-9._~+/=-]{8,})"#,
-        r#"(?i)(?:密码|密碼|口令|密钥|密鑰|金鑰|令牌|权杖|權杖|api[ _-]?key|token|password)[ \t]*(?:为|為|是|[:：=])[ \t]*["'“「]?([A-Za-z0-9_./\\+=~!@#$%^&*()?-]{4,})"#,
+        r#"(?i)(?:密码|密碼|口令|密钥|密鑰|秘钥|秘鑰|私钥|私鑰|金钥|金鑰|令牌|权杖|權杖|(?:^|[^A-Za-z0-9_])(?:api[ _-]?key|token|password))[ \t]*(?:为|為|是|[:：=])[ \t]*["'“「]?(?P<contextual>[A-Za-z0-9_./\\+=~!@#$%^&*()?-]{4,})"#,
     ]
     .into_iter()
     .map(|pattern| Regex::new(pattern).expect("static credential pattern"))
     .collect()
 })
+}
+
+fn credentials(text: &str) -> impl Iterator<Item = &str> {
+    patterns().iter().flat_map(move |pattern| {
+        pattern.captures_iter(text).filter_map(move |captures| {
+            let contextual = captures.name("contextual");
+            let assigned = captures.name("assigned");
+            let found = contextual
+                .or(assigned)
+                .or_else(|| captures.get(1))
+                .or_else(|| captures.get(0))
+                .unwrap();
+            if (assigned.is_some() || contextual.is_some())
+                && code_value(text, captures.get(0).unwrap().start(), found)
+            {
+                return None;
+            }
+            if contextual.is_some() && !text[..found.start()].ends_with(['"', '\'', '“', '「']) {
+                let label =
+                    text[captures.get(0).unwrap().start()..found.start()].to_ascii_lowercase();
+                let password = ["密码", "密碼", "口令", "password"]
+                    .iter()
+                    .any(|name| label.contains(name));
+                let value = found.as_str();
+                if value.bytes().all(|byte| byte.is_ascii_digit()) {
+                    if (!password && value.len() < 6) || numeric_unit(&text[found.end()..]) {
+                        return None;
+                    }
+                } else if !password
+                    && !(value.bytes().any(|byte| byte.is_ascii_alphabetic())
+                        && (value.bytes().any(|byte| byte.is_ascii_digit()) || value.len() >= 16))
+                {
+                    return None;
+                }
+            }
+            Some(found.as_str())
+        })
+    })
+}
+
+fn code_value(text: &str, field_start: usize, value: regex::Match<'_>) -> bool {
+    let before = text[..value.start()].trim_end_matches([' ', '\t']);
+    if before.ends_with(['"', '\'', '“', '「']) {
+        return false;
+    }
+    let after = text[value.end()..].trim_start_matches([' ', '\t']);
+    let candidate = value.as_str();
+    let (identifier, call) = candidate
+        .split_once('(')
+        .map_or((candidate, after.starts_with('(')), |(name, _)| {
+            (name, true)
+        });
+    let path = identifier
+        .as_bytes()
+        .first()
+        .is_some_and(|byte| byte.is_ascii_alphabetic() || *byte == b'_')
+        && identifier.split('.').all(|part| {
+            !part.is_empty() && part.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+        });
+    let candidate = path
+        && (call
+            || before.ends_with(':')
+                && after.starts_with([';', ',', ')', '}', ']', '|', '?', '&', '<', '>']));
+    if !candidate {
+        return false;
+    }
+    // Limit lookback on dense source text; ambiguous prose/config values stay protected.
+    let mut start = field_start.saturating_sub(256);
+    while !text.is_char_boundary(start) {
+        start += 1;
+    }
+    let prefix = text[start..field_start].trim_end_matches([' ', '\t']);
+    matches!(
+        prefix.split_ascii_whitespace().last(),
+        Some("const" | "let" | "var")
+    ) || prefix.rsplit_once('{').is_some_and(|(parent, fields)| {
+        !fields.contains('}')
+            && (parent.trim_end().ends_with('(')
+                || parent.split_ascii_whitespace().any(|word| {
+                    matches!(
+                        word,
+                        "const" | "let" | "var" | "interface" | "type" | "class"
+                    )
+                }))
+    })
+}
+
+fn numeric_unit(text: &str) -> bool {
+    let after = text.trim_start_matches([' ', '\t']);
+    ["位", "字节", "字節", "个", "個", "次", "秒", "毫秒", "天"]
+        .iter()
+        .any(|unit| after.starts_with(unit))
+        || matches!(
+            after.split(|ch: char| !ch.is_ascii_alphabetic()).next(),
+            Some("ms" | "s" | "bit" | "bits" | "byte" | "bytes")
+        )
 }
 
 pub(super) fn enabled(path: &Path) -> Result<bool, &'static str> {
@@ -120,7 +216,7 @@ impl Protection {
             request_strings(body, false, false, true, &mut |_, text, signed| {
                 let masked = store.mask(text);
                 if signed {
-                    if masked != *text || patterns().iter().any(|pattern| pattern.is_match(text)) {
+                    if masked != *text || credentials(text).next().is_some() {
                         result = Err(FAILURE);
                     }
                 } else {
@@ -203,11 +299,8 @@ impl Engine {
         if secret_field(key) {
             self.remember(text)?;
         }
-        for pattern in patterns().iter() {
-            for captures in pattern.captures_iter(text) {
-                let found = captures.get(1).or_else(|| captures.get(0)).unwrap();
-                self.remember(found.as_str())?;
-            }
+        for value in credentials(text) {
+            self.remember(value)?;
         }
         Ok(())
     }
