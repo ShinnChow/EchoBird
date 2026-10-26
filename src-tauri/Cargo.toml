@@ -1,6 +1,6 @@
 [package]
 name = "echobird"
-version = "6.0.6"
+version = "6.0.7"
 description = "The Nexus for Models, Agents & Vibe Coding"
 authors = ["Echobird Team"]
 license = "MIT"
@@ -123,7 +123,7 @@ which = "8"
 # (concatenated checksummed frames) by default; the "我的AI生涯" scanner
 # decompresses them to read the event log. Decode-only use, but the crate's
 # libzstd (zstd-sys, bundled C) is the standard multi-frame streaming decoder.
-zstd = "0.13.3"
+zstd = "0.14.3"
 
 [dev-dependencies]
 axum = { version = "0.8", features = ["http2"] }
