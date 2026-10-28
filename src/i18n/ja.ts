@@ -38,6 +38,8 @@ const ja: Partial<Translations> = {
   'plugins.china': 'GitCode (CN)',
   'plugins.install': 'インストール',
   'plugins.update': '更新',
+  'plugins.checkUpdates': '更新を確認',
+  'plugins.updated': 'プラグインを更新しました',
   'plugins.uninstall': 'プラグインを削除',
   'plugins.enabled': '有効',
   'plugins.disabled': '無効',

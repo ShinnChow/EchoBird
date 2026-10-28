@@ -9,6 +9,7 @@ import {
 import {
   Check,
   ChevronDown,
+  ExternalLink,
   FolderOpen,
   GitBranch,
   Plus,
@@ -32,6 +33,7 @@ import { useNavigationStore } from '../stores/navigationStore';
 import { ModelCardSkeleton } from '../components/cards/ModelCard';
 import { getDecodedImage, rememberDecodedImage } from '../utils/toolIcons';
 import * as api from '../api/plugins';
+import { openExternal } from '../api/tauri';
 import type {
   PluginCandidate,
   PluginCategory,
@@ -115,6 +117,18 @@ function PluginIconImage({ icon, fallback }: { icon?: string | null; fallback?: 
   );
 }
 
+const permissionLabels: Record<string, TKey> = {
+  'model.request': 'plugins.modelPermission',
+  'account.code': 'plugins.accountCodePermission',
+  'clipboard.write': 'plugins.clipboardPermission',
+  'extension.background': 'plugins.backgroundPermission',
+  configuration: 'plugins.configurationPermission',
+  storage: 'plugins.storagePermission',
+  commands: 'plugins.commandsPermission',
+  events: 'plugins.eventsPermission',
+  'text.process': 'plugins.textPermission',
+};
+
 function Permissions({ manifest }: { manifest: PluginManifest }) {
   const { t } = useI18n();
   return (
@@ -123,21 +137,7 @@ function Permissions({ manifest }: { manifest: PluginManifest }) {
         (permission) => (
           <li key={permission}>
             <ShieldCheck size={15} aria-hidden="true" />
-            {t(
-              (
-                {
-                  'model.request': 'plugins.modelPermission',
-                  'account.code': 'plugins.accountCodePermission',
-                  'clipboard.write': 'plugins.clipboardPermission',
-                  'extension.background': 'plugins.backgroundPermission',
-                  configuration: 'plugins.configurationPermission',
-                  storage: 'plugins.storagePermission',
-                  commands: 'plugins.commandsPermission',
-                  events: 'plugins.eventsPermission',
-                  'text.process': 'plugins.textPermission',
-                } as Record<string, TKey>
-              )[permission] ?? 'plugins.noPermissions'
-            )}
+            {t(permissionLabels[permission] ?? 'plugins.noPermissions')}
           </li>
         )
       )}
@@ -543,6 +543,18 @@ export function PluginHubMain({ active }: { active: boolean }) {
                 ))}
               </div>
             )}
+            <PageActionButton
+              icon={ExternalLink}
+              aria-label={`${t('plugins.source')}: ${t(store.region === 'china' ? 'plugins.china' : 'plugins.international')}`}
+              onClick={() => {
+                setMenu(null);
+                void openExternal(
+                  store.region === 'china'
+                    ? 'https://gitcode.com/edison7009/echobird-plugin'
+                    : 'https://github.com/edison7009/echobird-plugin'
+                ).catch((error) => showToast('error', String(error)));
+              }}
+            />
           </div>
         )}
         <div className="ph-search">
@@ -758,6 +770,7 @@ export function PluginHubMain({ active }: { active: boolean }) {
 
 export function PluginHubPanel() {
   const { t } = useI18n();
+  const { showToast } = useToast();
   const store = usePluginsStore();
   const confirm = useConfirm();
   const installed = store.installed.find((plugin) => plugin.id === store.selected);
@@ -796,14 +809,38 @@ export function PluginHubPanel() {
       </p>
       {installed && (
         <div className="ph-detail-action">
-          <span>{t(installed.enabled ? 'plugins.enabled' : 'plugins.disabled')}</span>
-          <RoutingToggle
-            label={manifest.displayName}
-            hideLabel
-            checked={installed.enabled}
-            pending={store.busy}
-            onChange={(enabled) => void store.enable(installed.id, enabled).catch(() => {})}
-          />
+          <button
+            className="ph-secondary"
+            disabled={store.busy || store.loading}
+            onClick={async () => {
+              try {
+                const result = await store.update(installed.id, (candidate) =>
+                  confirm({
+                    title: t('plugins.permissions'),
+                    message: `${candidate.manifest.displayName}\n${candidate.manifest.echobird.permissions
+                      .filter(
+                        (permission) =>
+                          !installed.manifest.echobird.permissions.includes(permission)
+                      )
+                      .map((permission) =>
+                        t(permissionLabels[permission] ?? 'plugins.noPermissions')
+                      )
+                      .join('\n')}`,
+                    confirmText: t('plugins.update'),
+                  })
+                );
+                if (result !== 'cancelled')
+                  showToast(
+                    'success',
+                    t(result === 'updated' ? 'plugins.updated' : 'settings.latestVersion')
+                  );
+              } catch (error) {
+                showToast('error', String(error));
+              }
+            }}
+          >
+            {t(store.busy ? 'plugins.checking' : 'plugins.checkUpdates')}
+          </button>
           <button
             className="ph-secondary"
             disabled={store.busy}

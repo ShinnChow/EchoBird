@@ -38,6 +38,8 @@ const zhHant: Partial<Translations> = {
   'plugins.china': 'GitCode (CN)',
   'plugins.install': '安裝',
   'plugins.update': '更新',
+  'plugins.checkUpdates': '檢查更新',
+  'plugins.updated': '外掛已更新',
   'plugins.uninstall': '解除安裝外掛',
   'plugins.enabled': '已啟用',
   'plugins.disabled': '已停用',

@@ -61,6 +61,8 @@ export type TKey =
   | 'plugins.themes'
   | 'plugins.uninstall'
   | 'plugins.update'
+  | 'plugins.checkUpdates'
+  | 'plugins.updated'
   | 'plugins.version'
   | 'settings.developerMode'
   | 'settings.developerModeError'

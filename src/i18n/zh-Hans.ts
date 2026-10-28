@@ -36,6 +36,8 @@ const zhHans: Partial<Translations> = {
   'plugins.china': 'GitCode (CN)',
   'plugins.install': '安装',
   'plugins.update': '更新',
+  'plugins.checkUpdates': '检查更新',
+  'plugins.updated': '插件已更新',
   'plugins.uninstall': '卸载插件',
   'plugins.enabled': '已启用',
   'plugins.disabled': '已停用',

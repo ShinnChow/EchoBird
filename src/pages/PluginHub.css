@@ -109,6 +109,9 @@
   align-items: center;
 }
 .ph-region {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
   margin-right: 12px;
 }

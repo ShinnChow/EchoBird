@@ -1,6 +1,12 @@
 import { create } from 'zustand';
+import { gt } from 'semver';
 import * as api from '../api/plugins';
-import type { InstalledPlugin, PluginRegistry, PluginRegion } from '../api/plugins';
+import type {
+  InstalledPlugin,
+  PluginCandidate,
+  PluginRegistry,
+  PluginRegion,
+} from '../api/plugins';
 import type { LocalTool } from '../api/types';
 import bundledIndex from '../data/pluginIndex.json';
 import { useNavigationStore } from './navigationStore';
@@ -60,6 +66,10 @@ interface PluginsState {
   select: (id: string | null) => void;
   setRegion: (region: PluginRegion) => void;
   install: (token: string) => Promise<void>;
+  update: (
+    id: string,
+    approve: (candidate: PluginCandidate) => Promise<boolean>
+  ) => Promise<'updated' | 'current' | 'cancelled'>;
   enable: (id: string, enabled: boolean) => Promise<void>;
   uninstall: (id: string) => Promise<void>;
 }
@@ -134,6 +144,57 @@ export const usePluginsStore = create<PluginsState>((set, get) => {
       }
     },
     install: (token) => mutate(() => api.installPlugin(token)),
+    update: async (id, approve) => {
+      let result: 'updated' | 'current' | 'cancelled' = 'cancelled';
+      await mutate(async () => {
+        const previous = get().installed.find((plugin) => plugin.id === id);
+        if (!previous) return get().installed;
+        const { region, revision } = get();
+        const current = () => active() && get().region === region && get().revision === revision;
+        let candidate: PluginCandidate | null = null;
+        try {
+          const catalog = get().registry.plugins.some((plugin) => plugin.id === id);
+          if (catalog) {
+            const registry = await api.getPluginRegistry(region, true);
+            if (!current()) return get().installed;
+            set({ registry });
+            const latest = registry.plugins.find((plugin) => plugin.id === id)?.releases[0];
+            if (!latest) throw new Error('Plugin is not in the official index');
+            if (!gt(latest.manifest.version, previous.manifest.version)) {
+              result = 'current';
+              return get().installed;
+            }
+          }
+          candidate = await api.previewPlugin(
+            catalog
+              ? 'catalog'
+              : previous.source.startsWith('https://')
+                ? 'repository'
+                : 'directory',
+            catalog ? id : previous.source,
+            region
+          );
+          if (!current()) return get().installed;
+          if (`${candidate.manifest.publisher}.${candidate.manifest.name}` !== id)
+            throw new Error('Updated plugin identity does not match the installed plugin');
+          if (!gt(candidate.manifest.version, previous.manifest.version)) {
+            result = 'current';
+            return get().installed;
+          }
+          const addedPermissions = candidate.manifest.echobird.permissions.some(
+            (permission) => !previous.manifest.echobird.permissions.includes(permission)
+          );
+          if (addedPermissions && !(await approve(candidate))) return get().installed;
+          if (!current()) return get().installed;
+          const installed = await api.installPlugin(candidate.token);
+          result = 'updated';
+          return installed;
+        } finally {
+          if (candidate) await api.cancelPlugin(candidate.token).catch(() => {});
+        }
+      });
+      return result;
+    },
     enable: (id, enabled) => mutate(() => api.setPluginEnabled(id, enabled)),
     uninstall: (id) => mutate(() => api.uninstallPlugin(id)),
   };

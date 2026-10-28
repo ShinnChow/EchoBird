@@ -37,6 +37,8 @@ const en: Translations = {
   'plugins.china': 'GitCode (CN)',
   'plugins.install': 'Install',
   'plugins.update': 'Update',
+  'plugins.checkUpdates': 'Check for updates',
+  'plugins.updated': 'Plugin updated',
   'plugins.uninstall': 'Uninstall plugin',
   'plugins.enabled': 'Enabled',
   'plugins.disabled': 'Disabled',
