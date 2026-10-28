@@ -22,13 +22,13 @@ async fn mock(responses: Vec<Response>) -> MockServer {
     let recorded = requests.clone();
     let responses = Arc::new(Mutex::new(VecDeque::from(responses)));
     let app = Router::new().route(
-        "/agenttool/v1/asr",
+        "/transcribe",
         post(move |headers: HeaderMap, mut fields: Multipart| {
             let recorded = recorded.clone();
             let responses = responses.clone();
             async move {
                 let field = fields.next_field().await.unwrap().unwrap();
-                assert_eq!(field.name(), Some("audio"));
+                assert_eq!(field.name(), Some("file"));
                 let filename = field.file_name().unwrap().to_owned();
                 let mime = field.content_type().unwrap().to_owned();
                 let bytes = field.bytes().await.unwrap();
@@ -57,9 +57,9 @@ async fn mock(responses: Vec<Response>) -> MockServer {
 
 fn upload() -> Upload {
     Upload {
-        selector: format!("workbuddy:{}", "a".repeat(64)),
+        selector: format!("codex:{}", "a".repeat(64)),
         source: AccountSource {
-            provider: AccountProvider::WorkBuddy,
+            provider: AccountProvider::Codex,
             account_id: "a".repeat(64),
         },
         audio: Bytes::from_static(b"RIFF\0\xff\x01\x80WAVEfixture"),
@@ -70,8 +70,7 @@ fn upload() -> Upload {
 }
 
 fn credentials(server: &MockServer, token: &str) -> Value {
-    json!({"accessToken":token,"uid":"selected-user","domain":"workbuddy.cn",
-        "enterpriseId":"selected-enterprise","baseUrl":"http://wrong-text-endpoint.invalid",
+    json!({"accessToken":token,"accountId":"selected-user",
         "_voice_test_endpoint":server.url})
 }
 
@@ -92,10 +91,7 @@ async fn forwards_binary_audio_and_selected_account_headers() {
     assert_eq!(recorded.len(), 1);
     let (headers, filename, mime, audio) = &recorded[0];
     assert_eq!(headers["authorization"], "Bearer selected-token");
-    assert_eq!(headers["x-user-id"], "selected-user");
-    assert_eq!(headers["x-domain"], "workbuddy.cn");
-    assert_eq!(headers["x-enterprise-id"], "selected-enterprise");
-    assert_eq!(headers["x-tenant-id"], "selected-enterprise");
+    assert_eq!(headers["chatgpt-account-id"], "selected-user");
     assert_eq!(filename, &input.filename);
     assert_eq!(mime, &input.mime);
     assert_eq!(audio, &input.audio);
@@ -168,8 +164,7 @@ async fn rejects_business_and_malformed_responses_but_accepts_silence() {
     for (response, expected) in [
         (Json(json!({"code":0,"text":""})).into_response(), Some("")),
         (
-            Json(json!({"code":123,"msg":"private upstream detail","text":"not a success"}))
-                .into_response(),
+            Json(json!({"error":"private upstream detail"})).into_response(),
             None,
         ),
         (Json(json!({"code":0})).into_response(), None),
@@ -224,7 +219,7 @@ async fn upstream_response_timeout_does_not_repeat_audio() {
 
 fn form() -> Form {
     Form::new()
-        .text("model", format!("workbuddy:{}", "a".repeat(64)))
+        .text("model", format!("codex:{}", "a".repeat(64)))
         .part(
             "file",
             Part::bytes(upload().audio.to_vec())
@@ -281,18 +276,18 @@ async fn validates_local_authentication_and_multipart_before_account_access() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     for invalid in [
-        Form::new().text("model", format!("workbuddy:{}", "a".repeat(64))),
+        Form::new().text("model", format!("codex:{}", "a".repeat(64))),
         Form::new().part("file", Part::bytes(vec![1])),
         Form::new()
-            .text("model", "workbuddy:../../other-account")
+            .text("model", "codex:../../other-account")
             .part("file", Part::bytes(vec![1])),
         Form::new()
             .text("model", format!("workbuddyAi:{}", "a".repeat(64)))
             .part("file", Part::bytes(vec![1])),
         Form::new()
-            .text("model", format!("workbuddy:{}", "a".repeat(64)))
+            .text("model", format!("codex:{}", "a".repeat(64)))
             .part("file", Part::bytes(vec![])),
-        form().text("model", format!("workbuddy:{}", "b".repeat(64))),
+        form().text("model", format!("codex:{}", "b".repeat(64))),
         form().text("language", "zh"),
         form().text("response_format", "srt"),
     ] {

@@ -24,9 +24,6 @@ use crate::services::model_manager;
 #[path = "zen_free.rs"]
 mod zen_free;
 
-#[path = "workbuddy_reset.rs"]
-mod workbuddy_reset;
-
 #[path = "standby.rs"]
 mod standby;
 #[path = "standby_probe.rs"]
@@ -3175,7 +3172,7 @@ fn mark_stream_failure(
         if let Some(value) = &proxy.retry_after {
             headers.insert(header::RETRY_AFTER, value.clone());
         }
-        let body = json!({"error":{"message":proxy.message,"code":proxy.error_code,"type":proxy.error_type}}).to_string();
+        let body = json!({"error":{"message":proxy.message,"code":proxy.error_code,"type":proxy.error_type,"retry_after":proxy.retry_after.as_ref().and_then(|value|value.to_str().ok())}}).to_string();
         return mark_upstream_failure(
             state,
             candidate,
@@ -3197,18 +3194,30 @@ fn mark_upstream_failure(
     retry_after: Option<Duration>,
     model_scope: bool,
 ) -> Option<FailureClass> {
-    let known = workbuddy_reset::classify(candidate, status, body, now_ms());
-    let failure = known
-        .as_ref()
-        .map(|known| known.failure)
-        .or_else(|| classify_failure(status, body))?;
+    let failure = classify_failure(status, body)?;
+    let reset_at_ms = if model_scope
+        && candidate.account_source.as_ref().is_some_and(|source| {
+            crate::services::plugin_accounts::application(source.provider).is_some()
+        }) {
+        serde_json::from_slice::<Value>(body)
+            .ok()
+            .and_then(|value| {
+                value["error"]["retry_after"]
+                    .as_str()
+                    .and_then(|value| value.parse::<u64>().ok())
+            })
+            .filter(|seconds| *seconds <= 7 * 24 * 60 * 60)
+            .map(|seconds| now_ms().saturating_add(seconds.saturating_mul(1000)))
+    } else {
+        None
+    };
     mark_failure_until(
         state,
         candidate,
         failure,
         retry_after,
-        model_scope || known.is_some(),
-        known.and_then(|known| known.reset_at_ms),
+        model_scope,
+        reset_at_ms,
     );
     Some(failure)
 }
@@ -6358,19 +6367,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn workbuddy_typed_quota_errors_fall_back_and_keep_the_official_model_deadline() {
+    async fn plugin_typed_quota_errors_keep_the_model_deadline() {
         for streaming in [false, true] {
-            let reset = chrono::Utc::now() + chrono::Duration::days(2);
-            let message = format!(
-                "WorkBuddy: your usage will reset at {} UTC+8, switch models until then",
-                reset
-                    .with_timezone(&chrono::FixedOffset::east_opt(8 * 3600).unwrap())
-                    .format("%Y-%m-%d %H:%M:%S")
+            let deadline = now_ms() + 172800000;
+            let mut error = crate::services::account_proxy::ProxyError::new(
+                StatusCode::TOO_MANY_REQUESTS,
+                "Model quota limit",
             );
-            let deadline = reset.timestamp() as u64 * 1000;
-            let mut error =
-                crate::services::account_proxy::ProxyError::new(StatusCode::BAD_GATEWAY, message);
-            error.error_code = Some("6004".into());
+            error.error_code = Some("rate_limit_exceeded".into());
+            error.retry_after = Some(HeaderValue::from_static("172800"));
+            error.model_scope = true;
             let backup = if streaming {
                 Response::new(Body::from("data: {\"choices\":[{\"delta\":{\"content\":\"backup\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"))
             } else {
@@ -6406,9 +6412,12 @@ mod tests {
                 memory.candidates["wb-typed"].failure,
                 Some(FailureClass::RateLimit)
             );
-            assert_eq!(
-                memory.candidates["wb-typed"].cooldown_until_ms,
-                Some(deadline)
+            assert!(
+                memory.candidates["wb-typed"]
+                    .cooldown_until_ms
+                    .unwrap()
+                    .abs_diff(deadline)
+                    < 1000
             );
             assert!(memory.accounts.is_empty());
         }

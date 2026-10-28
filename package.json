@@ -10,7 +10,7 @@
     "dev": "npm run tools:sync && cargo tauri dev",
     "build": "cargo tauri build",
     "preview": "vite preview",
-    "test": "vitest run --passWithNoTests && node --test scripts/tests/website_download.test.mjs",
+    "test": "vitest run --passWithNoTests && node --test scripts/tests/website_download.test.mjs scripts/tests/plugin_sdk.test.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.{ts,tsx}\" --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
@@ -30,6 +30,7 @@
     "@tauri-apps/plugin-shell": "^2.3.5",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "semver": "7.8.5",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
@@ -37,6 +38,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@types/react-test-renderer": "18.3.0",
+    "@types/semver": "7.8.0",
     "@typescript-eslint/eslint-plugin": "^8.59.3",
     "@typescript-eslint/parser": "^8.59.3",
     "@vitejs/plugin-react": "^4.3.1",

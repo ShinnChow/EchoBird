@@ -606,6 +606,22 @@ describe('AppManager views', () => {
     expect(markup).not.toContain(`aria-label="${hidden}"`);
   });
 
+  it('hides bundled app entries while retaining installed plugin entries', async () => {
+    const markup = await renderView('desktop', [
+      { ...installedTool, id: 'reversi', name: 'Bundled board game' },
+      { ...installedTool, id: 'translator', name: 'AI Translator' },
+      {
+        ...installedTool,
+        id: 'plugin:fixture.game:game',
+        name: 'Plugin board game',
+        plugin: { id: 'fixture.game', pageId: 'game' },
+      },
+    ]);
+    expect(markup).not.toContain('aria-label="Bundled board game"');
+    expect(markup).not.toContain('aria-label="AI Translator"');
+    expect(markup).toContain('aria-label="Plugin board game"');
+  });
+
   it.each([
     ['desktop', [uninstalledTool], 'aiDesktop.emptyDesktop'],
     ['install', [installedTool], 'aiDesktop.emptyInstall'],
@@ -739,8 +755,14 @@ describe('PageAwareHint', () => {
     expect(vi.getTimerCount()).toBe(0);
     act(() => renderer!.update(render()));
     expect(vi.getTimerCount()).toBe(1);
-    act(() => useNavigationStore.setState({ activePage: 'myProjects' }));
-    expect(text()).toBe('hint.myProjects');
+    act(() =>
+      useNavigationStore.setState({
+        activePage: 'developer',
+        developerMode: true,
+        developerTab: 'plugins',
+      })
+    );
+    expect(text()).toBeUndefined();
     expect(vi.getTimerCount()).toBe(0);
     act(() => useNavigationStore.setState({ activePage: 'voice' }));
     expect(vi.getTimerCount()).toBe(0);

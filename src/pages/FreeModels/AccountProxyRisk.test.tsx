@@ -1,3 +1,4 @@
+import { enableAccountPlugins } from '../../test/accountPlugins';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import * as api from '../../api/tauri';
@@ -129,6 +130,7 @@ function expectPassive() {
 }
 
 beforeEach(async () => {
+  enableAccountPlugins();
   useAccountAccessRiskStore.setState({ acknowledged: false, hydrated: false });
   language.locale = 'zh-Hans';
   await loadLocale(language.locale);

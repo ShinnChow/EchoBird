@@ -817,7 +817,20 @@ pub fn run() {
         .manage(ssh_commands::create_ssh_pool())
         .manage(services::agent_loop::create_session_map())
         .manage(services::parasite::create_parasite_sessions())
+        .manage(services::plugin_manager::PluginManager::default())
+        .manage(services::plugin_runtime::PluginRuntime::default())
+        .register_uri_scheme_protocol("echobird-plugin", |context, request| {
+            context
+                .app_handle()
+                .state::<services::plugin_runtime::PluginRuntime>()
+                .serve(context.webview_label(), request.uri())
+        })
         .setup(move |app| {
+            let statistics_settings = settings_commands::get_settings();
+            services::developer_preview::configure(
+                app.handle(),
+                statistics_settings.developer_mode == Some(true),
+            );
             // Clean up orphaned llama-server from a previous EchoBird session.
             kill_stale_llama_server();
             log::info!("[Setup] Cleaned up any leftover llama-server processes");
@@ -887,8 +900,7 @@ pub fn run() {
                 .plugin(tauri_plugin_global_shortcut::Builder::new().build())?;
             services::voice_input::init(app.handle());
 
-            // Register dialog plugin (native file pickers, used by the
-            // "我的AI项目" Add dialog for icon / launcher / models.json paths)
+            // Register native file pickers.
             app.handle().plugin(tauri_plugin_dialog::init())?;
 
             // Register autostart plugin (launch at login). Initialized with a
@@ -1114,7 +1126,24 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(services::plugin_runtime::guard(tauri::generate_handler![
+            commands::plugin_commands::plugin_list,
+            commands::plugin_commands::plugin_registry,
+            commands::plugin_commands::plugin_preview,
+            commands::plugin_commands::plugin_cancel,
+            commands::plugin_commands::plugin_install,
+            commands::plugin_commands::plugin_set_enabled,
+            commands::plugin_commands::plugin_uninstall,
+            commands::plugin_commands::plugin_launch,
+            commands::plugin_commands::plugin_account_operation,
+            commands::plugin_commands::plugin_model_request,
+            commands::plugin_commands::plugin_clipboard_write,
+            commands::plugin_commands::plugin_sdk_state,
+            commands::plugin_commands::plugin_sdk_manage,
+            commands::plugin_commands::plugin_sdk_execute,
+            commands::plugin_commands::plugin_host_call,
+            commands::plugin_commands::plugin_host_result,
+            commands::plugin_commands::plugin_window_control,
             mod_stub::app_ready,
             window_visibility::get_main_window_visibility,
             window_visibility::hide_main_window,
@@ -1260,10 +1289,6 @@ pub fn run() {
             tool_commands::switch_codex_account,
             tool_commands::refresh_codex_account_quota,
             tool_commands::delete_codex_account,
-            tool_commands::launch_game,
-            tool_commands::apply_user_project_model,
-            tool_commands::launch_user_project,
-            tool_commands::seed_builtin_to_user_dir,
             tool_commands::open_folder,
             tool_commands::open_tool_paths_config,
             model_commands::get_models,
@@ -1389,8 +1414,6 @@ pub fn run() {
             process_commands::list_engine_release_options,
             settings_commands::get_settings,
             settings_commands::save_settings,
-            settings_commands::get_my_projects,
-            settings_commands::save_my_projects,
             ssh_commands::ssh_test_connection,
             ssh_commands::load_ssh_servers,
             ssh_commands::save_ssh_server,
@@ -1434,7 +1457,7 @@ pub fn run() {
             commands::voice_input_commands::voice_selection_ready,
             commands::voice_input_commands::voice_selection_translate,
             commands::voice_input_commands::voice_selection_close,
-        ])
+        ]))
         .build(context)
         .expect("error while building tauri application")
         .run(|app_handle, event| {

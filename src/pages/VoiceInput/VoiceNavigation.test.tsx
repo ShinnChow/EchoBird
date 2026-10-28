@@ -1,3 +1,4 @@
+import { enableAccountPlugins } from '../../test/accountPlugins';
 import { useLayoutEffect } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -75,6 +76,7 @@ async function visit(page: 'voice' | 'models') {
   });
 }
 beforeEach(() => {
+  enableAccountPlugins();
   vi.useFakeTimers();
   vi.clearAllMocks();
   vi.mocked(listen).mockResolvedValue(() => {});

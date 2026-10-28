@@ -254,7 +254,7 @@ impl ProcessManager {
         // Merge for both official and third-party launches, after desktop
         // shutdown and before choosing the native/Store/CLI launch route.
         if tool_id == "claudedesktop" && restart {
-            crate::services::claude_desktop_history::prepare(None).await?;
+            crate::services::plugin_accounts::prepare_history("claudedesktop", false).await?;
         }
         if matches!(tool_id, "codex" | "chatgptdesktop") {
             if let Some(codex_dir) = crate::services::codex_runtime::default_codex_dir() {
@@ -1840,49 +1840,6 @@ impl Drop for OwnedDesktopConfigProcess {
 
 pub(crate) fn start_desktop_for_config(tool_id: &str) -> Result<OwnedDesktopConfigProcess, String> {
     start_desktop_with_config_args(tool_id, &[])
-}
-
-pub(crate) fn start_doubao_account_bridge(
-    tool_id: &str,
-    port: u16,
-) -> Result<OwnedDesktopConfigProcess, String> {
-    let product = match tool_id {
-        "doubaowork" => "DoubaoWork",
-        "dola" => "Cici",
-        _ => return Err("accountError.format".into()),
-    };
-    if port == 0 {
-        return Err("accountError.format".into());
-    }
-    #[cfg(windows)]
-    let data_dir = dirs::data_local_dir().map(|root| root.join(product).join("User Data"));
-    #[cfg(target_os = "macos")]
-    let data_dir = dirs::data_dir().map(|root| root.join(product));
-    #[cfg(not(any(windows, target_os = "macos")))]
-    let data_dir = dirs::config_dir().map(|root| root.join(product));
-    let data_dir = data_dir.ok_or("accountError.initializeClient")?;
-    start_desktop_with_config_args(
-        tool_id,
-        &[
-            "--headless=new".into(),
-            format!("--user-data-dir={}", data_dir.display()),
-            "--remote-debugging-address=127.0.0.1".into(),
-            format!("--remote-debugging-port={port}"),
-        ],
-    )
-}
-
-#[cfg(test)]
-pub(crate) fn start_doubao_account_restart_probe(
-    port: u16,
-) -> Result<OwnedDesktopConfigProcess, String> {
-    start_desktop_with_config_args(
-        "doubaowork",
-        &[
-            "--remote-debugging-address=127.0.0.1".into(),
-            format!("--remote-debugging-port={port}"),
-        ],
-    )
 }
 
 fn start_desktop_with_config_args(

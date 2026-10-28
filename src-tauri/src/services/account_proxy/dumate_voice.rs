@@ -19,7 +19,7 @@ pub(crate) fn validate_audio(audio: &[u8], mime: &str) -> Result<(), ProxyError>
             "DuMate speech requires WAV audio",
         ));
     }
-    let pcm = super::claude_voice::pcm(audio).map_err(|_| {
+    let pcm = super::audio_format::pcm(audio).map_err(|_| {
         ProxyError::new(
             StatusCode::BAD_REQUEST,
             "DuMate speech requires 16 kHz mono PCM16 WAV audio",

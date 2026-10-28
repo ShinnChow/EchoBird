@@ -1,3 +1,4 @@
+import { useAccountProviderFilter } from '../../hooks/useAccountPlugin';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useNavigationStore } from '../../stores/navigationStore';
@@ -18,6 +19,7 @@ interface AccountDirectory {
 const Context = createContext<AccountDirectory | null>(null);
 
 export function VoiceInputProvider({ children }: { children: ReactNode }) {
+  const available = useAccountProviderFilter();
   const active = useNavigationStore((state) => state.activePage === 'voice');
   const [directory, setDirectory] = useState<AccountDirectory>({
     accounts: [],
@@ -28,13 +30,14 @@ export function VoiceInputProvider({ children }: { children: ReactNode }) {
     let disposed = false;
     void Promise.resolve().then(async () => {
       if (disposed) return;
+      const providers = accountSpeechProviders.filter(available);
       const results = await Promise.allSettled(
-        accountSpeechProviders.map((provider) => listProxyAccounts(provider.id))
+        providers.map((provider) => listProxyAccounts(provider.id))
       );
       if (disposed) return;
       setDirectory((previous) => {
         const accountCounts = { ...previous.accountCounts };
-        const accounts = accountSpeechProviders.flatMap((provider, index) => {
+        const accounts = providers.flatMap((provider, index) => {
           const result = results[index];
           if (result.status === 'fulfilled') {
             accountCounts[provider.id] = result.value.length;
@@ -48,7 +51,7 @@ export function VoiceInputProvider({ children }: { children: ReactNode }) {
     return () => {
       disposed = true;
     };
-  }, [active]);
+  }, [active, available]);
   useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
@@ -84,7 +87,18 @@ export function VoiceInputProvider({ children }: { children: ReactNode }) {
         void state.cancel();
     };
   }, [active]);
-  return <Context.Provider value={directory}>{children}</Context.Provider>;
+  return (
+    <Context.Provider
+      value={{
+        ...directory,
+        accounts: directory.accounts.filter((account) =>
+          available({ id: account.source.provider })
+        ),
+      }}
+    >
+      {children}
+    </Context.Provider>
+  );
 }
 
 export function useVoiceAccounts() {

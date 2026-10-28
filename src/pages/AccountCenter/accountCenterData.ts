@@ -1,3 +1,4 @@
+import { accountPluginAvailable, communityAccountApplications } from '../../hooks/useAccountPlugin';
 import type { AppManagerContextType } from '../AppManager/context';
 import type { ManagedAccount } from '../AppManager/useManagedAccounts';
 import type { AntigravityQuota, TraeAccount, WorkBuddyAccount } from '../../api/tauri';
@@ -31,6 +32,7 @@ import {
 } from '../AppManager/dumateAccountDisplay';
 import { devinQuotaLabel } from '../AppManager/devinAccountDisplay';
 import { doubaoRemainingPercent, doubaoWindowLabel } from '../AppManager/doubaoAccountDisplay';
+import { openAccountPlugins } from '../AppManager/openAccountPlugins';
 
 export interface AccountMetric {
   label: string;
@@ -190,49 +192,57 @@ export function accountCenterProviders(
       | 'claimStatusExpiresAt'
       | 'showUnclaimed'
     >
-  ): AccountProvider => ({
-    id,
-    name,
-    icon,
-    website: context.detectedTools.find((tool) => toolIds.includes(tool.id) && tool.website)
-      ?.website,
-    installed: context.detectedTools.some((tool) => toolIds.includes(tool.id) && tool.installed),
-    busy: group.busy,
-    loading: group.loading,
-    loaded: group.loaded,
-    readFailed: group.readFailed,
-    mutationRevision: group.mutationRevision,
-    remainingSeconds: group.remainingSeconds,
-    waitingLabel: undefined,
-    add: () => void group.add(),
-    cancelLogin: group.cancelLogin,
-    accounts: group.accounts.map((account) => {
-      const summary = describe(account);
-      const free = isFreePlan(summary.plan);
-      return {
-        id: account.id,
-        ...summary,
-        subscriptionEndAt:
-          free && summary.subscriptionEndAt == null ? undefined : summary.subscriptionEndAt,
-        metrics:
-          id !== 'trae' &&
-          id !== 'traecn' &&
-          id !== 'kiro' &&
-          free &&
-          summary.metrics.every(
-            (metric) => metric.value === '—' && metric.percent == null && metric.resetAt == null
-          )
-            ? []
-            : summary.metrics,
-        refreshing: group.refreshing.has(account.id),
-        authorizationFailed: group.authorizationFailedIds.has(account.id),
-        refresh: async (onError) => {
-          await group.refresh(account, undefined, onError);
-        },
-        remove: () => void group.remove(account),
-      };
-    }),
-  });
+  ): AccountProvider => {
+    return {
+      id,
+      name,
+      icon,
+      website: context.detectedTools.find((tool) => toolIds.includes(tool.id) && tool.website)
+        ?.website,
+      installed: context.detectedTools.some((tool) => toolIds.includes(tool.id) && tool.installed),
+      busy: group.busy,
+      loading: group.loading,
+      loaded: group.loaded,
+      readFailed: group.readFailed,
+      mutationRevision: group.mutationRevision,
+      remainingSeconds: group.remainingSeconds,
+      waitingLabel: undefined,
+      add: () => {
+        if (communityAccountApplications.includes(id) && !accountPluginAvailable(id)) {
+          void openAccountPlugins().catch((error) => context.setApplyError(String(error)));
+        } else {
+          void group.add();
+        }
+      },
+      cancelLogin: group.cancelLogin,
+      accounts: group.accounts.map((account) => {
+        const summary = describe(account);
+        const free = isFreePlan(summary.plan);
+        return {
+          id: account.id,
+          ...summary,
+          subscriptionEndAt:
+            free && summary.subscriptionEndAt == null ? undefined : summary.subscriptionEndAt,
+          metrics:
+            id !== 'trae' &&
+            id !== 'traecn' &&
+            id !== 'kiro' &&
+            free &&
+            summary.metrics.every(
+              (metric) => metric.value === '—' && metric.percent == null && metric.resetAt == null
+            )
+              ? []
+              : summary.metrics,
+          refreshing: group.refreshing.has(account.id),
+          authorizationFailed: group.authorizationFailedIds.has(account.id),
+          refresh: async (onError) => {
+            await group.refresh(account, undefined, onError);
+          },
+          remove: () => void group.remove(account),
+        };
+      }),
+    };
+  };
   return [
     provider(
       'codex',

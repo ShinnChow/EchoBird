@@ -26,6 +26,7 @@ export interface DetectedTool {
 
 // UI-level tool type used by AppManager, MotherAgent, and App shell
 export interface LocalTool extends DetectedTool {
+  plugin?: { id: string; pageId: string };
   path?: string;
   icon?: string;
   displayName?: string;
@@ -170,6 +171,7 @@ export interface ApplyModelInput {
 // ─── App Settings Types ───
 
 export interface AppSettings {
+  developerMode?: boolean;
   sensitiveInfoProtection?: boolean;
   locale?: string;
   themeMode?: 'light' | 'dark';

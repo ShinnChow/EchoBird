@@ -8,14 +8,17 @@ vi.mock('@tauri-apps/api/event', () => events);
 
 let store: typeof import('./themeStore').useThemeStore;
 let storage: Map<string, string>;
-let root: { dataset: { theme?: string }; style: { setProperty: ReturnType<typeof vi.fn> } };
+let root: {
+  dataset: { theme?: string };
+  style: { setProperty: ReturnType<typeof vi.fn>; removeProperty: ReturnType<typeof vi.fn> };
+};
 let media: { matches: boolean; addEventListener: ReturnType<typeof vi.fn> };
 
 beforeEach(async () => {
   vi.resetModules();
   vi.resetAllMocks();
   storage = new Map();
-  root = { dataset: { theme: 'dark' }, style: { setProperty: vi.fn() } };
+  root = { dataset: { theme: 'dark' }, style: { setProperty: vi.fn(), removeProperty: vi.fn() } };
   media = { matches: false, addEventListener: vi.fn() };
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => storage.get(key) ?? null,
@@ -144,5 +147,51 @@ describe('startup theme before React mounts', () => {
     const script = startupHtml.match(/<script>([\s\S]*?)<\/script>/)![1];
     new Function('localStorage', 'document', 'window', script)(localStorage, document, window);
     expect(root.dataset.theme).toBe(cached ?? 'dark');
+  });
+});
+
+describe('plugin palettes', () => {
+  const palette = {
+    id: 'ocean',
+    title: 'Ocean',
+    light: { accent: '#112233', background: '#F0F1F2' },
+    dark: { accent: '#445566', background: '#010203' },
+  };
+  it('applies approved tokens and restores the original palette and CSS defaults when removed', async () => {
+    await store.getState().init();
+    store.getState().setPluginTheme(palette);
+    expect(root.style.setProperty).toHaveBeenCalledWith('--accent-rgb', '68 85 102');
+    expect(root.style.setProperty).toHaveBeenCalledWith('--bg-base-rgb', '1 2 3');
+    expect(api.saveSettings).not.toHaveBeenCalled();
+    store.getState().setPluginTheme(null);
+    expect(root.style.removeProperty).toHaveBeenCalledWith('--accent-rgb');
+    expect(root.style.setProperty).toHaveBeenLastCalledWith(
+      '--view-mode-wave-rgb',
+      'var(--view-mode-accent-rgb)'
+    );
+    expect(store.getState().colorTheme).toBe('oatgray');
+  });
+  it('follows light/dark without overwriting the saved base color and clears when the user picks a built-in palette', async () => {
+    await store.getState().init();
+    store.getState().setPluginTheme(palette);
+    store.getState().setMode('light');
+    expect(root.style.setProperty).toHaveBeenCalledWith('--accent-rgb', '17 34 51');
+    store.getState().setColorTheme('aurora');
+    expect(events.emit).toHaveBeenLastCalledWith('echobird-theme-changed', {
+      mode: 'light',
+      colorTheme: 'aurora',
+      pluginTheme: null,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(api.saveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ colorTheme: 'aurora' })
+    );
+  });
+  it('synchronizes a plugin palette across windows even if mode and built-in palette stay the same', () => {
+    store.getState().sync({ mode: 'dark', colorTheme: 'oatgray', pluginTheme: palette });
+    expect(root.style.setProperty).toHaveBeenCalledWith('--accent-rgb', '68 85 102');
+    store.getState().sync({ mode: 'dark', colorTheme: 'oatgray', pluginTheme: null });
+    expect(root.style.removeProperty).toHaveBeenCalledWith('--accent-rgb');
   });
 });

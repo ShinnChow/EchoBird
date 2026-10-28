@@ -3,9 +3,8 @@ use serde_json::Value;
 use std::time::Duration;
 
 use super::{
-    antigravity_voice, claude_voice, codearts_voice, codex_voice, cursor_voice, devin_voice,
-    doubao_voice, dumate_voice, grokbot_voice, kilo_voice, minimax_voice, qoder_voice,
-    qwenwork_voice, trae_global_voice, trae_voice, workbuddy_voice, ProxyError,
+    antigravity_voice, codearts_voice, codex_voice, cursor_voice, devin_voice, dumate_voice,
+    grokbot_voice, kilo_voice, minimax_voice, qoder_voice, qwenwork_voice, ProxyError,
 };
 use crate::models::model::{AccountProvider, AccountSource};
 use crate::services::account_model_sources;
@@ -189,13 +188,6 @@ pub(crate) async fn credentials(
         return crate::services::dumate_accounts::voice_credentials(&source.account_id, rejected)
             .await;
     }
-    if source.provider == AccountProvider::DoubaoWork {
-        return crate::services::doubao_accounts::speech::speech_credentials(
-            &source.account_id,
-            rejected,
-        )
-        .await;
-    }
     if matches!(
         source.provider,
         AccountProvider::Qoder | AccountProvider::QoderCn
@@ -230,15 +222,21 @@ where
     Fut: std::future::Future<Output = Result<Value, String>>,
 {
     let (source, model) = parse_selector(request.selector)?;
+    if let Some(application) = crate::services::plugin_accounts::application(source.provider) {
+        use base64::Engine;
+        account_model_sources::validate_source(&source)
+            .await
+            .map_err(account_model_sources::credential_error)?;
+        let value=crate::services::plugin_accounts::call(application,"voice",serde_json::json!({"accountId":source.account_id,"audio":base64::engine::general_purpose::STANDARD.encode(request.audio),"filename":request.filename,"mime":request.mime})).await.map_err(account_model_sources::credential_error)?;
+        return serde_json::from_value(value).map_err(ProxyError::upstream);
+    }
+
     match source.provider {
         AccountProvider::Dumate => dumate_voice::validate_audio(request.audio, request.mime)?,
         AccountProvider::Cursor => cursor_voice::validate_audio(request.audio, request.mime)?,
         AccountProvider::GrokBot => grokbot_voice::validate_audio(request.audio, request.mime)?,
         AccountProvider::Devin => devin_voice::validate_audio(request.audio, request.mime)?,
-        AccountProvider::Trae => trae_global_voice::validate_audio(request.audio, request.mime)?,
-        AccountProvider::Traecn => trae_voice::validate_audio(request.audio, request.mime)?,
         AccountProvider::CodeArts => codearts_voice::validate_audio(request.audio, request.mime)?,
-        AccountProvider::DoubaoWork => doubao_voice::validate_audio(request.audio, request.mime)?,
         _ => {}
     }
     let mut current = credentials(None)
@@ -286,28 +284,8 @@ where
                 )
                 .await
             }
-            AccountProvider::Trae => {
-                trae_global_voice::transcribe(
-                    client,
-                    &current,
-                    request.audio,
-                    request.filename,
-                    request.mime,
-                )
-                .await
-            }
             AccountProvider::CodeArts => {
                 codearts_voice::transcribe(
-                    client,
-                    &current,
-                    request.audio,
-                    request.filename,
-                    request.mime,
-                )
-                .await
-            }
-            AccountProvider::DoubaoWork => {
-                doubao_voice::transcribe(
                     client,
                     &current,
                     request.audio,
@@ -344,37 +322,6 @@ where
             }
             AccountProvider::Qoder | AccountProvider::QoderCn => {
                 qoder_voice::transcribe(
-                    client,
-                    &current,
-                    request.audio,
-                    request.filename,
-                    request.mime,
-                )
-                .await
-            }
-            AccountProvider::Traecn => {
-                trae_voice::transcribe(
-                    client,
-                    &current,
-                    request.audio,
-                    request.filename,
-                    request.mime,
-                )
-                .await
-            }
-            AccountProvider::WorkBuddy | AccountProvider::WorkBuddyAi => {
-                workbuddy_voice::transcribe_for_provider(
-                    client,
-                    source.provider,
-                    &current,
-                    request.audio,
-                    request.filename,
-                    request.mime,
-                )
-                .await
-            }
-            AccountProvider::ClaudeCode => {
-                claude_voice::transcribe(
                     client,
                     &current,
                     request.audio,

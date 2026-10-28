@@ -76,6 +76,7 @@ scripts/tests/*
 !scripts/tests/test_refresh_free_models.py
 !scripts/tests/test_filter_pulse.py
 !scripts/tests/website_download.test.mjs
+!scripts/tests/plugin_sdk.test.mjs
 
 # llama-server binaries (downloaded during CI build)
 electron/tools/llama-server/bin/

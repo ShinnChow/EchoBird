@@ -109,7 +109,7 @@ describe('application character background lifecycle', () => {
       'models',
       'freeModels',
       'mother',
-      'myProjects',
+      'developer',
       'aiCareer',
       'aiNews',
       'localLlm',

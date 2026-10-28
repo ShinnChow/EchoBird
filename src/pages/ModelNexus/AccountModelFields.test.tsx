@@ -1,3 +1,4 @@
+import { enableAccountPlugins } from '../../test/accountPlugins';
 import { useLayoutEffect, useState, type ComponentProps } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -168,6 +169,7 @@ function field(label: string) {
     .find((node) => node.props.ariaLabel === label)!;
 }
 beforeEach(() => {
+  enableAccountPlugins();
   stored = new Map();
   setItem = vi.fn((key: string, value: string) => stored.set(key, value));
   vi.stubGlobal('localStorage', { getItem: (key: string) => stored.get(key) ?? null, setItem });

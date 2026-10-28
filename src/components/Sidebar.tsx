@@ -3,7 +3,7 @@ import { useRef, type ReactNode } from 'react';
 import {
   Box,
   Server,
-  FolderHeart,
+  CodeXml,
   Trophy,
   Newspaper,
   Monitor,
@@ -24,6 +24,7 @@ import { useLocalServerStatusStore } from '../stores/localServerStatusStore';
 import { useVoiceInputStore, voiceBusy } from '../stores/voiceInputStore';
 import { BirdEasterEgg } from './BirdEasterEgg';
 import { useSidebarStore } from '../stores/sidebarStore';
+import { useNavigationStore } from '../stores/navigationStore';
 
 declare const __APP_EDITION__: string;
 const isFullEdition = __APP_EDITION__ === 'full';
@@ -36,7 +37,7 @@ export type PageType =
   | 'aiNews'
   | 'aiCareer'
   | 'voice'
-  | 'myProjects'
+  | 'developer'
   | 'localLlm'
   | 'mother'
   | 'feedback';
@@ -118,6 +119,7 @@ export const Sidebar = ({
   const { t } = useI18n();
   const { showToast } = useToast();
   const collapsed = useSidebarStore((state) => state.collapsed);
+  const developerMode = useNavigationStore((state) => state.developerMode);
   const sidebarRef = useRef<HTMLElement>(null);
   const perchRef = useRef<HTMLDivElement>(null);
   const serverRunning = useLocalServerStatusStore((state) => state.running);
@@ -230,13 +232,15 @@ export const Sidebar = ({
           active={activePage === 'aiCareer'}
           onClick={() => onPageChange('aiCareer')}
         />
-        <NavItem
-          collapsed={collapsed}
-          icon={<FolderHeart size={20} />}
-          label={t('nav.myProjects')}
-          active={activePage === 'myProjects'}
-          onClick={() => onPageChange('myProjects')}
-        />
+        {developerMode && (
+          <NavItem
+            collapsed={collapsed}
+            icon={<CodeXml size={20} />}
+            label={t('nav.developer')}
+            active={activePage === 'developer'}
+            onClick={() => onPageChange('developer')}
+          />
+        )}
         {isFullEdition && (
           <NavItem
             collapsed={collapsed}

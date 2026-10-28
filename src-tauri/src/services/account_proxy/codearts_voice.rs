@@ -44,7 +44,7 @@ fn validated_pcm<'a>(audio: &'a [u8], mime: &str) -> Result<&'a [u8], ProxyError
             "CodeArts speech requires WAV audio",
         ));
     }
-    super::claude_voice::pcm(audio).map_err(|_| {
+    super::audio_format::pcm(audio).map_err(|_| {
         ProxyError::new(
             StatusCode::BAD_REQUEST,
             "CodeArts speech requires 16 kHz mono PCM16 WAV audio",

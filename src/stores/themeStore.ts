@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { emit } from '@tauri-apps/api/event';
 import * as api from '../api/tauri';
+import type { PluginTheme } from '../api/plugins';
 import {
   getColorTheme,
   isColorThemeId,
@@ -12,10 +13,26 @@ import {
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 export const THEME_CHANGED_EVENT = 'echobird-theme-changed';
+export const THEME_REQUEST_EVENT = 'echobird-theme-request';
 export interface ThemeSelection {
   mode: ThemeMode;
   colorTheme: ColorThemeId;
+  pluginTheme?: PluginTheme | null;
 }
+let pluginTheme: PluginTheme | null = null;
+const pluginColorKeys: Record<string, string> = {
+  background: '--bg-base-rgb',
+  surface: '--bg-surface-rgb',
+  elevated: '--bg-elevated-rgb',
+  input: '--bg-input-rgb',
+  border: '--border-rgb',
+  text: '--text-primary-rgb',
+  textSecondary: '--text-secondary-rgb',
+  textMuted: '--text-muted-rgb',
+  accent: '--accent-rgb',
+  accentSecondary: '--accent-secondary-rgb',
+};
+const appliedPluginColors = new Set<string>();
 type Resolved = 'light' | 'dark';
 
 const mql = window.matchMedia('(prefers-color-scheme: dark)');
@@ -34,6 +51,8 @@ const applyColorTheme = (id: ColorThemeId, resolved: Resolved) => {
   const theme = getColorTheme(id);
   const variant: ColorThemeVariant = resolved === 'dark' ? theme.dark : theme.light;
   const root = document.documentElement;
+  for (const key of appliedPluginColors) root.style.removeProperty(key);
+  appliedPluginColors.clear();
   root.style.setProperty('--bg-base-rgb', hexToRgbChannels(variant.canvas));
   root.style.setProperty('--bg-terminal-rgb', hexToRgbChannels(variant.shell));
   root.style.setProperty('--bg-surface-rgb', hexToRgbChannels(variant.secondary));
@@ -49,6 +68,15 @@ const applyColorTheme = (id: ColorThemeId, resolved: Resolved) => {
     '--view-mode-wave-rgb',
     neutral && resolved === 'light' ? '255 246 235' : 'var(--view-mode-accent-rgb)'
   );
+  if (pluginTheme) {
+    for (const [key, value] of Object.entries(pluginTheme[resolved])) {
+      const property = pluginColorKeys[key];
+      if (property && /^#[0-9a-f]{6}$/i.test(value)) {
+        root.style.setProperty(property, hexToRgbChannels(value));
+        appliedPluginColors.add(property);
+      }
+    }
+  }
   try {
     localStorage.setItem('color-theme', id);
   } catch {
@@ -97,17 +125,32 @@ interface ThemeStore {
   setColorTheme: (colorTheme: ColorThemeId) => void;
   sync: (selection: ThemeSelection) => void;
   init: () => Promise<void>;
+  setPluginTheme: (theme: PluginTheme | null) => void;
 }
 
 export const useThemeStore = create<ThemeStore>((set, get) => ({
   mode: 'dark',
   resolved: 'dark',
   colorTheme: 'oatgray',
+  setPluginTheme: (theme) => {
+    if (JSON.stringify(pluginTheme) === JSON.stringify(theme)) return;
+    pluginTheme = theme;
+    apply(get().resolved, get().colorTheme, false);
+    void emit(THEME_CHANGED_EVENT, {
+      mode: get().mode,
+      colorTheme: get().colorTheme,
+      pluginTheme,
+    }).catch(() => {});
+  },
   setMode: (mode) => {
     const resolved = resolve(mode);
     apply(resolved, get().colorTheme, true);
     set({ mode, resolved });
-    void emit(THEME_CHANGED_EVENT, { mode, colorTheme: get().colorTheme }).catch(() => {});
+    void emit(THEME_CHANGED_EVENT, {
+      mode,
+      colorTheme: get().colorTheme,
+      ...(pluginTheme ? { pluginTheme } : {}),
+    }).catch(() => {});
     api
       .getSettings()
       .then((s) => {
@@ -121,9 +164,15 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
       .catch(() => {});
   },
   setColorTheme: (colorTheme) => {
+    const hadPluginTheme = pluginTheme !== null;
+    pluginTheme = null;
     apply(get().resolved, colorTheme, true);
     set({ colorTheme });
-    void emit(THEME_CHANGED_EVENT, { mode: get().mode, colorTheme }).catch(() => {});
+    void emit(THEME_CHANGED_EVENT, {
+      mode: get().mode,
+      colorTheme,
+      ...(hadPluginTheme ? { pluginTheme: null } : {}),
+    }).catch(() => {});
     api
       .getSettings()
       .then((s) => {
@@ -136,8 +185,11 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
       })
       .catch(() => {});
   },
-  sync: ({ mode, colorTheme }) => {
-    if (get().mode === mode && get().colorTheme === colorTheme) return;
+  sync: ({ mode, colorTheme, pluginTheme: incoming }) => {
+    const paletteChanged =
+      incoming !== undefined && JSON.stringify(pluginTheme) !== JSON.stringify(incoming);
+    if (incoming !== undefined) pluginTheme = incoming;
+    if (get().mode === mode && get().colorTheme === colorTheme && !paletteChanged) return;
     const resolved = resolve(mode);
     apply(resolved, colorTheme, true);
     set({ mode, resolved, colorTheme });

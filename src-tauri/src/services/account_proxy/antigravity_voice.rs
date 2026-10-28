@@ -65,7 +65,7 @@ fn validated_pcm<'a>(audio: &'a [u8], mime: &str) -> Result<&'a [u8], ProxyError
     if !mime.eq_ignore_ascii_case("audio/wav") && !mime.eq_ignore_ascii_case("audio/x-wav") {
         return Err(invalid_audio());
     }
-    super::claude_voice::pcm(audio).map_err(|_| invalid_audio())
+    super::audio_format::pcm(audio).map_err(|_| invalid_audio())
 }
 
 async fn recognize(

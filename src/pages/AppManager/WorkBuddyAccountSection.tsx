@@ -1,3 +1,4 @@
+import { useAccountPlugin } from '../../hooks/useAccountPlugin';
 import React from 'react';
 import { Gift } from 'lucide-react';
 import { useAppManager } from './context';
@@ -10,10 +11,11 @@ import {
 import { QuotaCountdown } from './QuotaCountdown';
 import { useI18n } from '../../hooks/useI18n';
 import { useWorkBuddyClaimedToday } from './workBuddyDailyCredits';
+import { openAccountPlugins } from './openAccountPlugins';
 export const WorkBuddyAccountSection: React.FC<{ showDivider?: boolean }> = ({
   showDivider = true,
 }) => {
-  const { workBuddyAccounts, selectedTool } = useAppManager();
+  const { workBuddyAccounts, selectedTool, setApplyError } = useAppManager();
   const { t } = useI18n();
   const {
     accounts,
@@ -22,7 +24,6 @@ export const WorkBuddyAccountSection: React.FC<{ showDivider?: boolean }> = ({
     busy,
     remainingSeconds,
     refreshing,
-    add,
     refresh,
     remove,
     claimDaily,
@@ -32,6 +33,7 @@ export const WorkBuddyAccountSection: React.FC<{ showDivider?: boolean }> = ({
     value == null
       ? t('model.noUsageData')
       : value.toLocaleString(undefined, { maximumFractionDigits: 2, useGrouping: false });
+  const installed = useAccountPlugin(selectedTool ?? 'workbuddy');
   return (
     <section>
       <AccountSectionButton
@@ -39,8 +41,13 @@ export const WorkBuddyAccountSection: React.FC<{ showDivider?: boolean }> = ({
         colorClassName="workbuddy-account-pill"
         busy={busy}
         remainingSeconds={remainingSeconds}
-        onClick={() => void add()}
-        onCancel={workBuddyAccounts.cancelLogin}
+        idleLabel="plugins.category.account"
+        onClick={() =>
+          void (installed ? workBuddyAccounts.add() : openAccountPlugins()).catch((error) =>
+            setApplyError(String(error))
+          )
+        }
+        onCancel={() => workBuddyAccounts.cancelLogin()}
       />
       {accounts.length > 0 && (
         <div className="space-y-2">

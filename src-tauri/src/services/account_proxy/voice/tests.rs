@@ -4,30 +4,23 @@ use serde_json::json;
 use std::sync::{Arc, Mutex};
 
 #[tokio::test]
-async fn trae_compatibility_invalid_cn_audio_does_not_load_or_refresh_credentials() {
-    let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    let observed = calls.clone();
-    let selector = format!("traecn:{}", "a".repeat(64));
-    let audio = Bytes::from_static(b"not a wave file");
-    let error = transcribe_with(
-        &reqwest::Client::new(),
-        SpeechRequest {
-            selector: &selector,
-            audio: &audio,
-            filename: "speech.wav",
-            mime: "audio/wav",
-        },
-        move |_| {
-            observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            std::future::ready(Ok(
-                json!({"edition":"traecn","region":"CN","accessToken":"fixture"}),
-            ))
-        },
-    )
-    .await
-    .unwrap_err();
-    assert_eq!(error.status, StatusCode::BAD_REQUEST);
-    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+async fn missing_community_speech_modules_never_load_host_credentials() {
+    for provider in ["trae", "traecn"] {
+        let selector = format!("{provider}:{}", "a".repeat(64));
+        let audio = Bytes::from_static(b"fixture");
+        let result = transcribe_with(
+            &reqwest::Client::new(),
+            SpeechRequest {
+                selector: &selector,
+                audio: &audio,
+                filename: "speech.wav",
+                mime: "audio/wav",
+            },
+            |_| async { panic!("community speech must not read host credentials") },
+        )
+        .await;
+        assert_eq!(result.unwrap_err().status, StatusCode::UNAUTHORIZED);
+    }
 }
 
 #[test]
@@ -128,15 +121,7 @@ fn selectors_only_accept_supported_speech_accounts() {
 #[tokio::test]
 async fn new_sources_validate_audio_before_loading_or_refreshing_saved_credentials() {
     let audio = Bytes::from_static(b"invalid-wave");
-    for provider in [
-        "cursor",
-        "grokbot",
-        "dumate",
-        "devin",
-        "trae",
-        "codearts",
-        "doubaowork",
-    ] {
+    for provider in ["cursor", "grokbot", "dumate", "devin", "codearts"] {
         let selector = format!("{provider}:{}", "a".repeat(64));
         let result = transcribe_with(
             &reqwest::Client::new(),
@@ -153,11 +138,7 @@ async fn new_sources_validate_audio_before_loading_or_refreshing_saved_credentia
         .await;
         assert_eq!(
             result.unwrap_err().status,
-            if provider == "trae" {
-                StatusCode::UNSUPPORTED_MEDIA_TYPE
-            } else {
-                StatusCode::BAD_REQUEST
-            },
+            StatusCode::BAD_REQUEST,
             "{provider}"
         );
     }
@@ -192,7 +173,7 @@ async fn selected_account_refreshes_only_once_after_401_and_never_after_other_fa
         let calls: Arc<Mutex<Vec<String>>> = Arc::default();
         let app = Router::new()
             .route(
-                "/agenttool/v1/asr",
+                "/transcribe",
                 post(
                     move |State(calls): State<Arc<Mutex<Vec<String>>>>, headers: HeaderMap| async move {
                         let mut calls = calls.lock().unwrap();
@@ -214,7 +195,7 @@ async fn selected_account_refreshes_only_once_after_401_and_never_after_other_fa
         let task = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
         let mut loaded = Vec::new();
         let audio = Bytes::from_static(b"fixture");
-        let selector = format!("workbuddyai:{}", "a".repeat(64));
+        let selector = format!("codex:{}", "a".repeat(64));
         let result = transcribe_with(
             &reqwest::Client::new(),
             SpeechRequest {
@@ -227,7 +208,7 @@ async fn selected_account_refreshes_only_once_after_401_and_never_after_other_fa
                 let token = if rejected.is_some() { "new" } else { "old" };
                 loaded.push(rejected);
                 std::future::ready(Ok(json!({
-                    "accessToken":token,"uid":"selected-user","_voice_test_endpoint":endpoint,
+                    "accessToken":token,"accountId":"selected-user","_voice_test_endpoint":endpoint,
                 })))
             },
         )

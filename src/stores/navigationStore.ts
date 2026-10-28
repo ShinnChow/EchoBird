@@ -6,8 +6,16 @@
 import { create } from 'zustand';
 import type { PageType } from '../components';
 
+export type DeveloperTab = 'pets' | 'plugins' | 'statistics';
+
 interface NavigationState {
   activePage: PageType;
+  developerMode: boolean;
+  developerModeReady: boolean;
+  developerGeneration: number;
+  developerTab: DeveloperTab;
+  accountPluginsRequest: number | null;
+  accountPluginsRequestId: number;
   backHistory: PageType[];
   forwardHistory: PageType[];
   motherPrefill: string | undefined;
@@ -19,6 +27,10 @@ interface NavigationState {
   sshServersVersion: number;
 
   setActivePage: (page: PageType) => void;
+  setDeveloperMode: (enabled: boolean) => void;
+  setDeveloperTab: (tab: DeveloperTab) => void;
+  openAccountPlugins: () => void;
+  consumeAccountPluginsRequest: (requestId: number) => void;
   goBack: () => void;
   goForward: () => void;
   goToMother: (prefill: string, cursor?: number) => void;
@@ -29,6 +41,7 @@ interface NavigationState {
 }
 
 function visitPage(state: NavigationState, page: PageType): Partial<NavigationState> {
+  if (page === 'developer' && !state.developerMode) return state;
   if (state.activePage === page) return state;
   return {
     activePage: page,
@@ -41,6 +54,12 @@ function visitPage(state: NavigationState, page: PageType): Partial<NavigationSt
 
 export const useNavigationStore = create<NavigationState>((set) => ({
   activePage: 'apps',
+  developerMode: false,
+  developerModeReady: false,
+  developerGeneration: 0,
+  developerTab: 'pets',
+  accountPluginsRequest: null,
+  accountPluginsRequestId: 0,
   backHistory: [],
   forwardHistory: [],
   motherPrefill: undefined,
@@ -50,6 +69,35 @@ export const useNavigationStore = create<NavigationState>((set) => ({
   sshServersVersion: 0,
 
   setActivePage: (page) => set((state) => visitPage(state, page)),
+  setDeveloperMode: (enabled) =>
+    set((state) => ({
+      developerMode: enabled,
+      developerModeReady: true,
+      developerGeneration: state.developerGeneration + Number(state.developerMode !== enabled),
+      ...(!enabled && {
+        activePage: state.activePage === 'developer' ? 'apps' : state.activePage,
+        backHistory: state.backHistory.filter((page) => page !== 'developer'),
+        forwardHistory: state.forwardHistory.filter((page) => page !== 'developer'),
+      }),
+    })),
+  setDeveloperTab: (developerTab) => set({ developerTab }),
+  openAccountPlugins: () =>
+    set((state) => {
+      const next = {
+        ...state,
+        developerMode: true,
+        developerModeReady: true,
+        developerGeneration: state.developerGeneration + Number(!state.developerMode),
+        developerTab: 'plugins' as const,
+        accountPluginsRequestId: state.accountPluginsRequestId + 1,
+        accountPluginsRequest: state.accountPluginsRequestId + 1,
+      };
+      return { ...next, ...visitPage(next, 'developer') };
+    }),
+  consumeAccountPluginsRequest: (requestId) =>
+    set((state) =>
+      state.accountPluginsRequest === requestId ? { accountPluginsRequest: null } : state
+    ),
   goBack: () =>
     set((state) => {
       const page = state.backHistory[state.backHistory.length - 1];

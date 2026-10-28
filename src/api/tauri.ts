@@ -167,22 +167,6 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
   return invoke('save_settings', { settings });
 }
 
-// ─── My Projects registry (persisted to ~/.echobird/projects.json via Rust) ───
-
-/// Read the user-authored AI-project registry. The front-end (myProjectsStore)
-/// owns the MyProject shape; Rust persists the array verbatim. Returns [] when
-/// the file is missing.
-export async function getMyProjects(): Promise<unknown[]> {
-  const arr = await invoke<unknown>('get_my_projects');
-  if (!Array.isArray(arr)) throw new Error('PROJECTS_INVALID_DATA');
-  return arr;
-}
-
-/// Persist the full project registry (sent on every CRUD op).
-export async function saveMyProjects(projects: unknown[]): Promise<void> {
-  return invoke('save_my_projects', { projects });
-}
-
 // ─── App Lifecycle APIs ───
 
 export async function appReady(): Promise<void> {
@@ -198,57 +182,6 @@ export async function hideMainWindow(): Promise<void> {
 /// can paste recent logs into a GitHub issue.
 export async function readLogTail(lines: number): Promise<string> {
   return invoke<string>('read_log_tail', { lines });
-}
-
-// ─── Misc APIs ───
-
-export async function launchGame(
-  toolId: string,
-  launchFile: string,
-  modelConfig?: {
-    baseUrl?: string;
-    anthropicUrl?: string;
-    apiKey?: string;
-    model?: string;
-    name?: string;
-    protocol?: string;
-  }
-): Promise<{ success: boolean; message?: string }> {
-  return invoke('launch_game', { toolId, launchFile, modelConfig: modelConfig || null });
-}
-
-/// Copy a built-in tool's reference files (paths.json, models.json,
-/// game.html, <id>.svg, README.txt) to ~/.echobird/<id>/ for the "我的AI
-/// 项目" page. Idempotent — files the user already has are left alone.
-/// Returns the absolute destination directory path.
-export async function seedBuiltinToUserDir(toolId: string): Promise<string> {
-  return invoke<string>('seed_builtin_to_user_dir', { toolId });
-}
-
-/// Apply a model config to a user-authored project's models.json mapping.
-/// Reads the project's models.json, gets its write map + configFile, and
-/// writes the ModelInfo fields into the target config file. Silent on
-/// every failure — these are user projects, not our problem to babysit.
-/// Caller is expected to NOT show error UI; await + ignore the Promise.
-export interface UserProjectModelInfo {
-  name?: string;
-  model?: string;
-  baseUrl?: string;
-  apiKey?: string;
-  anthropicUrl?: string;
-}
-export async function applyUserProjectModel(
-  modelsJsonPath: string,
-  modelInfo: UserProjectModelInfo
-): Promise<void> {
-  return invoke('apply_user_project_model', { modelsJsonPath, modelInfo });
-}
-
-/// Launch a user-authored project via the OS default handler. HTML →
-/// system browser; .exe / .bat / .cli → whatever extension association the
-/// user has. Silent on failure.
-export async function launchUserProject(launcherPath: string): Promise<void> {
-  return invoke('launch_user_project', { launcherPath });
 }
 
 // ─── Window APIs (Tauri built-in) ───

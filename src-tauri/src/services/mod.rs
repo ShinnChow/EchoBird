@@ -15,10 +15,10 @@ pub mod anthropic_proxy;
 pub mod antigravity_accounts;
 pub mod auto_fix;
 pub mod bundled_assets;
-pub mod claude_code_accounts;
-pub mod claude_code_oauth;
-pub mod claude_desktop_accounts;
-pub(crate) mod claude_desktop_history;
+pub use plugin_accounts::bindings::{
+    claude_code_accounts, claude_code_oauth, claude_desktop_accounts, doubao_accounts,
+    trae_accounts, workbuddy_accounts,
+};
 pub mod cline_accounts;
 pub mod cline_native;
 pub mod codearts_accounts;
@@ -38,7 +38,7 @@ pub(crate) mod cursor_usage;
 pub mod datalog;
 pub mod deepseek_accounts;
 pub mod deepseek_oauth;
-pub mod doubao_accounts;
+pub mod developer_preview;
 pub mod dumate_accounts;
 pub(crate) mod electron_storage;
 pub mod free_model_directory;
@@ -60,6 +60,9 @@ pub(crate) mod msix;
 pub mod musecode_proxy;
 pub(crate) mod native_account_files;
 pub mod parasite;
+pub(crate) mod plugin_accounts;
+pub mod plugin_manager;
+pub mod plugin_runtime;
 pub mod process_manager;
 pub mod pulse_archive;
 pub mod qoder_accounts;
@@ -71,7 +74,6 @@ pub mod smart_router;
 pub mod tool_config_manager;
 pub mod tool_manager;
 pub mod tool_patcher;
-pub mod trae_accounts;
 pub mod upstream_model_catalog;
 pub mod usage_providers;
 #[cfg(windows)]
@@ -82,6 +84,5 @@ pub(crate) mod devin_protocol;
 pub mod kimi_accounts;
 pub mod opendesign_accounts;
 pub mod voice_input;
-pub mod workbuddy_accounts;
 pub mod zcode_accounts;
 pub(crate) mod zcode_paths;

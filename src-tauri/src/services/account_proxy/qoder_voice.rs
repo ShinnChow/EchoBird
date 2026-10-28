@@ -1,4 +1,4 @@
-use super::{claude_voice, qoder, ProxyError};
+use super::{audio_format, qoder, ProxyError};
 use axum::{body::Bytes, http::StatusCode};
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
@@ -17,7 +17,7 @@ pub(crate) async fn transcribe(
     if !matches!(mime, "audio/wav" | "audio/x-wav") {
         return Err(invalid_audio());
     }
-    let pcm = claude_voice::pcm(audio).map_err(|_| invalid_audio())?;
+    let pcm = audio_format::pcm(audio).map_err(|_| invalid_audio())?;
     tokio::time::timeout(
         super::voice::media_timeout(pcm.len()),
         recognize(credentials, pcm),

@@ -1,3 +1,4 @@
+import { communityAccountApplications, hasAccountPlugin } from '../../hooks/useAccountPlugin';
 import { useCursorAccounts } from './useCursorAccounts';
 import { useAntigravityAccounts } from './useAntigravityAccounts';
 import { useDeepSeekAccounts } from './useDeepSeekAccounts';
@@ -23,7 +24,7 @@ import { useDoubaoAccounts } from './useDoubaoAccounts';
 import { useQwenWorkAccounts } from './useQwenWorkAccounts';
 import { useClaudeCodeAccounts } from './useClaudeCodeAccounts';
 import { useClaudeDesktopAccounts } from './useClaudeDesktopAccounts';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useCodexAccounts } from './useCodexAccounts';
 import { useI18n } from '../../hooks/useI18n';
 import * as api from '../../api/tauri';
@@ -35,6 +36,8 @@ import { useModelNexus } from '../ModelNexus/context';
 import { useFreeModels } from '../FreeModels/provider';
 import { getOfficialEndpoint, isOfficialModelSentinel } from '../../data/officialEndpoints';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import { pluginTools, usePluginsStore } from '../../stores/pluginsStore';
+import { launchPlugin } from '../../api/plugins';
 
 // ===== Provider =====
 
@@ -62,8 +65,23 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     );
 
   // From stores (replaces drilled props)
-  const { detectedTools, setDetectedTools, isScanning, scanTools, usingCachedTools } =
-    useToolsStore();
+  const {
+    detectedTools: scannedTools,
+    setDetectedTools,
+    isScanning,
+    scanTools,
+    usingCachedTools,
+  } = useToolsStore();
+  const installedPlugins = usePluginsStore((state) => state.installed);
+  const loadPlugins = usePluginsStore((state) => state.load);
+  const developerMode = useNavigationStore((state) => state.developerMode);
+  const detectedTools = useMemo(
+    () => [...scannedTools, ...(developerMode ? pluginTools(installedPlugins) : [])],
+    [scannedTools, installedPlugins, developerMode]
+  );
+  useEffect(() => {
+    if (developerMode) void loadPlugins();
+  }, [developerMode, loadPlugins]);
   const { activePage, goToMother } = useNavigationStore();
   const isActive = activePage === 'apps';
 
@@ -85,20 +103,14 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     zcode: null,
   });
 
-  // Load models internally. userModels is consumed by BOTH the AppManager
-  // right panel AND the 我的AI项目 right panel (same ModelListSection
-  // component), so reload on either activation — otherwise a model added
-  // in 模型中心 only surfaces in 我的AI项目 after the user incidentally
-  // bounces through 应用桌面 (which flips isActive). Also reload when Model
-  // Nexus changes, including edits/deletes from this panel.
+  // Reload application models on entry and after model changes.
   const [userModels, setUserModels] = useState<ModelConfig[]>([]);
   const { userModels: modelNexusModels } = useModelNexus();
   const { routerEnabled, routerBaseUrl, routers } = useFreeModels();
   const routerIdsKey = JSON.stringify(routers?.map((router) => router.id) ?? []);
-  const userModelsActive = isActive || activePage === 'myProjects';
   useEffect(() => {
-    if (!api.getModels) return;
-    // Guard against out-of-order resolution: rapid 应用桌面/我的AI项目 toggles can
+    if (!api.getModels || !isActive) return;
+    // Guard against out-of-order resolution: rapid navigation can
     // overlap getModels() calls, and a slower earlier one resolving last would
     // clobber userModels with stale data.
     let ignore = false;
@@ -126,7 +138,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     return () => {
       ignore = true;
     };
-  }, [userModelsActive, modelNexusModels, routerEnabled, routerBaseUrl, routerIdsKey]);
+  }, [isActive, modelNexusModels, routerEnabled, routerBaseUrl, routerIdsKey]);
 
   // AI-installable IDs from bundled install/index.json (offline-first).
   const [aiInstallableIds, setAiInstallableIds] = useState<string[]>([]);
@@ -148,7 +160,13 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   }, [isActive]);
 
   // Internalized state
-  const [selectedTool, setSelectedTool] = useState<string | null>(null);
+  const [selectedToolId, setSelectedTool] = useState<string | null>(null);
+  const selectedTool =
+    (isActive && ['reversi', 'translator'].includes(selectedToolId ?? '')) ||
+    (selectedToolId?.startsWith('plugin:') &&
+      !detectedTools.some((tool) => tool.id === selectedToolId))
+      ? null
+      : selectedToolId;
   const clineSelectionRevision = useRef(0);
   const accountNavigation = useRef({ tool: selectedTool, page: activePage });
   useEffect(() => {
@@ -157,14 +175,29 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   }, [selectedTool, activePage]);
   const accountsEnabled =
     isActive && detectedTools.some((tool) => tool.id === selectedTool && tool.installed);
+  const pluginAvailable = (id: string) => hasAccountPlugin(id, installedPlugins, developerMode);
   const accountGroupEnabled = (...ids: string[]) =>
+    ids.every((id) => !communityAccountApplications.includes(id) || pluginAvailable(id)) &&
     !usingCachedTools &&
     (activePage === 'accounts'
       ? detectedTools.some((tool) => ids.includes(tool.id) && tool.installed)
       : accountsEnabled && ids.includes(selectedTool ?? ''));
   const [isLaunching, setIsLaunching] = useState(false);
   const launchGeneration = useRef(0);
+  const previewLaunch = useRef(false);
   const [applyError, setApplyError] = useState<string | null>(null);
+  useEffect(
+    () =>
+      useNavigationStore.subscribe((state, previous) => {
+        if (previous.developerMode && !state.developerMode && previewLaunch.current) {
+          launchGeneration.current += 1;
+          previewLaunch.current = false;
+          setIsLaunching(false);
+          setApplyError(null);
+        }
+      }),
+    []
+  );
   const isCodexTool = selectedTool === 'codex' || selectedTool === 'chatgptdesktop';
   const codexManaged = useCodexAccounts(
     accountGroupEnabled('codex', 'chatgptdesktop'),
@@ -418,7 +451,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const doubaoWorkAccounts = useDoubaoAccounts(
     'doubaowork',
     accountGroupEnabled('doubaowork') ||
-      (!usingCachedTools &&
+      (pluginAvailable('doubaowork') &&
+        !usingCachedTools &&
         activePage === 'freeModels' &&
         detectedTools.some((tool) => tool.id === 'doubaowork' && tool.installed)),
     !!toolModelConfig.doubaowork,
@@ -429,7 +463,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const dolaAccounts = useDoubaoAccounts(
     'dola',
     accountGroupEnabled('dola') ||
-      (!usingCachedTools &&
+      (pluginAvailable('dola') &&
+        !usingCachedTools &&
         activePage === 'freeModels' &&
         detectedTools.some((tool) => tool.id === 'dola' && tool.installed)),
     !!toolModelConfig.dola,
@@ -1059,8 +1094,12 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     if (['qwenwork', 'qwenworkcn'].includes(selectedTool) && qwenWorkAccounts.busy) return;
     if ((selectedTool === 'kirocrew' || selectedTool === 'kirocli') && kiroAccounts.busy) return;
     const generation = ++launchGeneration.current;
+    const previewGeneration = useNavigationStore.getState().developerGeneration;
     const finishLaunch = () => {
-      if (launchGeneration.current === generation) setIsLaunching(false);
+      if (launchGeneration.current === generation) {
+        previewLaunch.current = false;
+        setIsLaunching(false);
+      }
     };
     const startCooldown = () => {
       setTimeout(finishLaunch, 3000);
@@ -1103,7 +1142,24 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
       startCooldown();
 
     const toolData = detectedTools.find((t) => t.id === selectedTool);
-    const isLaunchable = !!toolData?.launchFile;
+    previewLaunch.current = !!toolData?.plugin;
+    if (toolData?.plugin) {
+      try {
+        const model = userModels.find(
+          (model) => model.internalId === toolModelConfig[selectedTool]
+        );
+        await launchPlugin(toolData.plugin.id, toolData.plugin.pageId, model);
+      } catch (error) {
+        if (
+          launchGeneration.current === generation &&
+          previewGeneration === useNavigationStore.getState().developerGeneration
+        )
+          setApplyError(String(error));
+      } finally {
+        finishLaunch();
+      }
+      return;
+    }
     const noModelConfig = !!toolData?.noModelConfig;
     const pickWorkingDirectory = async () => {
       if (toolData?.category !== 'CLI Code' || toolData.noCwdPrompt) return undefined;
@@ -1524,12 +1580,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         finishLaunch();
         return;
       }
-    } else if (
-      !noModelConfig &&
-      agreedConfigPolicy &&
-      !isLaunchable &&
-      toolModelConfig[selectedTool]
-    ) {
+    } else if (!noModelConfig && agreedConfigPolicy && toolModelConfig[selectedTool]) {
       const pending = toolModelConfig[selectedTool]!;
       const applyResult = isOfficialModelSentinel(pending)
         ? await applyRestore(selectedTool)
@@ -1546,79 +1597,29 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
       noModelConfig ||
       ['qoder', 'qodercn', 'claudescience'].includes(selectedTool)
     ) {
-      if (isLaunchable) {
-        // Launchable tool (e.g. game): open independent window with model config
-        const selectedModelId = toolModelConfig[selectedTool];
-        const selectedModel = selectedModelId
-          ? userModels.find((m) => m.internalId === selectedModelId)
-          : undefined;
-        const modelConfig = selectedModel
-          ? {
-              baseUrl: selectedModel.baseUrl,
-              anthropicUrl: selectedModel.anthropicUrl,
-              apiKey: selectedModel.apiKey,
-              model: selectedModel.modelId || selectedModel.name || 'unknown',
-              name: selectedModel.name,
-              protocol: selectedModel.baseUrl ? 'openai' : 'anthropic',
-              locale,
-            }
-          : { locale };
-        const result = await api.launchGame(selectedTool, toolData!.launchFile!, modelConfig);
-        if (result && !result.success) {
-          console.error('Failed to launch:', result.message);
-          if (result.message) setApplyError(result.message);
-        } else if (selectedModel) {
-          // Mirror the apply-path optimistic update (see line ~209). launchable
-          // tools (games / WebView utilities) inject the model via
-          // window.__MODEL_CONFIG__ instead of writing a config file, so the
-          // apply path is skipped — without this, the tool card would forever
-          // show "模型: -" even after a successful launch.
-          setDetectedTools((prev) =>
-            prev.map((t) =>
-              t.id === selectedTool
-                ? { ...t, activeModel: selectedModel.modelId || selectedModel.internalId }
-                : t
-            )
-          );
-        }
-      } else {
-        // Only "CLI Code" tools prompt for a working folder — their launch goes
-        // through start_cli_tool, which honors cwd. Desktop / IDE / Utility /
-        // Game tools launch via start_gui_tool / launch_vscode / launchGame,
-        // none of which consume cwd, so prompting would silently discard the
-        // user's pick (Coffee-CLI-style launchpad, minus persistence — we
-        // re-prompt every launch). If the user cancels the picker, abort the
-        // launch entirely — don't fall back to home, which is the bug this
-        // fixes (CLI tools used to spawn in ~/ and were useless for development).
-        // A CLI tool may opt out per-tool via paths.json `noCwdPrompt: true`
-        // (e.g. openclaw) — it launches directly with no prompt, spawning in
-        // the home dir, which is fine for self-contained CLI agents.
-        let cwd: string | undefined;
-        try {
-          const picked = await pickWorkingDirectory();
-          if (picked === null) {
-            finishLaunch();
-            return;
-          }
-          cwd = picked;
-        } catch (e) {
-          console.error('[AppManager] folder picker failed:', e);
-          setApplyError(e instanceof Error ? e.message : String(e));
+      // CLI clients may request a working directory before launch.
+      let cwd: string | undefined;
+      try {
+        const picked = await pickWorkingDirectory();
+        if (picked === null) {
           finishLaunch();
           return;
         }
-        try {
-          await api.startTool(selectedTool, toolData?.startCommand, cwd);
-        } catch (err) {
-          console.error('Failed to launch tool:', err);
-          setApplyError(err instanceof Error ? err.message : String(err));
-        } finally {
-          if (
-            (selectedTool === 'kirocrew' || selectedTool === 'kirocli') &&
-            kiroAccounts.selectedId
-          )
-            finishLaunch();
-        }
+        cwd = picked;
+      } catch (e) {
+        console.error('[AppManager] folder picker failed:', e);
+        setApplyError(e instanceof Error ? e.message : String(e));
+        finishLaunch();
+        return;
+      }
+      try {
+        await api.startTool(selectedTool, toolData?.startCommand, cwd);
+      } catch (err) {
+        console.error('Failed to launch tool:', err);
+        setApplyError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if ((selectedTool === 'kirocrew' || selectedTool === 'kirocli') && kiroAccounts.selectedId)
+          finishLaunch();
       }
     }
     if (selectedTool === 'vscode' || selectedTool === 'copilotdesktop' || workBuddyEdition)
@@ -1643,24 +1644,34 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         setAccountCardOrder,
         claudeCodeAccounts: {
           ...claudeCodeAccounts,
-          accounts: orderedAccounts('claudecode', claudeCodeAccounts.accounts),
+          accounts: pluginAvailable('claudecode')
+            ? orderedAccounts('claudecode', claudeCodeAccounts.accounts)
+            : [],
         },
         claudeDesktopAccounts: {
           ...claudeDesktopAccounts,
-          accounts: orderedAccounts('claudedesktop', claudeDesktopAccounts.accounts),
+          accounts: pluginAvailable('claudedesktop')
+            ? orderedAccounts('claudedesktop', claudeDesktopAccounts.accounts)
+            : [],
         },
         workBuddyAccounts: {
           ...workBuddyAccounts,
-          accounts: orderedAccounts(workBuddyEdition ?? 'workbuddy', workBuddyAccounts.accounts),
+          accounts: pluginAvailable(workBuddyEdition ?? 'workbuddy')
+            ? orderedAccounts(workBuddyEdition ?? 'workbuddy', workBuddyAccounts.accounts)
+            : [],
         },
         workBuddyAccountGroups: {
           workbuddy: {
             ...workBuddyCnAccounts,
-            accounts: orderedAccounts('workbuddy', workBuddyCnAccounts.accounts),
+            accounts: pluginAvailable('workbuddy')
+              ? orderedAccounts('workbuddy', workBuddyCnAccounts.accounts)
+              : [],
           },
           workbuddyai: {
             ...workBuddyAiAccounts,
-            accounts: orderedAccounts('workbuddyai', workBuddyAiAccounts.accounts),
+            accounts: pluginAvailable('workbuddyai')
+              ? orderedAccounts('workbuddyai', workBuddyAiAccounts.accounts)
+              : [],
           },
         },
         kiroAccounts: {
@@ -1718,16 +1729,20 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         },
         doubaoAccounts: {
           ...doubaoAccounts,
-          accounts: orderedAccounts(doubaoEdition, doubaoAccounts.accounts),
+          accounts: pluginAvailable(doubaoEdition)
+            ? orderedAccounts(doubaoEdition, doubaoAccounts.accounts)
+            : [],
         },
         doubaoAccountGroups: {
           doubaowork: {
             ...doubaoWorkAccounts,
-            accounts: orderedAccounts('doubaowork', doubaoWorkAccounts.accounts),
+            accounts: pluginAvailable('doubaowork')
+              ? orderedAccounts('doubaowork', doubaoWorkAccounts.accounts)
+              : [],
           },
           dola: {
             ...dolaAccounts,
-            accounts: orderedAccounts('dola', dolaAccounts.accounts),
+            accounts: pluginAvailable('dola') ? orderedAccounts('dola', dolaAccounts.accounts) : [],
           },
         },
         qwenWorkAccounts: {

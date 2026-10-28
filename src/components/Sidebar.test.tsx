@@ -6,6 +6,7 @@ import { useVoiceInputStore as voice } from '../stores/voiceInputStore';
 import { voiceSnapshot } from '../pages/VoiceInput/testFixtures';
 import * as voiceApi from '../api/voiceInput';
 import { useSidebarStore } from '../stores/sidebarStore';
+import { useNavigationStore } from '../stores/navigationStore';
 import { Mic, Waypoints } from 'lucide-react';
 
 vi.mock('./BirdEasterEgg', () => ({ BirdEasterEgg: () => null }));
@@ -31,6 +32,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   voice.setState(voice.getInitialState());
   useSidebarStore.setState({ collapsed: false });
+  useNavigationStore.setState(useNavigationStore.getInitialState());
 });
 
 afterEach(() => act(() => renderer?.unmount()));
@@ -49,6 +51,18 @@ const sourceConfig = {
 const routerGroups = [{ candidateIds: ['one'], groupEnabled: true }];
 
 describe('Sidebar', () => {
+  it('shows the developer entry only when enabled and removes the separate projects entry', () => {
+    act(() => {
+      renderer = create(<Sidebar {...baseProps} smartRouterGroups={[]} />);
+    });
+    const labels = () =>
+      renderer.root.findAllByType('button').map((node) => node.props['aria-label']);
+    expect(labels()).not.toContain('nav.developer');
+    act(() => useNavigationStore.getState().setDeveloperMode(true));
+    expect(JSON.stringify(renderer.toJSON())).toContain('nav.developer');
+    act(() => useNavigationStore.getState().setDeveloperMode(false));
+    expect(JSON.stringify(renderer.toJSON())).not.toContain('nav.developer');
+  });
   it('collapses to accessible icons without changing the page, sources or global switches', () => {
     voice.setState({ snapshot: voiceSnapshot({ config: sourceConfig }) });
     act(() => {
@@ -61,7 +75,7 @@ describe('Sidebar', () => {
     const items = renderer.root
       .findAllByType('button')
       .filter((button) => button.props['aria-label'] && button.props.role !== 'switch');
-    expect(items).toHaveLength(10);
+    expect(items).toHaveLength(9);
     expect(items.every((item) => item.findByType('span').props.className === 'sr-only')).toBe(true);
     expect(renderer.root.findAllByProps({ 'aria-current': 'page' })).toHaveLength(1);
     expect(renderer.root.findByProps({ 'aria-current': 'page' }).props['aria-label']).toBe(
@@ -168,7 +182,7 @@ describe('Sidebar', () => {
       renderer.root
         .findAllByType('button')
         .filter((button) => button.props['aria-label'] && button.props.role !== 'switch')
-    ).toHaveLength(10);
+    ).toHaveLength(9);
     expect(baseProps.onPageChange).not.toHaveBeenCalled();
   });
 

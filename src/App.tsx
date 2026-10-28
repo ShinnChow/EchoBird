@@ -4,6 +4,7 @@
 // Providers stay mounted; visited pages retain their state behind CSS.
 
 import { lazy, useState, useEffect } from 'react';
+import { PluginProductBridge } from './components/PluginProductBridge';
 import { getVersion } from '@tauri-apps/api/app';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
@@ -25,6 +26,8 @@ import { useAutoClaimRewards } from './hooks/useAutoClaimRewards';
 // Zustand stores
 import { useToolsStore } from './stores/toolsStore';
 import { useNavigationStore } from './stores/navigationStore';
+import { DeveloperTitleActions } from './pages/Developer';
+import { PluginHubMain, PluginHubPanel } from './pages/PluginHub';
 
 // Shared providers remain mounted; display modules load on first use.
 import { ModelNexusProvider } from './pages/ModelNexus/provider';
@@ -33,7 +36,6 @@ import { LocalServerProvider } from './pages/LocalServer/provider';
 import { MotherAgentProvider } from './pages/MotherAgent/MotherAgentProvider';
 import { AiPulseProvider } from './pages/AiPulse/provider';
 import { FreeModelsProvider, useFreeModels } from './pages/FreeModels/provider';
-import { useMyProjectsStore } from './stores/myProjectsStore';
 import { VoiceInputProvider } from './pages/VoiceInput/provider';
 const VoiceInputMain = lazy(() =>
   import('./pages/VoiceInput/VoiceInput').then((module) => ({ default: module.VoiceInputMain }))
@@ -103,15 +105,6 @@ const MotherAgentPanel = lazy(() =>
 );
 const FeedbackMain = lazy(() =>
   import('./pages/Feedback').then((module) => ({ default: module.FeedbackMain }))
-);
-const MyProjectsMain = lazy(() =>
-  import('./pages/MyProjects').then((module) => ({ default: module.MyProjectsMain }))
-);
-const MyProjectsPanel = lazy(() =>
-  import('./pages/MyProjects').then((module) => ({ default: module.MyProjectsPanel }))
-);
-const MyProjectsBottom = lazy(() =>
-  import('./pages/MyProjects').then((module) => ({ default: module.MyProjectsBottom }))
 );
 const AiCareerMain = lazy(() =>
   import('./pages/AiCareer').then((module) => ({ default: module.AiCareerMain }))
@@ -215,13 +208,23 @@ function AppContent() {
   const setActivePage = useNavigationStore((s) => s.setActivePage);
   const setUpdateAvailable = useNavigationStore((s) => s.setUpdateAvailable);
   const scanTools = useToolsStore((s) => s.scanTools);
-  // When a user project is selected on "我的AI项目", the right panel +
-  // bottom bar swap to MyProjectsPanel / MyProjectsBottom (their state is
-  // mutually exclusive with AppManager.selectedTool; see myProjects'
-  // handleSelect). Read from the store at the root level so the swap is a
-  // single conditional render rather than per-component CSS toggles.
-  const selectedUserProjectId = useMyProjectsStore((s) => s.selectedUserProjectId);
-  const useMyProjectsPanel = activePage === 'myProjects' && !!selectedUserProjectId;
+  const developerMode = useNavigationStore((state) => state.developerMode);
+  const developerTab = useNavigationStore((state) => state.developerTab);
+  const setDeveloperMode = useNavigationStore((state) => state.setDeveloperMode);
+
+  useEffect(() => {
+    let active = true;
+    void getSettings()
+      .then((settings) => {
+        if (active && !useNavigationStore.getState().developerModeReady) {
+          setDeveloperMode(settings.developerMode === true);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [setDeveloperMode]);
 
   // ── Post-mount work — the window is already shown (main.tsx fires
   // appReady after first paint). Scan installed tools and check for app
@@ -388,6 +391,7 @@ function AppContent() {
                           {/* Main content wrapper — transparent against page bg, Claude-style */}
                           <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
                             {/* Main + Right panel row */}
+
                             <ResizablePanels>
                               <main className="min-w-0 flex-1 flex flex-col overflow-hidden">
                                 <section className="flex-1 flex flex-col overflow-hidden pr-2">
@@ -400,7 +404,7 @@ function AppContent() {
                                         {is('freeModels') && t('page.freeModels')}
 
                                         {is('apps') && t('page.appManager')}
-                                        {is('myProjects') && t('page.myProjects')}
+                                        {is('developer') && t('page.developer')}
                                         {is('aiCareer') && t('page.aiCareer')}
                                         {is('voice') && t('voice.input')}
                                         {is('aiNews') && t('page.aiNews')}
@@ -414,7 +418,7 @@ function AppContent() {
                                         {is('freeModels') &&
                                           (locale.startsWith('zh') ? 'ACCESS' : 'ROUTER')}
                                         {is('apps') && 'DESKTOP'}
-                                        {is('myProjects') && 'VIBE CODING'}
+                                        {is('developer') && 'DEVELOPER'}
                                         {is('aiCareer') && 'CAREER'}
                                         {is('voice') && 'VOICE'}
                                         {is('aiNews') && 'NEWS'}
@@ -423,6 +427,7 @@ function AppContent() {
                                         {is('feedback') && 'SUPPORT'}
                                       </div>
                                     </div>
+                                    {is('developer') && <DeveloperTitleActions />}
                                     {/* Title actions — always mounted but hidden */}
                                     <span className={page(is('models'))}>
                                       <OnFirstVisit active={is('models')}>
@@ -450,7 +455,7 @@ function AppContent() {
                                       </OnFirstVisit>
                                     </span>
                                     <span className={page(is('apps'))}>
-                                      <OnFirstVisit active={is('apps') || is('myProjects')}>
+                                      <OnFirstVisit active={is('apps')}>
                                         <AppManagerTitleActions />
                                       </OnFirstVisit>
                                     </span>
@@ -484,13 +489,30 @@ function AppContent() {
                                   </div>
 
                                   <div className={pageBlock(is('apps'))}>
-                                    <OnFirstVisit active={is('apps') || is('myProjects')}>
+                                    <OnFirstVisit active={is('apps')}>
                                       <AppManagerMain />
                                     </OnFirstVisit>
                                   </div>
-                                  <div className={pageBlock(is('myProjects'))}>
-                                    <OnFirstVisit active={is('myProjects')}>
-                                      <MyProjectsMain />
+
+                                  <div
+                                    className={pageBlock(
+                                      developerMode && is('developer') && developerTab === 'plugins'
+                                    )}
+                                  >
+                                    <OnFirstVisit
+                                      active={
+                                        developerMode &&
+                                        is('developer') &&
+                                        developerTab === 'plugins'
+                                      }
+                                    >
+                                      <PluginHubMain
+                                        active={
+                                          developerMode &&
+                                          is('developer') &&
+                                          developerTab === 'plugins'
+                                        }
+                                      />
                                     </OnFirstVisit>
                                   </div>
                                   <div className={pageBlock(is('localLlm'))}>
@@ -530,6 +552,19 @@ function AppContent() {
                               </main>
 
                               <aside className="flex flex-col">
+                                <div
+                                  className={page(
+                                    developerMode && is('developer') && developerTab === 'plugins'
+                                  )}
+                                >
+                                  <OnFirstVisit
+                                    active={
+                                      developerMode && is('developer') && developerTab === 'plugins'
+                                    }
+                                  >
+                                    <PluginHubPanel />
+                                  </OnFirstVisit>
+                                </div>
                                 <div className={page(is('voice'))}>
                                   <OnFirstVisit active={is('voice')}>
                                     <VoiceInputPanel />
@@ -551,16 +586,10 @@ function AppContent() {
                                   </OnFirstVisit>
                                 </div>
 
-                                <div className={page(is('apps') || is('myProjects'))}>
-                                  {useMyProjectsPanel ? (
-                                    <OnFirstVisit active={is('myProjects')}>
-                                      <MyProjectsPanel />
-                                    </OnFirstVisit>
-                                  ) : (
-                                    <OnFirstVisit active={is('apps') || is('myProjects')}>
-                                      <AppManagerPanel />
-                                    </OnFirstVisit>
-                                  )}
+                                <div className={page(is('apps'))}>
+                                  <OnFirstVisit active={is('apps')}>
+                                    <AppManagerPanel />
+                                  </OnFirstVisit>
                                 </div>
                                 <div className={page(is('localLlm'))}>
                                   <OnFirstVisit active={is('localLlm')}>
@@ -587,16 +616,10 @@ function AppContent() {
                             </ResizablePanels>
 
                             {/* Bottom bars — always mounted, CSS hidden */}
-                            <div className={page(is('apps') || is('myProjects'))}>
-                              {useMyProjectsPanel ? (
-                                <OnFirstVisit active={is('myProjects')}>
-                                  <MyProjectsBottom />
-                                </OnFirstVisit>
-                              ) : (
-                                <OnFirstVisit active={is('apps') || is('myProjects')}>
-                                  <AppManagerBottom />
-                                </OnFirstVisit>
-                              )}
+                            <div className={page(is('apps'))}>
+                              <OnFirstVisit active={is('apps')}>
+                                <AppManagerBottom />
+                              </OnFirstVisit>
                             </div>
                             <div className={page(is('localLlm'))}>
                               <OnFirstVisit active={is('localLlm')}>
@@ -614,7 +637,7 @@ function AppContent() {
 
                       {/* Modals */}
                       <ModelDialogs />
-                      <OnFirstVisit active={is('apps') || is('myProjects')}>
+                      <OnFirstVisit active={is('apps')}>
                         <AppManagerErrorModal />
                       </OnFirstVisit>
                     </VoiceInputProvider>
@@ -652,6 +675,7 @@ function App() {
   const activePage = useNavigationStore((s) => s.activePage);
   return (
     <AiPulseProvider active={activePage === 'aiNews'}>
+      <PluginProductBridge />
       <AppContent />
     </AiPulseProvider>
   );

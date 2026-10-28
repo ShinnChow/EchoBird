@@ -4,6 +4,60 @@ import { useNavigationStore as navigation } from './navigationStore';
 beforeEach(() => navigation.setState(navigation.getInitialState(), true));
 afterEach(() => vi.unstubAllGlobals());
 
+it('keeps developer pages inaccessible until enabled', () => {
+  navigation.getState().setActivePage('developer');
+  expect(navigation.getState().activePage).toBe('apps');
+  expect(navigation.getState().backHistory).toEqual([]);
+  navigation.getState().setDeveloperMode(true);
+  navigation.getState().setDeveloperTab('plugins');
+  navigation.getState().setActivePage('developer');
+  expect(navigation.getState().activePage).toBe('developer');
+});
+
+it('opens the complete plugin list from an account entry and preserves back navigation', () => {
+  const { openAccountPlugins, consumeAccountPluginsRequest, goBack } = navigation.getState();
+  openAccountPlugins();
+  expect(navigation.getState()).toMatchObject({
+    developerMode: true,
+    activePage: 'developer',
+    developerTab: 'plugins',
+    backHistory: ['apps'],
+    accountPluginsRequest: expect.any(Number),
+  });
+  const requestId = navigation.getState().accountPluginsRequest!;
+  consumeAccountPluginsRequest(requestId + 1);
+  expect(navigation.getState().accountPluginsRequest).toBe(requestId);
+  consumeAccountPluginsRequest(requestId);
+  expect(navigation.getState().accountPluginsRequest).toBeNull();
+  goBack();
+  expect(navigation.getState().activePage).toBe('apps');
+});
+
+it.each(['back', 'forward', 'active'] as const)(
+  'removes developer access and %s history when the mode is disabled',
+  (position) => {
+    const { setActivePage, setDeveloperMode, setDeveloperTab, goBack, goForward } =
+      navigation.getState();
+    setDeveloperMode(true);
+    setDeveloperTab('plugins');
+    setActivePage('developer');
+    if (position !== 'active') setActivePage('models');
+    if (position === 'forward') {
+      goBack();
+      goBack();
+    }
+    setDeveloperMode(false);
+    expect(navigation.getState().activePage).not.toBe('developer');
+    expect(navigation.getState().backHistory).not.toContain('developer');
+    expect(navigation.getState().forwardHistory).not.toContain('developer');
+    goBack();
+    goForward();
+    setActivePage('developer');
+    expect(navigation.getState().activePage).not.toBe('developer');
+    expect(navigation.getState().developerTab).toBe('plugins');
+  }
+);
+
 it('visits pages in order and moves back and forward without adding duplicate visits', () => {
   const { setActivePage, goBack, goForward } = navigation.getState();
   setActivePage('models');

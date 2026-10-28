@@ -1,3 +1,4 @@
+import { useAccountProviderFilter } from '../../hooks/useAccountPlugin';
 import { useEffect, useState } from 'react';
 import {
   accountProxyProviders,
@@ -47,6 +48,7 @@ export function AccountProxyPanel({
   accountCounts?: Partial<Record<AccountProvider, number>>;
 }) {
   const context = useModelNexus();
+  const available = useAccountProviderFilter();
   const { t } = useI18n();
   const { acknowledged } = useAccountAccessRisk();
   const activePage = useNavigationStore((state) => state.activePage);
@@ -57,15 +59,16 @@ export function AccountProxyPanel({
     let ignore = false;
     void Promise.resolve().then(async () => {
       if (ignore) return;
+      const availableProviders = accountProxyProviders.filter(available);
       const results = await Promise.allSettled(
-        accountProxyProviders.map((provider) => listProxyAccounts(provider.id))
+        availableProviders.map((provider) => listProxyAccounts(provider.id))
       );
       if (ignore) return;
       setAccountCounts((previous) => {
         const counts = { ...previous };
         results.forEach((result, index) => {
           if (result.status === 'fulfilled')
-            counts[accountProxyProviders[index].id] = result.value.length;
+            counts[availableProviders[index].id] = result.value.length;
         });
         return counts;
       });
@@ -73,9 +76,9 @@ export function AccountProxyPanel({
     return () => {
       ignore = true;
     };
-  }, [activePage, voice]);
+  }, [activePage, voice, available]);
 
-  const providers = voice ? accountSpeechProviders : accountProxyProviders;
+  const providers = (voice ? accountSpeechProviders : accountProxyProviders).filter(available);
   const counts: Partial<Record<AccountProvider, number>> = voice
     ? (suppliedCounts ?? {})
     : accountCounts;

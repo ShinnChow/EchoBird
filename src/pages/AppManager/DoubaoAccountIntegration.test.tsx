@@ -1,3 +1,4 @@
+import { enableAccountPlugins } from '../../test/accountPlugins';
 import { useLayoutEffect } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -166,6 +167,7 @@ it.each(editions)(
   }
 );
 beforeEach(() => {
+  enableAccountPlugins();
   vi.useFakeTimers();
   vi.clearAllMocks();
   const storage = new Map<string, string>();

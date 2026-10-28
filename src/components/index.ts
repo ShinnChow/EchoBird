@@ -1,6 +1,6 @@
 // Components barrel export
-export { ModelCard, ModelCardSkeleton, ToolCard, getModelIcon } from './cards';
-export type { ModelCardProps, ToolCardProps } from './cards';
+export { ModelCard, ModelCardSkeleton, getModelIcon } from './cards';
+export type { ModelCardProps } from './cards';
 
 export { NavItem } from './NavItem';
 export type { NavItemProps } from './NavItem';

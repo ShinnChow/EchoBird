@@ -1,3 +1,4 @@
+import { enableAccountPlugins } from '../../test/accountPlugins';
 import type { ReactNode } from 'react';
 import { DndContext, DragOverlay, PointerSensor, KeyboardSensor } from '@dnd-kit/core';
 import { SortableContext } from '@dnd-kit/sortable';
@@ -80,6 +81,7 @@ beforeAll(async () => {
   ({ Sidebar } = await import('../../components/Sidebar'));
 });
 beforeEach(() => {
+  enableAccountPlugins();
   vi.clearAllMocks();
   useAccountAccessRiskStore.setState({ acknowledged: false, hydrated: false });
   stored = new Map();

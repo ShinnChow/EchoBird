@@ -658,6 +658,16 @@ async fn stop_capture(app: &AppHandle, shortcut_only: bool) -> Result<Snapshot, 
     }
     publish(app);
     let mut warning = None;
+    let extensions = app.try_state::<crate::services::plugin_runtime::PluginRuntime>();
+    if let Some(extensions) = &extensions {
+        match tokio::select! {
+            _=cancel.cancelled()=>return Ok(snapshot(app)),
+            result=extensions.process_text(app,"voice.transcribed",&text)=>result,
+        } {
+            Ok(processed) => text = processed,
+            Err(_) => warning = Some("voice.error.plugin".into()),
+        }
+    }
     if !text.trim().is_empty() && config.optimization_enabled {
         {
             let mut runtime = voice.runtime.lock().unwrap();
@@ -673,6 +683,15 @@ async fn stop_capture(app: &AppHandle, shortcut_only: bool) -> Result<Snapshot, 
         } {
             Ok(Ok(optimized)) => text = optimized,
             _ => warning = Some("voice.error.optimization".into()),
+        }
+    }
+    if let Some(extensions) = &extensions {
+        match tokio::select! {
+            _=cancel.cancelled()=>return Ok(snapshot(app)),
+            result=extensions.process_text(app,"voice.output",&text)=>result,
+        } {
+            Ok(processed) => text = processed,
+            Err(_) => warning = Some("voice.error.plugin".into()),
         }
     }
     let (insert, target) = {

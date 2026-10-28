@@ -429,8 +429,7 @@ fn load_tool_definitions_with_overrides(apply_overrides: bool) -> Vec<ToolDefini
         let paths_file = path.join("paths.json");
         // Prefer models.json (canonical name for the model-field mapping file).
         // Fall back to config.json so legacy bundled or user-installed tools
-        // that haven't migrated still load. The new name is documented in
-        // the "我的AI项目" / Vibe Coding flow as the file users author.
+        // that haven't migrated still load.
         let models_file = path.join("models.json");
         let config_file = if models_file.exists() {
             models_file
@@ -2703,13 +2702,7 @@ async fn scan_single_tool(def: ToolDefinition) -> DetectedTool {
     };
 
     let detected_path = if pc.always_installed {
-        // Bundled tools (Reversi, Translator, etc.). For most of them launch_file
-        // points at an HTML file that doesn't actually live in tools/<id>/ —
-        // the real HTML is in public/tools/<id>.html and launch_file is just a
-        // truthy flag. So we fall back to def.tool_dir (e.g. <resource>/tools/
-        // reversi/), which is what users want to see on the card: the folder
-        // containing paths.json + models.json they can read as a Vibe Coding
-        // reference when authoring their own AI project under "我的AI项目".
+        // Resolve bundle-relative launch paths, falling back to the definition directory.
         if let Some(ref launch) = pc.launch_file {
             let tools_dir = find_tools_dir().unwrap_or_default();
             let launch_path = tools_dir.join(&def.id).join(launch);

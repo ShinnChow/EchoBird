@@ -1,3 +1,4 @@
+import { useAccountProviderFilter } from '../../hooks/useAccountPlugin';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   accountProxyProviders,
@@ -34,6 +35,8 @@ export function AccountModelFields({
   voice?: boolean;
 }) {
   const { t } = useI18n();
+  const available = useAccountProviderFilter();
+  active = active && available({ id: source.provider });
   const { showToast } = useToast();
   const { provider, accountId } = source;
   const [accounts, setAccounts] = useState<ProxyAccount[]>([]);
@@ -215,7 +218,7 @@ export function AccountModelFields({
   const savedAccounts = accounts.filter((account) => account.source.provider === provider);
   const selectedAccount = savedAccounts.find((account) => account.source.accountId === accountId);
   const modelLabels = selectedAccount?.modelLabels;
-  const providers = voice ? accountSpeechProviders : accountProxyProviders;
+  const providers = (voice ? accountSpeechProviders : accountProxyProviders).filter(available);
   return (
     <>
       <div>

@@ -1,3 +1,4 @@
+import { enableAccountPlugins } from '../../test/accountPlugins';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { invoke } from '@tauri-apps/api/core';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -60,6 +61,7 @@ function count(provider: AccountProvider) {
     .children.join('');
 }
 beforeEach(async () => {
+  enableAccountPlugins();
   useAccountAccessRiskStore.setState({ acknowledged: true, hydrated: true });
   locale = 'zh-Hans';
   await loadLocale(locale);

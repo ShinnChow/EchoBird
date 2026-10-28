@@ -39,7 +39,7 @@ impl Fixture {
             sha,
             "Only the fixed public synthetic fixtures are permitted"
         );
-        super::super::claude_voice::pcm(&audio)
+        super::super::audio_format::pcm(&audio)
             .expect("Public fixture format must be 16 kHz mono PCM16 WAV");
         Self {
             name,

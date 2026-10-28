@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { LoaderCircle, Mic, Square } from 'lucide-react';
-import { listen } from '@tauri-apps/api/event';
+import { emit, listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { showMainWindow, voiceIslandReady, type VoiceSnapshot } from '../../api/voiceInput';
 import { useVoiceInputStore, voiceBusy } from '../../stores/voiceInputStore';
-import { THEME_CHANGED_EVENT, useThemeStore, type ThemeSelection } from '../../stores/themeStore';
+import {
+  THEME_CHANGED_EVENT,
+  THEME_REQUEST_EVENT,
+  useThemeStore,
+  type ThemeSelection,
+} from '../../stores/themeStore';
 import { useI18n } from '../../hooks/useI18n';
 import type { TKey } from '../../i18n';
 import { VoiceAppIcon } from './VoiceAppIcon';
@@ -141,7 +146,10 @@ export function VoiceIsland() {
     listen<ThemeSelection>(THEME_CHANGED_EVENT, ({ payload }) =>
       useThemeStore.getState().sync(payload)
     )
-      .then(keep)
+      .then((stop) => {
+        keep(stop);
+        if (!stopped) void emit(THEME_REQUEST_EVENT, {}).catch(() => {});
+      })
       .catch(() => {});
     return () => {
       stopped = true;

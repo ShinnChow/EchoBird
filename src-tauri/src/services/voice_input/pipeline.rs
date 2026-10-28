@@ -1,6 +1,6 @@
 use super::audio::Recording;
 use super::config::{Channel, Config};
-use crate::models::model::{AccountProvider, AccountSource, ModelConfig};
+use crate::models::model::ModelConfig;
 use crate::services::{account_model_sources, account_proxy, llm_client, model_manager};
 use axum::body::Bytes;
 
@@ -67,24 +67,13 @@ pub(super) async fn recognize(
     client: &reqwest::Client,
 ) -> Result<String, String> {
     if channel.kind == "workbuddy" {
-        let source = AccountSource {
-            provider: AccountProvider::WorkBuddy,
-            account_id: channel.id.clone(),
-        };
-        return account_proxy::workbuddy_voice::transcribe_with(
+        return account_proxy::voice::transcribe(
             client,
-            audio,
-            "recording.wav",
-            "audio/wav",
-            |rejected| {
-                let source = &source;
-                async move {
-                    if let Some(rejected) = rejected {
-                        account_model_sources::credentials_after_rejection(source, &rejected).await
-                    } else {
-                        account_model_sources::credentials(source, false).await
-                    }
-                }
+            account_proxy::voice::SpeechRequest {
+                selector: &format!("workbuddy:{}", channel.id),
+                audio,
+                filename: "recording.wav",
+                mime: "audio/wav",
             },
         )
         .await

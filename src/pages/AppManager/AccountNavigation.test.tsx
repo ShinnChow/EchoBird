@@ -1,3 +1,5 @@
+import { usePluginsStore } from '../../stores/pluginsStore';
+import { enableAccountPlugins } from '../../test/accountPlugins';
 import React, { useLayoutEffect } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
@@ -198,6 +200,8 @@ vi.mock('../../api/tauri', () => {
     'startTool',
     'openExternal',
     'restoreToolToOfficial',
+    'getSettings',
+    'saveSettings',
   ];
   return {
     ...Object.fromEntries(names.map((n) => [n, vi.fn()])),
@@ -307,7 +311,7 @@ it.each(['kimicode', 'kimidesktop'] as const)(
     await mount(tool, false);
     expect(kimiApi.listKimiAccounts).not.toHaveBeenCalled();
     act(() => renderer.unmount());
-    await mount(tool);
+    await mount(tool as Tool);
     expect(kimiApi.listKimiAccounts).toHaveBeenCalledOnce();
     for (const [name, action] of Object.entries(kimiApi))
       if (name !== 'listKimiAccounts' && vi.isMockFunction(action))
@@ -803,8 +807,11 @@ beforeEach(() => {
   vi.mocked(api.startCodexLogin).mockResolvedValue('fixture-login');
   vi.mocked(api.restoreToolToOfficial).mockResolvedValue({ success: true, message: '' });
   vi.mocked(api.startTool).mockResolvedValue(undefined);
+  vi.mocked(api.getSettings).mockResolvedValue({ developerMode: false, locale: 'en' });
+  vi.mocked(api.saveSettings).mockResolvedValue(undefined);
   vi.mocked(folderPicker).mockResolvedValue('E:/fixture-project');
-  useNavigationStore.getState().setActivePage('apps');
+  useNavigationStore.setState(useNavigationStore.getInitialState(), true);
+  enableAccountPlugins();
 });
 
 async function showAccountCenter(tools: Tool[]) {
@@ -2871,8 +2878,57 @@ const cancelCases = [
   ['zcode', 'startZCodeLogin', 'pollZCodeLogin', 'cancelZCodeLogin'],
 ] as const;
 
+const communityProviderTools = [
+  'claudecode',
+  'claudedesktop',
+  'doubaowork',
+  'dola',
+  'workbuddy',
+  'workbuddyai',
+] as const;
+
+it.each(communityProviderTools)(
+  'apps: %s account login opens the complete plugin list without starting a login',
+  async (tool) => {
+    useNavigationStore.setState({ developerMode: false });
+    usePluginsStore.setState({ installed: [] });
+    await mount(tool as Tool);
+    act(() =>
+      renderer.update(
+        <AppManagerProvider>
+          <Harness panel />
+        </AppManagerProvider>
+      )
+    );
+    await act(async () => {
+      expect(renderer.root.findByType(AccountSectionButton).props.idleLabel).toBe(
+        'plugins.category.account'
+      );
+      renderer.root.findByType(AccountSectionButton).props.onClick();
+    });
+    expect(useNavigationStore.getState()).toMatchObject({
+      developerMode: true,
+      activePage: 'developer',
+      developerTab: 'plugins',
+      accountPluginsRequest: expect.any(Number),
+    });
+    expect(api.saveSettings).toHaveBeenCalledWith({ developerMode: true, locale: 'en' });
+    expect(api.openExternal).not.toHaveBeenCalled();
+    for (const action of [
+      api.startClaudeCodeLogin,
+      api.startClaudeDesktopLogin,
+      api.startWorkBuddyLogin,
+    ])
+      expect(action).not.toHaveBeenCalled();
+    expect(api.startTool).not.toHaveBeenCalled();
+  }
+);
+
 for (const page of ['apps', 'accounts'] as const) {
-  it.each(cancelCases)(
+  const supportedCancelCases = cancelCases.filter(
+    ([tool]) => !communityProviderTools.includes(tool as (typeof communityProviderTools)[number])
+  );
+  it.each(supportedCancelCases)(
     `${page}: %s cancel button ends the current native login and allows an immediate retry`,
     async (tool, startName, pollName, cancelName) => {
       let attempt = 0;

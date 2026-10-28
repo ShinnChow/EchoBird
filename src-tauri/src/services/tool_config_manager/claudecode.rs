@@ -319,7 +319,7 @@ fn claudecode_env_model_id(real_id: &str, var: &str, one_m: bool) -> String {
 /// Connect Claude Code directly to the selected Anthropic endpoint, preserving
 /// saved model identity and original settings for configuration reads/restore.
 pub(super) fn apply_claudecode(model_info: &ModelInfo) -> ApplyResult {
-    let config_dir = match crate::services::claude_code_accounts::config_dir() {
+    let config_dir = match config_dir() {
         Ok(dir) => dir,
         Err(message) => {
             return ApplyResult {
@@ -638,9 +638,7 @@ fn apply_claudecode_with_environment(
 }
 
 pub(super) fn read_claudecode() -> Option<ModelInfo> {
-    let settings_path = crate::services::claude_code_accounts::config_dir()
-        .ok()?
-        .join("settings.json");
+    let settings_path = config_dir().ok()?.join("settings.json");
     read_claudecode_at(&settings_path, &echobird_dir().join("claudecode.json"))
 }
 
@@ -714,7 +712,7 @@ fn read_claudecode_at(settings_path: &Path, relay_path: &Path) -> Option<ModelIn
 /// keeps in settings.json — deleting it wholesale would wipe their Claude Code
 /// setup, not just our model config.
 pub(super) fn restore_claudecode_to_official() -> ApplyResult {
-    let config_dir = match crate::services::claude_code_accounts::config_dir() {
+    let config_dir = match config_dir() {
         Ok(dir) => dir,
         Err(message) => {
             return ApplyResult {
@@ -1309,4 +1307,15 @@ mod switch_tests {
             assert_eq!(read_json_file(&settings).unwrap(), manual);
         });
     }
+}
+
+fn config_dir() -> Result<PathBuf, String> {
+    if let Ok(value) = std::env::var("CLAUDE_CONFIG_DIR") {
+        if !value.trim().is_empty() {
+            return Ok(PathBuf::from(value.trim().trim_matches('"')));
+        }
+    }
+    Ok(dirs::home_dir()
+        .ok_or("Cannot find the home directory")?
+        .join(".claude"))
 }

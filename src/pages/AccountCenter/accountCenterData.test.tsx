@@ -15,6 +15,8 @@ import type { DuMateAccount } from '../../api/dumate';
 import type { DoubaoAccount } from '../../api/doubao';
 
 vi.mock('../../hooks/useI18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
+const openAccountPlugins = vi.hoisted(() => vi.fn());
+vi.mock('../AppManager/openAccountPlugins', () => ({ openAccountPlugins }));
 
 function context() {
   const group = () => ({
@@ -71,6 +73,25 @@ const providers = (state: AppManagerContextType) =>
   accountCenterProviders(state, (key) => key, 'en');
 
 describe('Account Center display data', () => {
+  it.each([
+    'claudecode',
+    'claudedesktop',
+    'doubaowork',
+    'dola',
+    'workbuddy',
+    'workbuddyai',
+  ] as const)('%s redirects account add to the complete plugin list', (id) => {
+    const state = context();
+    openAccountPlugins.mockClear();
+    openAccountPlugins.mockResolvedValue(undefined);
+    state.detectedTools = [{ id, name: id, category: 'Desktop', installed: true }];
+    const entry = providers(state).find((provider) => provider.id === id)!;
+
+    entry.add();
+
+    expect(openAccountPlugins).toHaveBeenCalledWith();
+  });
+
   it.each([false, true])(
     'shares one Cursor group when CLI is installed and editor installed=%s',
     (editorInstalled) => {

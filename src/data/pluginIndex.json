@@ -1,0 +1,798 @@
+{
+  "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/index.schema.json",
+  "schemaVersion": 1,
+  "name": "EchoBird Plugin Hub",
+  "plugins": [
+    {
+      "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/registry-entry.schema.json",
+      "id": "echobird-community.claude-code-accounts",
+      "repository": "https://github.com/edison7009/echobird-plugin",
+      "releases": [
+        {
+          "manifest": {
+            "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/plugin-manifest.schema.json",
+            "name": "claude-code-accounts",
+            "publisher": "echobird-community",
+            "version": "0.1.0-preview.1",
+            "displayName": "Claude Code",
+            "description": "Claude Code 账号登录、切换及已有账号能力。Account capabilities for Claude Code.",
+            "license": "MIT",
+            "repository": "https://github.com/edison7009/echobird-plugin",
+            "icon": "icon.svg",
+            "category": "account",
+            "echobird": {
+              "manifestVersion": 1,
+              "apiVersion": "0.1-draft",
+              "platforms": ["windows"],
+              "permissions": ["account.code"],
+              "worker": {
+                "runtime": "native",
+                "entry": "bin/echobird-account-engine.exe"
+              },
+              "contributes": {
+                "pages": [],
+                "providers": [
+                  {
+                    "id": "claudecode",
+                    "title": "Claude Code",
+                    "applications": ["claudecode"],
+                    "searchTerms": ["Claude Code", "claudecode"],
+                    "operations": [
+                      "accounts",
+                      "login.start",
+                      "login.complete",
+                      "login.cancel",
+                      "account.refresh",
+                      "account.apply",
+                      "account.remove",
+                      "models",
+                      "proxy",
+                      "voice"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "commit": "5f6df19653df2b640f2c9a2ce0a07ef295f6ed80",
+          "sha256": "cc07f266c92e8354b170975b9702bdbd269707f37e8bab7d61d5212926ed7167",
+          "downloads": {
+            "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/5f6df19653df2b640f2c9a2ce0a07ef295f6ed80/packages/echobird-community.claude-code-accounts-0.1.0-preview.1.zip",
+            "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/echobird-community.claude-code-accounts-0.1.0-preview.1.zip"
+          }
+        }
+      ],
+      "icons": {
+        "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/5f6df19653df2b640f2c9a2ce0a07ef295f6ed80/packages/icons/claude-code-accounts-0.1.0-preview.1.png",
+        "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/icons/claude-code-accounts-0.1.0-preview.1.png"
+      },
+      "clientIcon": "claudecode.svg",
+      "descriptions": {
+        "international": "Sign in and switch accounts in Claude Code.",
+        "china": "Claude Code 账号登录、切换及已有账号能力。"
+      }
+    },
+    {
+      "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/registry-entry.schema.json",
+      "id": "echobird-community.claude-desktop-accounts",
+      "repository": "https://github.com/edison7009/echobird-plugin",
+      "releases": [
+        {
+          "manifest": {
+            "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/plugin-manifest.schema.json",
+            "name": "claude-desktop-accounts",
+            "publisher": "echobird-community",
+            "version": "0.1.0-preview.1",
+            "displayName": "Claude Desktop",
+            "description": "Claude Desktop 账号登录、切换及已有账号能力。Account capabilities for Claude Desktop.",
+            "license": "MIT",
+            "repository": "https://github.com/edison7009/echobird-plugin",
+            "icon": "icon.svg",
+            "category": "account",
+            "echobird": {
+              "manifestVersion": 1,
+              "apiVersion": "0.1-draft",
+              "platforms": ["windows"],
+              "permissions": ["account.code"],
+              "worker": {
+                "runtime": "native",
+                "entry": "bin/echobird-account-engine.exe"
+              },
+              "contributes": {
+                "pages": [],
+                "providers": [
+                  {
+                    "id": "claudedesktop",
+                    "title": "Claude Desktop",
+                    "applications": ["claudedesktop"],
+                    "searchTerms": ["Claude Desktop", "claudedesktop"],
+                    "operations": [
+                      "accounts",
+                      "login.start",
+                      "login.poll",
+                      "login.cancel",
+                      "account.refresh",
+                      "account.apply",
+                      "account.remove",
+                      "history.merge"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "commit": "5f6df19653df2b640f2c9a2ce0a07ef295f6ed80",
+          "sha256": "ceb46742bbc1cff90efc55a4ebd36f09f557a8a60425c95469fa82610c95abda",
+          "downloads": {
+            "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/5f6df19653df2b640f2c9a2ce0a07ef295f6ed80/packages/echobird-community.claude-desktop-accounts-0.1.0-preview.1.zip",
+            "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/echobird-community.claude-desktop-accounts-0.1.0-preview.1.zip"
+          }
+        }
+      ],
+      "icons": {
+        "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/5f6df19653df2b640f2c9a2ce0a07ef295f6ed80/packages/icons/claude-desktop-accounts-0.1.0-preview.1.png",
+        "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/icons/claude-desktop-accounts-0.1.0-preview.1.png"
+      },
+      "clientIcon": "claudedesktop.svg",
+      "descriptions": {
+        "international": "Sign in and switch accounts in Claude Desktop.",
+        "china": "Claude Desktop 账号登录、切换及已有账号能力。"
+      }
+    },
+    {
+      "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/registry-entry.schema.json",
+      "id": "echobird-community.dola-accounts",
+      "repository": "https://github.com/edison7009/echobird-plugin",
+      "releases": [
+        {
+          "manifest": {
+            "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/plugin-manifest.schema.json",
+            "name": "dola-accounts",
+            "publisher": "echobird-community",
+            "version": "0.1.0-preview.1",
+            "displayName": "Dola",
+            "description": "Dola 账号登录、切换及已有账号能力。Account capabilities for Dola.",
+            "license": "MIT",
+            "repository": "https://github.com/edison7009/echobird-plugin",
+            "icon": "icon.png",
+            "category": "account",
+            "echobird": {
+              "manifestVersion": 1,
+              "apiVersion": "0.1-draft",
+              "platforms": ["windows"],
+              "permissions": ["account.code"],
+              "worker": {
+                "runtime": "native",
+                "entry": "bin/echobird-account-engine.exe"
+              },
+              "contributes": {
+                "pages": [],
+                "providers": [
+                  {
+                    "id": "dola",
+                    "title": "Dola",
+                    "applications": ["dola"],
+                    "searchTerms": ["Dola", "dola"],
+                    "operations": [
+                      "accounts",
+                      "login.start",
+                      "login.poll",
+                      "login.cancel",
+                      "account.refresh",
+                      "account.claim",
+                      "account.apply",
+                      "account.remove",
+                      "models",
+                      "proxy"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "commit": "5f6df19653df2b640f2c9a2ce0a07ef295f6ed80",
+          "sha256": "95e734155232a60e34322b166086bb39854bf55dfe1e6a0be404962b64b9f8fa",
+          "downloads": {
+            "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/5f6df19653df2b640f2c9a2ce0a07ef295f6ed80/packages/echobird-community.dola-accounts-0.1.0-preview.1.zip",
+            "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/echobird-community.dola-accounts-0.1.0-preview.1.zip"
+          }
+        }
+      ],
+      "icons": {
+        "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/5f6df19653df2b640f2c9a2ce0a07ef295f6ed80/packages/icons/dola-accounts-0.1.0-preview.1.png",
+        "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/icons/dola-accounts-0.1.0-preview.1.png"
+      },
+      "clientIcon": "dola.png",
+      "descriptions": {
+        "international": "Sign in and switch accounts in Dola.",
+        "china": "Dola 账号登录、切换及已有账号能力。"
+      }
+    },
+    {
+      "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/registry-entry.schema.json",
+      "id": "echobird-community.doubao-work-accounts",
+      "repository": "https://github.com/edison7009/echobird-plugin",
+      "releases": [
+        {
+          "manifest": {
+            "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/plugin-manifest.schema.json",
+            "name": "doubao-work-accounts",
+            "publisher": "echobird-community",
+            "version": "0.1.0-preview.1",
+            "displayName": "豆包工作",
+            "description": "豆包工作 账号登录、切换及已有账号能力。Account capabilities for 豆包工作.",
+            "license": "MIT",
+            "repository": "https://github.com/edison7009/echobird-plugin",
+            "icon": "icon.png",
+            "category": "account",
+            "echobird": {
+              "manifestVersion": 1,
+              "apiVersion": "0.1-draft",
+              "platforms": ["windows"],
+              "permissions": ["account.code"],
+              "worker": {
+                "runtime": "native",
+                "entry": "bin/echobird-account-engine.exe"
+              },
+              "contributes": {
+                "pages": [],
+                "providers": [
+                  {
+                    "id": "doubaowork",
+                    "title": "豆包工作",
+                    "applications": ["doubaowork"],
+                    "searchTerms": ["豆包工作", "doubaowork"],
+                    "operations": [
+                      "accounts",
+                      "login.start",
+                      "login.poll",
+                      "login.cancel",
+                      "account.refresh",
+                      "account.claim",
+                      "account.apply",
+                      "account.remove",
+                      "models",
+                      "proxy",
+                      "voice"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "commit": "5f6df19653df2b640f2c9a2ce0a07ef295f6ed80",
+          "sha256": "1f26b16ea9db9e0c56f8706e07fc863607c249f93c3be50316d80e8829e7dc60",
+          "downloads": {
+            "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/5f6df19653df2b640f2c9a2ce0a07ef295f6ed80/packages/echobird-community.doubao-work-accounts-0.1.0-preview.1.zip",
+            "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/echobird-community.doubao-work-accounts-0.1.0-preview.1.zip"
+          }
+        }
+      ],
+      "icons": {
+        "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/5f6df19653df2b640f2c9a2ce0a07ef295f6ed80/packages/icons/doubao-work-accounts-0.1.0-preview.1.png",
+        "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/icons/doubao-work-accounts-0.1.0-preview.1.png"
+      },
+      "clientIcon": "doubaowork.png",
+      "descriptions": {
+        "international": "Sign in and switch accounts in Doubao Work.",
+        "china": "豆包工作 账号登录、切换及已有账号能力。"
+      }
+    },
+    {
+      "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/registry-entry.schema.json",
+      "id": "echobird-community.trae-accounts",
+      "repository": "https://github.com/edison7009/echobird-plugin",
+      "releases": [
+        {
+          "manifest": {
+            "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/plugin-manifest.schema.json",
+            "name": "trae-accounts",
+            "publisher": "echobird-community",
+            "version": "0.1.0-preview.1",
+            "displayName": "Trae",
+            "description": "Trae 账号登录、切换、智能接入和语音接入。Account capabilities for Trae.",
+            "license": "MIT",
+            "repository": "https://github.com/edison7009/echobird-plugin",
+            "icon": "icon.svg",
+            "category": "account",
+            "echobird": {
+              "manifestVersion": 1,
+              "apiVersion": "0.1-draft",
+              "platforms": ["windows"],
+              "permissions": ["account.code"],
+              "worker": {
+                "runtime": "native",
+                "entry": "bin/echobird-account-engine.exe"
+              },
+              "contributes": {
+                "pages": [],
+                "providers": [
+                  {
+                    "id": "trae",
+                    "title": "Trae",
+                    "applications": ["trae"],
+                    "searchTerms": ["Trae", "trae"],
+                    "operations": [
+                      "accounts",
+                      "login.start",
+                      "login.poll",
+                      "login.cancel",
+                      "account.refresh",
+                      "account.claim",
+                      "account.apply",
+                      "account.remove",
+                      "models",
+                      "proxy",
+                      "voice"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "commit": "daed3fabf424ea29479c3359da233bb56f7c1308",
+          "sha256": "28fa685e8e482aa99f78b2bfb532bf1e6325ea0fb13139aeca8b1a4c4ab6c632",
+          "downloads": {
+            "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/daed3fabf424ea29479c3359da233bb56f7c1308/packages/echobird-community.trae-accounts-0.1.0-preview.1.zip",
+            "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/echobird-community.trae-accounts-0.1.0-preview.1.zip"
+          }
+        }
+      ],
+      "icons": {
+        "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/daed3fabf424ea29479c3359da233bb56f7c1308/packages/icons/trae-accounts-0.1.0-preview.1.svg",
+        "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/icons/trae-accounts-0.1.0-preview.1.svg"
+      },
+      "clientIcon": "trae.svg",
+      "descriptions": {
+        "international": "Account sign-in, switching, AI access, and voice access for Trae.",
+        "china": "Trae 账号登录、切换、智能接入和语音接入。"
+      }
+    },
+    {
+      "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/registry-entry.schema.json",
+      "id": "echobird-community.trae-cn-accounts",
+      "repository": "https://github.com/edison7009/echobird-plugin",
+      "releases": [
+        {
+          "manifest": {
+            "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/plugin-manifest.schema.json",
+            "name": "trae-cn-accounts",
+            "publisher": "echobird-community",
+            "version": "0.1.0-preview.1",
+            "displayName": "Trae CN",
+            "description": "Trae CN 账号登录、切换、智能接入和语音接入。Account capabilities for Trae CN.",
+            "license": "MIT",
+            "repository": "https://github.com/edison7009/echobird-plugin",
+            "icon": "icon.svg",
+            "category": "account",
+            "echobird": {
+              "manifestVersion": 1,
+              "apiVersion": "0.1-draft",
+              "platforms": ["windows"],
+              "permissions": ["account.code"],
+              "worker": {
+                "runtime": "native",
+                "entry": "bin/echobird-account-engine.exe"
+              },
+              "contributes": {
+                "pages": [],
+                "providers": [
+                  {
+                    "id": "traecn",
+                    "title": "Trae CN",
+                    "applications": ["traecn"],
+                    "searchTerms": ["Trae CN", "traecn"],
+                    "operations": [
+                      "accounts",
+                      "login.start",
+                      "login.poll",
+                      "login.cancel",
+                      "account.refresh",
+                      "account.claim",
+                      "account.apply",
+                      "account.remove",
+                      "models",
+                      "proxy",
+                      "voice"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "commit": "daed3fabf424ea29479c3359da233bb56f7c1308",
+          "sha256": "9479fc228ac6659ab89f5d34dc30125b20843419aa80d5b0fa87674cdf520264",
+          "downloads": {
+            "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/daed3fabf424ea29479c3359da233bb56f7c1308/packages/echobird-community.trae-cn-accounts-0.1.0-preview.1.zip",
+            "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/echobird-community.trae-cn-accounts-0.1.0-preview.1.zip"
+          }
+        }
+      ],
+      "icons": {
+        "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/daed3fabf424ea29479c3359da233bb56f7c1308/packages/icons/trae-cn-accounts-0.1.0-preview.1.svg",
+        "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/icons/trae-cn-accounts-0.1.0-preview.1.svg"
+      },
+      "clientIcon": "traecn.svg",
+      "descriptions": {
+        "international": "Account sign-in, switching, AI access, and voice access for Trae CN.",
+        "china": "Trae CN 账号登录、切换、智能接入和语音接入。"
+      }
+    },
+    {
+      "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/registry-entry.schema.json",
+      "id": "echobird-community.workbuddy-accounts",
+      "repository": "https://github.com/edison7009/echobird-plugin",
+      "releases": [
+        {
+          "manifest": {
+            "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/plugin-manifest.schema.json",
+            "name": "workbuddy-accounts",
+            "publisher": "echobird-community",
+            "version": "0.1.0-preview.1",
+            "displayName": "WorkBuddy",
+            "description": "WorkBuddy 账号登录、切换及已有账号能力。Account capabilities for WorkBuddy.",
+            "license": "MIT",
+            "repository": "https://github.com/edison7009/echobird-plugin",
+            "icon": "icon.png",
+            "category": "account",
+            "echobird": {
+              "manifestVersion": 1,
+              "apiVersion": "0.1-draft",
+              "platforms": ["windows"],
+              "permissions": ["account.code"],
+              "worker": {
+                "runtime": "native",
+                "entry": "bin/echobird-account-engine.exe"
+              },
+              "contributes": {
+                "pages": [],
+                "providers": [
+                  {
+                    "id": "workbuddy",
+                    "title": "WorkBuddy",
+                    "applications": ["workbuddy"],
+                    "searchTerms": ["WorkBuddy", "workbuddy"],
+                    "operations": [
+                      "accounts",
+                      "login.start",
+                      "login.poll",
+                      "login.cancel",
+                      "account.refresh",
+                      "account.claim",
+                      "account.apply",
+                      "account.remove",
+                      "models",
+                      "proxy",
+                      "voice"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "commit": "5f6df19653df2b640f2c9a2ce0a07ef295f6ed80",
+          "sha256": "260e921ad42117127c4c47fc0d08d023de7d753dd9dbdb7148b5d01946ae5485",
+          "downloads": {
+            "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/5f6df19653df2b640f2c9a2ce0a07ef295f6ed80/packages/echobird-community.workbuddy-accounts-0.1.0-preview.1.zip",
+            "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/echobird-community.workbuddy-accounts-0.1.0-preview.1.zip"
+          }
+        }
+      ],
+      "icons": {
+        "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/5f6df19653df2b640f2c9a2ce0a07ef295f6ed80/packages/icons/workbuddy-accounts-0.1.0-preview.1.png",
+        "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/icons/workbuddy-accounts-0.1.0-preview.1.png"
+      },
+      "clientIcon": "workbuddy.png",
+      "descriptions": {
+        "international": "Sign in and switch accounts in WorkBuddy.",
+        "china": "WorkBuddy 账号登录、切换及已有账号能力。"
+      }
+    },
+    {
+      "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/registry-entry.schema.json",
+      "id": "echobird-community.workbuddy-ai-accounts",
+      "repository": "https://github.com/edison7009/echobird-plugin",
+      "releases": [
+        {
+          "manifest": {
+            "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/plugin-manifest.schema.json",
+            "name": "workbuddy-ai-accounts",
+            "publisher": "echobird-community",
+            "version": "0.1.0-preview.1",
+            "displayName": "WorkBuddy AI",
+            "description": "WorkBuddy AI 账号登录、切换及已有账号能力。Account capabilities for WorkBuddy AI.",
+            "license": "MIT",
+            "repository": "https://github.com/edison7009/echobird-plugin",
+            "icon": "icon.png",
+            "category": "account",
+            "echobird": {
+              "manifestVersion": 1,
+              "apiVersion": "0.1-draft",
+              "platforms": ["windows"],
+              "permissions": ["account.code"],
+              "worker": {
+                "runtime": "native",
+                "entry": "bin/echobird-account-engine.exe"
+              },
+              "contributes": {
+                "pages": [],
+                "providers": [
+                  {
+                    "id": "workbuddyai",
+                    "title": "WorkBuddy AI",
+                    "applications": ["workbuddyai"],
+                    "searchTerms": ["WorkBuddy AI", "workbuddyai"],
+                    "operations": [
+                      "accounts",
+                      "login.start",
+                      "login.poll",
+                      "login.cancel",
+                      "account.refresh",
+                      "account.claim",
+                      "account.apply",
+                      "account.remove",
+                      "models",
+                      "proxy",
+                      "voice"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "commit": "5f6df19653df2b640f2c9a2ce0a07ef295f6ed80",
+          "sha256": "fe16090d7f1d5e9e5483b3f417f431dfc3ba836bc53f7852af2be30728b0bbc1",
+          "downloads": {
+            "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/5f6df19653df2b640f2c9a2ce0a07ef295f6ed80/packages/echobird-community.workbuddy-ai-accounts-0.1.0-preview.1.zip",
+            "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/echobird-community.workbuddy-ai-accounts-0.1.0-preview.1.zip"
+          }
+        }
+      ],
+      "icons": {
+        "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/5f6df19653df2b640f2c9a2ce0a07ef295f6ed80/packages/icons/workbuddy-ai-accounts-0.1.0-preview.1.png",
+        "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/icons/workbuddy-ai-accounts-0.1.0-preview.1.png"
+      },
+      "clientIcon": "workbuddyai.png",
+      "descriptions": {
+        "international": "Sign in and switch accounts in WorkBuddy AI.",
+        "china": "WorkBuddy AI 账号登录、切换及已有账号能力。"
+      }
+    },
+    {
+      "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/registry-entry.schema.json",
+      "id": "echobird.ocean-theme",
+      "repository": "https://github.com/edison7009/echobird-plugin",
+      "descriptions": {
+        "international": "A light and dark ocean palette for EchoBird.",
+        "china": "EchoBird 海洋明暗主题配色。"
+      },
+      "releases": [
+        {
+          "manifest": {
+            "name": "ocean-theme",
+            "publisher": "echobird",
+            "version": "0.1.0",
+            "displayName": "Ocean Theme",
+            "description": "A light and dark ocean palette for EchoBird.",
+            "category": "appearance",
+            "license": "MIT",
+            "repository": "https://github.com/edison7009/echobird-plugin",
+            "echobird": {
+              "manifestVersion": 1,
+              "apiVersion": "0.1-draft",
+              "platforms": ["windows", "macos", "linux"],
+              "permissions": [],
+              "contributes": {
+                "pages": [],
+                "themes": [
+                  {
+                    "id": "ocean",
+                    "title": "Ocean",
+                    "light": {
+                      "background": "#F0F7FA",
+                      "surface": "#E4EFF4",
+                      "elevated": "#D6E6ED",
+                      "input": "#F9FCFD",
+                      "border": "#B8CED8",
+                      "text": "#183544",
+                      "textSecondary": "#476775",
+                      "textMuted": "#708994",
+                      "accent": "#16889A",
+                      "accentSecondary": "#3377AA"
+                    },
+                    "dark": {
+                      "background": "#14232B",
+                      "surface": "#1B303B",
+                      "elevated": "#24404D",
+                      "input": "#192E37",
+                      "border": "#345361",
+                      "text": "#E7F1F5",
+                      "textSecondary": "#AAC5D1",
+                      "textMuted": "#7F9BA8",
+                      "accent": "#46BEC5",
+                      "accentSecondary": "#7BAAE6"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "commit": "72bf00de721ac4a1c622c3be7bfe2526a7e9387f",
+          "sha256": "f8a037f95b838415a37d8add63c0f68de0f3ef86659240b8a8b2ba17364f5434",
+          "downloads": {
+            "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/72bf00de721ac4a1c622c3be7bfe2526a7e9387f/packages/echobird.ocean-theme-0.1.0.zip",
+            "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/echobird.ocean-theme-0.1.0.zip"
+          }
+        }
+      ]
+    },
+    {
+      "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/registry-entry.schema.json",
+      "id": "echobird.reversi",
+      "repository": "https://github.com/edison7009/echobird-plugin",
+      "releases": [
+        {
+          "manifest": {
+            "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/plugin-manifest.schema.json",
+            "name": "reversi",
+            "publisher": "echobird",
+            "version": "1.0.0",
+            "displayName": "黑白棋 · Reversi",
+            "description": "与选定的 AI 模型对弈。Play Reversi with your selected AI model.",
+            "license": "MIT",
+            "repository": "https://github.com/edison7009/echobird-plugin",
+            "icon": "ui/icon.svg",
+            "echobird": {
+              "manifestVersion": 1,
+              "apiVersion": "0.1-draft",
+              "platforms": ["windows", "macos", "linux"],
+              "permissions": ["model.request"],
+              "contributes": {
+                "pages": [
+                  {
+                    "id": "game",
+                    "title": "黑白棋 · Reversi",
+                    "entry": "ui/index.html"
+                  }
+                ]
+              }
+            }
+          },
+          "commit": "1db647d859c941244fdc73a7c7eddc109730e057",
+          "sha256": "fc629de0971cd77139ec708808b2c1919983ef56b21106bbe9c48d7c26a4cf0d",
+          "downloads": {
+            "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/1db647d859c941244fdc73a7c7eddc109730e057/packages/echobird.reversi-1.0.0.zip",
+            "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/echobird.reversi-1.0.0.zip"
+          }
+        }
+      ],
+      "icons": {
+        "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/907f520eae6cf22bf2ff7f223441e4cb4b853439/packages/icons/reversi-1.0.0.png",
+        "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/icons/reversi-1.0.0.png"
+      },
+      "clientIcon": "reversi.svg",
+      "descriptions": {
+        "international": "Play Reversi with your selected AI model.",
+        "china": "与选定的 AI 模型对弈。"
+      }
+    },
+    {
+      "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/registry-entry.schema.json",
+      "id": "echobird.text-tools",
+      "repository": "https://github.com/edison7009/echobird-plugin",
+      "descriptions": {
+        "international": "Clean up speech text and run a text-formatting command with private settings.",
+        "china": "清理语音文本，支持私有配置、存储和文本格式化命令。"
+      },
+      "releases": [
+        {
+          "manifest": {
+            "name": "text-tools",
+            "publisher": "echobird",
+            "version": "0.1.0",
+            "displayName": "Text Tools",
+            "description": "Clean up speech text and run a text-formatting command with private settings.",
+            "category": "feature",
+            "license": "MIT",
+            "repository": "https://github.com/edison7009/echobird-plugin",
+            "echobird": {
+              "manifestVersion": 1,
+              "apiVersion": "0.1-draft",
+              "platforms": ["windows", "macos", "linux"],
+              "permissions": [
+                "extension.background",
+                "configuration",
+                "storage",
+                "commands",
+                "events",
+                "text.process"
+              ],
+              "background": "background.mjs",
+              "contributes": {
+                "pages": [],
+                "configuration": [
+                  {
+                    "key": "collapse-spaces",
+                    "title": "Collapse repeated spaces",
+                    "type": "boolean",
+                    "default": true
+                  },
+                  {
+                    "key": "prefix",
+                    "title": "Output prefix",
+                    "type": "string",
+                    "default": ""
+                  }
+                ],
+                "commands": [{ "id": "format", "title": "Format text" }],
+                "textProcessors": [
+                  {
+                    "id": "clean-output",
+                    "title": "Clean speech output",
+                    "stage": "voice.output"
+                  }
+                ]
+              }
+            }
+          },
+          "commit": "72bf00de721ac4a1c622c3be7bfe2526a7e9387f",
+          "sha256": "0585ca5e8e71e751003a8decb2b63527d92f0fb1ab43ff2e5877f8bae1ab45c6",
+          "downloads": {
+            "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/72bf00de721ac4a1c622c3be7bfe2526a7e9387f/packages/echobird.text-tools-0.1.0.zip",
+            "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/echobird.text-tools-0.1.0.zip"
+          }
+        }
+      ]
+    },
+    {
+      "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/registry-entry.schema.json",
+      "id": "echobird.translator",
+      "repository": "https://github.com/edison7009/echobird-plugin",
+      "releases": [
+        {
+          "manifest": {
+            "$schema": "https://raw.githubusercontent.com/edison7009/echobird-plugin/main/schemas/plugin-manifest.schema.json",
+            "name": "translator",
+            "publisher": "echobird",
+            "version": "1.0.0",
+            "displayName": "AI 翻译 · Translate",
+            "description": "使用选定的 AI 模型翻译文本。Translate text with your selected AI model.",
+            "license": "MIT",
+            "repository": "https://github.com/edison7009/echobird-plugin",
+            "icon": "ui/icon.svg",
+            "echobird": {
+              "manifestVersion": 1,
+              "apiVersion": "0.1-draft",
+              "platforms": ["windows", "macos", "linux"],
+              "permissions": ["model.request", "clipboard.write"],
+              "contributes": {
+                "pages": [
+                  {
+                    "id": "translate",
+                    "title": "AI 翻译 · Translate",
+                    "entry": "ui/index.html"
+                  }
+                ]
+              }
+            }
+          },
+          "commit": "da21e0ffbe7c1a8bd1755ef9fc9b7ac50e1dc300",
+          "sha256": "a580adce3fad79d74bc9828ee5f1fa93aa60694ce8ccceadca8ca8da019db3e2",
+          "downloads": {
+            "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/da21e0ffbe7c1a8bd1755ef9fc9b7ac50e1dc300/packages/echobird.translator-1.0.0.zip",
+            "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/echobird.translator-1.0.0.zip"
+          }
+        }
+      ],
+      "icons": {
+        "international": "https://raw.githubusercontent.com/edison7009/echobird-plugin/907f520eae6cf22bf2ff7f223441e4cb4b853439/packages/icons/translator-1.0.0.png",
+        "china": "https://api.gitcode.com/api/v5/repos/edison7009/echobird-plugin/raw/packages/icons/translator-1.0.0.png"
+      },
+      "clientIcon": "translator.svg",
+      "descriptions": {
+        "international": "Translate text with your selected AI model.",
+        "china": "使用选定的 AI 模型翻译文本。"
+      }
+    }
+  ]
+}

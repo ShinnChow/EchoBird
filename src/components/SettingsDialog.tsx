@@ -12,6 +12,7 @@ import {
   Power,
   Monitor,
   Gift,
+  CodeXml,
   Shield,
 } from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
@@ -28,6 +29,8 @@ import { useUiScaleStore } from '../stores/uiScaleStore';
 import { useEasterEggStore } from '../stores/easterEggStore';
 import { useRewardClaimStore } from '../stores/rewardClaimStore';
 import { RoutingToggle } from './RoutingToggle';
+import { useNavigationStore } from '../stores/navigationStore';
+import { usePluginProductStore } from '../stores/pluginProductStore';
 
 // All supported locales
 const LOCALE_OPTIONS = [
@@ -67,10 +70,16 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   >(null);
   const [installPct, setInstallPct] = useState(0);
   const [closeToTray, setCloseToTray] = useState<boolean | null>(false);
-  const [sensitiveInfoProtection, setSensitiveInfoProtection] = useState(false);
-  const [protectionReady, setProtectionReady] = useState(false);
+  const [settingsReady, setSettingsReady] = useState(false);
+  const [protectionEnabled, setProtectionEnabled] = useState(false);
   const [protectionPending, setProtectionPending] = useState(false);
   const [protectionError, setProtectionError] = useState(false);
+  const protectionChange = useRef({ revision: 0, pending: false });
+  const developerMode = useNavigationStore((state) => state.developerMode);
+  const setDeveloperMode = useNavigationStore((state) => state.setDeveloperMode);
+  const [developerPending, setDeveloperPending] = useState(false);
+  const [developerError, setDeveloperError] = useState(false);
+  const developerChange = useRef({ revision: 0, pending: false });
   const easterEgg = useEasterEggStore((state) => state.enabled);
   const setEasterEgg = useEasterEggStore((state) => state.setEnabled);
   const autoClaimRewards = useRewardClaimStore((state) => state.enabled);
@@ -124,10 +133,13 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   // Load backend settings each time the dialog opens.
   useEffect(() => {
     let active = true;
+    const developerReadRevision = developerChange.current.revision;
+    const protectionReadRevision = protectionChange.current.revision;
     if (isOpen) {
       void Promise.resolve().then(() => {
         if (active) {
-          setProtectionReady(false);
+          setSettingsReady(false);
+          setDeveloperError(false);
           setProtectionError(false);
         }
       });
@@ -140,8 +152,20 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
         .getSettings()
         .then((settings) => {
           if (!active) return;
-          setSensitiveInfoProtection(settings.sensitiveInfoProtection === true);
-          setProtectionReady(true);
+          // A reopened dialog can return an older snapshot after an explicit save.
+          if (
+            !developerChange.current.pending &&
+            developerReadRevision === developerChange.current.revision
+          ) {
+            setDeveloperMode(settings.developerMode === true);
+          }
+          if (
+            !protectionChange.current.pending &&
+            protectionReadRevision === protectionChange.current.revision
+          ) {
+            setProtectionEnabled(settings.sensitiveInfoProtection === true);
+          }
+          setSettingsReady(true);
           // null ("always ask") is a real selectable value, not a missing
           // field — the backend stores it as Option<bool>=None. When the user
           // explicitly chose it (closeWindowBehaviorSet === true), preserve
@@ -155,25 +179,53 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
           );
         })
         .catch(() => {
-          if (active) setProtectionError(true);
+          if (active) {
+            setDeveloperError(true);
+            setProtectionError(true);
+          }
         });
     }
     return () => {
       active = false;
     };
-  }, [isOpen]);
+  }, [isOpen, setDeveloperMode]);
+
+  const handleDeveloperChange = async (value: boolean) => {
+    if (!settingsReady || developerChange.current.pending || protectionChange.current.pending)
+      return;
+    developerChange.current.pending = true;
+    developerChange.current.revision++;
+    setDeveloperPending(true);
+    setDeveloperError(false);
+    try {
+      const settings = await api.getSettings();
+      await api.saveSettings({ ...settings, developerMode: value });
+      setDeveloperMode(value);
+    } catch {
+      setDeveloperError(true);
+    } finally {
+      developerChange.current.pending = false;
+      developerChange.current.revision++;
+      setDeveloperPending(false);
+    }
+  };
 
   const handleProtectionChange = async (value: boolean) => {
-    if (!protectionReady || protectionPending) return;
+    if (!settingsReady || protectionChange.current.pending || developerChange.current.pending)
+      return;
+    protectionChange.current.pending = true;
+    protectionChange.current.revision++;
     setProtectionPending(true);
     setProtectionError(false);
     try {
       const settings = await api.getSettings();
       await api.saveSettings({ ...settings, sensitiveInfoProtection: value });
-      setSensitiveInfoProtection(value);
+      setProtectionEnabled(value);
     } catch {
       setProtectionError(true);
     } finally {
+      protectionChange.current.pending = false;
+      protectionChange.current.revision++;
       setProtectionPending(false);
     }
   };
@@ -569,21 +621,46 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     </div>
                     <ToggleSwitch checked={autoClaimRewards} onChange={setAutoClaimRewards} />
                   </div>
-                  <div className="min-w-0">
+                  <div className="px-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <Shield size={14} className="text-cyber-text-secondary shrink-0" />
+                        <CodeXml size={14} className="text-cyber-text-secondary" />
+                        <span className="text-[14px] font-medium text-cyber-text-secondary">
+                          {t('settings.developerMode')}
+                        </span>
+                      </div>
+                      <RoutingToggle
+                        label={t('settings.developerMode')}
+                        hideLabel
+                        className="flex-row-reverse gap-1.5"
+                        hint={t('settings.developerModeHint')}
+                        checked={developerMode}
+                        disabled={!settingsReady || protectionPending}
+                        pending={developerPending}
+                        onChange={(value) => void handleDeveloperChange(value)}
+                      />
+                    </div>
+                    {developerError && (
+                      <p role="alert" className="mt-1 text-xs text-red-400">
+                        {t('settings.developerModeError')}
+                      </p>
+                    )}
+                  </div>
+                  <div className="px-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Shield size={14} className="text-cyber-text-secondary" />
                         <span className="text-[14px] font-medium text-cyber-text-secondary">
                           {t('settings.sensitiveInfoProtection')}
                         </span>
                       </div>
                       <RoutingToggle
-                        className="flex-1 flex-row-reverse justify-between"
                         label={t('settings.sensitiveInfoProtection')}
                         hideLabel
+                        className="flex-row-reverse gap-1.5"
                         hint={t('settings.sensitiveInfoProtectionHint')}
-                        checked={sensitiveInfoProtection}
-                        disabled={!protectionReady}
+                        checked={protectionEnabled}
+                        disabled={!settingsReady || developerPending}
                         pending={protectionPending}
                         onChange={(value) => void handleProtectionChange(value)}
                       />
@@ -682,7 +759,18 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   value={colorTheme}
                   mode={themeMode}
                   locale={locale}
-                  onChange={setColorTheme}
+                  onChange={(id) => {
+                    if (usePluginProductStore.getState().snapshot.theme) {
+                      void usePluginProductStore
+                        .getState()
+                        .manage(null, 'theme', '')
+                        .then(() => {
+                          useThemeStore.getState().setPluginTheme(null);
+                          setColorTheme(id);
+                        })
+                        .catch(() => {});
+                    } else setColorTheme(id);
+                  }}
                 />
               </div>
             ) : (

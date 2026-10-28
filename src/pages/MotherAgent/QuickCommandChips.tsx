@@ -6,7 +6,17 @@ import { useMotherAgent } from './context';
 import { FRONTEND_HINTS } from './frontendHints';
 import type { MotherHint } from './types';
 import { useToolsStore } from '../../stores/toolsStore';
-import { pickToolName } from '../../stores/myProjectsStore';
+import type { LocalTool } from '../../api/types';
+
+const pickToolName = (tool: LocalTool, locale: string): string => {
+  if (locale === 'en' || !tool.names) return tool.name;
+  const direct = tool.names[locale];
+  if (direct) return direct;
+  const base = locale.split('-')[0];
+  if (tool.names[base]) return tool.names[base];
+  const fuzzy = Object.entries(tool.names).find(([k]) => k.startsWith(base));
+  return fuzzy?.[1] || tool.name;
+};
 
 // Quick-command chips for the Mother Agent welcome screen. Each chip drops a
 // self-contained prompt into the chat input (the user edits, then sends).

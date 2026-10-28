@@ -2,6 +2,12 @@ import type { LocalTool } from '../api/types';
 
 // Retain decoded images across refreshes and tab remounts, including fallback choices.
 const images = new Map<string, Promise<HTMLImageElement | null>>();
+const decodedImages = new Map<string, HTMLImageElement>();
+
+export const getDecodedImage = (src: string) => decodedImages.get(src);
+export const rememberDecodedImage = (src: string, image: HTMLImageElement) => {
+  decodedImages.set(src, image);
+};
 
 function loadImage(src: string): Promise<HTMLImageElement | null> {
   let pending = images.get(src);
@@ -9,7 +15,10 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
     const image = new Image();
     image.src = src;
     pending = image.decode().then(
-      () => image,
+      () => {
+        rememberDecodedImage(src, image);
+        return image;
+      },
       () => null
     );
     images.set(src, pending);

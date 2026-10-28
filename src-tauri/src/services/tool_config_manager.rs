@@ -367,7 +367,9 @@ pub async fn apply_model_to_tool(tool_id: &str, model_info: ModelInfo) -> ApplyR
         "claudedesktop" => {
             let mut result = apply_claudedesktop(&model_info);
             if result.success {
-                if let Err(message) = super::claude_desktop_history::prepare_if_stopped().await {
+                if let Err(message) =
+                    super::plugin_accounts::prepare_history("claudedesktop", true).await
+                {
                     result.success = false;
                     result.message = message;
                 }
@@ -467,7 +469,9 @@ pub async fn restore_tool_to_official(tool_id: &str) -> ApplyResult {
     if tool_id == "claudedesktop" {
         let mut result = restore_claudedesktop_to_official();
         if result.success {
-            if let Err(message) = super::claude_desktop_history::prepare_if_stopped().await {
+            if let Err(message) =
+                super::plugin_accounts::prepare_history("claudedesktop", true).await
+            {
                 result.success = false;
                 result.message = message;
             }

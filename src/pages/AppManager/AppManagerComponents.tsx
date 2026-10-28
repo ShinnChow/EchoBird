@@ -168,7 +168,7 @@ const catLabelKey = (cat: string): TKey => {
   return map[cat] || (cat as TKey);
 };
 
-// Localized display name — resolves per-locale `names` like ToolCard, but
+// Localized display name — resolves per-locale `names`, but
 // prefers `displayName` when present (the pre-localized label some tools
 // carry), then falls back to the plain name.
 const toolDisplayName = (tool: LocalTool, locale: string): string => {
@@ -303,7 +303,10 @@ export const AppManagerMain: React.FC = () => {
   };
 
   const installed = useMemo(
-    () => detectedTools.filter((tool) => tool.installed).sort(compareTools),
+    () =>
+      detectedTools
+        .filter((tool) => tool.installed && !['reversi', 'translator'].includes(tool.id))
+        .sort(compareTools),
     [detectedTools]
   );
   const uninstalled = useMemo(
@@ -1317,7 +1320,8 @@ export const AppManagerBottom: React.FC = () => {
   // actually on the machine.
   const isUninstalled = !!selectedToolData && !selectedToolData.installed;
   const isInstallAction = isUninstalled || (activePage === 'apps' && viewMode === 'install');
-  const isBuiltInApp = selectedTool === 'reversi' || selectedTool === 'translator';
+  const isPlugin = !!selectedToolData?.plugin;
+  const isBuiltInApp = selectedTool === 'reversi' || selectedTool === 'translator' || isPlugin;
   const hasModelSelected = !!(selectedTool && toolModelConfig[selectedTool]);
   const codeArtsAccountSelected = selectedTool === 'codearts' && !!codeArtsAccounts.selectedId;
   const hasAccountSelected =
@@ -1357,8 +1361,9 @@ export const AppManagerBottom: React.FC = () => {
   // Many tools already work out of the box, so launching without picking a model must stay enabled —
   // forcing model selection just to start a CLI was the long-standing bug.
   const willApply =
-    hasAccountSelected || (!noModelConfig && agreedConfigPolicy && hasModelSelected);
+    hasAccountSelected || (!isPlugin && !noModelConfig && agreedConfigPolicy && hasModelSelected);
   const willLaunch =
+    isPlugin ||
     launchAfterApply ||
     noModelConfig ||
     ['qoder', 'qodercn', 'claudescience'].includes(selectedTool ?? '');
@@ -1451,7 +1456,7 @@ export const AppManagerBottom: React.FC = () => {
             Apps without model configuration keep the controls visible but disabled. */}
         <div
           className={`flex flex-col gap-2 ${
-            isCatalogOnly || isInstallAction
+            isCatalogOnly || isInstallAction || isPlugin
               ? 'invisible pointer-events-none'
               : noModelConfig
                 ? 'opacity-40 pointer-events-none'
@@ -1540,9 +1545,7 @@ export const AppManagerBottom: React.FC = () => {
   );
 };
 
-// Orange instructional copy shown at the bottom-left of the launch row.
-// Branches on activePage so the same AppManagerBottom can serve both
-// "应用桌面" and "我的AI项目" without duplicating the rest of the row.
+// Application launch hints shown at the bottom-left of the launch row.
 const APP_TIP_KEYS = [
   'hint.cliRecommendation',
   'hint.appReorder',
@@ -1571,15 +1574,13 @@ export const PageAwareHint: React.FC = () => {
   const { viewMode, selectedTool } = useAppManager();
   const activePage = useNavigationStore((s) => s.activePage);
   const key =
-    activePage === 'myProjects'
-      ? 'hint.myProjects'
-      : viewMode === 'install'
-        ? 'aiDesktop.installHint'
-        : selectedTool === 'chatgptdesktop' || selectedTool === 'codex'
-          ? 'hint.responsesRequired'
-          : ['claudedesktop', 'workbuddy', 'workbuddyai'].includes(selectedTool ?? '')
-            ? 'hint.localHistoryPreserved'
-            : null;
+    viewMode === 'install'
+      ? 'aiDesktop.installHint'
+      : selectedTool === 'chatgptdesktop' || selectedTool === 'codex'
+        ? 'hint.responsesRequired'
+        : ['claudedesktop', 'workbuddy', 'workbuddyai'].includes(selectedTool ?? '')
+          ? 'hint.localHistoryPreserved'
+          : null;
   return (
     <div className="flex-1 text-[15px] font-medium text-cyber-accent">
       {key ? t(key) : activePage === 'apps' && <RandomAppTip />}

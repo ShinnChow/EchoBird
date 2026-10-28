@@ -6,6 +6,7 @@ import { useUiScaleStore } from '../stores/uiScaleStore';
 import { useEasterEggStore } from '../stores/easterEggStore';
 import { useBackgroundStore } from '../stores/backgroundStore';
 import { useRewardClaimStore } from '../stores/rewardClaimStore';
+import { useNavigationStore } from '../stores/navigationStore';
 
 const mocks = vi.hoisted(() => ({ zoom: vi.fn(), save: vi.fn(), get: vi.fn() }));
 vi.mock('@tauri-apps/api/app', () => ({ getVersion: async () => '' }));
@@ -36,6 +37,7 @@ beforeEach(() => {
   useEasterEggStore.setState({ enabled: true });
   useRewardClaimStore.setState({ enabled: false });
   useBackgroundStore.setState({ mode: 'characters' });
+  useNavigationStore.setState(useNavigationStore.getInitialState());
   useUiScaleStore.setState({
     preference: 'auto',
     requestedPreference: null,
@@ -57,6 +59,199 @@ async function tab(label: string) {
       .props.onClick();
   });
 }
+
+function developerSwitch() {
+  return view.root
+    .findAllByProps({ role: 'switch' })
+    .find((node) => node.props['aria-label'] === 'settings.developerMode')!;
+}
+
+function protectionSwitch() {
+  return view.root
+    .findAllByProps({ role: 'switch' })
+    .find((node) => node.props['aria-label'] === 'settings.sensitiveInfoProtection')!;
+}
+
+it('keeps global protection available with developer preview off and merges only its own explicit change', async () => {
+  const saved = { developerMode: false, sensitiveInfoProtection: true, locale: 'ja' };
+  mocks.get.mockResolvedValue(saved);
+  await act(async () => {
+    view = create(<SettingsDialog {...props} />);
+  });
+  expect(protectionSwitch().props['aria-checked']).toBe(true);
+  expect(developerSwitch().props['aria-checked']).toBe(false);
+  expect(mocks.save).not.toHaveBeenCalled();
+  await act(async () => protectionSwitch().props.onClick());
+  expect(mocks.save).toHaveBeenCalledExactlyOnceWith({ ...saved, sensitiveInfoProtection: false });
+  expect(useNavigationStore.getState().developerMode).toBe(false);
+});
+
+it('preserves pending protection across reopening and prevents concurrent master-switch writes', async () => {
+  mocks.get.mockResolvedValue({ sensitiveInfoProtection: true });
+  await act(async () => {
+    view = create(<SettingsDialog {...props} />);
+  });
+  let finish!: () => void;
+  mocks.save.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+  );
+  await act(async () => protectionSwitch().props.onClick());
+  expect(protectionSwitch().props.disabled).toBe(true);
+  expect(developerSwitch().props.disabled).toBe(true);
+  await act(async () => view.update(<SettingsDialog {...props} isOpen={false} />));
+  await act(async () => view.update(<SettingsDialog {...props} />));
+  await act(async () => developerSwitch().props.onClick());
+  expect(mocks.save).toHaveBeenCalledOnce();
+  await act(async () => finish());
+  expect(protectionSwitch().props['aria-checked']).toBe(false);
+  expect(protectionSwitch().props.disabled).toBe(false);
+});
+
+it.each([false, true])(
+  'ignores a stale protection read after a save across reopening (initial=%s)',
+  async (initial) => {
+    mocks.get.mockResolvedValue({ sensitiveInfoProtection: initial });
+    await act(async () => {
+      view = create(<SettingsDialog {...props} />);
+    });
+    let finishSave!: () => void;
+    mocks.save.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSave = resolve;
+        })
+    );
+    await act(async () => protectionSwitch().props.onClick());
+    await act(async () => view.update(<SettingsDialog {...props} isOpen={false} />));
+    let finishRead!: (value: object) => void;
+    mocks.get.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishRead = resolve;
+        })
+    );
+    await act(async () => view.update(<SettingsDialog {...props} />));
+    await act(async () => finishSave());
+    await act(async () => finishRead({ sensitiveInfoProtection: initial }));
+    expect(protectionSwitch().props['aria-checked']).toBe(!initial);
+  }
+);
+
+it('preserves protection and shows its existing error when saving fails', async () => {
+  mocks.get.mockResolvedValue({ sensitiveInfoProtection: true });
+  await act(async () => {
+    view = create(<SettingsDialog {...props} />);
+  });
+  mocks.save.mockRejectedValueOnce(new Error('disk full'));
+  await act(async () => protectionSwitch().props.onClick());
+  expect(protectionSwitch().props['aria-checked']).toBe(true);
+  expect(JSON.stringify(view.toJSON())).toContain('settings.sensitiveInfoProtectionError');
+});
+
+it('persists developer mode only after an explicit change and keeps the control pending until saved', async () => {
+  mocks.get.mockResolvedValue({ locale: 'ja', sensitiveInfoProtection: true });
+  await act(async () => {
+    view = create(<SettingsDialog {...props} />);
+  });
+  expect(developerSwitch().props['aria-checked']).toBe(false);
+  expect(mocks.save).not.toHaveBeenCalled();
+  let finish!: () => void;
+  mocks.save.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+  );
+  await act(async () => {
+    developerSwitch().props.onClick();
+  });
+  expect(developerSwitch().props.disabled).toBe(true);
+  expect(useNavigationStore.getState().developerMode).toBe(false);
+  expect(mocks.save).toHaveBeenCalledExactlyOnceWith({
+    locale: 'ja',
+    sensitiveInfoProtection: true,
+    developerMode: true,
+  });
+  await act(async () => {
+    finish();
+  });
+  expect(developerSwitch().props['aria-checked']).toBe(true);
+  expect(useNavigationStore.getState().developerMode).toBe(true);
+  mocks.get.mockResolvedValue({ developerMode: true });
+  await act(async () => {
+    view.update(<SettingsDialog {...props} isOpen={false} />);
+  });
+  await act(async () => {
+    view.update(<SettingsDialog {...props} />);
+  });
+  expect(developerSwitch().props['aria-checked']).toBe(true);
+  expect(mocks.save).toHaveBeenCalledOnce();
+});
+
+it('preserves the developer page and saved selection when disabling fails', async () => {
+  mocks.get.mockResolvedValue({ developerMode: true });
+  await act(async () => {
+    view = create(<SettingsDialog {...props} />);
+  });
+  useNavigationStore.getState().setActivePage('developer');
+  useNavigationStore.getState().setDeveloperTab('plugins');
+  mocks.save.mockRejectedValueOnce(new Error('disk full'));
+  await act(async () => {
+    developerSwitch().props.onClick();
+  });
+  expect(developerSwitch().props['aria-checked']).toBe(true);
+  expect(useNavigationStore.getState().activePage).toBe('developer');
+  expect(useNavigationStore.getState().developerTab).toBe('plugins');
+  expect(JSON.stringify(view.toJSON())).toContain('settings.developerModeError');
+});
+
+it.each([false, true])(
+  'does not let a stale read undo a saved developer mode after reopening (initial=%s)',
+  async (initial) => {
+    const target = !initial;
+    mocks.get.mockResolvedValue({ developerMode: initial });
+    await act(async () => {
+      view = create(<SettingsDialog {...props} />);
+    });
+    let finishSave!: () => void;
+    mocks.save.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSave = resolve;
+        })
+    );
+    await act(async () => {
+      developerSwitch().props.onClick();
+    });
+    await act(async () => {
+      view.update(<SettingsDialog {...props} isOpen={false} />);
+    });
+    let finishRead!: (settings: { developerMode: boolean }) => void;
+    mocks.get.mockImplementationOnce(
+      () =>
+        new Promise<{ developerMode: boolean }>((resolve) => {
+          finishRead = resolve;
+        })
+    );
+    await act(async () => {
+      view.update(<SettingsDialog {...props} />);
+    });
+    await act(async () => {
+      finishSave();
+    });
+    expect(useNavigationStore.getState().developerMode).toBe(target);
+    if (target) useNavigationStore.getState().setActivePage('developer');
+    await act(async () => {
+      finishRead({ developerMode: initial });
+    });
+    expect(useNavigationStore.getState().developerMode).toBe(target);
+    expect(useNavigationStore.getState().activePage).toBe(target ? 'developer' : 'apps');
+    expect(developerSwitch().props['aria-checked']).toBe(target);
+  }
+);
 
 it('places scale in General and offers languages directly on their own page', async () => {
   await act(async () => {
@@ -156,6 +351,7 @@ it('places opt-in reward claiming below startup and preserves the setting throug
     'settings.launchAtStartup',
     'settings.easterEgg',
     'settings.autoClaimRewards',
+    'settings.developerMode',
     'settings.sensitiveInfoProtection',
   ]);
   expect(localStorage.setItem).not.toHaveBeenCalled();
@@ -175,85 +371,15 @@ function EasterEggObserver() {
   return <span data-easter-egg-state>{String(enabled)}</span>;
 }
 
-function protectionSwitch() {
-  return view.root
-    .findAllByProps({ role: 'switch' })
-    .find((control) => control.props['aria-label'] === 'settings.sensitiveInfoProtection')!;
-}
-
-it('loads protection without writing and saves only an explicit toggle while retaining other settings', async () => {
-  const saved = {
-    locale: 'ja',
-    themeMode: 'dark',
-    colorTheme: 'oatgray',
-    closeToTray: true,
-    sensitiveInfoProtection: true,
-  };
-  mocks.get.mockResolvedValue(saved);
+it('keeps global protection independent in General beside developer preview', async () => {
   await act(async () => {
     view = create(<SettingsDialog {...props} />);
   });
-  expect(protectionSwitch().props['aria-checked']).toBe(true);
-  expect(mocks.save).not.toHaveBeenCalled();
-  await act(async () => protectionSwitch().props.onClick());
-  expect(mocks.save).toHaveBeenCalledExactlyOnceWith({ ...saved, sensitiveInfoProtection: false });
-  expect(protectionSwitch().props['aria-checked']).toBe(false);
-  mocks.get.mockResolvedValue({ ...saved, sensitiveInfoProtection: false });
-  await act(async () => view.update(<SettingsDialog {...props} isOpen={false} />));
-  await act(async () => view.update(<SettingsDialog {...props} />));
-  expect(protectionSwitch().props['aria-checked']).toBe(false);
-  expect(mocks.save).toHaveBeenCalledTimes(1);
-});
-
-it('keeps the saved protection state on failure and disables repeated writes while pending', async () => {
-  await act(async () => {
-    view = create(<SettingsDialog {...props} />);
-  });
-  expect(protectionSwitch().props['aria-checked']).toBe(false);
-  let finish!: () => void;
-  mocks.save.mockImplementationOnce(
-    () =>
-      new Promise<void>((resolve) => {
-        finish = resolve;
-      })
-  );
-  await act(async () => protectionSwitch().props.onClick());
-  expect(protectionSwitch().props.disabled).toBe(true);
-  expect(protectionSwitch().props['aria-checked']).toBe(false);
-  await act(async () => protectionSwitch().props.onClick());
-  expect(mocks.save).toHaveBeenCalledTimes(1);
-  await act(async () => finish());
-  expect(protectionSwitch().props['aria-checked']).toBe(true);
-  mocks.save.mockRejectedValueOnce(new Error('unavailable'));
-  await act(async () => protectionSwitch().props.onClick());
-  expect(protectionSwitch().props['aria-checked']).toBe(true);
-  expect(view.root.findByProps({ role: 'alert' }).children).toContain(
-    'settings.sensitiveInfoProtectionError'
-  );
-  expect(protectionSwitch().props.disabled).toBe(false);
-});
-
-it('does not replace unreadable protection settings with defaults or use late loads from a closed dialog', async () => {
-  mocks.get.mockRejectedValueOnce(new Error('unreadable'));
-  await act(async () => {
-    view = create(<SettingsDialog {...props} />);
-  });
-  expect(protectionSwitch().props.disabled).toBe(true);
-  expect(mocks.save).not.toHaveBeenCalled();
-  let finish!: (value: object) => void;
-  mocks.get.mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        finish = resolve;
-      })
-  );
-  await act(async () => view.update(<SettingsDialog {...props} isOpen={false} />));
-  await act(async () => view.update(<SettingsDialog {...props} />));
-  await act(async () => view.update(<SettingsDialog {...props} isOpen={false} />));
-  await act(async () => finish({ sensitiveInfoProtection: true }));
-  mocks.get.mockResolvedValue({ sensitiveInfoProtection: false });
-  await act(async () => view.update(<SettingsDialog {...props} />));
-  expect(protectionSwitch().props['aria-checked']).toBe(false);
+  expect(view.root.findAllByProps({ role: 'switch' })).toHaveLength(5);
+  expect(
+    view.root.findAllByProps({ 'aria-label': 'settings.sensitiveInfoProtection' })
+  ).toHaveLength(1);
+  expect(view.root.findAllByProps({ className: 'grid grid-cols-2 gap-8' })).toHaveLength(1);
   expect(mocks.save).not.toHaveBeenCalled();
 });
 

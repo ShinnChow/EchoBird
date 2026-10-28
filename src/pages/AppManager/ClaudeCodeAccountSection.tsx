@@ -1,26 +1,33 @@
+import { useAccountPlugin } from '../../hooks/useAccountPlugin';
 import React from 'react';
 import { useAppManager } from './context';
 import { ModelSwitchDivider } from './ModelSwitchDivider';
 import { AccountSectionButton, AccountSectionRow } from './AccountSectionPrimitives';
 import { QuotaCountdown } from './QuotaCountdown';
+import { openAccountPlugins } from './openAccountPlugins';
 export const ClaudeCodeAccountSection: React.FC<{ showDivider?: boolean; desktop?: boolean }> = ({
   showDivider = true,
   desktop = false,
 }) => {
-  const { claudeCodeAccounts, claudeDesktopAccounts, isLaunching } = useAppManager();
+  const { claudeCodeAccounts, claudeDesktopAccounts, setApplyError } = useAppManager();
   const group = desktop ? claudeDesktopAccounts : claudeCodeAccounts;
-  const { accounts, selectedId, select, busy, remainingSeconds, refreshing, add, refresh, remove } =
+  const { accounts, selectedId, select, busy, remainingSeconds, refreshing, refresh, remove } =
     group;
+  const installed = useAccountPlugin(desktop ? 'claudedesktop' : 'claudecode');
   return (
     <section>
       <AccountSectionButton
         iconSrc={desktop ? '/icons/tools/claudedesktop.svg' : '/icons/tools/claudecode.svg'}
         colorClassName="claude-account-pill"
         busy={busy}
-        disabled={desktop && isLaunching}
         remainingSeconds={remainingSeconds}
-        onClick={() => void add()}
-        onCancel={group.cancelLogin}
+        idleLabel="plugins.category.account"
+        onClick={() =>
+          void (installed ? group.add() : openAccountPlugins()).catch((error) =>
+            setApplyError(String(error))
+          )
+        }
+        onCancel={() => group.cancelLogin()}
       />
       {accounts.length > 0 && (
         <div className="space-y-2">

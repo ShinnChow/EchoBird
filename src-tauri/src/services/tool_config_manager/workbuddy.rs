@@ -3,9 +3,7 @@
 mod selection;
 
 use super::{extract_domain_name, ApplyResult, ModelInfo};
-use crate::services::{
-    native_account_files as files, process_manager, tool_manager, workbuddy_accounts::Edition,
-};
+use crate::services::{native_account_files as files, process_manager, tool_manager};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
@@ -865,5 +863,29 @@ mod tests {
                 .unwrap(),
             "workbuddy-desktop.info"
         );
+    }
+}
+
+#[derive(Clone, Copy)]
+enum Edition {
+    Cn,
+    Ai,
+}
+impl Edition {
+    pub(crate) fn auth_path(self) -> Result<PathBuf, String> {
+        let home = dirs::home_dir().ok_or("accountError.home")?;
+        #[cfg(windows)]
+        let root = dirs::data_local_dir().ok_or("accountError.home")?;
+        #[cfg(target_os = "macos")]
+        let root = home.join("Library/Application Support");
+        #[cfg(not(any(windows, target_os = "macos")))]
+        let root = home.join(".local/share");
+        let _ = home;
+        Ok(root
+            .join("CodeBuddyExtension/Data/Public/auth")
+            .join(match self {
+                Self::Cn => "workbuddy-desktop.info",
+                Self::Ai => "workbuddy-desktop-ai.info",
+            }))
     }
 }

@@ -6,6 +6,14 @@ import type { AppManagerContextType } from './context';
 import { TraeAccountSection } from './TraeAccountSection';
 import type { useTraeAccounts } from './useTraeAccounts';
 import { traeClaimedToday } from './traeDailyCredits';
+import { enableAccountPlugins } from '../../test/accountPlugins';
+import { usePluginsStore } from '../../stores/pluginsStore';
+import { useNavigationStore } from '../../stores/navigationStore';
+import { openAccountPlugins } from './openAccountPlugins';
+
+vi.mock('./openAccountPlugins', () => ({
+  openAccountPlugins: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('../../hooks/useI18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 let context: AppManagerContextType;
@@ -57,6 +65,40 @@ function fixture(
 }
 
 describe('TRAE account rows', () => {
+  it.each(['trae', 'traecn'] as const)(
+    '%s opens the Hub without a module and keeps login when installed',
+    async (edition) => {
+      const { content, group } = fixture([{ ...saved, edition }]);
+      usePluginsStore.setState({ installed: [] });
+      useNavigationStore.setState({ developerMode: true });
+      vi.mocked(openAccountPlugins).mockClear();
+      let renderer: ReactTestRenderer;
+      act(() => {
+        renderer = create(content);
+      });
+      try {
+        const login = () =>
+          renderer.root
+            .findAllByType('button')
+            .find((node) =>
+              node
+                .findAllByType('span')
+                .some((span) => span.props.children === 'plugins.category.account')
+            )!;
+        await act(async () => login().props.onClick());
+        expect(openAccountPlugins).toHaveBeenCalledOnce();
+        expect(group.add).not.toHaveBeenCalled();
+        act(() => enableAccountPlugins());
+        await act(async () => login().props.onClick());
+        expect(group.add).toHaveBeenCalledOnce();
+        expect(openAccountPlugins).toHaveBeenCalledOnce();
+      } finally {
+        act(() => renderer!.unmount());
+        usePluginsStore.setState(usePluginsStore.getInitialState(), true);
+        useNavigationStore.setState(useNavigationStore.getInitialState(), true);
+      }
+    }
+  );
   it.each(['Free', 'Lite', 'Pro', 'Pro+', 'Ultra', 'Express'])(
     'shows plan %s once using shared row actions',
     (plan) => {

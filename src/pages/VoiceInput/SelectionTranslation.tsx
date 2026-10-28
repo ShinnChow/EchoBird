@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Copy, LoaderCircle, RefreshCw, X } from 'lucide-react';
-import { listen } from '@tauri-apps/api/event';
+import { emit, listen } from '@tauri-apps/api/event';
 import { readText } from '@tauri-apps/plugin-clipboard-manager';
 import {
   closeSelectionTranslation,
@@ -14,7 +14,12 @@ import {
 import { useI18n } from '../../hooks/useI18n';
 import type { TKey } from '../../i18n';
 import { copyText } from '../../utils/copyText';
-import { THEME_CHANGED_EVENT, useThemeStore, type ThemeSelection } from '../../stores/themeStore';
+import {
+  THEME_CHANGED_EVENT,
+  THEME_REQUEST_EVENT,
+  useThemeStore,
+  type ThemeSelection,
+} from '../../stores/themeStore';
 import './VoiceInput.css';
 
 export function SelectionTranslation() {
@@ -77,7 +82,10 @@ export function SelectionTranslation() {
     )
       .then((unlisten) => {
         if (disposed) unlisten();
-        else stop = unlisten;
+        else {
+          stop = unlisten;
+          void emit(THEME_REQUEST_EVENT, {}).catch(() => {});
+        }
       })
       .catch(() => {});
     return () => {

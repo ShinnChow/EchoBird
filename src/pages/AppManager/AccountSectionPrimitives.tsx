@@ -3,6 +3,7 @@ import { Check, Gift, LoaderCircle, RefreshCw, Trash2, X } from 'lucide-react';
 import { useI18n } from '../../hooks/useI18n';
 import { accountPlanLabel } from './accountPlanLabel';
 import { ACCOUNT_NAME_MASK, useAccountPrivacyStore } from '../../stores/accountPrivacyStore';
+import type { TKey } from '../../i18n/types';
 
 export const AccountSectionButton: React.FC<{
   iconSrc: string;
@@ -14,6 +15,7 @@ export const AccountSectionButton: React.FC<{
   colorClassName?: string;
   secondary?: React.ReactNode;
   waitingLabel?: string;
+  idleLabel?: TKey;
 }> = ({
   iconSrc,
   busy,
@@ -24,11 +26,14 @@ export const AccountSectionButton: React.FC<{
   colorClassName = '',
   secondary,
   waitingLabel,
+  idleLabel,
 }) => {
   const { t } = useI18n();
   const label = busy
     ? (waitingLabel ?? t('agent.waitingForBrowser')).replace('{seconds}', String(remainingSeconds))
-    : t('agent.addCurrentAccount');
+    : idleLabel
+      ? t(idleLabel)
+      : t('agent.addCurrentAccount');
   if (busy) {
     return (
       <div

@@ -43,7 +43,7 @@ pub(crate) fn validate_audio(audio: &Bytes, mime: &str) -> Result<(), ProxyError
         ));
     }
     if matches!(mime, "audio/wav" | "audio/x-wav") {
-        super::claude_voice::pcm(audio).map_err(|_| {
+        super::audio_format::pcm(audio).map_err(|_| {
             ProxyError::new(
                 StatusCode::BAD_REQUEST,
                 "Grok Bot WAV audio must be 16 kHz mono PCM16",

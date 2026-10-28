@@ -35,7 +35,7 @@ pub(crate) fn validate_audio(audio: &Bytes, mime: &str) -> Result<(), ProxyError
         return Err(invalid_audio());
     }
     if matches!(mime, "audio/wav" | "audio/x-wav") {
-        super::claude_voice::pcm(audio).map_err(|_| invalid_audio())?;
+        super::audio_format::pcm(audio).map_err(|_| invalid_audio())?;
     }
     Ok(())
 }

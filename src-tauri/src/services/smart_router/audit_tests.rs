@@ -246,17 +246,17 @@ fn common_error_codes_use_one_failure_policy_without_guessing_unknown_bad_reques
 }
 
 #[tokio::test]
-async fn workbuddy_channel_refusal_switches_candidates_without_cooling_a_valid_account() {
+async fn normalized_plugin_channel_refusal_switches_candidates_without_cooling_a_valid_account() {
     for provider in [
         AccountProvider::WorkBuddy,
         AccountProvider::WorkBuddyAi,
         AccountProvider::Kilo,
     ] {
-        for code in [11128, 99999] {
+        for known in [true, false] {
             let first = Response::builder()
                 .status(400)
                 .body(Body::from(
-                    json!({"code":code,"msg":"Illegal API invocation from an unapproved channel"})
+                    json!({"error":{"code":if known{"request_incompatible"}else{"unknown"},"message":"Unapproved channel"}})
                         .to_string(),
                 ))
                 .unwrap();
@@ -278,7 +278,6 @@ async fn workbuddy_channel_refusal_switches_candidates_without_cooling_a_valid_a
                 vec![candidate, audit_candidate("second")],
             )
             .await;
-            let known = provider != AccountProvider::Kilo && code == 11128;
             assert_eq!(
                 response.status(),
                 if known {
@@ -304,13 +303,13 @@ async fn workbuddy_channel_refusal_switches_candidates_without_cooling_a_valid_a
 }
 
 #[tokio::test]
-async fn typed_workbuddy_channel_refusal_uses_the_same_fallback_policy() {
+async fn typed_plugin_channel_refusal_uses_the_same_fallback_policy() {
     for streaming in [false, true] {
         let mut error = crate::services::account_proxy::ProxyError::new(
             StatusCode::BAD_REQUEST,
             "Illegal API invocation from an unapproved channel",
         );
-        error.error_code = Some("11128".into());
+        error.error_code = Some("request_incompatible".into());
         let first = Response::new(Body::from_stream(stream::once(async move {
             Err::<Bytes, std::io::Error>(std::io::Error::other(error))
         })));
@@ -439,20 +438,21 @@ async fn issue_576_all_incompatible_candidates_are_tried_before_returning_bad_re
 }
 
 #[tokio::test]
-async fn issue_576_workbuddy_reset_uses_the_official_deadline_without_pausing_other_models() {
+async fn plugin_retry_after_keeps_other_models_available() {
     for provider in [AccountProvider::WorkBuddy, AccountProvider::WorkBuddyAi] {
-        for status in [400, 429] {
-            let reset = chrono::Utc::now() + chrono::Duration::days(2);
-            let reset = reset
-                .with_timezone(&chrono::FixedOffset::east_opt(8 * 3600).unwrap())
-                .format("%Y-%m-%d %H:%M:%S")
-                .to_string();
-            let deadline = chrono::NaiveDateTime::parse_from_str(&reset, "%Y-%m-%d %H:%M:%S")
-                .unwrap()
-                .and_local_timezone(chrono::FixedOffset::east_opt(8 * 3600).unwrap())
-                .unwrap()
-                .timestamp_millis() as u64;
-            let first = Response::builder().status(status).body(Body::from(json!({"code":6004,"msg":format!("今日使用量已超频次上限，于 {reset} (UTC+8) 可用")}).to_string())).unwrap();
+        for _ in [0] {
+            let deadline = now_ms() + 172800000;
+            let mut first = Response::builder()
+                .status(429)
+                .header(header::RETRY_AFTER, "172800")
+                .body(Body::from(
+                    json!({"error":{"code":"rate_limit_exceeded","message":"Model quota limit","retry_after":"172800"}})
+                        .to_string(),
+                ))
+                .unwrap();
+            first
+                .extensions_mut()
+                .insert(crate::services::account_proxy::ProxyFailureMetadata { model_scope: true });
             let state = audit_fixtures(
                 first,
                 audit_chat_json(
@@ -481,14 +481,14 @@ async fn issue_576_workbuddy_reset_uses_the_official_deadline_without_pausing_ot
                 let memory = state.route_memory.lock().unwrap();
                 let health = &memory.candidates["first"];
                 assert_eq!(health.failure, Some(FailureClass::RateLimit));
-                assert_eq!(health.cooldown_until_ms, Some(deadline));
+                assert!(health.cooldown_until_ms.unwrap().abs_diff(deadline) < 1000);
                 assert!(memory.accounts.is_empty());
-                assert!(!is_cooling_down(&memory, &limited, deadline));
+                assert!(!is_cooling_down(&memory, &limited, deadline + 1000));
                 let restored: RouteMemory =
                     serde_json::from_slice(&serde_json::to_vec(&*memory).unwrap()).unwrap();
                 assert_eq!(
                     restored.candidates["first"].cooldown_until_ms,
-                    Some(deadline)
+                    health.cooldown_until_ms
                 );
             }
             assert!(candidate_is_cooling_down(&state, &limited));
