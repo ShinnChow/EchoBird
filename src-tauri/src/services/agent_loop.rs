@@ -773,7 +773,9 @@ pub async fn run_agent(
             if tc.name == "shell_exec" {
                 if let Ok(args) = serde_json::from_str::<Value>(&tc.arguments) {
                     if let Some(cmd) = args["command"].as_str() {
-                        if let Err(msg) = validate_install_intent(cmd, &messages_snapshot) {
+                        if let Err(msg) = validate_install_intent(cmd, &messages_snapshot)
+                            .and_then(|()| validate_shared_agent_command(cmd, &messages_snapshot))
+                        {
                             log::warn!(
                                 "[AgentLoop] Install-intent block on tool {}: {}",
                                 tc.id,
@@ -1451,6 +1453,7 @@ async fn build_system_prompt(request: &AgentRequest, ssh_pool: &SSHPool) -> Stri
         When the user says 'install Kilo Code', install `@kilocode/cli` (or `curl -fsSL https://kilo.ai/cli/install | bash` on macOS/Linux). It is a fork of OpenCode but a SEPARATE product — do NOT install `@opencode/cli`.\n\
         When the user says 'install Kimi CLI' or 'install Kimi Code CLI', follow the `kimicode` reference and install `@moonshot-ai/kimi-code` (or `curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash` on macOS/Linux). It is built on Pi's pi-tui but a SEPARATE product — do NOT install `pi` or `@earendil-works/pi-coding-agent`.\n\
         When the user says 'install Kimi Desktop', 'Kimi 桌面端', or 'Kimi Code Desktop', follow the `kimidesktop` reference for the official Moonshot AI desktop installer. Do NOT install `@moonshot-ai/kimi-code`. If the user only says 'Kimi Code' and the conversation does not identify the edition, ask whether they want Desktop or CLI before installing.\n\
+        Cursor desktop (`cursor`) and Cursor CLI (`cursorcli`) are separate installations. Only install CLI when explicitly requested. Both Cursor CLI and Grok Build can provide `agent`; before version, login, update or launch, inspect Get-Command -All / command -v and use the verified `cursor-agent` path for Cursor CLI or `grok` for Grok Build. A successful agent --version does not prove which product it is. Desktop updates use Cursor: Attempt Update inside the editor, not agent update. Never reorder PATH or replace another product's alias to fix this collision.\n\
         When the user says 'install OMP' or 'Oh My Pi', follow the `omp` install reference. Its binary is `omp`, package is `@oh-my-pi/pi-coding-agent`, and config is under ~/.omp/agent. It is separate from Pi; do NOT install Pi or write ~/.pi/agent for this request.\n\
         ALWAYS read the tool's install JSON first from the **Embedded Install References** section appended below — do NOT `web_fetch` echobird.ai for these (they are already in this prompt).\n\n\
         ## Rules\n\
@@ -1707,6 +1710,9 @@ enum AgentTarget {
     KimiDesktop,
     ClaudeCode,
     Codex,
+    CursorDesktop,
+    CursorCli,
+    GrokBuild,
 }
 
 impl AgentTarget {
@@ -1725,6 +1731,9 @@ impl AgentTarget {
             Self::KimiDesktop => "Kimi Desktop (Kimi 桌面端)",
             Self::ClaudeCode => "Claude Code",
             Self::Codex => "Codex CLI",
+            Self::CursorDesktop => "Cursor desktop editor",
+            Self::CursorCli => "Cursor CLI",
+            Self::GrokBuild => "Grok Build",
         }
     }
     fn canonical_install(&self) -> &'static str {
@@ -1742,6 +1751,9 @@ impl AgentTarget {
             Self::KimiDesktop => "Follow the embedded kimidesktop install reference for the official Kimi desktop installer.",
             Self::ClaudeCode => "curl -fsSL https://claude.ai/install.sh | bash  (or  npm install -g @anthropic-ai/claude-code)",
             Self::Codex => "npm install -g @openai/codex",
+            Self::CursorDesktop => "Follow the cursor desktop install reference; do not install Cursor CLI for this request.",
+            Self::CursorCli => "Follow the cursorcli install reference; command cursor-agent, not the ambiguous agent alias.",
+            Self::GrokBuild => "Follow the grok install reference; command grok, not the ambiguous agent alias.",
         }
     }
 }
@@ -1855,6 +1867,23 @@ fn detect_user_intent(messages: &[Message]) -> Option<AgentTarget> {
         if text.contains("codex") {
             return Some(AgentTarget::Codex);
         }
+        if text.contains("grok build") && !text.contains("cursor") {
+            return Some(AgentTarget::GrokBuild);
+        }
+        if text.contains("cursor") && !text.contains("grok build") {
+            return Some(
+                if text.contains("cursor cli")
+                    || text.contains("cursorcli")
+                    || text.contains("cursor-agent")
+                    || text.contains("cursor 命令行")
+                    || text.contains("cursor命令行")
+                {
+                    AgentTarget::CursorCli
+                } else {
+                    AgentTarget::CursorDesktop
+                },
+            );
+        }
         return None; // Latest user message has no install target — don't validate.
     }
     None
@@ -1881,6 +1910,16 @@ fn detect_command_target(command: &str) -> Option<AgentTarget> {
         || cmd.contains("cline/cline/releases/download/desktop-");
     if !is_install_op {
         return None;
+    }
+
+    if cmd.contains("cursor.com/install") {
+        return Some(AgentTarget::CursorCli);
+    }
+    if cmd.contains("anysphere.cursor") {
+        return Some(AgentTarget::CursorDesktop);
+    }
+    if cmd.contains("x.ai/cli/install") {
+        return Some(AgentTarget::GrokBuild);
     }
 
     // Order matters: check the more-specific package strings first.
@@ -1988,6 +2027,53 @@ fn is_legacy_opencode_install(command: &str) -> bool {
         || cmd.contains("chocolatey install opencode")
         || (cmd.contains("brew install opencode") && !cmd.contains("opencode-v2"))
         || (cmd.contains("brew install anomalyco/tap/opencode") && !cmd.contains("opencode-v2"))
+}
+
+// A literal `agent` invocation cannot establish which product will run. Keep
+// discovery commands available, and require an explicit CLI launcher instead.
+fn validate_shared_agent_command(command: &str, messages: &[Message]) -> Result<(), String> {
+    let target = messages
+        .iter()
+        .rev()
+        .find_map(|message| detect_user_intent(std::slice::from_ref(message)));
+    if !matches!(
+        target,
+        Some(AgentTarget::CursorDesktop | AgentTarget::CursorCli | AgentTarget::GrokBuild)
+    ) {
+        return Ok(());
+    }
+    static INVOCATION: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let invocation = INVOCATION.get_or_init(|| {
+        regex::Regex::new(r#"(?im)(?:^|[;&|\r\n])\s*(?:(?:&|call|exec|command|sudo|start-process(?:\s+-filepath)?|cmd(?:\.exe)?\s+/(?:c|k))\s+)?(?:"([^"\r\n]+)"|'([^'\r\n]+)'|([^\s;&|\r\n]+))"#).unwrap()
+    });
+    for capture in invocation.captures_iter(command) {
+        let executable = (1..=3)
+            .find_map(|i| capture.get(i))
+            .unwrap()
+            .as_str()
+            .replace('\\', "/")
+            .to_lowercase();
+        let name = executable.rsplit('/').next().unwrap_or(&executable);
+        let stem = name
+            .strip_suffix(".exe")
+            .or_else(|| name.strip_suffix(".cmd"))
+            .or_else(|| name.strip_suffix(".ps1"))
+            .unwrap_or(name);
+        let related = matches!(stem, "agent" | "cursor-agent" | "grok");
+        let ambiguous = stem == "agent" && !executable.contains('/');
+        let wrong = match target {
+            Some(AgentTarget::CursorDesktop) => related,
+            Some(AgentTarget::CursorCli) => {
+                stem == "grok" || executable.contains("/.grok/") || ambiguous
+            }
+            Some(AgentTarget::GrokBuild) => matches!(stem, "agent" | "cursor-agent"),
+            _ => false,
+        };
+        if wrong {
+            return Err("CLI IDENTITY MISMATCH: Cursor desktop, Cursor CLI and Grok Build are separate products. Do not run an unverified agent alias. Use Get-Command -All / command -v to inspect the resolved launcher, verify its product and version, then invoke Cursor CLI via cursor-agent or its verified absolute path, and Grok Build via grok. Cursor desktop updates use the editor's own updater; never install the CLI or run agent update for a desktop-only request.".into());
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -2599,6 +2685,79 @@ mod conversation_tests {
 #[cfg(test)]
 mod install_intent_tests {
     use super::*;
+
+    #[test]
+    fn cursor_desktop_cli_and_grok_have_separate_install_and_execution_identities() {
+        let desktop = request("安装 Cursor");
+        let cli = request("安装 Cursor CLI");
+        let grok = request("安装 Grok Build");
+        for command in [
+            "agent update",
+            "agent.exe --version",
+            "cursor-agent update",
+            "grok update",
+            "& 'C:\\Users\\test\\.grok\\bin\\agent.exe' --version",
+            "Start-Process -FilePath agent -ArgumentList update",
+            "cmd /c agent update",
+        ] {
+            assert!(
+                validate_shared_agent_command(command, &desktop).is_err(),
+                "{command}"
+            );
+        }
+        for command in [
+            "agent update",
+            "agent.exe --version",
+            "& 'C:\\Users\\test\\.grok\\bin\\agent.exe' update",
+            "grok update",
+        ] {
+            assert!(
+                validate_shared_agent_command(command, &cli).is_err(),
+                "{command}"
+            );
+        }
+        for command in [
+            "cursor-agent --version",
+            "& 'C:\\Users\\test\\AppData\\Local\\cursor-agent\\cursor-agent.cmd' update",
+            "'/home/test/.local/bin/cursor-agent' status",
+            "Get-Command agent,cursor-agent -All",
+            "command -v agent",
+            "echo 'agent update'",
+            "git status",
+        ] {
+            assert!(
+                validate_shared_agent_command(command, &cli).is_ok(),
+                "{command}"
+            );
+        }
+        assert!(validate_shared_agent_command("grok --version", &grok).is_ok());
+        assert!(validate_shared_agent_command("agent update", &grok).is_err());
+        assert!(validate_shared_agent_command("agent update", &request("更新 Codex")).is_ok());
+        let follow_up = [cli.clone(), request("继续")].concat();
+        assert!(validate_shared_agent_command("agent update", &follow_up).is_err());
+        let different_task = [cli.clone(), request("安装 Claude Code")].concat();
+        assert!(validate_shared_agent_command("agent update", &different_task).is_ok());
+        let cli_install = "irm 'https://cursor.com/install?win32=true' | iex";
+        assert!(validate_install_intent(cli_install, &desktop).is_err());
+        assert!(validate_install_intent(cli_install, &cli).is_ok());
+        assert!(validate_install_intent("winget install --id Anysphere.Cursor", &desktop).is_ok());
+        assert!(validate_install_intent("irm https://x.ai/cli/install.ps1 | iex", &cli).is_err());
+        for (prompt, command) in [
+            ("用 Cursor 安装 OpenClaw", "npm install -g openclaw"),
+            (
+                "在 Cursor 终端安装 Claude Code",
+                "npm install -g @anthropic-ai/claude-code",
+            ),
+            (
+                "Use Cursor to install Codex",
+                "npm install -g @openai/codex",
+            ),
+        ] {
+            let messages = request(prompt);
+            assert!(validate_install_intent(command, &messages).is_ok());
+            assert!(validate_shared_agent_command(command, &messages).is_ok());
+        }
+    }
 
     #[test]
     fn cline_cli_and_desktop_install_targets_are_distinct() {

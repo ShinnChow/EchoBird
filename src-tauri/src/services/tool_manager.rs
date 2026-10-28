@@ -1096,6 +1096,17 @@ fn valid_executable(pc: &PathsConfig, path: &Path) -> bool {
             }
             "Devin" => devin_desktop_identity(path),
             "Devin CLI" => !devin_desktop_identity(path),
+            "Cursor CLI" => fs::canonicalize(path).ok().is_some_and(|resolved| {
+                resolved
+                    .file_stem()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.eq_ignore_ascii_case("cursor-agent"))
+                    && !resolved.components().any(|part| {
+                        part.as_os_str()
+                            .to_string_lossy()
+                            .eq_ignore_ascii_case(".grok")
+                    })
+            }),
             _ => true,
         }
 }
@@ -1530,6 +1541,11 @@ async fn detect_tool(pc: &PathsConfig) -> Option<String> {
     if !pc.command.is_empty() {
         let found_in_path = platform::command_exists(&pc.command).await;
         if found_in_path {
+            if pc.name == "Cursor CLI" {
+                return platform::get_command_path(&pc.command)
+                    .await
+                    .filter(|path| valid_executable(pc, Path::new(path)));
+            }
             if pc.require_config_file {
                 if config_file_exists(pc) {
                     let path = platform::get_command_path(&pc.command).await;
@@ -4393,6 +4409,56 @@ mod tests {
                 .unwrap()
                 .contains(&serde_json::json!(id)));
         }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn cursor_cli_catalog_and_detection_never_reuse_the_grok_agent_alias() {
+        let cli: PathsConfig =
+            serde_json::from_str(include_str!("../../../tools/cursorcli/paths.json")).unwrap();
+        assert_eq!(cli.command, "cursor-agent");
+        assert_eq!(cli.start_command.as_deref(), Some("cursor-agent"));
+        assert!(cli.no_model_config);
+        let root = std::env::temp_dir().join(format!(
+            "echobird-cursor-detection-{}",
+            uuid::Uuid::new_v4()
+        ));
+        for name in [
+            "cursor-agent.cmd",
+            "cursor-agent",
+            "agent.exe",
+            "Cursor.exe",
+            "grok.exe",
+        ] {
+            let path = root.join(name);
+            fs::create_dir_all(&root).unwrap();
+            fs::write(&path, b"fixture").unwrap();
+            assert_eq!(
+                valid_executable(&cli, &path),
+                matches!(name, "cursor-agent.cmd" | "cursor-agent")
+            );
+        }
+        let wrong = root.join(".grok/bin/cursor-agent.cmd");
+        assert!(!valid_executable(
+            &cli,
+            &root.join("missing/cursor-agent.cmd")
+        ));
+        fs::create_dir_all(wrong.parent().unwrap()).unwrap();
+        fs::write(&wrong, b"wrong product").unwrap();
+        assert!(!valid_executable(&cli, &wrong));
+        let install: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/api/tools/install/cursorcli.json"
+        ))
+        .unwrap();
+        assert_eq!(install["id"], "cursorcli");
+        let index: serde_json::Value =
+            serde_json::from_str(include_str!("../../../docs/api/tools/install/index.json"))
+                .unwrap();
+        assert!(index["ids"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v == "cursorcli"));
         fs::remove_dir_all(root).unwrap();
     }
     #[cfg(windows)]

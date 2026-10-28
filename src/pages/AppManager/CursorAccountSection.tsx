@@ -4,7 +4,9 @@ import { AccountSectionButton, AccountSectionRow } from './AccountSectionPrimiti
 import { QuotaCountdown } from './QuotaCountdown';
 import { ACCOUNT_NAME_MASK, useAccountPrivacyStore } from '../../stores/accountPrivacyStore';
 
-export const CursorAccountSection: React.FC<{ tool: 'cursor' | 'grokbot' }> = ({ tool }) => {
+export const CursorAccountSection: React.FC<{ tool: 'cursor' | 'cursorcli' | 'grokbot' }> = ({
+  tool,
+}) => {
   const { cursorAccounts, grokBotAccounts, isLaunching } = useAppManager();
   const hidden = useAccountPrivacyStore((state) => state.hidden);
   const {
@@ -18,16 +20,16 @@ export const CursorAccountSection: React.FC<{ tool: 'cursor' | 'grokbot' }> = ({
     refresh,
     add,
     remove,
-  } = tool === 'cursor' ? cursorAccounts : grokBotAccounts;
+  } = tool === 'grokbot' ? grokBotAccounts : cursorAccounts;
   return (
     <section>
       <AccountSectionButton
-        iconSrc={tool === 'cursor' ? '/icons/tools/cursor.svg' : '/icons/tools/grokbot.png'}
+        iconSrc={tool === 'grokbot' ? '/icons/tools/grokbot.png' : '/icons/tools/cursor.svg'}
         busy={busy}
         disabled={isLaunching}
         remainingSeconds={remainingSeconds}
         onClick={() => void add()}
-        onCancel={(tool === 'cursor' ? cursorAccounts : grokBotAccounts).cancelLogin}
+        onCancel={(tool === 'grokbot' ? grokBotAccounts : cursorAccounts).cancelLogin}
       />
       <div className="space-y-2">
         {accounts.map((account) => (

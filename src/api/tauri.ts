@@ -795,24 +795,25 @@ export interface CursorLogin {
   verificationUri: string;
   expiresAt: number;
 }
-export function listCursorAccounts(): Promise<CursorAccount[]> {
-  return invoke('list_cursor_accounts');
+export type CursorTool = 'cursor' | 'cursorcli';
+export function listCursorAccounts(tool?: CursorTool): Promise<CursorAccount[]> {
+  return invoke('list_cursor_accounts', tool ? { tool } : undefined);
 }
-export function startCursorLogin(): Promise<CursorLogin> {
-  return invoke('start_cursor_login');
+export function startCursorLogin(tool?: CursorTool): Promise<CursorLogin> {
+  return invoke('start_cursor_login', tool ? { tool } : undefined);
 }
-export function pollCursorLogin(loginId: string): Promise<CursorAccount | null> {
-  return invoke('poll_cursor_login', { loginId });
+export function pollCursorLogin(loginId: string, tool?: CursorTool): Promise<CursorAccount | null> {
+  return invoke('poll_cursor_login', { loginId, ...(tool ? { tool } : {}) });
 }
 export function cancelCursorLogin(loginId: string): Promise<void> {
   return invoke('cancel_cursor_login', { loginId });
 }
-export function switchCursorAccount(accountId: string): Promise<CursorAccount> {
-  return invoke('switch_cursor_account', { accountId });
+export function switchCursorAccount(accountId: string, tool?: CursorTool): Promise<CursorAccount> {
+  return invoke('switch_cursor_account', { accountId, ...(tool ? { tool } : {}) });
 }
 export function deleteCursorAccount(accountId: string): Promise<void> {
   return invoke('delete_cursor_account', { accountId });
 }
-export function refreshCursorAccount(accountId: string): Promise<CursorUsage> {
-  return invoke('refresh_cursor_account', { accountId });
+export function refreshCursorAccount(accountId: string, tool?: CursorTool): Promise<CursorUsage> {
+  return invoke('refresh_cursor_account', { accountId, ...(tool ? { tool } : {}) });
 }

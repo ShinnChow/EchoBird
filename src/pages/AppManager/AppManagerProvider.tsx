@@ -568,15 +568,22 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   );
 
   const clearCursorModel = useCallback(
-    () => setToolModelConfig((prev) => ({ ...prev, cursor: null })),
+    () => setToolModelConfig((prev) => ({ ...prev, cursor: null, cursorcli: null })),
     []
   );
   const cursorAccounts = useCursorAccounts(
-    'cursor',
-    accountGroupEnabled('cursor'),
+    selectedTool === 'cursorcli' ||
+      !detectedTools.some((tool) => tool.id === 'cursor' && tool.installed)
+      ? 'cursorcli'
+      : 'cursor',
+    accountGroupEnabled('cursor', 'cursorcli'),
     clearCursorModel,
     setApplyError
   );
+  const cursorRevision = useRef(0);
+  useEffect(() => {
+    cursorRevision.current += 1;
+  }, [activePage, selectedTool, cursorAccounts.selectedId]);
   const antigravityAccounts = useAntigravityAccounts(
     accountGroupEnabled('antigravity', 'antigravitydesktop'),
     activePage === 'accounts'
@@ -660,7 +667,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     if (toolId === 'zcode') zcodeAccounts.select(null);
     if (toolId === 'kimicode' || toolId === 'kimidesktop') kimiAccounts.select(null);
     if (toolId === 'opendesign') openDesignAccounts.select(null);
-    if (toolId === 'cursor') cursorAccounts.select(null);
+    if (toolId === 'cursor' || toolId === 'cursorcli') cursorAccounts.select(null);
     if (toolId === 'grokbot') grokBotAccounts.select(null);
     if (toolId === 'dsh') deepSeekAccounts.select(null);
     if (toolId === 'grok') grokAccounts.select(null);
@@ -1033,6 +1040,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   // Launch handler
   const handleLaunch = async () => {
     if (!selectedTool || isLaunching) return;
+    if (['cursor', 'cursorcli'].includes(selectedTool) && cursorAccounts.busy) return;
     if (selectedTool === 'codearts' && codeArtsAccounts.busy) return;
     if (selectedTool === 'zcode' && zcodeAccounts.busy) return;
     if (['kimicode', 'kimidesktop'].includes(selectedTool) && kimiAccounts.busy) return;
@@ -1085,7 +1093,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
       !(['copilot', 'copilotdesktop'].includes(selectedTool) && copilotAccounts.selectedId) &&
       !(selectedTool === 'manus' && manusAccounts.selectedId) &&
       !(selectedTool === 'cue' && cueAccounts.selectedId) &&
-      !(selectedTool === 'cursor' && cursorAccounts.selectedId) &&
+      !(['cursor', 'cursorcli'].includes(selectedTool) && cursorAccounts.selectedId) &&
       !(selectedTool === 'grokbot' && grokBotAccounts.selectedId) &&
       !(
         (selectedTool === 'antigravity' || selectedTool === 'antigravitydesktop') &&
@@ -1195,13 +1203,26 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         finishLaunch();
       }
       return;
-    } else if (selectedTool === 'cursor' && cursorAccounts.selectedId) {
+    } else if (['cursor', 'cursorcli'].includes(selectedTool) && cursorAccounts.selectedId) {
+      const revision = cursorRevision.current;
+      const current = () =>
+        revision === cursorRevision.current &&
+        accountNavigation.current.tool === selectedTool &&
+        accountNavigation.current.page === activePage;
       try {
-        await api.switchCursorAccount(cursorAccounts.selectedId);
-        await cursorAccounts.reload();
-        await api.startTool('cursor');
+        const cwd = await pickWorkingDirectory();
+        if (cwd === null || !current()) return;
+        if (selectedTool === 'cursorcli')
+          await api.switchCursorAccount(cursorAccounts.selectedId, 'cursorcli');
+        else await api.switchCursorAccount(cursorAccounts.selectedId);
+        if (current()) await cursorAccounts.reload();
+        if (current()) {
+          if (selectedTool === 'cursorcli')
+            await api.startTool(selectedTool, toolData?.startCommand, cwd);
+          else await api.startTool('cursor');
+        }
       } catch (error) {
-        setApplyError(accountError(error, t));
+        if (current()) setApplyError(accountError(error, t));
       } finally {
         finishLaunch();
       }

@@ -90,24 +90,42 @@ pub async fn refresh_grok_bot_account(
 use crate::services::cursor_accounts::{self, Account as CursorAccount, LoginStart as CursorLogin};
 
 #[tauri::command]
-pub async fn list_cursor_accounts() -> Result<Vec<CursorAccount>, String> {
-    cursor_accounts::list().await
+pub async fn list_cursor_accounts(tool: Option<String>) -> Result<Vec<CursorAccount>, String> {
+    match cursor_client(tool.as_deref())? {
+        "cursorcli" => cursor_accounts::cli::list().await,
+        _ => cursor_accounts::list().await,
+    }
 }
 #[tauri::command]
-pub fn start_cursor_login() -> Result<CursorLogin, String> {
-    cursor_accounts::start_login()
+pub fn start_cursor_login(tool: Option<String>) -> Result<CursorLogin, String> {
+    match cursor_client(tool.as_deref())? {
+        "cursorcli" => cursor_accounts::cli::start_login(),
+        _ => cursor_accounts::start_login(),
+    }
 }
 #[tauri::command]
-pub async fn poll_cursor_login(login_id: String) -> Result<Option<CursorAccount>, String> {
-    cursor_accounts::poll_login(&login_id).await
+pub async fn poll_cursor_login(
+    login_id: String,
+    tool: Option<String>,
+) -> Result<Option<CursorAccount>, String> {
+    match cursor_client(tool.as_deref())? {
+        "cursorcli" => cursor_accounts::cli::poll_login(&login_id).await,
+        _ => cursor_accounts::poll_login(&login_id).await,
+    }
 }
 #[tauri::command]
 pub fn cancel_cursor_login(login_id: String) -> Result<(), String> {
     cursor_accounts::cancel_login(&login_id)
 }
 #[tauri::command]
-pub async fn switch_cursor_account(account_id: String) -> Result<CursorAccount, String> {
-    cursor_accounts::switch(&account_id).await
+pub async fn switch_cursor_account(
+    account_id: String,
+    tool: Option<String>,
+) -> Result<CursorAccount, String> {
+    match cursor_client(tool.as_deref())? {
+        "cursorcli" => cursor_accounts::cli::switch(&account_id).await,
+        _ => cursor_accounts::switch(&account_id).await,
+    }
 }
 #[tauri::command]
 pub async fn delete_cursor_account(account_id: String) -> Result<(), String> {
@@ -116,8 +134,20 @@ pub async fn delete_cursor_account(account_id: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn refresh_cursor_account(
     account_id: String,
+    tool: Option<String>,
 ) -> Result<crate::services::cursor_usage::Usage, String> {
-    cursor_accounts::refresh(&account_id).await
+    match cursor_client(tool.as_deref())? {
+        "cursorcli" => cursor_accounts::cli::refresh(&account_id).await,
+        _ => cursor_accounts::refresh(&account_id).await,
+    }
+}
+
+fn cursor_client(tool: Option<&str>) -> Result<&str, String> {
+    match tool.unwrap_or("cursor") {
+        "cursor" => Ok("cursor"),
+        "cursorcli" => Ok("cursorcli"),
+        _ => Err("accountError.invalidAccount".into()),
+    }
 }
 
 /// Copy a built-in tool's bundle to the user's ~/.echobird/<id>/ directory so

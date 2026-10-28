@@ -6,7 +6,7 @@ import { AppManagerContext, type AppManagerContextType } from './context';
 import type { CursorUsage } from '../../api/tauri';
 import { QuotaCountdown } from './QuotaCountdown';
 
-describe.each(['grokbot', 'cursor'] as const)('%s account controls', (tool) => {
+describe.each(['grokbot', 'cursor', 'cursorcli'] as const)('%s account controls', (tool) => {
   function fixture(busy = false, usage?: CursorUsage, refreshing = false) {
     const select = vi.fn();
     const remove = vi.fn();
@@ -14,7 +14,7 @@ describe.each(['grokbot', 'cursor'] as const)('%s account controls', (tool) => {
     const cancelLogin = vi.fn();
     const context = {
       isLaunching: false,
-      [tool === 'cursor' ? 'cursorAccounts' : 'grokBotAccounts']: {
+      [tool === 'grokbot' ? 'grokBotAccounts' : 'cursorAccounts']: {
         accounts: [{ id: 'one', email: 'one@example.test', active: true, usage }],
         selectedId: 'one',
         select,
@@ -45,7 +45,7 @@ describe.each(['grokbot', 'cursor'] as const)('%s account controls', (tool) => {
     const renderer = create(fixture().element);
     const markup = JSON.stringify(renderer.toJSON());
     expect(markup).toContain(
-      tool === 'cursor' ? '/icons/tools/cursor.svg' : '/icons/tools/grokbot.png'
+      tool === 'grokbot' ? '/icons/tools/grokbot.png' : '/icons/tools/cursor.svg'
     );
     expect(renderer.root.findByProps({ role: 'radio' }).props['aria-checked']).toBe(true);
     expect(

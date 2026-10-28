@@ -71,6 +71,34 @@ const providers = (state: AppManagerContextType) =>
   accountCenterProviders(state, (key) => key, 'en');
 
 describe('Account Center display data', () => {
+  it.each([false, true])(
+    'shares one Cursor group when CLI is installed and editor installed=%s',
+    (editorInstalled) => {
+      const state = context();
+      state.detectedTools = [
+        {
+          id: 'cursorcli',
+          name: 'Cursor CLI',
+          category: 'CLI Code',
+          installed: true,
+          noModelConfig: true,
+        },
+        {
+          id: 'cursor',
+          name: 'Cursor',
+          category: 'Desktop',
+          installed: editorInstalled,
+          noModelConfig: true,
+        },
+      ];
+      const groups = providers(state).filter((entry) => entry.id === 'cursor');
+      expect(groups).toHaveLength(1);
+      expect(groups[0].installed).toBe(true);
+      expect(groups[0].icon).toBe('/icons/tools/cursor.svg');
+      expect(state.cursorAccounts.add).not.toHaveBeenCalled();
+      expect(state.cursorAccounts.refresh).not.toHaveBeenCalled();
+    }
+  );
   it('keeps overlapping Doubao windows separate from bonus credits and uses real plan names', () => {
     const state = context();
     const row: DoubaoAccount = {

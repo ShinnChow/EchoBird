@@ -1,8 +1,5 @@
 //! Saved Cursor accounts only. No native catalog sync, usage lookup or account switch.
-use super::{
-    cipher, claims, credentials, data_dir, identity, read, saved, store_path, write, Account,
-    Store, ACCOUNT_LOCK,
-};
+use super::{claims, cli, identity, read, store_path, write, Account, Store, ACCOUNT_LOCK};
 use serde_json::{json, Value};
 use std::{path::Path, time::Duration};
 
@@ -51,9 +48,9 @@ async fn selected_credentials(
     let _guard = ACCOUNT_LOCK.lock().await;
     let path = store_path()?;
     let mut store: Store = read(&path)?;
-    let key = cipher(&data_dir()?)?;
+    let key = cli::desktop_key()?;
     let entry = store.get_mut(id).ok_or("accountError.invalidAccount")?;
-    let mut current = credentials(id, entry, &key)?;
+    let mut current = cli::restored(id, entry, key.as_ref())?;
     if should_rotate(&current.access_token, rejected, force)? {
         let rotated = refresh_pair(&current.refresh_token).await?;
         if identity(&rotated.access_token)? != id {
@@ -61,7 +58,7 @@ async fn selected_credentials(
         }
         current.access_token = rotated.access_token;
         current.refresh_token = rotated.refresh_token;
-        let replacement = saved(&current, &key, entry.applied)?;
+        let replacement = cli::snapshot(&current, key.as_ref())?;
         entry.session = replacement.session;
         entry.email = replacement.email;
         write(&path, &store)?;
@@ -153,7 +150,7 @@ fn pair_from(value: &Value, old_refresh: &str) -> Result<RotatedPair, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::Cipher;
+    use super::super::{credentials, saved, Cipher};
     use super::*;
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
     use cbc::cipher::KeyInit;

@@ -485,6 +485,12 @@ impl ProcessManager {
         command: &str,
         cwd: Option<&str>,
     ) -> Result<(), String> {
+        if tool_id == "cursorcli" && command != "cursor-agent" {
+            return Err(
+                "Cursor CLI must launch through cursor-agent, not an ambiguous agent command"
+                    .into(),
+            );
+        }
         let home = dirs::home_dir().unwrap_or_default();
         // Working directory for the spawned terminal: the folder the user
         // picked in the frontend launch dialog (threaded through start_tool),
@@ -541,6 +547,10 @@ impl ProcessManager {
             })
             .flatten()
             .or_else(|| {
+                if tool_id == "cursorcli" {
+                    return crate::services::tool_manager::get_tool_exe_path(tool_id)
+                        .filter(|path| command == "cursor-agent" || command == path);
+                }
                 if tool_id == "devincli" {
                     return devin_literal_launch_path(
                         command,
@@ -555,6 +565,9 @@ impl ProcessManager {
                     crate::services::tool_manager::get_tool_exe_path(tool_id),
                 )
             });
+        if tool_id == "cursorcli" && literal_executable.is_none() {
+            return Err("Cursor CLI executable not found".into());
+        }
         let mut full_command = command.to_string();
         #[cfg(not(windows))]
         if let Some(executable) = &literal_executable {
@@ -2264,6 +2277,14 @@ async fn stop_desktop_instances(tool_id: &str) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn cursor_cli_rejects_other_product_commands_before_reading_configuration_or_spawning() {
+        let mut manager = super::ProcessManager::new();
+        for command in ["agent", "agent update", "grok", "Cursor.exe"] {
+            assert!(manager.start_cli_tool("cursorcli", command, None).is_err());
+        }
+        assert!(manager.processes.is_empty());
+    }
     #[test]
     fn claude_desktop_shutdown_excludes_standalone_cli_and_supports_store_and_squirrel() {
         use super::claude_desktop_windows_process;

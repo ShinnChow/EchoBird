@@ -196,6 +196,10 @@ static BUNDLED: BundledAssets = BundledAssets {
             include_str!("../../docs/api/tools/install/cursor.json"),
         ),
         (
+            "cursorcli",
+            include_str!("../../docs/api/tools/install/cursorcli.json"),
+        ),
+        (
             "clashverge",
             include_str!("../../docs/api/tools/install/clashverge.json"),
         ),

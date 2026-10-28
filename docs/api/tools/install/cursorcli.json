@@ -1,0 +1,27 @@
+{
+    "id": "cursorcli",
+    "displayName": "Cursor CLI",
+    "homepage": "https://cursor.com/cli",
+    "docs": "https://cursor.com/docs/cli/installation",
+    "kind": "cli",
+    "platforms": ["windows", "macos", "linux"],
+    "install": {
+        "windows": "irm 'https://cursor.com/install?win32=true' | iex",
+        "macos_linux": "curl https://cursor.com/install -fsS | bash",
+        "note": "Cursor CLI is separate from the Cursor desktop editor. Install it only when the user requests the CLI. EchoBird does not switch its models. It shares Cursor accounts, but applies login only to the selected client."
+    },
+    "identity_guard": {
+        "description": "Cursor CLI and Grok Build both install an agent command. Never identify or update Cursor with an unverified bare agent command.",
+        "windows": "Use %LOCALAPPDATA%\\cursor-agent\\cursor-agent.cmd. Inspect Get-Command cursor-agent -All and the resolved launcher before invoking it. Do not use %USERPROFILE%\\.grok\\bin\\agent.exe.",
+        "macos_linux": "Use ~/.local/bin/cursor-agent or the verified absolute Cursor CLI launcher. Inspect command -v cursor-agent and the resolved file first.",
+        "verify": "Run the verified Cursor CLI launcher with --version; its version uses a date and commit identifier. A successful grok --version or agent --version does not verify Cursor CLI.",
+        "update": "Run the verified Cursor CLI launcher with update. This updates only the CLI, not the desktop editor. Do not edit PATH order or replace another product's agent alias."
+    },
+    "install_flow": {
+        "agent_steps": [
+            "Detect the selected machine's OS and follow its official install command.",
+            "Verify Cursor CLI by its cursor-agent launcher and --version, not a generic agent alias or Cursor.exe.",
+            "Keep the desktop Cursor installation and Grok Build unchanged. Do not configure models or start account login as part of installation."
+        ]
+    }
+}

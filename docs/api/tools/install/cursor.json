@@ -16,6 +16,11 @@
         "linux_download": "Open https://cursor.com/download and select the .deb, .rpm, or AppImage for x64 or ARM64. Install a downloaded .deb with apt or .rpm with the distro package manager. For AppImage, save under ~/Applications, make it executable, and run it.",
         "note": "GUI IDE. AI features and model selection are built into the app; EchoBird does not switch its model. EchoBird supports multiple accounts in the default user-data directory on Windows, macOS and Linux. Launch Cursor once to initialize its database and system credential store. On Linux, save your work and close Cursor before switching; on Windows/macOS, EchoBird requests a normal quit and aborts if the editor remains open. The system keychain/keyring must be accessible."
     },
+    "identity_guard": {
+        "description": "This reference installs the Cursor desktop editor, not Cursor CLI or Grok Build. Do not install CLI unless explicitly requested.",
+        "update": "Use Cursor: Attempt Update inside the desktop editor. agent update does not update the editor and can execute Grok Build instead.",
+        "windows_user_setup": "A user-level Cursor installation disables updates when run as administrator. Verify the launch permission and updater log; do not move its executable path to another product."
+    },
     "install_flow": {
         "summary": "winget if available → otherwise download installer → user runs the wizard or AppImage",
         "agent_steps": [

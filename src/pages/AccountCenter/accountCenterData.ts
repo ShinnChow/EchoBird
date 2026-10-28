@@ -454,7 +454,7 @@ export function accountCenterProviders(
       'cursor',
       'Cursor',
       '/icons/tools/cursor.svg',
-      ['cursor'],
+      ['cursor', 'cursorcli'],
       context.cursorAccounts,
       (account) => ({
         identity: account.email,

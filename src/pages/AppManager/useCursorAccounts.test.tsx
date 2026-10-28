@@ -26,7 +26,7 @@ vi.mock('../../hooks/useI18n', () => {
   return { useI18n: () => ({ t }) };
 });
 vi.mock('../../components/ConfirmDialog', () => ({ useConfirm: () => async () => true }));
-describe.each(['grokbot', 'cursor'] as const)('%s account lifecycle', (tool) => {
+describe.each(['grokbot', 'cursor', 'cursorcli'] as const)('%s account lifecycle', (tool) => {
   const client =
     tool === 'grokbot'
       ? {
@@ -104,6 +104,15 @@ describe.each(['grokbot', 'cursor'] as const)('%s account lifecycle', (tool) => 
     expect(clearModel).toHaveBeenCalled();
     expect(client.switch).not.toHaveBeenCalled();
     expect(state.busy).toBe(false);
+    if (tool === 'cursorcli') {
+      expect(api.listCursorAccounts).toHaveBeenCalledWith('cursorcli');
+      expect(api.startCursorLogin).toHaveBeenCalledWith('cursorcli');
+      expect(api.pollCursorLogin).toHaveBeenCalledWith('login', 'cursorcli');
+    } else if (tool === 'cursor') {
+      expect(api.listCursorAccounts).toHaveBeenCalledWith();
+      expect(api.startCursorLogin).toHaveBeenCalledWith();
+      expect(api.pollCursorLogin).toHaveBeenCalledWith('login');
+    }
   });
   it('cancels late initialization after leaving the tool without opening a browser', async () => {
     await mount();

@@ -13,22 +13,30 @@ const clients = {
   cursor: {
     list: api.listCursorAccounts,
     start: api.startCursorLogin,
-    poll: api.pollCursorLogin,
+    poll: (id: string) => api.pollCursorLogin(id),
     cancel: api.cancelCursorLogin,
     remove: api.deleteCursorAccount,
     refresh: api.refreshCursorAccount,
   },
+  cursorcli: {
+    list: () => api.listCursorAccounts('cursorcli'),
+    start: () => api.startCursorLogin('cursorcli'),
+    poll: (id: string) => api.pollCursorLogin(id, 'cursorcli'),
+    cancel: api.cancelCursorLogin,
+    remove: api.deleteCursorAccount,
+    refresh: (id: string) => api.refreshCursorAccount(id, 'cursorcli'),
+  },
 };
 
 export function useCursorAccounts(
-  tool: 'cursor' | 'grokbot',
+  tool: api.CursorTool | 'grokbot',
   enabled: boolean,
   clearModel: () => void,
   showError: (error: string) => void
 ) {
   const client = clients[tool];
   return useManagedAccounts<api.CursorAccount, api.CursorLogin>(
-    tool,
+    tool === 'cursorcli' ? 'cursor' : tool,
     enabled,
     false,
     clearModel,
@@ -39,6 +47,7 @@ export function useCursorAccounts(
       remove: (account) => client.remove(account.id),
       refresh: async (account) => ({ ...account, usage: await client.refresh(account.id) }),
       label: (account) => account.email,
-    }
+    },
+    tool
   );
 }

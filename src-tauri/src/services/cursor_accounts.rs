@@ -1,5 +1,6 @@
 //! Cursor 3.22 account state in the default user-data directory.
 //! Only authentication keys and team selection are changed, in one SQLite transaction.
+pub(crate) mod cli;
 pub(crate) mod speech;
 use super::cursor_auth::{
     cipher, claims, decrypt, encrypt, identity, read, write, Cipher, LoginFlow,
@@ -35,6 +36,8 @@ struct Saved {
     // EchoBird never persists Cursor's plaintext SQLite tokens in its own account store.
     session: String,
     applied: bool,
+    #[serde(default)]
+    cli_applied: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     email: Option<String>,
     #[serde(default)]
@@ -151,13 +154,18 @@ fn saved(credentials: &Credentials, key: &Cipher, applied: bool) -> Result<Saved
             &serde_json::to_string(credentials).map_err(|_| "accountError.format")?,
         )?,
         applied,
+        cli_applied: false,
         email: Some(summary(credentials, None)?.email),
         usage: None,
     })
 }
 fn credentials(id: &str, saved: &Saved, key: &Cipher) -> Result<Credentials, String> {
-    let value: Credentials =
-        serde_json::from_str(&decrypt(key, &saved.session)?).map_err(|_| "accountError.format")?;
+    let raw = if saved.session.starts_with("enc:v1:") {
+        super::model_manager::decrypt_key_for_use(&saved.session)
+    } else {
+        decrypt(key, &saved.session)?
+    };
+    let value: Credentials = serde_json::from_str(&raw).map_err(|_| "accountError.format")?;
     if summary(&value, None)?.id != id {
         return Err("accountError.invalidAccount".into());
     }
@@ -191,6 +199,7 @@ fn sync_native(
             let replacement = saved(current, key, true)?;
             entry.session = replacement.session;
             entry.email = replacement.email;
+            entry.cli_applied = false;
         }
     }
     Ok(())
@@ -378,10 +387,9 @@ pub async fn switch(id: &str) -> Result<Account, String> {
         .email = Some(summary(&selected, None)?.email);
     write(&path, &store)?;
     apply(&mut db, &selected)?;
-    store
-        .get_mut(id)
-        .ok_or("accountError.invalidAccount")?
-        .applied = true;
+    let entry = store.get_mut(id).ok_or("accountError.invalidAccount")?;
+    entry.applied = true;
+    entry.cli_applied = false;
     write(&path, &store)?;
     summary(&selected, Some(id))
 }

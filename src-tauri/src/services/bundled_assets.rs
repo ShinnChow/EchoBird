@@ -172,6 +172,7 @@ pub const INSTALLABLE_TOOL_IDS: &[&str] = &[
     "openscience",
     "vscode",
     "cursor",
+    "cursorcli",
     "clashverge",
     "trae",
     "traecn",

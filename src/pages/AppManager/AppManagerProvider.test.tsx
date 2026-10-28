@@ -10,6 +10,7 @@ import { AppManagerBottom } from './AppManagerComponents';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import museCodeDefinition from '../../../tools/musecode/paths.json';
 import * as devinApi from '../../api/devin';
+import cursorCliDefinition from '../../../tools/cursorcli/paths.json';
 
 vi.mock('../../api/devin', () => ({
   listDevinAccounts: vi.fn().mockResolvedValue([]),
@@ -19,6 +20,119 @@ vi.mock('../../api/devin', () => ({
   deleteDevinAccount: vi.fn(),
   refreshDevinAccount: vi.fn(),
 }));
+
+describe('Cursor CLI account integration', () => {
+  let renderer: ReactTestRenderer;
+  let context: ReturnType<typeof useAppManager>;
+  const account = {
+    id: 'cursor-cli-fixture',
+    email: 'fixture@example.test',
+    active: true,
+    usage: null,
+  };
+  const tools = (installed: boolean) => [
+    { ...cursorCliDefinition, id: 'cursorcli', installed },
+    { id: 'cursor', name: 'Cursor', category: 'Desktop', installed: true, noModelConfig: true },
+  ];
+  function Harness() {
+    const state = useAppManager();
+    useLayoutEffect(() => {
+      context = state;
+    });
+    return null;
+  }
+  async function mount(installed = true) {
+    useToolsStore.getState().setDetectedTools(tools(installed));
+    await act(async () => {
+      renderer = create(
+        <AppManagerProvider>
+          <Harness />
+        </AppManagerProvider>
+      );
+    });
+    act(() => {
+      context.setViewMode('desktop');
+      context.setSelectedTool('cursorcli');
+    });
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+  }
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    useNavigationStore.getState().setActivePage('apps');
+    vi.mocked(api.listCursorAccounts).mockResolvedValue([account]);
+    vi.mocked(api.switchCursorAccount).mockResolvedValue(account);
+    vi.mocked(openDialog).mockResolvedValue('/fixture');
+  });
+  afterEach(() => {
+    act(() => renderer?.unmount());
+    useToolsStore.getState().setDetectedTools([]);
+    vi.mocked(api.listCursorAccounts).mockRejectedValue(new Error('accountError.read'));
+    vi.useRealTimers();
+  });
+  it('loads only installed CLI accounts without login, quota or configuration changes', async () => {
+    await mount(false);
+    expect(api.listCursorAccounts).not.toHaveBeenCalled();
+    act(() => useToolsStore.getState().setDetectedTools(tools(true)));
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+    expect(api.listCursorAccounts).toHaveBeenCalledWith('cursorcli');
+    expect(api.startCursorLogin).not.toHaveBeenCalled();
+    expect(api.refreshCursorAccount).not.toHaveBeenCalled();
+    expect(api.switchCursorAccount).not.toHaveBeenCalled();
+    expect(api.applyModelToTool).not.toHaveBeenCalled();
+    expect(api.startTool).not.toHaveBeenCalled();
+  });
+  it('applies the shared account only to CLI and launches its verified command in the chosen folder', async () => {
+    await mount();
+    expect(context.cursorAccounts.selectedId).toBe(account.id);
+    await act(async () => {
+      await context.handleLaunch();
+    });
+    expect(api.switchCursorAccount).toHaveBeenCalledExactlyOnceWith(account.id, 'cursorcli');
+    expect(api.startTool).toHaveBeenCalledExactlyOnceWith('cursorcli', 'cursor-agent', '/fixture');
+    expect(api.applyModelToTool).not.toHaveBeenCalled();
+    expect(api.restoreToolToOfficial).not.toHaveBeenCalled();
+  });
+  it('does not write a login or launch when the folder dialog is cancelled', async () => {
+    await mount();
+    vi.mocked(openDialog).mockResolvedValueOnce(null);
+    await act(async () => {
+      await context.handleLaunch();
+    });
+    expect(api.switchCursorAccount).not.toHaveBeenCalled();
+    expect(api.startTool).not.toHaveBeenCalled();
+    expect(context.isLaunching).toBe(false);
+  });
+  it('ignores a late CLI apply result after switching to the editor and reports explicit failures', async () => {
+    await mount();
+    vi.mocked(api.switchCursorAccount).mockRejectedValueOnce(new Error('accountError.write'));
+    await act(async () => {
+      await context.handleLaunch();
+    });
+    expect(context.applyError).toBe('accountError.write');
+    expect(api.startTool).not.toHaveBeenCalled();
+    let finish!: (value: api.CursorAccount) => void;
+    vi.mocked(api.switchCursorAccount).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+    );
+    let operation!: Promise<void>;
+    await act(async () => {
+      operation = context.handleLaunch();
+    });
+    act(() => context.setSelectedTool('cursor'));
+    await act(async () => {
+      finish(account);
+      await operation;
+    });
+    expect(api.startTool).not.toHaveBeenCalled();
+  });
+});
 
 vi.hoisted(() => vi.stubGlobal('__APP_EDITION__', 'full'));
 vi.mock('../../utils/platform', () => ({ IS_WINDOWS: false }));
@@ -146,6 +260,7 @@ vi.mock('../../api/tauri', () => ({
   getInstallIndex: vi.fn().mockResolvedValue('{"ids":[]}'),
   listGrokBotAccounts: vi.fn().mockRejectedValue(new Error('accountError.read')),
   listCursorAccounts: vi.fn().mockRejectedValue(new Error('accountError.read')),
+  switchCursorAccount: vi.fn(),
   listAntigravityAccounts: vi.fn().mockRejectedValue(new Error('accountError.read')),
   startAntigravityLogin: vi.fn(),
   pollAntigravityLogin: vi.fn(),

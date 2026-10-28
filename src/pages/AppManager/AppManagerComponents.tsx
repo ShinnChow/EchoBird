@@ -1157,7 +1157,9 @@ export const AppManagerPanel: React.FC = () => {
             <ManusAccountSection tool={selectedTool} />
           ) : selectedTool === 'antigravity' || selectedTool === 'antigravitydesktop' ? (
             <AntigravityAccountSection />
-          ) : selectedTool === 'grokbot' || selectedTool === 'cursor' ? (
+          ) : selectedTool === 'grokbot' ||
+            selectedTool === 'cursor' ||
+            selectedTool === 'cursorcli' ? (
             <CursorAccountSection tool={selectedTool} />
           ) : selectedTool === 'kirocrew' || selectedTool === 'kirocli' ? (
             <KiroAccountSection />
@@ -1342,7 +1344,7 @@ export const AppManagerBottom: React.FC = () => {
     (selectedTool === 'manus' && !!manusAccounts.selectedId) ||
     (selectedTool === 'cue' && !!cueAccounts.selectedId) ||
     (selectedTool === 'grokbot' && !!grokBotAccounts.selectedId) ||
-    (selectedTool === 'cursor' && !!cursorAccounts.selectedId) ||
+    (['cursor', 'cursorcli'].includes(selectedTool ?? '') && !!cursorAccounts.selectedId) ||
     ((selectedTool === 'antigravity' || selectedTool === 'antigravitydesktop') &&
       !!antigravityAccounts.selectedId) ||
     ((selectedTool === 'workbuddy' || selectedTool === 'workbuddyai') &&
@@ -1381,7 +1383,7 @@ export const AppManagerBottom: React.FC = () => {
     (selectedTool === 'cue' && cueAccounts.busy) ||
     (selectedTool === 'claudedesktop' && claudeDesktopAccounts.busy) ||
     (selectedTool === 'grokbot' && grokBotAccounts.busy) ||
-    (selectedTool === 'cursor' && cursorAccounts.busy) ||
+    (['cursor', 'cursorcli'].includes(selectedTool ?? '') && cursorAccounts.busy) ||
     ((selectedTool === 'trae' || selectedTool === 'traecn') && traeAccounts.busy) ||
     ((selectedTool === 'kirocrew' || selectedTool === 'kirocli') && kiroAccounts.busy) ||
     (!isUninstalled && !willApply && !willLaunch);
