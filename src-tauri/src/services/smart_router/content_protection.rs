@@ -52,54 +52,132 @@ fn patterns() -> &'static Vec<Regex> {
 }
 
 fn credentials(text: &str) -> impl Iterator<Item = &str> {
-    patterns().iter().flat_map(move |pattern| {
-        pattern.captures_iter(text).filter_map(move |captures| {
-            let contextual = captures.name("contextual");
-            let assigned = captures.name("assigned");
-            let found = contextual
-                .or(assigned)
-                .or_else(|| captures.get(1))
-                .or_else(|| captures.get(0))
-                .unwrap();
-            // Exempt short typed IDs only from the label rule, not other credential rules.
-            if captures.name("assigned_field").is_some_and(|field| {
-                let field = field.as_str().to_ascii_lowercase().replace(['_', '-'], "");
-                let id = found.as_str().as_bytes();
-                matches!(
-                    field.as_str(),
-                    "elementtoken" | "nodetoken" | "snapshottoken" | "handletoken"
-                ) && (2..=17).contains(&id.len())
-                    && id[0].is_ascii_alphabetic()
-                    && id[1..].iter().all(u8::is_ascii_hexdigit)
-            }) {
-                return None;
-            }
-            if (assigned.is_some() || contextual.is_some())
-                && code_value(text, captures.get(0).unwrap().start(), found)
-            {
-                return None;
-            }
-            if contextual.is_some() && !text[..found.start()].ends_with(['"', '\'', '“', '「']) {
-                let label =
-                    text[captures.get(0).unwrap().start()..found.start()].to_ascii_lowercase();
-                let password = ["密码", "密碼", "口令", "password"]
-                    .iter()
-                    .any(|name| label.contains(name));
-                let value = found.as_str();
-                if value.bytes().all(|byte| byte.is_ascii_digit()) {
-                    if (!password && value.len() < 6) || numeric_unit(&text[found.end()..]) {
-                        return None;
-                    }
-                } else if !password
-                    && !(value.bytes().any(|byte| byte.is_ascii_alphabetic())
-                        && (value.bytes().any(|byte| byte.is_ascii_digit()) || value.len() >= 16))
+    credential_hits(text).map(|(value, _)| value)
+}
+
+fn credential_hits(text: &str) -> impl Iterator<Item = (&str, u8)> {
+    patterns()
+        .iter()
+        .enumerate()
+        .flat_map(move |(index, pattern)| {
+            pattern.captures_iter(text).filter_map(move |captures| {
+                let contextual = captures.name("contextual");
+                let assigned = captures.name("assigned");
+                let found = contextual
+                    .or(assigned)
+                    .or_else(|| captures.get(1))
+                    .or_else(|| captures.get(0))
+                    .unwrap();
+                // Exempt short typed IDs only from the label rule, not other credential rules.
+                if captures.name("assigned_field").is_some_and(|field| {
+                    let field = field.as_str().to_ascii_lowercase().replace(['_', '-'], "");
+                    let id = found.as_str().as_bytes();
+                    matches!(
+                        field.as_str(),
+                        "elementtoken" | "nodetoken" | "snapshottoken" | "handletoken"
+                    ) && (2..=17).contains(&id.len())
+                        && id[0].is_ascii_alphabetic()
+                        && id[1..].iter().all(u8::is_ascii_hexdigit)
+                }) {
+                    return None;
+                }
+                if (assigned.is_some() || contextual.is_some())
+                    && code_value(text, captures.get(0).unwrap().start(), found)
                 {
                     return None;
                 }
-            }
-            Some(found.as_str())
+                if contextual.is_some() && !text[..found.start()].ends_with(['"', '\'', '“', '「'])
+                {
+                    let label =
+                        text[captures.get(0).unwrap().start()..found.start()].to_ascii_lowercase();
+                    let password = ["密码", "密碼", "口令", "password"]
+                        .iter()
+                        .any(|name| label.contains(name));
+                    let value = found.as_str();
+                    if value.bytes().all(|byte| byte.is_ascii_digit()) {
+                        if (!password && value.len() < 6) || numeric_unit(&text[found.end()..]) {
+                            return None;
+                        }
+                    } else if !password
+                        && !(value.bytes().any(|byte| byte.is_ascii_alphabetic())
+                            && (value.bytes().any(|byte| byte.is_ascii_digit())
+                                || value.len() >= 16))
+                    {
+                        return None;
+                    }
+                }
+                let label = captures
+                    .name("assigned_field")
+                    .map(|field| field.as_str())
+                    .unwrap_or(&text[captures.get(0).unwrap().start()..found.start()]);
+                let kind = if index == 0 {
+                    3
+                } else if index == 7 {
+                    2
+                } else {
+                    credential_kind(label, found.as_str())
+                };
+                Some((found.as_str(), kind))
+            })
         })
-    })
+}
+
+fn credential_kind(label: &str, value: &str) -> u8 {
+    let label = label
+        .chars()
+        .rev()
+        .take(128)
+        .collect::<String>()
+        .chars()
+        .rev()
+        .collect::<String>()
+        .to_ascii_lowercase()
+        .replace(['_', '-'], "");
+    if value.starts_with("-----BEGIN ")
+        || label.contains("privatekey")
+        || label.contains("私钥")
+        || label.contains("私鑰")
+    {
+        3
+    } else if ["password", "passwd", "密码", "密碼", "口令"]
+        .iter()
+        .any(|name| label.contains(name))
+    {
+        2
+    } else if ["token", "bearer", "令牌", "权杖", "權杖"]
+        .iter()
+        .any(|name| label.contains(name))
+        || [
+            "eyJ",
+            "ghp_",
+            "gho_",
+            "ghu_",
+            "ghs_",
+            "ghr_",
+            "github_pat_",
+            "glpat-",
+            "hf_",
+            "npm_",
+            "xox",
+        ]
+        .iter()
+        .any(|prefix| value.starts_with(prefix))
+    {
+        1
+    } else if label.contains("key")
+        || ["密钥", "密鑰", "秘钥", "秘鑰", "金钥", "金鑰"]
+            .iter()
+            .any(|name| label.contains(name))
+        || value.starts_with("sk")
+        || value.contains("_sk_")
+        || ["AIza", "AKIA", "ASIA", "gsk_", "xai-", "rk_live_"]
+            .iter()
+            .any(|prefix| value.starts_with(prefix))
+    {
+        0
+    } else {
+        4
+    }
 }
 
 fn code_value(text: &str, field_start: usize, value: regex::Match<'_>) -> bool {
@@ -214,9 +292,30 @@ async fn blocking<T: Send + 'static>(
         .map_err(|_| FAILURE)?
 }
 
-pub(super) struct Protection(SharedRestorer);
+pub(super) struct Protection(SharedRestorer, [u64; 5]);
 
 impl Protection {
+    pub(super) fn categories(&self) -> [u64; 5] {
+        self.1
+    }
+
+    pub(super) async fn prepare_tracked(
+        body: &mut Value,
+        scope: &Path,
+        settings: &Path,
+        tracking: bool,
+    ) -> Result<Self, &'static str> {
+        Self::prepare_until_tracked(
+            body,
+            scope,
+            settings,
+            Instant::now() + PROCESS_TIMEOUT,
+            tracking,
+        )
+        .await
+    }
+
+    #[cfg(test)]
     pub(super) async fn prepare(
         body: &mut Value,
         scope: &Path,
@@ -225,11 +324,22 @@ impl Protection {
         Self::prepare_until(body, scope, settings, Instant::now() + PROCESS_TIMEOUT).await
     }
 
+    #[cfg(test)]
     async fn prepare_until(
         body: &mut Value,
         scope: &Path,
         settings: &Path,
         deadline: Instant,
+    ) -> Result<Self, &'static str> {
+        Self::prepare_until_tracked(body, scope, settings, deadline, false).await
+    }
+
+    async fn prepare_until_tracked(
+        body: &mut Value,
+        scope: &Path,
+        settings: &Path,
+        deadline: Instant,
+        tracking: bool,
     ) -> Result<Self, &'static str> {
         let slot = {
             let mut engines = ENGINES
@@ -273,7 +383,7 @@ impl Protection {
                 *slot = Some(engine.clone());
                 engine
             };
-            let protection = Self::with_engine_until(&mut input, engine, deadline)?;
+            let protection = Self::with_engine_until(&mut input, engine, deadline, tracking)?;
             Ok((input, protection))
         })
         .await?;
@@ -283,14 +393,16 @@ impl Protection {
 
     #[cfg(test)]
     fn with_engine(body: &mut Value, engine: SharedEngine) -> Result<Self, &'static str> {
-        Self::with_engine_until(body, engine, Instant::now() + PROCESS_TIMEOUT)
+        Self::with_engine_until(body, engine, Instant::now() + PROCESS_TIMEOUT, false)
     }
 
     fn with_engine_until(
         body: &mut Value,
         engine: SharedEngine,
         deadline: Instant,
+        tracking: bool,
     ) -> Result<Self, &'static str> {
+        let mut categories = [0_u64; 5];
         let restorer = {
             let mut store = engine.lock().map_err(|_| FAILURE)?;
             let mut result = Ok(());
@@ -304,13 +416,14 @@ impl Protection {
                 if result.is_err() {
                     return;
                 }
-                let masked = match store.mask(text, deadline) {
-                    Ok(masked) => masked,
-                    Err(error) => {
-                        result = Err(error);
-                        return;
-                    }
-                };
+                let masked =
+                    match store.mask_tracked(text, deadline, tracking.then_some(&mut categories)) {
+                        Ok(masked) => masked,
+                        Err(error) => {
+                            result = Err(error);
+                            return;
+                        }
+                    };
                 if signed {
                     if masked != *text || credentials(text).next().is_some() {
                         result = Err(FAILURE);
@@ -322,7 +435,7 @@ impl Protection {
             result?;
             store.restorer.clone()
         };
-        Ok(Self(restorer))
+        Ok(Self(restorer, categories))
     }
 
     pub(super) async fn restore(self, response: Response) -> Response {
@@ -333,6 +446,7 @@ impl Protection {
 struct Secret {
     value: Arc<str>,
     token: String,
+    kind: u8,
 }
 
 struct Engine {
@@ -356,7 +470,12 @@ impl Engine {
         }
     }
 
+    #[cfg(test)]
     fn remember(&mut self, value: &str) -> Result<(), &'static str> {
+        self.remember_kind(value, 4)
+    }
+
+    fn remember_kind(&mut self, value: &str, kind: u8) -> Result<(), &'static str> {
         if value.len() < 4 || value.starts_with(PREFIX) || placeholder_value(value) {
             return Ok(());
         }
@@ -388,7 +507,7 @@ impl Engine {
         Arc::make_mut(&mut self.restorer)
             .values
             .insert(token.clone(), value.clone());
-        self.secrets.push(Secret { value, token });
+        self.secrets.push(Secret { value, token, kind });
         Ok(())
     }
 
@@ -397,18 +516,28 @@ impl Engine {
             return Err(FAILURE);
         }
         if secret_field(key) {
-            self.remember(text)?;
+            self.remember_kind(text, credential_kind(key, text))?;
         }
-        for value in credentials(text) {
+        for (value, kind) in credential_hits(text) {
             if Instant::now() >= deadline {
                 return Err(FAILURE);
             }
-            self.remember(value)?;
+            self.remember_kind(value, kind)?;
         }
         Ok(())
     }
 
+    #[cfg(test)]
     fn mask(&self, text: &str, deadline: Instant) -> Result<String, &'static str> {
+        self.mask_tracked(text, deadline, None)
+    }
+
+    fn mask_tracked(
+        &self,
+        text: &str,
+        deadline: Instant,
+        mut counts: Option<&mut [u64; 5]>,
+    ) -> Result<String, &'static str> {
         let mut result = String::new();
         let mut cursor = 0;
         let mut copied = 0;
@@ -439,6 +568,10 @@ impl Engine {
                 .filter(|secret| text.as_bytes()[cursor..].starts_with(secret.value.as_bytes()))
                 .max_by_key(|secret| secret.value.len());
             if let Some(secret) = found {
+                if let Some(counts) = counts.as_mut() {
+                    counts[usize::from(secret.kind)] =
+                        counts[usize::from(secret.kind)].saturating_add(1);
+                }
                 result.push_str(&text[copied..cursor]);
                 result.push_str(&secret.token);
                 cursor += secret.value.len();

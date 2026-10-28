@@ -4,6 +4,8 @@ pub(crate) mod catalog;
 pub(crate) mod profiles;
 mod runtime;
 mod server;
+pub(crate) mod statistics;
+mod usage;
 
 pub(crate) use server::{cancel_probe, probe_candidate, ProbeResult};
 

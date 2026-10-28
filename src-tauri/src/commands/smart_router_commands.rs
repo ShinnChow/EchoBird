@@ -2,6 +2,30 @@ use crate::models::model::ModelConfig;
 use crate::services::smart_router::{self, PublicActivity, PublicConfig};
 
 #[tauri::command]
+pub async fn get_smart_router_token_credits(
+) -> Result<smart_router::statistics::TokenCredits, String> {
+    crate::services::developer_preview::run(async {
+        tauri::async_runtime::spawn_blocking(smart_router::statistics::token_credits)
+            .await
+            .map_err(|_| "Unable to read local TokenPet credits".to_string())?
+    })
+    .await
+}
+
+#[tauri::command]
+pub fn get_smart_router_statistics(
+    days: u8,
+    group: Option<String>,
+) -> Result<smart_router::statistics::Snapshot, String> {
+    smart_router::statistics::snapshot(days, group.as_deref())
+}
+
+#[tauri::command]
+pub fn get_smart_router_statistics_catalog() -> Result<smart_router::statistics::Catalog, String> {
+    smart_router::statistics::catalog()
+}
+
+#[tauri::command]
 pub async fn set_smart_router_enabled(enabled: bool) -> Result<PublicConfig, String> {
     smart_router::profiles::set_master_enabled(enabled).await
 }

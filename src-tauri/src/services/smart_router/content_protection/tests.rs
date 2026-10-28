@@ -59,6 +59,54 @@ fn all_chosen_credential_types_have_positive_controls() {
 }
 
 #[test]
+fn tracked_categories_count_replacements_once_and_keep_known_values_across_requests() {
+    let engine = engine();
+    let original = json!({"messages":[{"content":format!("{SECRET} {SECRET} token=abcdEFGH12345678 password=fixturepassword -----BEGIN RSA PRIVATE KEY-----\nabc123\n-----END RSA PRIVATE KEY-----")},{"content":[{"type":"tool_use","input":{"secret":"other-credential-fixture"}}]}]});
+    let mut body = original.clone();
+    let protection = Protection::with_engine_until(
+        &mut body,
+        engine.clone(),
+        Instant::now() + PROCESS_TIMEOUT,
+        true,
+    )
+    .unwrap();
+    assert_eq!(protection.categories(), [2, 1, 1, 1, 1]);
+    let mut restored = body.clone();
+    stream::restore_value(&restorer(&engine), &mut restored).unwrap();
+    assert_eq!(restored, original);
+    let again = Protection::with_engine_until(
+        &mut body,
+        engine.clone(),
+        Instant::now() + PROCESS_TIMEOUT,
+        true,
+    )
+    .unwrap();
+    assert_eq!(
+        again.categories(),
+        [0; 5],
+        "existing placeholders are not counted again"
+    );
+    let mut later = json!({"messages":[{"content":"reuse abcdEFGH12345678 and fixturepassword without labels"}]});
+    let later = Protection::with_engine_until(
+        &mut later,
+        engine.clone(),
+        Instant::now() + PROCESS_TIMEOUT,
+        true,
+    )
+    .unwrap();
+    assert_eq!(later.categories(), [0, 1, 1, 0, 0]);
+    let mut untracked = original;
+    let untracked = Protection::with_engine_until(
+        &mut untracked,
+        engine,
+        Instant::now() + PROCESS_TIMEOUT,
+        false,
+    )
+    .unwrap();
+    assert_eq!(untracked.categories(), [0; 5]);
+}
+
+#[test]
 fn multi_turn_values_and_discovery_after_first_occurrence_are_consistent() {
     let engine = engine();
     let mut first = json!({"messages":[{"content":"the value is abcdEFGH12345678"},{"content":"DB_PASSWORD=abcdEFGH12345678"}]});

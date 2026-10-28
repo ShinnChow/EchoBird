@@ -1,12 +1,14 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import * as api from '../api/plugins';
-import type { InstalledPlugin } from '../api/plugins';
+import type { InstalledPlugin, PluginCandidate, PluginRegistry } from '../api/plugins';
 import { pluginTools, usePluginsStore as store } from './pluginsStore';
 import { useNavigationStore } from './navigationStore';
 
 vi.mock('../api/plugins', () => ({
   listPlugins: vi.fn(),
   getPluginRegistry: vi.fn(),
+  previewPlugin: vi.fn(),
+  cancelPlugin: vi.fn(),
   installPlugin: vi.fn(),
   setPluginEnabled: vi.fn(),
   uninstallPlugin: vi.fn(),
@@ -37,10 +39,19 @@ const plugin: InstalledPlugin = {
   },
 };
 
+const updateCandidate: PluginCandidate = {
+  token: 'reviewed-update',
+  manifest: { ...plugin.manifest, version: '1.1.0' },
+  source: plugin.source,
+  revision: null,
+};
+
 beforeEach(() => {
   useNavigationStore.getState().setDeveloperMode(true);
   store.setState(store.getInitialState(), true);
   vi.clearAllMocks();
+  vi.mocked(api.previewPlugin).mockResolvedValue(updateCandidate);
+  vi.mocked(api.cancelPlugin).mockResolvedValue(undefined);
 });
 
 it('starts no plugin operation while developer preview is paused', async () => {
@@ -185,4 +196,110 @@ it('only explicit refresh fetches the selected regional index and keeps the prio
   expect(api.getPluginRegistry).toHaveBeenCalledExactlyOnceWith('china', true);
   expect(store.getState().registry).toBe(previous);
   expect(store.getState().error).toContain('offline');
+});
+
+it('updates a newer local package once without requesting unchanged permissions or changing enablement', async () => {
+  const updated = { ...plugin, enabled: false, manifest: updateCandidate.manifest };
+  store.setState({ installed: [{ ...plugin, enabled: false }], region: 'international' });
+  vi.mocked(api.installPlugin).mockResolvedValue([updated]);
+  const approve = vi.fn();
+  await expect(store.getState().update(plugin.id, approve)).resolves.toBe('updated');
+  expect(api.previewPlugin).toHaveBeenCalledExactlyOnceWith(
+    'directory',
+    '/fixture',
+    'international'
+  );
+  expect(api.installPlugin).toHaveBeenCalledExactlyOnceWith(updateCandidate.token);
+  expect(api.cancelPlugin).toHaveBeenCalledExactlyOnceWith(updateCandidate.token);
+  expect(approve).not.toHaveBeenCalled();
+  expect(api.setPluginEnabled).not.toHaveBeenCalled();
+  expect(store.getState().installed).toEqual([updated]);
+  expect(store.getState().busy).toBe(false);
+});
+
+it('does not install an unchanged version and cleans up its reviewed candidate', async () => {
+  store.setState({ installed: [plugin] });
+  vi.mocked(api.previewPlugin).mockResolvedValue({ ...updateCandidate, manifest: plugin.manifest });
+  const approve = vi.fn();
+  await expect(store.getState().update(plugin.id, approve)).resolves.toBe('current');
+  expect(api.installPlugin).not.toHaveBeenCalled();
+  expect(approve).not.toHaveBeenCalled();
+  expect(api.cancelPlugin).toHaveBeenCalledExactlyOnceWith(updateCandidate.token);
+});
+
+it('leaves the installed version intact when newly requested permissions are declined', async () => {
+  store.setState({ installed: [plugin] });
+  const candidate = {
+    ...updateCandidate,
+    manifest: {
+      ...updateCandidate.manifest,
+      echobird: {
+        ...updateCandidate.manifest.echobird,
+        permissions: ['model.request', 'clipboard.write'],
+      },
+    },
+  };
+  vi.mocked(api.previewPlugin).mockResolvedValue(candidate);
+  const approve = vi.fn(async () => false);
+  await expect(store.getState().update(plugin.id, approve)).resolves.toBe('cancelled');
+  expect(approve).toHaveBeenCalledExactlyOnceWith(candidate);
+  expect(api.installPlugin).not.toHaveBeenCalled();
+  expect(api.cancelPlugin).toHaveBeenCalledExactlyOnceWith(candidate.token);
+  expect(store.getState().installed).toEqual([plugin]);
+});
+
+it('rejects a mismatched update identity before installation or permission approval', async () => {
+  store.setState({ installed: [plugin] });
+  vi.mocked(api.previewPlugin).mockResolvedValue({
+    ...updateCandidate,
+    manifest: { ...updateCandidate.manifest, publisher: 'other' },
+  });
+  const approve = vi.fn();
+  await expect(store.getState().update(plugin.id, approve)).rejects.toThrow('identity');
+  expect(api.installPlugin).not.toHaveBeenCalled();
+  expect(approve).not.toHaveBeenCalled();
+  expect(api.cancelPlugin).toHaveBeenCalledExactlyOnceWith(updateCandidate.token);
+  expect(store.getState().installed).toEqual([plugin]);
+});
+
+it('cancels a late update preview after pausing and resuming without installing it', async () => {
+  store.setState({ installed: [plugin] });
+  let resolve!: (value: PluginCandidate) => void;
+  vi.mocked(api.previewPlugin).mockReturnValueOnce(new Promise((done) => (resolve = done)));
+  const pending = store.getState().update(plugin.id, vi.fn());
+  useNavigationStore.getState().setDeveloperMode(false);
+  useNavigationStore.getState().setDeveloperMode(true);
+  resolve(updateCandidate);
+  await expect(pending).resolves.toBe('cancelled');
+  expect(api.installPlugin).not.toHaveBeenCalled();
+  expect(api.cancelPlugin).toHaveBeenCalledExactlyOnceWith(updateCandidate.token);
+  expect(store.getState().installed).toEqual([plugin]);
+  expect(store.getState().busy).toBe(false);
+});
+
+it('checks the current regional catalog before previewing an update', async () => {
+  const registry: PluginRegistry = {
+    schemaVersion: 1,
+    name: 'Fixture',
+    plugins: [
+      {
+        id: plugin.id,
+        repository: plugin.manifest.repository,
+        releases: [
+          {
+            manifest: plugin.manifest,
+            commit: 'a'.repeat(40),
+            sha256: 'b'.repeat(64),
+            downloads: {},
+          },
+        ],
+      },
+    ],
+  };
+  store.setState({ installed: [plugin], registry, region: 'china' });
+  vi.mocked(api.getPluginRegistry).mockResolvedValue(registry);
+  await expect(store.getState().update(plugin.id, vi.fn())).resolves.toBe('current');
+  expect(api.getPluginRegistry).toHaveBeenCalledExactlyOnceWith('china', true);
+  expect(api.previewPlugin).not.toHaveBeenCalled();
+  expect(api.installPlugin).not.toHaveBeenCalled();
 });

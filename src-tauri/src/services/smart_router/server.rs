@@ -32,6 +32,9 @@ mod standby_probe;
 #[path = "standby_route_tests.rs"]
 mod standby_route_tests;
 #[cfg(test)]
+#[path = "statistics_integration_tests.rs"]
+mod statistics_integration_tests;
+#[cfg(test)]
 #[path = "switch_tests.rs"]
 mod switch_tests;
 
@@ -184,6 +187,8 @@ pub(crate) fn public_activity() -> PublicActivity {
 
 #[derive(Clone)]
 struct AppState {
+    request_statistics: Option<Arc<super::statistics::Request>>,
+    statistics_collector: Option<Arc<super::statistics::Collector>>,
     config_path: PathBuf,
     protection_settings_path: PathBuf,
     model_id: String,
@@ -227,6 +232,8 @@ impl AppState {
         let standby = Arc::new(standby::Standby::new());
         standby::register(&config_path, &standby);
         Ok(Self {
+            request_statistics: None,
+            statistics_collector: None,
             config_path,
             protection_settings_path: crate::utils::platform::echobird_dir().join("settings.json"),
             model_id: SMART_ROUTER_MODEL_ID.into(),
@@ -255,6 +262,8 @@ impl AppState {
             .build()
             .map_err(|e| format!("reqwest client build failed: {e}"))?;
         Ok(Self {
+            request_statistics: None,
+            statistics_collector: None,
             config_path: super::config_path(),
             protection_settings_path: std::env::temp_dir()
                 .join(format!("router-settings-{}.json", uuid::Uuid::new_v4())),
@@ -783,25 +792,66 @@ async fn protected_route(
     candidates: Vec<Candidate>,
     protocol: ClientProtocol,
 ) -> Response {
-    let protection = match prepare_protection(state, &mut body).await {
+    let group = state
+        .config_path
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .unwrap_or(SMART_ROUTER_INTERNAL_ID);
+    let statistics = state.statistics_collector.as_ref().map_or_else(
+        || super::statistics::begin(group),
+        |collector| collector.begin(group),
+    );
+    let mut completion = statistics
+        .as_ref()
+        .map(|request| super::statistics::Completion {
+            request: request.clone(),
+            response_ok: false,
+            response_ready: false,
+            done: false,
+        });
+    let mut state = state.clone();
+    state.request_statistics = statistics.clone();
+    let protection = match prepare_protection(&state, &mut body).await {
         Ok(protection) => protection,
         Err(error) => {
+            if let Some(completion) = &mut completion {
+                completion.request.finish(false, false);
+                completion.done = true;
+            }
             return match protocol {
                 ClientProtocol::Messages => anthropic_error(StatusCode::SERVICE_UNAVAILABLE, error),
                 _ => openai_error(StatusCode::SERVICE_UNAVAILABLE, error),
-            }
+            };
         }
     };
+    if let (Some(statistics), Some(protection)) = (&statistics, &protection) {
+        statistics.protections(protection.categories());
+    }
     let response = match protocol {
-        ClientProtocol::Chat => route_chat_with_candidates(state, headers, body, candidates).await,
+        ClientProtocol::Chat => route_chat_with_candidates(&state, headers, body, candidates).await,
         ClientProtocol::Responses => {
-            route_responses_with_candidates(state, headers, body, candidates).await
+            route_responses_with_candidates(&state, headers, body, candidates).await
         }
         ClientProtocol::Messages => {
-            route_messages_with_candidates(state, headers, body, candidates).await
+            route_messages_with_candidates(&state, headers, body, candidates).await
         }
     };
-    restore_protection(protection, response).await
+    let response = restore_protection(protection, response).await;
+    let Some(mut completion) = completion else {
+        return response;
+    };
+    completion.response_ok = response.status().is_success();
+    completion.response_ready = true;
+    completion.request.response_ready();
+    if !completion.response_ok {
+        completion.error();
+    }
+    let (parts, body) = response.into_parts();
+    let body = body.map_err(move |error| {
+        completion.error();
+        error
+    });
+    Response::from_parts(parts, Body::new(body))
 }
 
 async fn prepare_protection(
@@ -809,10 +859,11 @@ async fn prepare_protection(
     body: &mut Value,
 ) -> Result<Option<content_protection::Protection>, &'static str> {
     if content_protection::enabled(&state.protection_settings_path).await? {
-        content_protection::Protection::prepare(
+        content_protection::Protection::prepare_tracked(
             body,
             &state.config_path,
             &state.protection_settings_path,
+            state.request_statistics.is_some(),
         )
         .await
         .map(Some)
@@ -1533,6 +1584,21 @@ async fn route_with_policy(
             break;
         };
         let mut upstream_body = body.clone();
+        if !authentication_retried {
+            if let Some(statistics) = &state.request_statistics {
+                let group = state
+                    .config_path
+                    .file_stem()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or(SMART_ROUTER_INTERNAL_ID);
+                statistics.attempt(
+                    group,
+                    &candidate.internal_id,
+                    &candidate.model_id,
+                    candidate.account_source.as_ref(),
+                );
+            }
+        }
         upstream_body["model"] = Value::String(candidate.model_id.clone());
         let activity_guard =
             RouteActivityGuard::begin_for(&candidate.internal_id, state.activity.clone());
@@ -1586,6 +1652,18 @@ async fn route_with_policy(
             }
         };
 
+        response = match &state.statistics_collector {
+            Some(collector) => collector.observe(
+                response,
+                state.request_statistics.as_ref(),
+                &candidate.internal_id,
+            ),
+            None => super::statistics::observe(
+                response,
+                state.request_statistics.as_ref(),
+                &candidate.internal_id,
+            ),
+        };
         let rejected_credentials = (!authentication_retried)
             .then(|| {
                 response
@@ -3194,7 +3272,13 @@ fn mark_upstream_failure(
     retry_after: Option<Duration>,
     model_scope: bool,
 ) -> Option<FailureClass> {
-    let failure = classify_failure(status, body)?;
+    let failure = classify_failure(status, body);
+    let Some(failure) = failure else {
+        if let Some(statistics) = &state.request_statistics {
+            statistics.outcome(&candidate.internal_id, Some(5));
+        }
+        return None;
+    };
     let reset_at_ms = if model_scope
         && candidate.account_source.as_ref().is_some_and(|source| {
             crate::services::plugin_accounts::application(source.provider).is_some()
@@ -3440,6 +3524,9 @@ fn bind_attempt_credentials(state: &AppState, candidate: &Candidate, credentials
 }
 
 fn mark_success(state: &AppState, candidate: &Candidate) {
+    if let Some(statistics) = &state.request_statistics {
+        statistics.outcome(&candidate.internal_id, None);
+    }
     let Ok(mut memory) = state.route_memory.lock() else {
         return;
     };
@@ -3519,6 +3606,17 @@ fn mark_failure_until(
     model_scope: bool,
     reset_at_ms: Option<u64>,
 ) {
+    if let Some(statistics) = &state.request_statistics {
+        let category = match failure {
+            FailureClass::RateLimit => 0,
+            FailureClass::Authentication => 1,
+            FailureClass::Billing => 2,
+            FailureClass::ModelUnavailable => 3,
+            FailureClass::Transient => 4,
+            FailureClass::RequestIncompatible => 5,
+        };
+        statistics.outcome(&candidate.internal_id, Some(category));
+    }
     if failure == FailureClass::RequestIncompatible {
         return;
     }
@@ -4011,6 +4109,7 @@ fn mark_response_failure(
         let body = json!({"error":{"message":proxy.message,"code":proxy.error_code,"type":proxy.error_type}}).to_string();
         is_continuation_failure(proxy.status, body.as_bytes())
     }) {
+        if let Some(statistics) = &state.request_statistics { statistics.outcome(&candidate.internal_id, Some(5)); }
         return None;
     }
     mark_stream_failure(state, candidate, error)

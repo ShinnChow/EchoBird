@@ -76,6 +76,27 @@ fn provider_contributions_reference_a_page_and_unique_application_targets() {
     );
 }
 
+#[tokio::test]
+async fn installing_a_new_version_preserves_disabled_state_on_disk() {
+    let fixture = Fixture::new();
+    let first = fixture.preview().await;
+    assert!(fixture.manager.install(&first.token).unwrap()[0].enabled);
+    fixture.manager.set_enabled("fixture.game", false).unwrap();
+    let mut manifest = manifest_value();
+    manifest["version"] = json!("1.1.0");
+    fs::write(
+        fixture.source.join("package.json"),
+        serde_json::to_vec(&manifest).unwrap(),
+    )
+    .unwrap();
+    let next = fixture.preview().await;
+    let installed = fixture.manager.install(&next.token).unwrap();
+    assert_eq!(installed[0].manifest.version, "1.1.0");
+    assert!(!installed[0].enabled);
+    let reopened = PluginManager::new(fixture.root.join("storage"));
+    assert!(!reopened.list().unwrap()[0].enabled);
+}
+
 #[test]
 fn account_worker_requires_permission_and_declared_operations() {
     let mut value = manifest_value();

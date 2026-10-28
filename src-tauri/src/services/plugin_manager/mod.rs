@@ -291,7 +291,7 @@ impl PluginManager {
             id: manifest.id(),
             icon: packages::icon(&destination, &manifest),
             manifest,
-            enabled: previous.as_ref().is_none_or(|plugin| plugin.enabled),
+            enabled: previous.as_ref().map_or(true, |plugin| plugin.enabled),
             directory,
             source: candidate.source,
             revision: candidate.revision,

@@ -77,13 +77,16 @@ pub fn command_allowed(command: &str) -> bool {
         && !matches!(command, "plugin_cancel" | "plugin_window_control"))
         || matches!(
             command,
-            "get_smart_router_statistics" | "get_smart_router_statistics_catalog"
+            "get_smart_router_statistics"
+                | "get_smart_router_statistics_catalog"
+                | "get_smart_router_token_credits"
         );
     !developer_command || token().is_ok()
 }
 
 pub fn configure(app: &tauri::AppHandle, enabled: bool) {
     gate().configure(enabled);
+    super::smart_router::statistics::configure(enabled);
     if !enabled {
         app.state::<super::plugin_runtime::PluginRuntime>()
             .pause(app);

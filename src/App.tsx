@@ -27,6 +27,12 @@ import { useAutoClaimRewards } from './hooks/useAutoClaimRewards';
 import { useToolsStore } from './stores/toolsStore';
 import { useNavigationStore } from './stores/navigationStore';
 import { DeveloperTitleActions } from './pages/Developer';
+const PetsMain = lazy(() =>
+  import('./pages/Pets/Pets').then((module) => ({ default: module.PetsMain }))
+);
+const PetsPanel = lazy(() =>
+  import('./pages/Pets/Pets').then((module) => ({ default: module.PetsPanel }))
+);
 import { PluginHubMain, PluginHubPanel } from './pages/PluginHub';
 
 // Shared providers remain mounted; display modules load on first use.
@@ -494,6 +500,13 @@ function AppContent() {
                                     </OnFirstVisit>
                                   </div>
 
+                                  {developerMode && is('developer') && developerTab === 'pets' && (
+                                    <div className={pageBlock(true)}>
+                                      <OnFirstVisit active>
+                                        <PetsMain />
+                                      </OnFirstVisit>
+                                    </div>
+                                  )}
                                   <div
                                     className={pageBlock(
                                       developerMode && is('developer') && developerTab === 'plugins'
@@ -552,6 +565,13 @@ function AppContent() {
                               </main>
 
                               <aside className="flex flex-col">
+                                {developerMode && is('developer') && developerTab === 'pets' && (
+                                  <div className={page(true)}>
+                                    <OnFirstVisit active>
+                                      <PetsPanel />
+                                    </OnFirstVisit>
+                                  </div>
+                                )}
                                 <div
                                   className={page(
                                     developerMode && is('developer') && developerTab === 'plugins'

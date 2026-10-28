@@ -7,6 +7,9 @@ pub(super) async fn check(
     mut candidate: Candidate,
     protocol: RouteProtocol,
 ) -> bool {
+    let mut state = state.clone();
+    state.request_statistics = None;
+    let state = &state;
     if !try_begin_attempt(state, &mut candidate) {
         return false;
     }

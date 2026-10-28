@@ -301,6 +301,10 @@ list of major upstream projects:
   - lucide-react (ISC)               https://lucide.dev
   - Rust crates listed in Cargo.toml — see each crate's own license
   - npm packages listed in package.json — see each package's own license
+  - @kongyo2/cards-css (MIT), Copyright (c) 2026 kongyo2
+    https://github.com/kongyo2/cards-css — public/licenses/cards-css-LICENSE.txt
+  - three.js (MIT), Copyright © 2010-2025 three.js authors
+    https://threejs.org — public/licenses/three-LICENSE.txt
   - free-llm-api-hub catalog data (MIT)
     Copyright (c) 2026 Paco Cartones
     https://github.com/pacocartones/free-llm-api-hub

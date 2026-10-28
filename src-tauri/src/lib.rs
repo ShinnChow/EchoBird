@@ -1368,6 +1368,9 @@ pub fn run() {
             model_commands::get_zhipu_team_access,
             model_commands::save_zhipu_team_access,
             smart_router_commands::get_smart_router_config,
+            smart_router_commands::get_smart_router_statistics,
+            smart_router_commands::get_smart_router_token_credits,
+            smart_router_commands::get_smart_router_statistics_catalog,
             smart_router_commands::list_smart_routers,
             smart_router_commands::get_smart_router_settings,
             smart_router_commands::get_smart_router_available_port,
@@ -1482,6 +1485,7 @@ pub fn run() {
                     // Otherwise, let it close normally
                 }
                 tauri::RunEvent::Exit => {
+                    services::smart_router::statistics::shutdown();
                     services::voice_input::shutdown(app_handle);
                     // Clean up llama-server (our spawned local LLM). The
                     // codex launcher we don't touch — if it's still running
