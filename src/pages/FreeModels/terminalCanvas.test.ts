@@ -4,6 +4,85 @@ import type { TerminalSegment } from '../../api/routerTerminal';
 
 afterEach(() => vi.unstubAllGlobals());
 
+it('samples recent secrets ahead of bulk text and skips stale rows after a delayed frame', () => {
+  let callback!: FrameRequestCallback;
+  const painted: string[] = [];
+  const context = {
+    setTransform: vi.fn(),
+    fillRect: vi.fn(),
+    strokeRect: vi.fn(),
+    clearRect: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    beginPath: vi.fn(),
+    rect: vi.fn(),
+    clip: vi.fn(),
+    measureText: (text: string) => ({ width: text.length * 8 }),
+    fillText: (text: string) => painted.push(text),
+  };
+  vi.stubGlobal('window', { devicePixelRatio: 1 });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
+  vi.stubGlobal('requestAnimationFrame', (next: FrameRequestCallback) => {
+    callback = next;
+    return 1;
+  });
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  const plain = (text: string): TerminalSegment[] => [{ text, protectedText: null, kind: null }];
+  const pending = {
+    current: [
+      ...Array.from({ length: 64 }, (_, i) => plain(`old-bulk-${i}`)),
+      [{ text: 'latest-secret', protectedText: '{{SECRET_latest}}', kind: 0 }],
+    ],
+  };
+  const playback = { current: { group: 'one', generation: 0, realtime: true, protection: false } };
+  const stop = animateTerminal(
+    {
+      getContext: () => context,
+      getBoundingClientRect: () => ({ width: 600, height: 300 }),
+    } as unknown as HTMLCanvasElement,
+    pending,
+    '[protected]',
+    'waiting',
+    playback
+  )!;
+  let now = 0;
+  const advance = (duration: number) => {
+    for (let i = 0; i < duration; i += 50) {
+      now += 50;
+      painted.length = 0;
+      callback(now);
+    }
+  };
+  advance(1800);
+  expect(painted).toContain('latest-secret');
+  // Wall-clock freshness must also hold when animation frames were suspended.
+  now += 60_000;
+  callback(now);
+  advance(7500);
+  expect(painted.some((text) => text.includes('old-bulk-'))).toBe(false);
+  pending.current.push(plain('current-request'));
+  advance(1800);
+  expect(painted.join('')).toContain('current-request');
+  pending.current = [
+    plain('keep-visible'),
+    ...Array.from({ length: 3 }, (_, i) => plain(`stale-queued-${i + 1}`)),
+  ];
+  advance(600);
+  now += 60_000;
+  callback(now);
+  advance(2500);
+  expect(painted.join('')).not.toContain('stale-queued-3');
+  expect(painted.join('')).toContain('keep-visible');
+  expect(context.clearRect).not.toHaveBeenCalled();
+  stop();
+});
+
 it('keeps the same moving rows across protection toggles and group changes', () => {
   const painted: string[] = [];
   let callback: FrameRequestCallback;

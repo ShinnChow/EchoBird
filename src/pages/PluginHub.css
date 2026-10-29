@@ -115,6 +115,22 @@
   flex-shrink: 0;
   margin-right: 12px;
 }
+.ph-region > button.ph-source-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ph-secondary);
+  transition: color 0.15s;
+}
+.ph-region > .ph-source-link:hover,
+.ph-region > .ph-source-link:focus-visible {
+  color: rgb(var(--accent-rgb));
+}
 .ph-region-menu {
   left: 0;
   right: auto;

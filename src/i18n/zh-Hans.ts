@@ -848,7 +848,7 @@ const zhHans: Partial<Translations> = {
   'statistics.recent': '最近',
   'statistics.paused': '已暂停',
   'statistics.privacy':
-    '本机记录调用、保护次数与 Token 用量，不保存正文或访问凭据。明细保留 14 天，TokenPet 累计账本长期保留。可在「设置 → 通用」关闭「开发者预览」以停止记录并减少资源开销。',
+    '本机记录调用、保护次数与 Token 用量，不保存正文或访问凭据。明细保留 14 天，宠物养成用的 TokenPet 由智能接入 Token 消耗转换累计账本长期保留。「开发者预览」可在「设置 → 通用」关闭，以停止记录并减少资源开销。',
   'statistics.cancelled': '已取消',
   'statistics.storageError': '保存失败，新增统计暂存在内存中',
   'statistics.capped': '已达到本机统计上限，部分来源未计入',

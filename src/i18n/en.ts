@@ -910,7 +910,7 @@ const en: Translations = {
   'statistics.recent': 'Recent',
   'statistics.paused': 'Paused',
   'statistics.privacy':
-    'Local call/protection counts and reported token usage; no content or credentials stored. Details are retained for 14 days; the cumulative TokenPet ledger is retained long term. Disable Developer preview in Settings → GENERAL to stop recording and reduce resource use.',
+    'Local call/protection counts and reported token usage; no content or credentials stored. Details are retained for 14 days. TokenPet for pet progression is earned from Smart Access token usage, and its cumulative ledger is retained long term. Disable Developer preview in Settings → GENERAL to stop recording and reduce resource use.',
   'statistics.cancelled': 'Cancelled',
   'statistics.storageError': 'New counts could not be saved; they remain in memory.',
   'statistics.capped': 'The local statistics limit was reached; some sources were not counted.',

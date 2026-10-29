@@ -109,7 +109,7 @@ it('ignores late responses from the previous group and keeps the new queue', asy
   expect(mocks.stop).toHaveBeenCalledWith(oldSession);
 });
 
-it('keeps rows on a temporary read failure and recovers on the next read', async () => {
+it('resumes demo on a read failure and recovers on the next read', async () => {
   mocks.poll.mockResolvedValueOnce([row]).mockRejectedValueOnce(new Error('fixture'));
   await act(async () => {
     view = create(<Probe group="one" active />);
@@ -118,7 +118,8 @@ it('keeps rows on a temporary read failure and recovers on the next read', async
     await vi.advanceTimersByTimeAsync(600);
   });
   expect(feed.error).toBe(true);
-  expect(feed.pending.current).toEqual([row]);
+  expect(feed.pending.current).toEqual([]);
+  expect(feed.realtime).toBe(false);
   await act(async () => {
     await vi.advanceTimersByTimeAsync(600);
   });
@@ -176,7 +177,7 @@ it('shares pending protection across group remounts and prevents duplicate saves
   expect(view.root.findByProps({ role: 'switch' }).props['aria-checked']).toBe(false);
 });
 
-it('labels demo before real input, stays live after an idle poll, and resets the label on group switch', async () => {
+it('resumes demo on the first idle poll and accepts fresh real input without remounting', async () => {
   await act(async () => {
     view = create(<Probe group="one" active />);
   });
@@ -189,12 +190,18 @@ it('labels demo before real input, stays live after an idle poll, and resets the
   await act(async () => {
     await vi.advanceTimersByTimeAsync(600);
   });
+  expect(feed.realtime).toBe(false);
+  expect(feed.pending.current).toEqual([]);
+  mocks.poll.mockResolvedValueOnce([row]);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(600);
+  });
   expect(feed.realtime).toBe(true);
   await act(async () => view.update(<Probe group="two" active />));
   expect(feed.realtime).toBe(false);
 });
 
-it('hides the demo notice after real input and keeps it hidden during an idle poll', async () => {
+it('restores the demo notice as soon as real input stops', async () => {
   await act(async () => {
     view = create(<RouterTerminal />);
   });
@@ -209,6 +216,22 @@ it('hides the demo notice after real input and keeps it hidden during an idle po
   await act(async () => {
     await vi.advanceTimersByTimeAsync(600);
   });
-  expect(view.root.findAllByProps({ role: 'status' })).toHaveLength(0);
+  expect(view.root.findByProps({ role: 'status' }).children).toContain(
+    'freeModels.terminal.demoNotice'
+  );
   expect(mocks.save).not.toHaveBeenCalled();
+});
+
+it('replaces undisplayed input with the latest poll instead of replaying the backlog', async () => {
+  mocks.poll.mockResolvedValueOnce(Array.from({ length: 64 }, () => row));
+  await act(async () => {
+    view = create(<Probe group="one" active />);
+  });
+  const latest = [{ ...row[0], text: 'latest-request' }];
+  mocks.poll.mockResolvedValueOnce([latest]);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(600);
+  });
+  expect(feed.pending.current).toEqual([latest]);
+  expect(feed.realtime).toBe(true);
 });

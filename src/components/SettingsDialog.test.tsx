@@ -153,8 +153,21 @@ it('preserves protection and shows its existing error when saving fails', async 
   expect(JSON.stringify(view.toJSON())).toContain('settings.sensitiveInfoProtectionError');
 });
 
+it('defaults developer preview on without writing settings', async () => {
+  await act(async () => {
+    view = create(<SettingsDialog {...props} />);
+  });
+  expect(developerSwitch().props['aria-checked']).toBe(true);
+  expect(useNavigationStore.getState().developerMode).toBe(true);
+  expect(mocks.save).not.toHaveBeenCalled();
+});
+
 it('persists developer mode only after an explicit change and keeps the control pending until saved', async () => {
-  mocks.get.mockResolvedValue({ locale: 'ja', sensitiveInfoProtection: true });
+  mocks.get.mockResolvedValue({
+    developerMode: false,
+    locale: 'ja',
+    sensitiveInfoProtection: true,
+  });
   await act(async () => {
     view = create(<SettingsDialog {...props} />);
   });
@@ -763,13 +776,14 @@ it.each([false, true])(
     await act(async () => {
       view = create(<SettingsDialog {...props} />);
     });
+    expect(useNavigationStore.getState().developerMode).toBe(true);
     await act(async () => developerSwitch().props.onClick());
     expect(useProtectionStore.getState().pending).toBe(true);
     await act(async () => view.update(<SettingsDialog {...props} isOpen={false} />));
     expect(useProtectionStore.getState().pending).toBe(true);
     await act(async () => finish());
     expect(useProtectionStore.getState().pending).toBe(false);
-    expect(useNavigationStore.getState().developerMode).toBe(!fails);
-    expect(mocks.save).toHaveBeenCalledOnce();
+    expect(useNavigationStore.getState().developerMode).toBe(fails);
+    expect(mocks.save).toHaveBeenCalledExactlyOnceWith({ developerMode: false });
   }
 );

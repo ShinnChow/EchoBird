@@ -12,6 +12,8 @@ export interface TerminalPlayback {
 const FONT_SIZE = 18;
 const LINE_HEIGHT = 30;
 const INTERVAL = 560;
+const MAX_QUEUED_ROWS = 4;
+const MAX_QUEUE_AGE = 2000;
 // Matches source/protection categories used by RouterStatistics.
 const COLORS = ['#8bb9dc', '#8dbda7', '#b9a7e5', '#d0b27f', '#aca8a0'];
 
@@ -28,6 +30,7 @@ interface Chunk extends TerminalSegment {
 interface Row {
   chunks: Chunk[];
   seed: number;
+  receivedAt: number;
   flipAt?: number;
 }
 
@@ -63,11 +66,11 @@ export function animateTerminal(
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
   resize();
-  const wrap = (segments: TerminalSegment[]) => {
+  const wrap = (segments: TerminalSegment[], receivedAt: number) => {
     let chunks: Chunk[] = [],
       used = 0;
     const flush = () => {
-      if (chunks.length) queued.push({ chunks, seed: Math.random() * 1000 });
+      if (chunks.length) queued.push({ chunks, seed: Math.random() * 1000, receivedAt });
       chunks = [];
       used = 0;
     };
@@ -99,7 +102,6 @@ export function animateTerminal(
       }
     }
     flush();
-    if (queued.length > 128) queued.splice(0, queued.length - 128);
   };
   const draw = (now: number) => {
     frame = requestAnimationFrame(draw);
@@ -109,10 +111,26 @@ export function animateTerminal(
       queued.length = 0;
       generation = playback.current.generation;
     }
-    for (const segments of pending.current.splice(0)) wrap(segments);
+    const incoming = pending.current.splice(0);
+    if (incoming.length) {
+      // This is a live sample, so each poll supersedes undisplayed older input.
+      queued.length = 0;
+      const overloaded = incoming.length > MAX_QUEUED_ROWS;
+      const highlights = overloaded
+        ? incoming.filter((segments) => segments.some((s) => s.protectedText))
+        : [];
+      const selected = (highlights.length ? highlights : incoming).slice(-MAX_QUEUED_ROWS);
+      for (const segments of overloaded ? selected.reverse() : selected) wrap(segments, now);
+      if (overloaded || queued.length > MAX_QUEUED_ROWS) {
+        const important = queued.filter((row) => row.chunks.some((chunk) => chunk.protectedText));
+        const sample = important.length ? important : queued;
+        queued.splice(0, queued.length, ...sample.slice(0, MAX_QUEUED_ROWS));
+      }
+    }
+    while (queued.length && now - queued[0].receivedAt >= MAX_QUEUE_AGE) queued.shift();
     if (elapsed >= next) {
       next = elapsed + INTERVAL;
-      if (!playback.current.realtime && !queued.length) wrap(terminalDemoRow());
+      if (!playback.current.realtime && !queued.length) wrap(terminalDemoRow(), now);
       rows.push(queued.shift() ?? null);
       if (rows.length > Math.ceil(height / LINE_HEIGHT) + 4) rows.shift();
     }

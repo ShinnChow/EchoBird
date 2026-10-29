@@ -107,6 +107,7 @@ export function RouterTerminal() {
           <RoutingToggle
             className="router-terminal-protection"
             label={t('settings.sensitiveInfoProtection')}
+            hint={t('settings.sensitiveInfoProtectionHint')}
             checked={enabled === true}
             disabled={!ready}
             pending={saving}

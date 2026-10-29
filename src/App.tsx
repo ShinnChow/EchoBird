@@ -228,7 +228,7 @@ function AppContent() {
     void getSettings()
       .then((settings) => {
         if (active && !useNavigationStore.getState().developerModeReady) {
-          setDeveloperMode(settings.developerMode === true);
+          setDeveloperMode(settings.developerMode !== false);
         }
       })
       .catch(() => {});

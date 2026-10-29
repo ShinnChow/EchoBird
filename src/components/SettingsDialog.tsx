@@ -173,7 +173,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             !developerChange.current.pending &&
             developerReadRevision === developerChange.current.revision
           ) {
-            setDeveloperMode(settings.developerMode === true);
+            setDeveloperMode(settings.developerMode !== false);
           }
           if (
             !protectionChange.current.pending &&

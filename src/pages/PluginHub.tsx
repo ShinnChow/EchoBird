@@ -543,8 +543,9 @@ export function PluginHubMain({ active }: { active: boolean }) {
                 ))}
               </div>
             )}
-            <PageActionButton
-              icon={ExternalLink}
+            <button
+              type="button"
+              className="ph-source-link"
               aria-label={`${t('plugins.source')}: ${t(store.region === 'china' ? 'plugins.china' : 'plugins.international')}`}
               onClick={() => {
                 setMenu(null);
@@ -554,7 +555,9 @@ export function PluginHubMain({ active }: { active: boolean }) {
                     : 'https://github.com/edison7009/echobird-plugin'
                 ).catch((error) => showToast('error', String(error)));
               }}
-            />
+            >
+              <ExternalLink size={18} aria-hidden="true" />
+            </button>
           </div>
         )}
         <div className="ph-search">

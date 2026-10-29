@@ -36,6 +36,12 @@ pub struct AppSettings {
     pub sensitive_info_protection: Option<bool>,
 }
 
+impl AppSettings {
+    pub fn developer_mode_enabled(&self) -> bool {
+        self.developer_mode.unwrap_or(true)
+    }
+}
+
 fn settings_path() -> std::path::PathBuf {
     echobird_dir().join("settings.json")
 }
@@ -74,7 +80,7 @@ pub fn save_settings(mut settings: AppSettings, app: tauri::AppHandle) -> Result
     }
     let json = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
     std::fs::write(settings_path(), json).map_err(|e| e.to_string())?;
-    crate::services::developer_preview::configure(&app, settings.developer_mode == Some(true));
+    crate::services::developer_preview::configure(&app, settings.developer_mode_enabled());
 
     // Update tray menu locale if locale changed
     if let Some(locale) = &settings.locale {
@@ -153,12 +159,19 @@ mod tests {
     use super::read_settings;
 
     #[test]
-    fn developer_mode_defaults_off_and_survives_other_settings_updates() {
+    fn developer_mode_defaults_on_and_preserves_explicit_choices() {
         let root =
             std::env::temp_dir().join(format!("developer-settings-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir(&root).unwrap();
         let path = root.join("settings.json");
-        assert_ne!(read_settings(&path).developer_mode, Some(true));
+        assert!(read_settings(&path).developer_mode_enabled());
+        assert!(!path.exists());
+        std::fs::write(&path, r#"{"locale":"ja"}"#).unwrap();
+        assert!(read_settings(&path).developer_mode_enabled());
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            r#"{"locale":"ja"}"#
+        );
         std::fs::write(&path, r#"{"developerMode":true,"locale":"ja"}"#).unwrap();
         assert_eq!(read_settings(&path).developer_mode, Some(true));
         let mut update = super::AppSettings {
@@ -173,6 +186,11 @@ mod tests {
             serde_json::to_value(update).unwrap()["developerMode"],
             false
         );
+        std::fs::write(&path, r#"{"developerMode":false}"#).unwrap();
+        assert!(!read_settings(&path).developer_mode_enabled());
+        let mut update = super::AppSettings::default();
+        super::preserve_protection_setting(&path, &mut update).unwrap();
+        assert!(!update.developer_mode_enabled());
         std::fs::remove_file(path).unwrap();
         std::fs::remove_dir(root).unwrap();
     }
@@ -183,7 +201,7 @@ mod tests {
             std::env::temp_dir().join(format!("statistics-settings-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir(&root).unwrap();
         let path = root.join("settings.json");
-        assert_ne!(read_settings(&path).developer_mode, Some(true));
+        assert!(read_settings(&path).developer_mode_enabled());
         assert!(!path.exists());
         std::fs::write(
             &path,

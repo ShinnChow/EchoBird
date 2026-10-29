@@ -32,29 +32,31 @@ export function useTerminalFeed(
     let timer: ReturnType<typeof setTimeout>;
     const stop = () => void stopRouterTerminal(session).catch(() => {});
     const poll = async () => {
+      let rows: TerminalSegment[][] = [];
       try {
-        const rows = await pollRouterTerminal(session, group);
-        if (!alive) {
-          stop();
-          return;
-        }
-        if (rows.length && !realtime) {
-          realtime = true;
-          if (playbackRef) {
-            playbackRef.current = {
-              ...playbackRef.current,
-              realtime: true,
-              generation: playbackRef.current.generation + 1,
-            };
-          }
-        }
-        setSource({ group, realtime });
-        pending.current = [...pending.current, ...rows].slice(-128);
-        setError(false);
+        rows = await pollRouterTerminal(session, group);
+        if (alive) setError(false);
       } catch {
         if (alive) setError(true);
       }
-      if (alive) timer = setTimeout(() => void poll(), 600);
+      if (!alive) {
+        stop();
+        return;
+      }
+      const nextRealtime = rows.length > 0;
+      if (nextRealtime !== realtime) {
+        realtime = nextRealtime;
+        if (playbackRef) {
+          playbackRef.current = {
+            ...playbackRef.current,
+            realtime,
+            generation: playbackRef.current.generation + 1,
+          };
+        }
+      }
+      setSource({ group, realtime });
+      pending.current = rows;
+      timer = setTimeout(() => void poll(), 600);
     };
     void poll();
     return () => {

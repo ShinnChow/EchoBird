@@ -847,7 +847,7 @@ const zhHant: Partial<Translations> = {
   'statistics.recent': '最近',
   'statistics.paused': '已暫停',
   'statistics.privacy':
-    '本機記錄呼叫、防護次數與 Token 用量，不儲存原文或存取憑證。明細保留 14 天，TokenPet 累計帳本長期保留。可在「設定 → 一般」關閉「開發者預覽」以停止記錄並減少資源開銷。',
+    '本機記錄呼叫、防護次數與 Token 用量，不儲存原文或存取憑證。明細保留 14 天，用於寵物養成的 TokenPet 由智慧接入的 Token 消耗轉換而來，累計帳本長期保留。「開發者預覽」可在「設定 → 一般」關閉，以停止記錄並減少資源開銷。',
   'statistics.cancelled': '已取消',
   'statistics.storageError': '儲存失敗，新增統計暫存在記憶體中',
   'statistics.capped': '已達到本機統計上限，部分來源未計入',

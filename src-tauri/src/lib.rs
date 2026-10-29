@@ -829,7 +829,7 @@ pub fn run() {
             let statistics_settings = settings_commands::get_settings();
             services::developer_preview::configure(
                 app.handle(),
-                statistics_settings.developer_mode == Some(true),
+                statistics_settings.developer_mode_enabled(),
             );
             // Clean up orphaned llama-server from a previous EchoBird session.
             kill_stale_llama_server();
