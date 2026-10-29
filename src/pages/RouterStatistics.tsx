@@ -129,7 +129,9 @@ function useStatisticsState() {
   }, []);
   const rows = useMemo(() => statisticsRows(snapshot, catalog, group), [snapshot, catalog, group]);
   const unusedCount = rows.filter((row) => row.enabled && row.counts.attempts === 0).length;
-  const shown = unused ? rows.filter((row) => row.enabled && row.counts.attempts === 0) : rows;
+  const shown = unused
+    ? rows.filter((row) => row.enabled && row.counts.attempts === 0)
+    : rows.filter((row) => row.counts.attempts > 0);
   const current = shown.find((row) => row.id === selected) ?? shown[0];
   return {
     days,

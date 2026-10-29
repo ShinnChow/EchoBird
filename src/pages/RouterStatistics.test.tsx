@@ -7,6 +7,7 @@ import {
 } from './RouterStatistics';
 import { useNavigationStore } from '../stores/navigationStore';
 import type { RouterStatisticsSnapshot } from '../api/routerStatistics';
+import { emptyStatisticsCounts } from './routerStatisticsData';
 
 const mocks = vi.hoisted(() => ({ snapshot: vi.fn(), catalog: vi.fn(), visible: true }));
 vi.mock('../api/routerStatistics', () => ({
@@ -294,6 +295,87 @@ it('leaves usage and details empty until real rows arrive, then shows only recor
   expect(
     view.root.findByProps({ className: 'rs-detail-identity' }).findByType('strong').children
   ).toEqual(['Configured source']);
+});
+
+it('shows only sources used in the selected period and removes all placeholders once real data arrives', async () => {
+  const source = {
+    id: 'used',
+    account: 'used-account',
+    model: 'model',
+    group: 'group',
+    name: 'DeepSeek',
+    modelName: 'deepseek-flash',
+    provider: 'api.deepseek.com',
+    enabled: true,
+  };
+  const old = Array.from({ length: 3 }, (_, index) => ({
+    id: `old-${index}`,
+    account: `old-account-${index}`,
+    model: 'old-model',
+    group: 'group',
+    lastUsedAt: Date.now() - 86400000,
+    counts: emptyStatisticsCounts(),
+  }));
+  mocks.catalog.mockResolvedValue({
+    groups: [{ id: 'group', name: 'Connection' }],
+    sources: [source],
+    capped: false,
+  });
+  mocks.snapshot.mockResolvedValue({ ...empty, rows: old });
+  await activate();
+  await mount();
+  const rows = () =>
+    view.root
+      .findAllByType('button')
+      .filter((node) => String(node.props.className).startsWith('rs-row '));
+  const refresh = () =>
+    act(async () => view.root.findByProps({ 'aria-label': 'btn.refresh' }).props.onClick());
+  expect(rows()).toHaveLength(0);
+  expect(view.root.findAllByProps({ className: 'rs-row rs-placeholder' })).toHaveLength(3);
+
+  const used = {
+    ...source,
+    lastUsedAt: Date.now(),
+    counts: { ...emptyStatisticsCounts(), attempts: 82, completed: 82 },
+  };
+  mocks.snapshot.mockResolvedValue({
+    ...empty,
+    rows: [old[0], used, ...old.slice(1)],
+    totals: { ...empty.totals, calls: 82, completed: 82 },
+  });
+  await refresh();
+  expect(rows()).toHaveLength(1);
+  expect(rows()[0].findByProps({ className: 'rs-identity' }).findByType('b').children).toEqual([
+    'DeepSeek',
+  ]);
+  expect(rows()[0].findByProps({ className: 'rs-load' }).findByType('b').children).toEqual(['82']);
+  expect(view.root.findAllByProps({ className: 'rs-row rs-placeholder' })).toHaveLength(0);
+  expect(JSON.stringify(view.toJSON())).not.toContain('statistics.archived');
+
+  // A removed source with real counts in a longer period remains valid history.
+  mocks.snapshot.mockImplementation((days) =>
+    Promise.resolve({
+      ...empty,
+      rows: [
+        used,
+        ...old.map((row, index) => ({
+          ...row,
+          counts: { ...row.counts, attempts: days === 7 && index === 0 ? 2 : 0 },
+        })),
+      ],
+    })
+  );
+  await act(async () =>
+    view.root
+      .findAllByType('button')
+      .find((node) => node.children.includes('statistics.week'))!
+      .props.onClick()
+  );
+  expect(rows()).toHaveLength(2);
+  expect(rows()[1].findByProps({ className: 'rs-identity' }).findByType('b').children).toEqual([
+    'statistics.archived',
+  ]);
+  expect(view.root.findAllByProps({ className: 'rs-row rs-placeholder' })).toHaveLength(0);
 });
 
 it('selects account and API sources from the same list without extra reads and hides both names together', async () => {
