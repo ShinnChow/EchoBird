@@ -126,3 +126,21 @@ pub(crate) async fn test_smart_router_candidate(
 pub fn cancel_smart_router_probe(request_id: String) {
     smart_router::cancel_probe(&request_id);
 }
+
+#[tauri::command]
+pub(crate) fn poll_smart_router_terminal(
+    session: String,
+    router_id: Option<String>,
+) -> Result<Vec<Vec<smart_router::terminal::Segment>>, String> {
+    if session.is_empty() || session.len() > 128 {
+        return Err("Invalid terminal session".into());
+    }
+    smart_router::profiles::checked(router_id, || {
+        smart_router::terminal::poll(&session, &smart_router::profiles::current_id())
+    })
+}
+
+#[tauri::command]
+pub fn stop_smart_router_terminal(session: String) {
+    smart_router::terminal::stop(&session);
+}

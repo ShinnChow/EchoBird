@@ -809,6 +809,7 @@ async fn protected_route(
             response_ready: false,
             done: false,
         });
+    let terminal_session = super::terminal::ticket(group);
     let mut state = state.clone();
     state.request_statistics = statistics.clone();
     let protection = match prepare_protection(&state, &mut body).await {
@@ -826,6 +827,20 @@ async fn protected_route(
     };
     if let (Some(statistics), Some(protection)) = (&statistics, &protection) {
         statistics.protections(protection.categories());
+    }
+    if let Some(session) = terminal_session {
+        super::terminal::capture(&session, group, &body, |text| {
+            protection.as_ref().map_or_else(
+                || {
+                    vec![super::terminal::Segment {
+                        text: text.into(),
+                        protected_text: None,
+                        kind: None,
+                    }]
+                },
+                |p| p.terminal_segments(text),
+            )
+        });
     }
     let response = match protocol {
         ClientProtocol::Chat => route_chat_with_candidates(&state, headers, body, candidates).await,
@@ -7126,5 +7141,61 @@ mod tests {
                     >= started + 120_000
             );
         }
+    }
+    #[tokio::test]
+    async fn terminal_observes_real_replacements_without_changing_upstream_payload() {
+        let root = std::env::temp_dir().join(format!("terminal-fixture-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        let captured = Arc::new(Mutex::new(Value::Null));
+        let addr = spawn_mock(Router::new().route(
+            "/v1/chat/completions",
+            post({
+                let captured = captured.clone();
+                move |Json(body): Json<Value>| {
+                    *captured.lock().unwrap() = body;
+                    async { Json(json!({"choices":[{"message":{"content":"ok"}}]})) }
+                }
+            }),
+        ))
+        .await;
+        let mut state = AppState::for_tests().unwrap();
+        state.http_client = reqwest::Client::builder().no_proxy().build().unwrap();
+        state.config_path = root.join("terminal-fixture.json");
+        state.protection_settings_path = root.join("settings.json");
+        state.statistics_collector =
+            Some(super::super::statistics::Collector::open(root.join("counts.json")).unwrap());
+        let group = "terminal-fixture";
+        let session = uuid::Uuid::new_v4().to_string();
+        let content = format!("{} password = DemoPass!2026", "x".repeat(226));
+        for enabled in [true, false] {
+            fs::write(
+                &state.protection_settings_path,
+                json!({"sensitiveInfoProtection":enabled}).to_string(),
+            )
+            .unwrap();
+            super::super::terminal::poll(&session, group);
+            let response = protected_route(
+                &state,
+                &HeaderMap::new(),
+                json!({"model":"auto","messages":[{"role":"user","content":content}]}),
+                vec![candidate(addr, "fixture")],
+                ClientProtocol::Chat,
+            )
+            .await;
+            assert_eq!(response.status(), StatusCode::OK);
+            let _ = response.into_body().collect().await.unwrap();
+            let rows = super::super::terminal::poll(&session, group);
+            assert!(!rows.is_empty());
+            let segments: Vec<_> = rows.iter().flatten().collect();
+            let displayed: String = segments.iter().map(|s| s.text.as_str()).collect();
+            assert!(displayed.contains("DemoPass!2026"), "enabled={enabled}");
+            assert_eq!(segments.iter().any(|s| s.protected_text.is_some()), enabled);
+            let sent = captured.lock().unwrap().to_string();
+            assert_eq!(sent.contains("DemoPass!2026"), !enabled);
+            assert_eq!(sent.contains("{{SECRET_"), enabled);
+        }
+        super::super::terminal::stop(&session);
+        assert!(super::super::terminal::ticket(group).is_none());
+        fs::remove_dir_all(root).unwrap();
     }
 }

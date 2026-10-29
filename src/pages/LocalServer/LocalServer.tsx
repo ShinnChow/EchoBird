@@ -1205,9 +1205,14 @@ export const LocalServerPanel: React.FC = () => {
   );
 
   // Rescan models after download completes
+  const completedDownloads = useRef(new Set<string>());
   useEffect(() => {
-    const hasCompleted = Array.from(downloads.values()).some((d) => d.status === 'completed');
-    if (hasCompleted) rescanModels();
+    const completed = new Set(
+      [...downloads].filter(([, download]) => download.status === 'completed').map(([id]) => id)
+    );
+    const hasNewCompletion = [...completed].some((id) => !completedDownloads.current.has(id));
+    completedDownloads.current = completed;
+    if (hasNewCompletion) rescanModels();
   }, [downloads, rescanModels]);
 
   // GPU info — VRAM size drives runtime defaults, Compute option, and model-card fitness colors

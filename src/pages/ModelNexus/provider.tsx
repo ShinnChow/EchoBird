@@ -196,7 +196,6 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
   const [testInput, setTestInput] = useState('');
   const [testOutput, setTestOutput] = useState<string[]>([]);
   const [isTesting, setIsTesting] = useState(false);
-  const [arrowIndex, setArrowIndex] = useState(0);
   const [modelLatencies, setModelLatencies] = useState<Record<string, number>>({});
   const [modelTerminals, setModelTerminals] = useState<
     Record<string, { input: string; output: string[] }>
@@ -240,15 +239,6 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
       });
     }
   }, [newModelForm.baseUrl, newModelForm.anthropicUrl]);
-
-  // Marquee animation
-  useEffect(() => {
-    if (!isTesting) return;
-    const timer = setInterval(() => {
-      setArrowIndex((prev) => (prev + 1) % 4);
-    }, 200);
-    return () => clearInterval(timer);
-  }, [isTesting]);
 
   // Listen for model selection change - auto restore terminal history and focus
   useEffect(() => {
@@ -550,7 +540,6 @@ export function ModelNexusProvider({ children }: { children: React.ReactNode }) 
         testOutput,
         setTestOutput,
         isTesting,
-        arrowIndex,
         testProtocol,
         setTestProtocol,
         modelLatencies,

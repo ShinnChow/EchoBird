@@ -25,6 +25,7 @@ const { confirm, showToast, edit, updateUserModel, drag } = vi.hoisted(() => ({
   updateUserModel: vi.fn(),
   drag: vi.fn(),
 }));
+vi.mock('./RouterTerminal', () => ({ RouterTerminal: () => <div data-testid="terminal" /> }));
 vi.mock('../../hooks/useI18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 vi.mock('../../components', () => ({ getModelIcon: () => null }));
 vi.mock('../../components/LatencyIndicator', () => ({
@@ -161,7 +162,7 @@ describe('Smart Router list layout and candidate pause', () => {
       );
     });
   }
-  async function layout(mode: 'cards' | 'list') {
+  async function layout(mode: 'cards' | 'list' | 'terminal') {
     const button = renderer.root.findByProps({ 'aria-label': `freeModels.layout.${mode}` });
     await act(async () => button.props.onClick());
   }
@@ -372,6 +373,9 @@ describe('Smart Router list layout and candidate pause', () => {
     expect(replies).toHaveLength(3);
     await act(async () => useNavigationStore.getState().setActivePage('freeModels'));
     expect(buttons('btn.pingAll')[0].props['aria-busy']).toBe(true);
+    await layout('terminal');
+    expect(renderer.root.findByProps({ 'data-testid': 'terminal' })).toBeDefined();
+    expect(routerProbe.cancelSmartRouterProbe).not.toHaveBeenCalled();
     await layout('cards');
     await layout('list');
     expect(buttons('btn.pingAll')[0].props['aria-busy']).toBe(true);
@@ -495,11 +499,13 @@ describe('Smart Router list layout and candidate pause', () => {
       'freeModels.hideAccountNames',
       'freeModels.layout.cards',
       'freeModels.layout.list',
+      'freeModels.layout.terminal',
       'freeModels.help',
     ]);
-    expect(group.findAllByType('svg')).toHaveLength(2);
+    expect(group.findAllByType('svg')).toHaveLength(3);
     expect(group.findAllByType('button').map((node) => node.props['aria-pressed'])).toEqual([
       true,
+      false,
       false,
     ]);
     expect(JSON.stringify(renderer.toJSON())).not.toMatch(/freeModels\.(view|super)\./);
@@ -566,7 +572,7 @@ describe('Smart Router list layout and candidate pause', () => {
     expect(accountApi.getAccountProxyModels).not.toHaveBeenCalled();
   });
 
-  it('keeps activity polling across layouts and stops it on leaving the page', async () => {
+  it('shares polling across cards/list, pauses in terminal and resumes on return without writes', async () => {
     vi.useFakeTimers();
     vi.stubGlobal('window', { setInterval, clearInterval, setTimeout });
     await open();
@@ -582,13 +588,21 @@ describe('Smart Router list layout and candidate pause', () => {
       vi.advanceTimersByTime(750);
     });
     expect(api.getSmartRouterActivity).toHaveBeenCalledTimes(3);
+    await layout('terminal');
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(api.getSmartRouterActivity).toHaveBeenCalledTimes(3);
+    await layout('list');
+    expect(api.getSmartRouterActivity).toHaveBeenCalledTimes(4);
+    expect(rows()).toHaveLength(3);
     await act(async () => useNavigationStore.getState().setActivePage('models'));
     await act(async () => {
       vi.advanceTimersByTime(1500);
     });
-    expect(api.getSmartRouterActivity).toHaveBeenCalledTimes(3);
-    await act(async () => useNavigationStore.getState().setActivePage('freeModels'));
     expect(api.getSmartRouterActivity).toHaveBeenCalledTimes(4);
+    await act(async () => useNavigationStore.getState().setActivePage('freeModels'));
+    expect(api.getSmartRouterActivity).toHaveBeenCalledTimes(5);
     expect(api.setSmartRouterCandidateEnabled).not.toHaveBeenCalled();
     expect(api.setSmartRouterCandidates).not.toHaveBeenCalled();
     expect(api.removeSmartRouterCandidate).not.toHaveBeenCalled();
@@ -596,6 +610,25 @@ describe('Smart Router list layout and candidate pause', () => {
     expect(modelApi.fetchUpstreamModelCatalog).not.toHaveBeenCalled();
     expect(confirm).not.toHaveBeenCalled();
     expect(showToast).not.toHaveBeenCalled();
+    noModelWrites();
+  });
+
+  it('only schedules card geometry while the card view is visible', async () => {
+    const schedule = vi.fn(() => 1);
+    vi.stubGlobal('requestAnimationFrame', schedule);
+    await open();
+    expect(schedule).toHaveBeenCalled();
+    const initial = schedule.mock.calls.length;
+    await layout('terminal');
+    await layout('list');
+    expect(schedule).toHaveBeenCalledTimes(initial);
+    await layout('cards');
+    expect(schedule.mock.calls.length).toBeGreaterThan(initial);
+    const resumed = schedule.mock.calls.length;
+    await act(async () => useNavigationStore.getState().setActivePage('models'));
+    expect(schedule).toHaveBeenCalledTimes(resumed);
+    await act(async () => useNavigationStore.getState().setActivePage('freeModels'));
+    expect(schedule.mock.calls.length).toBeGreaterThan(resumed);
     noModelWrites();
   });
 

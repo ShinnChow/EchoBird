@@ -839,3 +839,27 @@ async fn unreadable_protection_fails_before_upstream_and_authentication_precedes
     }
     std::fs::remove_dir(root).unwrap();
 }
+
+#[test]
+fn terminal_preview_uses_the_actual_replacement_without_mutating_payload() {
+    let store = engine();
+    let mut body = json!({"messages":[{"role":"user","content":"password = DemoPass!2026"}]});
+    let protection = protect(&mut body, &store);
+    let before = body.clone();
+    let segments = protection.terminal_segments(body["messages"][0]["content"].as_str().unwrap());
+    assert_eq!(
+        segments.iter().map(|s| s.text.as_str()).collect::<String>(),
+        "password = DemoPass!2026"
+    );
+    let sensitive = segments
+        .iter()
+        .find(|s| s.protected_text.is_some())
+        .unwrap();
+    assert_eq!(sensitive.kind, Some(2));
+    assert_eq!(
+        sensitive.protected_text.as_deref(),
+        Some(token(&store).as_str())
+    );
+    assert_eq!(body, before);
+    assert!(!body.to_string().contains("DemoPass!2026"));
+}

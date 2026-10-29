@@ -31,6 +31,7 @@ import { useRewardClaimStore } from '../stores/rewardClaimStore';
 import { RoutingToggle } from './RoutingToggle';
 import { ToggleSwitch } from './ToggleSwitch';
 import { useNavigationStore } from '../stores/navigationStore';
+import { useProtectionStore } from '../stores/protectionStore';
 import { usePluginProductStore } from '../stores/pluginProductStore';
 
 // All supported locales
@@ -73,9 +74,22 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const [closeToTray, setCloseToTray] = useState<boolean | null>(false);
   const [settingsReady, setSettingsReady] = useState(false);
   const [protectionEnabled, setProtectionEnabled] = useState(false);
-  const [protectionPending, setProtectionPending] = useState(false);
+  const protectionPending = useProtectionStore((s) => s.pending);
+  const setProtectionPending = (pending: boolean) => useProtectionStore.setState({ pending });
   const [protectionError, setProtectionError] = useState(false);
   const protectionChange = useRef({ revision: 0, pending: false });
+  useEffect(
+    () =>
+      useProtectionStore.subscribe((state, previous) => {
+        if (
+          state.revision !== previous.revision &&
+          state.enabled !== null &&
+          !protectionChange.current.pending
+        )
+          setProtectionEnabled(state.enabled);
+      }),
+    []
+  );
   const developerMode = useNavigationStore((state) => state.developerMode);
   const setDeveloperMode = useNavigationStore((state) => state.setDeveloperMode);
   const [developerPending, setDeveloperPending] = useState(false);
@@ -136,6 +150,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     let active = true;
     const developerReadRevision = developerChange.current.revision;
     const protectionReadRevision = protectionChange.current.revision;
+    const sharedProtectionRevision = useProtectionStore.getState().revision;
     if (isOpen) {
       void Promise.resolve().then(() => {
         if (active) {
@@ -162,7 +177,8 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
           }
           if (
             !protectionChange.current.pending &&
-            protectionReadRevision === protectionChange.current.revision
+            protectionReadRevision === protectionChange.current.revision &&
+            sharedProtectionRevision === useProtectionStore.getState().revision
           ) {
             setProtectionEnabled(settings.sensitiveInfoProtection === true);
           }
@@ -192,10 +208,16 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   }, [isOpen, setDeveloperMode]);
 
   const handleDeveloperChange = async (value: boolean) => {
-    if (!settingsReady || developerChange.current.pending || protectionChange.current.pending)
+    if (
+      !settingsReady ||
+      useProtectionStore.getState().pending ||
+      developerChange.current.pending ||
+      protectionChange.current.pending
+    )
       return;
     developerChange.current.pending = true;
     developerChange.current.revision++;
+    setProtectionPending(true);
     setDeveloperPending(true);
     setDeveloperError(false);
     try {
@@ -207,12 +229,18 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     } finally {
       developerChange.current.pending = false;
       developerChange.current.revision++;
+      setProtectionPending(false);
       setDeveloperPending(false);
     }
   };
 
   const handleProtectionChange = async (value: boolean) => {
-    if (!settingsReady || protectionChange.current.pending || developerChange.current.pending)
+    if (
+      !settingsReady ||
+      useProtectionStore.getState().pending ||
+      protectionChange.current.pending ||
+      developerChange.current.pending
+    )
       return;
     protectionChange.current.pending = true;
     protectionChange.current.revision++;
@@ -222,6 +250,8 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       const settings = await api.getSettings();
       await api.saveSettings({ ...settings, sensitiveInfoProtection: value });
       setProtectionEnabled(value);
+      useProtectionStore.getState().publish(value);
+      useProtectionStore.setState({ saveError: false });
     } catch {
       setProtectionError(true);
     } finally {

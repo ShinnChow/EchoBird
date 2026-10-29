@@ -53,7 +53,6 @@ export interface ModelNexusCtx {
   testOutput: string[];
   setTestOutput: React.Dispatch<React.SetStateAction<string[]>>;
   isTesting: boolean;
-  arrowIndex: number;
   testProtocol: 'openai' | 'anthropic';
   setTestProtocol: (v: 'openai' | 'anthropic') => void;
   modelLatencies: Record<string, number>;

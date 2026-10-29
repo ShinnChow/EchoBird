@@ -6,6 +6,7 @@ import { useUiScaleStore } from '../stores/uiScaleStore';
 import { useEasterEggStore } from '../stores/easterEggStore';
 import { useBackgroundStore } from '../stores/backgroundStore';
 import { useRewardClaimStore } from '../stores/rewardClaimStore';
+import { useProtectionStore } from '../stores/protectionStore';
 import { useNavigationStore } from '../stores/navigationStore';
 
 const mocks = vi.hoisted(() => ({ zoom: vi.fn(), save: vi.fn(), get: vi.fn() }));
@@ -28,6 +29,7 @@ let view: ReactTestRenderer;
 const props = { isOpen: true, onClose: vi.fn(), locale: 'en', onLocaleChange: vi.fn() };
 beforeEach(() => {
   vi.clearAllMocks();
+  useProtectionStore.setState({ enabled: null, revision: 0, pending: false, saveError: false });
   mocks.zoom.mockResolvedValue(undefined);
   mocks.get.mockResolvedValue({});
   mocks.save.mockResolvedValue(undefined);
@@ -734,3 +736,40 @@ it('keeps keyboard changes at ten percent with a continuous pointer range', asyn
     expect(view.root.findByProps({ id: 'ui-scale' }).props.value).toBe(expected);
   }
 });
+
+it('reflects the terminal protection control and locks settings controls while its save is pending', async () => {
+  await act(async () => {
+    view = create(<SettingsDialog {...props} />);
+  });
+  await act(async () => useProtectionStore.getState().publish(true));
+  expect(protectionSwitch().props['aria-checked']).toBe(true);
+  await act(async () => useProtectionStore.setState({ pending: true }));
+  expect(protectionSwitch().props.disabled).toBe(true);
+  expect(developerSwitch().props.disabled).toBe(true);
+  expect(mocks.save).not.toHaveBeenCalled();
+  await act(async () => useProtectionStore.setState({ pending: false }));
+});
+
+it.each([false, true])(
+  'keeps the shared settings lock after closing during a developer save and releases it on failure=%s',
+  async (fails) => {
+    let finish!: () => void;
+    mocks.save.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          finish = () => (fails ? reject(new Error('fixture')) : resolve());
+        })
+    );
+    await act(async () => {
+      view = create(<SettingsDialog {...props} />);
+    });
+    await act(async () => developerSwitch().props.onClick());
+    expect(useProtectionStore.getState().pending).toBe(true);
+    await act(async () => view.update(<SettingsDialog {...props} isOpen={false} />));
+    expect(useProtectionStore.getState().pending).toBe(true);
+    await act(async () => finish());
+    expect(useProtectionStore.getState().pending).toBe(false);
+    expect(useNavigationStore.getState().developerMode).toBe(!fails);
+    expect(mocks.save).toHaveBeenCalledOnce();
+  }
+);

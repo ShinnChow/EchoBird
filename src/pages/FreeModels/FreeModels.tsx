@@ -45,6 +45,7 @@ import {
   GripVertical,
   LayoutGrid,
   List,
+  Terminal,
   Plus,
   RefreshCw,
   SquarePen,
@@ -89,6 +90,7 @@ import { AppManagerContext } from '../AppManager/context';
 import './FreeModels.css';
 import { type RouteModelNode, providerRank, useFreeModels } from './provider';
 import { useRouteResponseTests } from './useRouteResponseTests';
+import { RouterTerminal } from './RouterTerminal';
 import { RouterGroups } from './RouterGroups';
 export { FreeModelsProvider, useFreeModels } from './provider';
 
@@ -182,14 +184,18 @@ export function FreeModelsTitleActions() {
         aria-label={t('freeModels.layout.label')}
         className="view-mode-tabs flex h-9 overflow-hidden rounded-button border border-cyber-border"
       >
-        {(['cards', 'list'] as const).map((mode) => {
-          const Icon = mode === 'cards' ? LayoutGrid : List;
+        {(['cards', 'list', 'terminal'] as const).map((mode) => {
+          const Icon = mode === 'cards' ? LayoutGrid : mode === 'list' ? List : Terminal;
           return (
             <button
               key={mode}
               type="button"
               aria-label={t(
-                mode === 'cards' ? 'freeModels.layout.cards' : 'freeModels.layout.list'
+                mode === 'cards'
+                  ? 'freeModels.layout.cards'
+                  : mode === 'list'
+                    ? 'freeModels.layout.list'
+                    : 'freeModels.layout.terminal'
               )}
               aria-pressed={layout === mode}
               disabled={activeDragId !== null}
@@ -726,15 +732,18 @@ function routeCatalogBinding(model: RouteModelNode) {
 }
 
 export function FreeModelsMain() {
-  const { activeRouterId } = useFreeModels();
+  const { activeRouterId, layout } = useFreeModels();
   const routerFocusRef = useRef(false);
   const routerTabPositionRef = useRef<ViewModeTabPosition | null>(null);
   return (
-    <FreeModelsContent
-      key={activeRouterId}
-      routerFocusRef={routerFocusRef}
-      routerTabPositionRef={routerTabPositionRef}
-    />
+    <>
+      <FreeModelsContent
+        key={activeRouterId}
+        routerFocusRef={routerFocusRef}
+        routerTabPositionRef={routerTabPositionRef}
+      />
+      {layout === 'terminal' && <RouterTerminal />}
+    </>
   );
 }
 
@@ -1143,10 +1152,11 @@ function FreeModelsContent({
       ? savedActivity
       : { candidateId: null, active: false, sequence: 0, updatedAtMs: 0 };
   const [activityObservedAtMs, setActivityObservedAtMs] = useState(0);
+  const showRouteActivity = layout !== 'terminal';
 
   useEffect(() => {
     let cancelled = false;
-    if (!routerEnabled || !docVisible || activePage !== 'freeModels') return;
+    if (!showRouteActivity || !routerEnabled || !docVisible || activePage !== 'freeModels') return;
     let pending = false;
     let errorReported = false;
     const pollActivity = async () => {
@@ -1175,7 +1185,7 @@ function FreeModelsContent({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [routerEnabled, docVisible, activePage, activeRouterId]);
+  }, [showRouteActivity, routerEnabled, docVisible, activePage, activeRouterId]);
 
   const setNodeRef = useCallback((id: string, node: HTMLDivElement | null) => {
     if (node) nodeRefs.current.set(id, node);
@@ -1331,7 +1341,7 @@ function FreeModelsContent({
   }, [pausedIds]);
 
   useLayoutEffect(() => {
-    if (layout === 'list') return;
+    if (layout !== 'cards' || !docVisible || activePage !== 'freeModels') return;
     const frame = requestAnimationFrame(updatePaths);
     const stage = stageRef.current;
     if (!stage) return () => cancelAnimationFrame(frame);
@@ -1342,7 +1352,7 @@ function FreeModelsContent({
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [selectedModels, nodeColumns, updatePaths, layout]);
+  }, [selectedModels, nodeColumns, updatePaths, layout, docVisible, activePage]);
 
   const activityIsVisible =
     routerActivity.candidateId !== null &&
@@ -1366,6 +1376,8 @@ function FreeModelsContent({
       56 +
       24
   );
+
+  if (layout === 'terminal') return null;
 
   return (
     <div

@@ -438,6 +438,44 @@ impl Protection {
         Ok(Self(restorer, categories))
     }
 
+    pub(super) fn terminal_segments(&self, text: &str) -> Vec<super::super::terminal::Segment> {
+        use super::super::terminal::Segment;
+        let mut segments = Vec::new();
+        let mut rest = text;
+        while let Some(start) = rest.find(PREFIX) {
+            let Some(end) = rest[start..].find("}}") else {
+                break;
+            };
+            let end = start + end + 2;
+            let token = &rest[start..end];
+            if let Some(value) = self.0.values.get(token) {
+                segments.push(Segment {
+                    text: rest[..start].into(),
+                    protected_text: None,
+                    kind: None,
+                });
+                segments.push(Segment {
+                    text: value.chars().take(240).collect(),
+                    protected_text: Some(token.into()),
+                    kind: self.0.kinds.get(token).copied(),
+                });
+            } else {
+                segments.push(Segment {
+                    text: rest[..end].into(),
+                    protected_text: None,
+                    kind: None,
+                });
+            }
+            rest = &rest[end..];
+        }
+        segments.push(Segment {
+            text: rest.into(),
+            protected_text: None,
+            kind: None,
+        });
+        segments
+    }
+
     pub(super) async fn restore(self, response: Response) -> Response {
         stream::restore(self.0, response).await
     }
@@ -504,6 +542,9 @@ impl Engine {
             .push(index);
         self.bytes += value.len();
         let value: Arc<str> = value.into();
+        Arc::make_mut(&mut self.restorer)
+            .kinds
+            .insert(token.clone(), kind);
         Arc::make_mut(&mut self.restorer)
             .values
             .insert(token.clone(), value.clone());
@@ -595,6 +636,7 @@ impl Engine {
 
 #[derive(Clone, Default)]
 struct Restorer {
+    kinds: HashMap<String, u8>,
     values: HashMap<String, Arc<str>>,
 }
 

@@ -1380,6 +1380,8 @@ pub fn run() {
             smart_router_commands::set_smart_router_enabled,
             smart_router_commands::set_smart_router_candidate_enabled,
             smart_router_commands::get_smart_router_activity,
+            smart_router_commands::poll_smart_router_terminal,
+            smart_router_commands::stop_smart_router_terminal,
             smart_router_commands::get_smart_router_candidates,
             smart_router_commands::remove_smart_router_candidate,
             smart_router_commands::set_smart_router_candidates,

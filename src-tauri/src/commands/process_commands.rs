@@ -116,13 +116,17 @@ pub fn get_download_dir() -> String {
 }
 
 #[tauri::command]
-pub fn scan_gguf_files(dir: String) -> Vec<GgufFile> {
-    local_llm::scan_gguf_files(&dir, 5)
+pub async fn scan_gguf_files(dir: String) -> Result<Vec<GgufFile>, String> {
+    tauri::async_runtime::spawn_blocking(move || local_llm::scan_gguf_files(&dir, 5))
+        .await
+        .map_err(|e| format!("Model scan task join failed: {e}"))
 }
 
 #[tauri::command]
-pub fn scan_hf_models(dir: String) -> Vec<HfModelEntry> {
-    local_llm::scan_hf_models(&dir, 5)
+pub async fn scan_hf_models(dir: String) -> Result<Vec<HfModelEntry>, String> {
+    tauri::async_runtime::spawn_blocking(move || local_llm::scan_hf_models(&dir, 5))
+        .await
+        .map_err(|e| format!("Model scan task join failed: {e}"))
 }
 
 #[tauri::command]
@@ -269,5 +273,48 @@ pub async fn list_engine_release_options(
         // ship a picker for them yet — return empty so the frontend
         // degrades to its auto-latest install path.
         _ => Ok(Vec::new()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn background_model_scans_preserve_results_and_read_new_files_on_rescan() {
+        let root =
+            std::env::temp_dir().join(format!("echobird-model-scan-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).unwrap();
+        let hf = root.join("hf-model");
+        std::fs::create_dir(&hf).unwrap();
+        std::fs::write(root.join("first.gguf"), b"GGUF").unwrap();
+        std::fs::write(hf.join("config.json"), r#"{"model_type":"fixture"}"#).unwrap();
+        std::fs::write(hf.join("weights.safetensors"), b"weights").unwrap();
+        let dir = root.to_string_lossy().into_owned();
+        let (gguf, models) =
+            tokio::join!(scan_gguf_files(dir.clone()), scan_hf_models(dir.clone()));
+        let gguf = gguf.unwrap();
+        assert_eq!(gguf.len(), 1);
+        assert_eq!(gguf[0].file_name, "first.gguf");
+        assert_eq!(gguf[0].file_size, 4);
+        let models = models.unwrap();
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].model_name, "fixture");
+        assert_eq!(models[0].total_size, 7);
+        std::fs::write(root.join("second.gguf"), b"new").unwrap();
+        assert_eq!(scan_gguf_files(dir).await.unwrap().len(), 2);
+        let missing = root.join("missing").to_string_lossy().into_owned();
+        assert!(scan_gguf_files(missing.clone()).await.unwrap().is_empty());
+        assert!(scan_hf_models(missing).await.unwrap().is_empty());
+        for file in [
+            "first.gguf",
+            "second.gguf",
+            "hf-model/config.json",
+            "hf-model/weights.safetensors",
+        ] {
+            std::fs::remove_file(root.join(file)).unwrap();
+        }
+        std::fs::remove_dir(hf).unwrap();
+        std::fs::remove_dir(root).unwrap();
     }
 }

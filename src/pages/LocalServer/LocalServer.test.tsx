@@ -8,8 +8,9 @@ import type { GgufFile } from '../../api/types';
 import { LocalServerMain, LocalServerPanel, LocalServerProvider } from './LocalServer';
 import { useLocalServer } from './context';
 
-const { downloads, startDownload, confirm, visibility } = vi.hoisted(() => ({
+const { downloads, downloadState, startDownload, confirm, visibility } = vi.hoisted(() => ({
   downloads: new Map(),
+  downloadState: { snapshot: undefined as Map<string, unknown> | undefined },
   visibility: { visible: false },
   startDownload: vi.fn(),
   confirm: vi.fn(),
@@ -18,7 +19,11 @@ vi.mock('../../hooks/useI18n', () => ({ useI18n: () => ({ t: (key: string) => ke
 vi.mock('../../hooks/useDocumentVisible', () => ({ useDocumentVisible: () => visibility.visible }));
 vi.mock('../../components/ConfirmDialog', () => ({ useConfirm: () => confirm }));
 vi.mock('../../components/DownloadContext', () => ({
-  useDownload: () => ({ downloads, startDownload, isDownloading: false }),
+  useDownload: () => ({
+    downloads: downloadState.snapshot ?? downloads,
+    startDownload,
+    isDownloading: false,
+  }),
 }));
 vi.mock('../../components/MiniSelect', () => ({
   MiniSelect: (props: { value: string; onChange: (value: string) => void }) => (
@@ -81,6 +86,7 @@ describe('Local model page navigation', () => {
     useNavigationStore.setState({ activePage: 'localLlm' });
     useLocalServerStatusStore.setState({ running: false });
     downloads.clear();
+    downloadState.snapshot = undefined;
     vi.stubGlobal('navigator', { platform: 'Linux' });
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Offline')));
     vi.mocked(api.getModelsDirs).mockResolvedValue(['/models']);
@@ -345,6 +351,34 @@ describe('Local model page navigation', () => {
       expect(api.setDownloadDir).not.toHaveBeenCalled();
     }
   );
+
+  it('rescans on new completions, not progress updates beside an already completed download', async () => {
+    await open(false, true);
+    const scans = vi.mocked(api.scanGgufFiles).mock.calls.length;
+    const update = async (status: string) => {
+      downloads.set('model.gguf', { status });
+      downloadState.snapshot = new Map(downloads);
+      await act(async () => {
+        renderer.update(
+          <LocalServerProvider>
+            <Harness main={false} panel />
+          </LocalServerProvider>
+        );
+      });
+    };
+    await update('completed');
+    expect(api.scanGgufFiles).toHaveBeenCalledTimes(scans + 1);
+    for (let progress = 1; progress <= 10; progress++) {
+      downloads.set('other.gguf', { status: 'downloading', progress });
+      await update('completed');
+    }
+    expect(api.scanGgufFiles).toHaveBeenCalledTimes(scans + 1);
+    await update('downloading');
+    await update('completed');
+    expect(api.scanGgufFiles).toHaveBeenCalledTimes(scans + 2);
+    expect(api.startLlmServer).not.toHaveBeenCalled();
+    expect(startDownload).not.toHaveBeenCalled();
+  });
 
   it('positive control: changes the download directory when no model job is pending', async () => {
     await open(false, true);

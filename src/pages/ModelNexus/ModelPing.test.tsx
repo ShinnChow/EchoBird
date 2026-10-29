@@ -101,6 +101,54 @@ it('continues queued model speed tests while another page is shown and retains r
 afterEach(() => {
   act(() => renderer?.unmount());
   vi.clearAllMocks();
+  vi.useRealTimers();
+});
+
+it('does not rerender the model tree on a timer while a request is pending and retains off-page results', async () => {
+  vi.useFakeTimers();
+  let renders = 0;
+  function ModelTree() {
+    useModelNexus();
+    renders++;
+    return <Harness />;
+  }
+  let finish!: (value: Awaited<ReturnType<typeof api.testModel>>) => void;
+  vi.mocked(api.testModel).mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+  await act(async () => {
+    renderer = create(
+      <ModelNexusProvider>
+        <ModelTree />
+      </ModelNexusProvider>
+    );
+  });
+  act(() => context.setTestInput('fixture prompt'));
+  let request!: Promise<void>;
+  act(() => {
+    request = context.handleTestModel();
+  });
+  const waiting = renders;
+  await act(async () => {
+    vi.advanceTimersByTime(2000);
+  });
+  expect(renders).toBe(waiting);
+  await act(async () => useNavigationStore.getState().setActivePage('apps'));
+  const hidden = renders;
+  await act(async () => {
+    vi.advanceTimersByTime(1000);
+  });
+  expect(renders).toBe(hidden);
+  expect(context.isTesting).toBe(true);
+  expect(api.testModel).toHaveBeenCalledOnce();
+  await act(async () => {
+    finish({ success: true, latency: 10, response: 'fixture result', protocol: 'openai' });
+    await request;
+  });
+  await act(async () => useNavigationStore.getState().setActivePage('models'));
+  expect(context.isTesting).toBe(false);
+  expect(context.testOutput).toContain('fixture result');
+  expect(vi.getTimerCount()).toBe(0);
+  expect(api.queryModelUsage).not.toHaveBeenCalled();
+  expect(api.updateModel).not.toHaveBeenCalled();
 });
 
 it.each([

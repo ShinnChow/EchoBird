@@ -31,8 +31,8 @@ interface FreeModelsContextValue {
   saveRouter: (settings: api.SmartRouterSettings) => Promise<void>;
   deleteRouter: (id: string) => Promise<void>;
   setGroupEnabled: (id: string, enabled: boolean) => Promise<void>;
-  layout: 'cards' | 'list';
-  setLayout: (layout: 'cards' | 'list') => void;
+  layout: 'cards' | 'list' | 'terminal';
+  setLayout: (layout: 'cards' | 'list' | 'terminal') => void;
   activeDragId: string | null;
   setActiveDragId: (id: string | null) => void;
   catalog: FreeModelDirectory;
@@ -123,14 +123,15 @@ export function FreeModelsProvider({ children }: { children: ReactNode }) {
   const { showToast } = useToast();
   const activePage = useNavigationStore((state) => state.activePage);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [layout, setLayoutState] = useState<'cards' | 'list'>(() => {
+  const [layout, setLayoutState] = useState<'cards' | 'list' | 'terminal'>(() => {
     try {
-      return localStorage.getItem(ROUTER_LAYOUT_KEY) === 'list' ? 'list' : 'cards';
+      const saved = localStorage.getItem(ROUTER_LAYOUT_KEY);
+      return saved === 'list' || saved === 'terminal' ? saved : 'cards';
     } catch {
       return 'cards';
     }
   });
-  const setLayout = useCallback((next: 'cards' | 'list') => {
+  const setLayout = useCallback((next: 'cards' | 'list' | 'terminal') => {
     setLayoutState(next);
     try {
       localStorage.setItem(ROUTER_LAYOUT_KEY, next);
