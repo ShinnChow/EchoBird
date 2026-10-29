@@ -9,6 +9,7 @@ export function DeveloperTitleActions() {
   const setTab = useNavigationStore((state) => state.setDeveloperTab);
   return (
     <div className="flex items-center gap-3">
+      <RoutingHint hint={t('settings.developerModeHint')} />
       <ViewModeTabs
         value={tab}
         onChange={setTab}
@@ -18,7 +19,6 @@ export function DeveloperTitleActions() {
           { value: 'statistics', label: t('developer.statistics') },
         ]}
       />
-      <RoutingHint hint={t('settings.developerModeHint')} />
     </div>
   );
 }
