@@ -32,6 +32,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => view?.unmount());
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   vi.useRealTimers();
 });
 const nextAt = (until: number) =>
@@ -100,6 +101,7 @@ it('holds a ready swaying gift without a countdown or automatically granting any
 });
 
 it('pauses the next opportunity while holding a card and starts ten minutes only after use', async () => {
+  vi.spyOn(Math, 'random').mockReturnValue(0);
   nextAt(Date.now());
   act(() => {
     view = create(<PetRewards />);
