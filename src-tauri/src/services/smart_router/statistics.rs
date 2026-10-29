@@ -1,4 +1,4 @@
-//! Bounded local aggregates. This module never receives request/response content.
+//! Bounded local aggregates. Response content and credentials are never persisted.
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
 use std::path::PathBuf;
@@ -381,17 +381,17 @@ impl Collector {
             admitted = true;
             started = (day, hour);
         });
-        admitted.then(|| {
-            Arc::new(Request {
-                collector: self.clone(),
-                epoch,
-                group,
-                day: started.0,
-                hour: started.1,
-                started: Instant::now(),
-                state: Mutex::new(RequestState::default()),
-            })
-        })
+        // Even capped requests need a handle tied to their original recording epoch.
+        Some(Arc::new(Request {
+            collector: self.clone(),
+            epoch,
+            admitted,
+            group,
+            day: started.0,
+            hour: started.1,
+            started: Instant::now(),
+            state: Mutex::new(RequestState::default()),
+        }))
     }
 
     pub fn snapshot(&self, days: u8, group: Option<&str>) -> Result<Snapshot, String> {
@@ -491,13 +491,12 @@ impl Collector {
         if !self.active.load(Ordering::Relaxed) {
             return Err("Developer preview is paused".into());
         }
-        self.flush()?;
-        Ok(self
-            .state
-            .lock()
-            .unwrap_or_else(|error| error.into_inner())
-            .durable_credits
-            .clone())
+        let state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+        if state.storage_error {
+            return Err(STORAGE_ERROR.into());
+        }
+        // Reads never force disk I/O or publish credits before the writer saves them.
+        Ok(state.durable_credits.clone())
     }
 
     pub fn observe(
@@ -506,11 +505,14 @@ impl Collector {
         request: Option<&Arc<Request>>,
         candidate: &str,
     ) -> axum::response::Response {
-        if !self.active.load(Ordering::Relaxed) {
+        let Some(request) = request else {
+            return response;
+        };
+        let epoch = request.epoch;
+        if !self.active.load(Ordering::Relaxed) || self.epoch.load(Ordering::SeqCst) != epoch {
             return response;
         }
-        let epoch = self.epoch.load(Ordering::SeqCst);
-        let target = request.and_then(|request| {
+        let target = {
             let state = request
                 .state
                 .lock()
@@ -528,7 +530,7 @@ impl Collector {
                         request.group.clone(),
                     )
                 })
-        });
+        };
         let collector = self.clone();
         super::usage::observe(response, move |usage| {
             collector.update(epoch, |store, _, _, _| {
@@ -776,6 +778,7 @@ struct Attempt {
 pub struct Request {
     collector: Arc<Collector>,
     epoch: u64,
+    admitted: bool,
     group: String,
     day: i32,
     hour: u8,
@@ -798,6 +801,9 @@ impl Request {
         model: &str,
         source: Option<&AccountSource>,
     ) {
+        if !self.admitted {
+            return;
+        }
         let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
         if state.finished {
             return;
@@ -908,6 +914,9 @@ impl Request {
     }
 
     pub fn finish(&self, response_ok: bool, cancelled: bool) {
+        if !self.admitted {
+            return;
+        }
         let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
         if state.finished {
             return;

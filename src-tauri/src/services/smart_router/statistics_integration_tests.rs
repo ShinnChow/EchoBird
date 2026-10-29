@@ -98,6 +98,8 @@ async fn reported_tokens_share_statistics_and_durable_pet_credits_without_replay
         fixture.snapshot().rows[0].counts.usage.reported_responses,
         1
     );
+    assert_eq!(fixture.collector.token_credits().unwrap().total, 0);
+    fixture.collector.flush().unwrap();
     let credits = fixture.collector.token_credits().unwrap();
     assert_eq!(credits.total, 579);
     assert_eq!(fixture.collector.token_credits().unwrap().total, 579);

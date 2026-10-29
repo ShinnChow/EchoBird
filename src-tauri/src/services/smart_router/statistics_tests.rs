@@ -18,28 +18,134 @@ fn successful(collector: &Arc<Collector>) {
 async fn paused_or_old_generation_responses_cannot_credit_a_new_session() {
     let (root, collector) = fixture();
     collector.configure(true);
+    let request = collector.begin("group").unwrap();
     let response = collector.observe(
         crate::services::account_proxy::json_response(
             &serde_json::json!({"usage":{"total_tokens":7}}),
         ),
-        None,
+        Some(&request),
         "",
     );
     collector.configure(false);
     collector.configure(true);
     response.into_body().collect().await.unwrap();
+    collector.flush().unwrap();
     assert_eq!(collector.token_credits().unwrap().total, 0);
+    let request = collector.begin("group").unwrap();
     let response = collector.observe(
         crate::services::account_proxy::json_response(
             &serde_json::json!({"usage":{"total_tokens":7}}),
         ),
-        None,
+        Some(&request),
         "",
     );
     response.into_body().collect().await.unwrap();
+    collector.flush().unwrap();
     assert_eq!(collector.token_credits().unwrap().total, 7);
     collector.configure(false);
     assert!(collector.token_credits().is_err());
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
+async fn delayed_headers_keep_the_request_generation_even_when_detail_capacity_is_full() {
+    for capped in [false, true] {
+        let (root, collector) = fixture();
+        collector.configure(true);
+        if capped {
+            for index in 0..MAX_GROUPS {
+                collector.begin(&format!("group-{index}")).unwrap();
+            }
+        }
+        let request = collector.begin("group").unwrap();
+        assert_eq!(request.admitted, !capped);
+        request.attempt("group", "candidate", "model", None);
+        collector.configure(false);
+        collector.configure(true);
+        let response = collector.observe(
+            crate::services::account_proxy::json_response(
+                &serde_json::json!({"usage":{"total_tokens":7}}),
+            ),
+            Some(&request),
+            "candidate",
+        );
+        response.into_body().collect().await.unwrap();
+        collector.flush().unwrap();
+        assert_eq!(collector.token_credits().unwrap().total, 0);
+
+        let current = collector.begin("group").unwrap();
+        current.attempt("group", "candidate", "model", None);
+        let response = collector.observe(
+            crate::services::account_proxy::json_response(
+                &serde_json::json!({"usage":{"total_tokens":7}}),
+            ),
+            Some(&current),
+            "candidate",
+        );
+        response.into_body().collect().await.unwrap();
+        current.outcome("candidate", None);
+        current.finish(true, false);
+        collector.flush().unwrap();
+        assert_eq!(
+            collector.token_credits().unwrap().total,
+            7,
+            "positive control"
+        );
+        if capped {
+            let snapshot = collector.snapshot(1, None).unwrap();
+            assert_eq!(snapshot.totals.calls, MAX_GROUPS as u64);
+            assert_eq!(snapshot.totals.completed, 0);
+            assert!(snapshot.rows.is_empty());
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[tokio::test]
+async fn requests_started_while_paused_cannot_earn_credits_after_enabling() {
+    let (root, collector) = fixture();
+    let request = collector.begin("group");
+    assert!(request.is_none());
+    collector.configure(true);
+    let response = collector.observe(
+        crate::services::account_proxy::json_response(
+            &serde_json::json!({"usage":{"total_tokens":7}}),
+        ),
+        request.as_ref(),
+        "candidate",
+    );
+    response.into_body().collect().await.unwrap();
+    assert_eq!(collector.token_credits().unwrap().total, 0);
+    assert_eq!(collector.writes.load(Ordering::Relaxed), 0);
+    assert!(!root.exists());
+}
+
+#[tokio::test]
+async fn wallet_polling_reads_only_durable_credits_without_forcing_writes() {
+    let (root, collector) = fixture();
+    collector.configure(true);
+    for _ in 0..6 {
+        let request = collector.begin("group").unwrap();
+        request.attempt("group", "candidate", "model", None);
+        let response = collector.observe(
+            crate::services::account_proxy::json_response(
+                &serde_json::json!({"usage":{"total_tokens":7}}),
+            ),
+            Some(&request),
+            "candidate",
+        );
+        response.into_body().collect().await.unwrap();
+        request.outcome("candidate", None);
+        request.finish(true, false);
+        assert_eq!(collector.token_credits().unwrap().total, 0);
+    }
+    assert_eq!(collector.writes.load(Ordering::Relaxed), 0);
+    collector.flush().unwrap();
+    for _ in 0..6 {
+        assert_eq!(collector.token_credits().unwrap().total, 42);
+    }
+    assert_eq!(collector.writes.load(Ordering::Relaxed), 1);
+    println!("six dirty wallet polls: zero forced writes, one merged flush");
     std::fs::remove_dir_all(root).unwrap();
 }
 
@@ -50,12 +156,13 @@ async fn lifetime_credits_survive_retention_and_group_capacity_without_persistin
     for index in 0..MAX_GROUPS {
         assert!(collector.begin(&format!("group-{index}")).is_some());
     }
-    assert!(collector.begin("over-capacity").is_none());
+    let request = collector.begin("over-capacity").unwrap();
+    assert!(!request.admitted);
     let response = collector.observe(
         crate::services::account_proxy::json_response(
             &serde_json::json!({"usage":{"input_tokens":3,"output_tokens":4}}),
         ),
-        None,
+        Some(&request),
         "",
     );
     response.into_body().collect().await.unwrap();
@@ -65,6 +172,7 @@ async fn lifetime_credits_survive_retention_and_group_capacity_without_persistin
         .unwrap()
         .data
         .trim(clock().0 + RETENTION_DAYS + 1);
+    collector.flush().unwrap();
     assert_eq!(collector.token_credits().unwrap().total, 7);
     assert!(collector.state.lock().unwrap().data.days.is_empty());
     std::fs::remove_dir_all(root).unwrap();
@@ -74,20 +182,23 @@ async fn lifetime_credits_survive_retention_and_group_capacity_without_persistin
 async fn a_failed_disk_write_does_not_publish_uncommitted_credits_and_can_recover() {
     let (root, collector) = fixture();
     collector.configure(true);
+    let request = collector.begin("group").unwrap();
     std::fs::write(&root, "fixture blocker").unwrap();
     let response = collector.observe(
         crate::services::account_proxy::json_response(
             &serde_json::json!({"usage":{"total_tokens":9}}),
         ),
-        None,
+        Some(&request),
         "",
     );
     response.into_body().collect().await.unwrap();
+    assert!(collector.flush().is_err());
     assert!(collector.token_credits().is_err());
     assert_eq!(collector.state.lock().unwrap().durable_credits.total, 0);
     assert_eq!(std::fs::read_to_string(&root).unwrap(), "fixture blocker");
     std::fs::remove_file(&root).unwrap();
     std::fs::create_dir_all(&root).unwrap();
+    collector.flush().unwrap();
     assert_eq!(collector.token_credits().unwrap().total, 9);
     assert_eq!(collector.token_credits().unwrap().total, 9);
     std::fs::remove_dir_all(root).unwrap();
@@ -372,7 +483,7 @@ fn maximum_fourteen_day_store_fits_the_file_cap_and_expired_groups_can_be_replac
         }
         request.finish(true, false);
     }
-    assert!(collector.begin("over-cap").is_none());
+    assert!(!collector.begin("over-cap").unwrap().admitted);
     let today = clock().0;
     let mut state = collector.state.lock().unwrap();
     let template = state.data.days[&today].clone();
