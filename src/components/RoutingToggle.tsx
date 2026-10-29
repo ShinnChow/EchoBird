@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { ToggleSwitch } from './ToggleSwitch';
 
 // A single routing toggle: label + switch + themed help glyph with an
 // interactive tooltip. The tooltip stays open while the pointer is over the
@@ -25,6 +26,25 @@ export function RoutingToggle({
   pending = false,
   onChange,
 }: RoutingToggleProps) {
+  return (
+    <div className={`flex items-center ${className}`}>
+      {!hideLabel && (
+        <span className="text-xs text-cyber-text-secondary mr-2 whitespace-nowrap">{label}</span>
+      )}
+      <ToggleSwitch
+        checked={checked}
+        onChange={onChange}
+        ariaLabel={label}
+        disabled={disabled}
+        pending={pending}
+        className={`${hideLabel ? '' : 'mr-2'} ${disabled ? 'disabled:opacity-50' : ''}`}
+      />
+      {hint && <RoutingHint hint={hint} />}
+    </div>
+  );
+}
+
+export function RoutingHint({ hint }: { hint: string }) {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLSpanElement>(null);
   const tooltipRef = useRef<HTMLSpanElement>(null);
@@ -84,73 +104,45 @@ export function RoutingToggle({
   };
 
   return (
-    <div className={`flex items-center ${className}`}>
-      {!hideLabel && (
-        <span className="text-xs text-cyber-text-secondary mr-2 whitespace-nowrap">{label}</span>
-      )}
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        aria-busy={pending || undefined}
-        disabled={disabled || pending}
-        onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-cyber-accent ${hideLabel ? '' : 'mr-2'} ${disabled ? 'disabled:opacity-50' : ''} ${
-          checked ? 'bg-cyber-accent' : 'bg-cyber-border'
-        }`}
+    <span
+      ref={anchorRef}
+      className="relative inline-flex items-center"
+      onMouseEnter={showTip}
+      onMouseLeave={scheduleHide}
+    >
+      <span
+        aria-label={hint}
+        className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-cyber-elevated font-sans text-xs font-medium leading-none text-cyber-text-secondary select-none hover:bg-cyber-accent/15 hover:text-cyber-accent transition-colors"
       >
-        <span
-          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-all duration-200 ${
-            checked ? 'translate-x-[18px] shadow-[0_1px_2px_rgba(0,0,0,0.35)]' : 'translate-x-1'
-          }`}
-        />
-      </button>
-      {/* Help glyph — themed, interactive tooltip (not the native browser one).
-          onMouseEnter/Leave on this wrapper covers both the glyph and the
-          tooltip (a descendant), so the tooltip stays open while hovered. */}
-      {hint && (
-        <span
-          ref={anchorRef}
-          className="relative inline-flex items-center"
-          onMouseEnter={showTip}
-          onMouseLeave={scheduleHide}
-        >
+        ?
+      </span>
+      {open &&
+        createPortal(
           <span
-            aria-label={hint}
-            className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-cyber-elevated font-sans text-xs font-medium leading-none text-cyber-text-secondary select-none hover:bg-cyber-accent/15 hover:text-cyber-accent transition-colors"
+            ref={tooltipRef}
+            role="tooltip"
+            onMouseEnter={showTip}
+            onMouseLeave={scheduleHide}
+            style={{
+              left: position?.left ?? 0,
+              top: position?.top ?? 0,
+              visibility: position ? 'visible' : 'hidden',
+              width: 'min(288px, calc(100vw - 16px))',
+              maxHeight: 'calc(100vh - 16px)',
+            }}
+            className="fixed z-[10000] rounded border border-cyber-accent/40 bg-cyber-elevated px-3 py-2 text-[11px] leading-relaxed text-cyber-text shadow-cyber-card backdrop-blur-sm"
           >
-            ?
-          </span>
-          {open &&
-            createPortal(
-              <span
-                ref={tooltipRef}
-                role="tooltip"
-                onMouseEnter={showTip}
-                onMouseLeave={scheduleHide}
-                style={{
-                  left: position?.left ?? 0,
-                  top: position?.top ?? 0,
-                  visibility: position ? 'visible' : 'hidden',
-                  width: 'min(288px, calc(100vw - 16px))',
-                  maxHeight: 'calc(100vh - 16px)',
-                }}
-                className="fixed z-[10000] rounded border border-cyber-accent/40 bg-cyber-elevated px-3 py-2 text-[11px] leading-relaxed text-cyber-text shadow-cyber-card backdrop-blur-sm"
-              >
-                <span
-                  aria-hidden="true"
-                  style={{ left: position?.caret ?? 0 }}
-                  className={`absolute h-2 w-2 rotate-45 border-cyber-accent/40 bg-cyber-elevated ${position?.above ? '-bottom-1 border-r border-b' : '-top-1 border-l border-t'}`}
-                />
-                <span className="block overflow-y-auto" style={{ maxHeight: 'calc(100vh - 34px)' }}>
-                  {hint}
-                </span>
-              </span>,
-              document.body
-            )}
-        </span>
-      )}
-    </div>
+            <span
+              aria-hidden="true"
+              style={{ left: position?.caret ?? 0 }}
+              className={`absolute h-2 w-2 rotate-45 border-cyber-accent/40 bg-cyber-elevated ${position?.above ? '-bottom-1 border-r border-b' : '-top-1 border-l border-t'}`}
+            />
+            <span className="block overflow-y-auto" style={{ maxHeight: 'calc(100vh - 34px)' }}>
+              {hint}
+            </span>
+          </span>,
+          document.body
+        )}
+    </span>
   );
 }

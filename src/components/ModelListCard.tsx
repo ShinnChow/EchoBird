@@ -52,9 +52,9 @@ export function ModelListCard({
   return (
     <div
       aria-disabled={disabled || undefined}
-      className={`relative overflow-hidden p-3 rounded-card transition-colors flex items-center gap-3 border border-transparent ${
+      className={`relative overflow-hidden p-[11px] rounded-card transition-colors flex items-center gap-3 border-2 ${
         disabled ? 'opacity-50' : ''
-      } ${selected ? 'bg-cyber-elevated/75' : 'bg-cyber-surface/60 hover:bg-cyber-elevated/70'}`}
+      } ${selected ? 'border-cyber-accent/70 bg-cyber-accent/10' : 'border-transparent bg-cyber-surface/60 hover:bg-cyber-elevated/70'}`}
     >
       <button
         type="button"

@@ -1747,10 +1747,10 @@ export const LocalServerPanel: React.FC = () => {
                   return (
                     <div
                       key={model.id}
-                      className={`p-3 rounded transition-colors border bg-cyber-surface/60 ${
+                      className={`p-[11px] rounded transition-colors border-2 ${
                         isExpanded
-                          ? 'border-cyber-accent'
-                          : 'border-transparent hover:bg-cyber-elevated/70'
+                          ? 'border-cyber-accent/70 bg-cyber-accent/10'
+                          : 'border-transparent bg-cyber-surface/60 hover:bg-cyber-elevated/70'
                       }`}
                       onClick={() => setExpandedModelId(isExpanded ? null : model.id)}
                     >

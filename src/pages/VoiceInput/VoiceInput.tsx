@@ -165,6 +165,7 @@ export function VoiceInputMain() {
               : null
         }
         disabled={busy || activeDragId !== null || overlay}
+        active={config.shortcutEnabled && !!channel && snapshot.activeChannel === index && !overlay}
         handle={channel ? handle : undefined}
         overlay={overlay}
         onRemove={() =>
@@ -582,6 +583,7 @@ function VoiceChannelCard({
   detail,
   icon,
   disabled,
+  active,
   handle,
   overlay,
   onRemove,
@@ -592,6 +594,7 @@ function VoiceChannelCard({
   detail: string;
   icon: string | null;
   disabled: boolean;
+  active: boolean;
   handle?: ReactNode;
   overlay: boolean;
   onRemove: () => void;
@@ -604,7 +607,8 @@ function VoiceChannelCard({
       aria-label={position}
       aria-hidden={overlay || undefined}
       className={
-        'free-model-route-node voice-channel relative min-h-[80px] rounded-card p-3 flex items-center' +
+        'free-model-route-node voice-channel relative min-h-[80px] rounded-card flex items-center' +
+        (active ? ' is-active' : '') +
         (overlay ? ' is-dragging shadow-2xl' : '')
       }
     >

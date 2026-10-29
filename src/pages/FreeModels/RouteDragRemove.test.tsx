@@ -513,7 +513,7 @@ describe('Remove router candidates by dragging', () => {
   it('omits a paused tail and the separate lines inside paused cards', async () => {
     paused = ['geometry-4', 'geometry-5'];
     await openGeometry(8);
-    expect(visiblePaths()).toHaveLength(7);
+    expect(visiblePaths()).toHaveLength(10);
     expect(visiblePaths()).toContain('M 400 317 V 287');
     expect(visiblePaths()).toContain('M 400 433 V 403');
     expect(visiblePaths()).not.toContain('M 600 317 V 287');
@@ -534,7 +534,11 @@ describe('Remove router candidates by dragging', () => {
   it('keeps a lone off-center enabled card connected to the hub', async () => {
     paused = Array.from({ length: 7 }, (_, index) => `geometry-${index + 1}`);
     await openGeometry(8);
-    expect(visiblePaths()).toEqual(['M 200 201 C 200 179.5 400 179.5 400 158']);
+    expect(visiblePaths()).toEqual([
+      'M 400 172 V 158',
+      'M 200 201 V 184 A 12 12 0 0 1 212 172',
+      'M 212 172 H 400',
+    ]);
     expectNoRemoval();
   });
 
@@ -573,7 +577,7 @@ describe('Remove router candidates by dragging', () => {
     const geometry = await openGeometry(3, 800, 43);
     const span = () => Number(geometry.glowStyle.get('--free-model-route-glow-span'));
     const glow = () => renderer.root.findByProps({ className: 'free-model-route-glow' });
-    expect(glow().props.d).toBe('M 400 201 V 158');
+    expect(glow().props.d).toBe('M 400 201 V 172 V 158');
     expect(glow().props.pathLength).toBe('1');
     expect(geometry.getTotalLength).toHaveBeenCalled();
     expect(span() * 43).toBeCloseTo(20);
@@ -612,7 +616,7 @@ describe('Remove router candidates by dragging', () => {
     expectNoRemoval();
   });
 
-  it('curves the outer columns into the hub once while preserving the complete lower-row activity path', async () => {
+  it('joins the rounded outer branches to one bus while preserving the complete lower-row activity path', async () => {
     enabled = true;
     vi.mocked(api.getSmartRouterActivity).mockResolvedValue({
       candidateId: 'geometry-3',
@@ -624,20 +628,27 @@ describe('Remove router candidates by dragging', () => {
     const grid = renderer.root.findByProps({ className: 'free-model-node-grid relative z-10' });
     expect(grid.props.style.gridTemplateColumns).toMatch(/^repeat\(3,/);
     const paths = visiblePaths();
-    const curves = paths.filter((path) => path.includes(' C '));
-    expect(curves).toEqual([
-      'M 200 201 C 200 179.5 400 179.5 400 158',
-      'M 600 201 C 600 179.5 400 179.5 400 158',
+    const branches = paths.filter((path) => path.includes(' A '));
+    expect(branches).toEqual([
+      'M 200 201 V 184 A 12 12 0 0 1 212 172',
+      'M 600 201 V 184 A 12 12 0 0 0 588 172',
     ]);
-    expect(paths).toHaveLength(6);
-    expect(paths.every((path) => !/[AH]/.test(path))).toBe(true);
-    expect(paths).toContain('M 400 201 V 158');
+    expect(paths).toHaveLength(9);
+    expect(paths.every((path) => !path.includes(' C '))).toBe(true);
+    expect(paths.filter((path) => path.includes(' H '))).toEqual([
+      'M 212 172 H 400',
+      'M 588 172 H 400',
+    ]);
+    expect(paths).toContain('M 400 172 V 158');
+    expect(paths).toContain('M 400 201 V 172');
     expect(paths).toContain('M 200 317 V 287');
     expect(paths).toContain('M 400 317 V 287');
     expect(paths).toContain('M 600 317 V 287');
     const glow = renderer.root.findByProps({ className: 'free-model-route-glow' });
     expect(glow.props.d).toMatch(/^M 200 317 V 287 V 201 /);
-    expect(glow.props.d).toBe(`M 200 317 V 287 V 201 ${curves[0].slice('M 200 201 '.length)}`);
+    expect(glow.props.d).toBe(
+      `M 200 317 V 287 V 201 ${branches[0].slice('M 200 201 '.length)} H 400 V 158`
+    );
     expectNoRemoval();
   });
 
@@ -647,10 +658,11 @@ describe('Remove router candidates by dragging', () => {
     const grid = renderer.root.findByProps({ className: 'free-model-node-grid relative z-10' });
     expect(grid.props.style.gridTemplateColumns).toMatch(/^repeat\(3,/);
     let paths = visiblePaths();
-    expect(paths.filter((path) => path.includes(' C '))).toEqual([
-      'M 110 201 C 110 179.5 310 179.5 310 158',
-      'M 510 201 C 510 179.5 310 179.5 310 158',
+    expect(paths.filter((path) => path.includes(' A '))).toEqual([
+      'M 110 201 V 184 A 12 12 0 0 1 122 172',
+      'M 510 201 V 184 A 12 12 0 0 0 498 172',
     ]);
+    expect(paths.every((path) => !path.includes(' C '))).toBe(true);
     expect(paths).toContain('M 110 317 V 287');
     await geometry.resize(240);
     expect(grid.props.style.gridTemplateColumns).toMatch(/^repeat\(1,/);

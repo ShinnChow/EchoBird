@@ -13,7 +13,7 @@ import {
   Monitor,
   Gift,
   CodeXml,
-  Shield,
+  ShieldCheck,
 } from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
@@ -29,6 +29,7 @@ import { useUiScaleStore } from '../stores/uiScaleStore';
 import { useEasterEggStore } from '../stores/easterEggStore';
 import { useRewardClaimStore } from '../stores/rewardClaimStore';
 import { RoutingToggle } from './RoutingToggle';
+import { ToggleSwitch } from './ToggleSwitch';
 import { useNavigationStore } from '../stores/navigationStore';
 import { usePluginProductStore } from '../stores/pluginProductStore';
 
@@ -347,13 +348,13 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       {/* Dialog */}
       <div
         ref={dialogRef}
-        className={`relative flex h-[560px] max-h-[88vh] w-[720px] max-w-[92vw] overflow-hidden rounded-xl border border-cyber-border/30 bg-cyber-bg shadow-2xl transition-all duration-200 ${
+        className={`relative flex h-[72vh] w-[clamp(640px,62vw,1000px)] max-w-[92vw] overflow-hidden rounded-xl border border-cyber-border/30 bg-cyber-bg shadow-2xl transition-all duration-200 ${
           isAnimatingOut ? 'scale-95 opacity-0' : 'scale-100 opacity-100'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         <aside className="flex w-[168px] flex-shrink-0 flex-col p-3">
-          <div className="px-3 pt-2 pb-4 text-[12px] font-semibold tracking-wide text-cyber-text-muted">
+          <div className="px-3 pt-2 pb-4 text-[16px] font-semibold tracking-wide text-cyber-text-muted">
             {t('settings.title')}
           </div>
           <nav className="space-y-1">
@@ -591,7 +592,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 <div className="h-px bg-cyber-border/50" />
 
                 <div className="grid grid-cols-2 gap-8">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between px-3">
                     <div className="flex items-center gap-2">
                       <Power size={14} className="text-cyber-text-secondary" />
                       <span className="text-[14px] font-medium text-cyber-text-secondary">
@@ -603,7 +604,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                       onChange={handleLaunchAtStartupChange}
                     />
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between px-3">
                     <div className="flex items-center gap-2">
                       <Sparkles size={14} className="text-cyber-text-secondary" />
                       <span className="text-[14px] font-medium text-cyber-text-secondary">
@@ -612,7 +613,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     </div>
                     <ToggleSwitch checked={easterEgg} onChange={setEasterEgg} />
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between px-3">
                     <div className="flex items-center gap-2">
                       <Gift size={14} className="text-cyber-text-secondary" />
                       <span className="text-[14px] font-medium text-cyber-text-secondary">
@@ -649,7 +650,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   <div className="px-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <Shield size={14} className="text-cyber-text-secondary" />
+                        <ShieldCheck size={14} className="text-cyber-text-secondary" />
                         <span className="text-[14px] font-medium text-cyber-text-secondary">
                           {t('settings.sensitiveInfoProtection')}
                         </span>
@@ -782,7 +783,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     lang={option.id}
                     aria-pressed={locale === option.id}
                     onClick={() => onLocaleChange(option.id)}
-                    className={`flex min-h-12 items-center gap-2.5 rounded-lg border px-3 py-2.5 text-[13px] transition-colors ${locale === option.id ? 'border-cyber-border bg-cyber-elevated text-cyber-text' : 'border-transparent text-cyber-text-secondary hover:bg-cyber-elevated/60 hover:text-cyber-text'}`}
+                    className={`flex min-h-12 items-center gap-2.5 rounded-lg border-2 px-[11px] py-[9px] text-[13px] transition-colors ${locale === option.id ? 'border-cyber-accent/70 bg-cyber-accent/10 text-cyber-text' : 'border-transparent text-cyber-text-secondary hover:bg-cyber-elevated/60 hover:text-cyber-text'}`}
                   >
                     <span
                       aria-hidden="true"
@@ -802,28 +803,6 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     </div>
   );
 };
-
-// Compact on/off switch.
-const ToggleSwitch: React.FC<{ checked: boolean; onChange: (v: boolean) => void }> = ({
-  checked,
-  onChange,
-}) => (
-  <button
-    type="button"
-    role="switch"
-    aria-checked={checked}
-    onClick={() => onChange(!checked)}
-    className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full outline-none transition-colors ${
-      checked ? 'bg-cyber-accent' : 'bg-cyber-border'
-    }`}
-  >
-    <span
-      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-200 ${
-        checked ? 'translate-x-[18px]' : 'translate-x-1'
-      }`}
-    />
-  </button>
-);
 
 // Compact segmented tabs for the theme mode: Light / Dark / System.
 const ThemeSegmented: React.FC<{

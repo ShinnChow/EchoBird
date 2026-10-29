@@ -149,10 +149,11 @@ interface RouteArrow {
   y: number;
 }
 
-function routeToParent(x: number, y: number, parentX: number, parentY: number): string {
-  if (Math.abs(parentX - x) < 1) return `V ${parentY}`;
-  const bend = (y + parentY) / 2;
-  return `C ${x} ${bend} ${parentX} ${bend} ${parentX} ${parentY}`;
+function routeBranchToBus(x: number, top: number, busY: number, hubX: number): string {
+  const dx = hubX - x;
+  if (Math.abs(dx) < 1) return `V ${busY}`;
+  const radius = Math.min(12, (top - busY) / 2, Math.abs(dx) / 2);
+  return `V ${busY + radius} A ${radius} ${radius} 0 0 ${dx > 0 ? 1 : 0} ${x + Math.sign(dx) * radius} ${busY} H ${hubX}`;
 }
 
 function isKeylessFreeModel(model: FreeModelEntry): boolean {
@@ -551,7 +552,7 @@ function RouteModelCard({
     <div
       ref={cardRef}
       aria-hidden={overlay || undefined}
-      className={`free-model-route-node relative min-h-[80px] rounded-card p-3 flex items-center ${hasModelPicker ? 'has-model-picker' : ''} ${active ? 'is-active' : ''} ${paused ? 'is-paused' : ''} ${overlay ? 'is-dragging shadow-2xl' : ''}`}
+      className={`free-model-route-node relative min-h-[80px] rounded-card flex items-center ${hasModelPicker ? 'has-model-picker' : ''} ${active ? 'is-active' : ''} ${paused ? 'is-paused' : ''} ${overlay ? 'is-dragging shadow-2xl' : ''}`}
     >
       <div
         aria-hidden="true"
@@ -1235,19 +1236,50 @@ function FreeModelsContent({
     const nextActivityPaths: RoutePath[] = [];
     const parentById = new Map<string, (typeof entries)[number]>();
     const firstRow = rows[0];
+    const directToHub = firstRow?.length === 1 && Math.abs(firstRow[0].x - endX) < 1;
     let nextArrow: RouteArrow | null = null;
+    let routeBusY: number | null = null;
     let routeLineEndY: number | null = null;
     if (firstRow) {
       const arrowY = endY + HUB_ARROW_GAP;
       const lineEndY = arrowY + HUB_ARROW_HEIGHT + HUB_ARROW_LINE_GAP;
       routeLineEndY = lineEndY;
-      firstRow.forEach((entry) => {
+      if (directToHub) {
+        const entry = firstRow[0];
         nextPaths.push({
           id: entry.id,
-          d: `M ${entry.x} ${entry.top - 3} ${routeToParent(entry.x, entry.top - 3, endX, lineEndY)}`,
+          d: `M ${entry.x} ${entry.top - 3} V ${lineEndY}`,
         });
-      });
-      nextArrow = { x: endX, y: arrowY };
+        nextArrow = { x: endX, y: arrowY };
+      } else {
+        const busY = endY + (firstRow[0].top - endY) / 2;
+        routeBusY = busY;
+        nextPaths.push({
+          id: 'hub-trunk',
+          d: `M ${endX} ${busY} V ${lineEndY}`,
+        });
+        nextArrow = { x: endX, y: arrowY };
+        const busJoins = firstRow.map((entry) => {
+          const top = entry.top - 3;
+          const dx = endX - entry.x;
+          const radius = Math.min(12, (top - busY) / 2, Math.abs(dx) / 2);
+          const joinX = Math.abs(dx) < 1 ? entry.x : entry.x + Math.sign(dx) * radius;
+          nextPaths.push({
+            id: entry.id,
+            d:
+              Math.abs(dx) < 1
+                ? `M ${entry.x} ${top} V ${busY}`
+                : `M ${entry.x} ${top} V ${busY + radius} A ${radius} ${radius} 0 0 ${dx > 0 ? 1 : 0} ${joinX} ${busY}`,
+          });
+          return joinX;
+        });
+        const leftJoin = Math.min(endX, ...busJoins);
+        const rightJoin = Math.max(endX, ...busJoins);
+        if (leftJoin < endX)
+          nextPaths.push({ id: 'hub-bus-left', d: `M ${leftJoin} ${busY} H ${endX}` });
+        if (rightJoin > endX)
+          nextPaths.push({ id: 'hub-bus-right', d: `M ${rightJoin} ${busY} H ${endX}` });
+      }
     }
 
     rows.slice(1).forEach((row, rowIndex) => {
@@ -1256,10 +1288,14 @@ function FreeModelsContent({
         const parent = parentRow.reduce((closest, candidate) =>
           Math.abs(candidate.x - entry.x) < Math.abs(closest.x - entry.x) ? candidate : closest
         );
+        const bridgeY = parent.bottom + (entry.top - parent.bottom) / 2;
         parentById.set(entry.id, parent);
         nextPaths.push({
           id: entry.id,
-          d: `M ${entry.x} ${entry.top - 3} ${routeToParent(entry.x, entry.top - 3, parent.x, parent.bottom + 3)}`,
+          d:
+            Math.abs(entry.x - parent.x) < 1
+              ? `M ${entry.x} ${entry.top - 3} V ${parent.bottom + 3}`
+              : `M ${entry.x} ${entry.top - 3} V ${bridgeY} H ${parent.x} V ${parent.bottom + 3}`,
         });
       });
     });
@@ -1271,12 +1307,20 @@ function FreeModelsContent({
         let d = `M ${entry.x} ${entry.top - 3}`;
         let parent = parentById.get(current.id);
         while (parent) {
-          d += ` ${routeToParent(current.x, current.top - 3, parent.x, parent.bottom + 3)}`;
+          const bridgeY = parent.bottom + (current.top - parent.bottom) / 2;
+          d +=
+            Math.abs(current.x - parent.x) < 1
+              ? ` V ${parent.bottom + 3}`
+              : ` V ${bridgeY} H ${parent.x} V ${parent.bottom + 3}`;
           d += ` V ${parent.top - 3}`;
           current = parent;
           parent = parentById.get(current.id);
         }
-        d += ` ${routeToParent(current.x, current.top - 3, endX, routeLineEndY)}`;
+        if (directToHub) {
+          d += ` V ${routeLineEndY}`;
+        } else if (routeBusY !== null) {
+          d += ` ${routeBranchToBus(current.x, current.top - 3, routeBusY, endX)} V ${routeLineEndY}`;
+        }
         nextActivityPaths.push({ id: entry.id, d });
       });
     }

@@ -426,6 +426,44 @@ it('uses saved account access when native clients are uninstalled', async () => 
   expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
 });
 
+it('follows the actual active voice source through failover, completion and disabling', async () => {
+  const config = {
+    ...voiceSnapshot().config,
+    shortcutEnabled: true,
+    channels: [
+      { kind: 'model' as const, id: 'speech-one' },
+      { kind: 'model' as const, id: 'speech-two' },
+    ],
+  };
+  voice.setState({ snapshot: voiceSnapshot({ config, phase: 'transcribing', activeChannel: 0 }) });
+  await act(async () => {
+    renderer = create(<VoiceInputMain />);
+  });
+  const highlighted = () =>
+    renderer.root
+      .findAllByProps({ role: 'listitem' })
+      .flatMap((card, index) => (card.props.className.includes('is-active') ? [index] : []));
+  expect(highlighted()).toEqual([0]);
+  await act(async () => {
+    voice.setState({
+      snapshot: voiceSnapshot({ config, phase: 'transcribing', activeChannel: 1 }),
+    });
+  });
+  expect(highlighted()).toEqual([1]);
+  await act(async () => {
+    voice.setState({ snapshot: voiceSnapshot({ config }) });
+  });
+  expect(highlighted()).toEqual([]);
+  await act(async () => {
+    voice.setState({
+      snapshot: voiceSnapshot({ config: { ...config, shortcutEnabled: false }, activeChannel: 1 }),
+    });
+  });
+  expect(highlighted()).toEqual([]);
+  expect(voiceApi.saveVoiceConfig).not.toHaveBeenCalled();
+  expect(voiceApi.recordVoice).not.toHaveBeenCalled();
+});
+
 describe('voice source card ordering', () => {
   const channels = [
     { kind: 'workbuddy' as const, id: 'a'.repeat(64) },

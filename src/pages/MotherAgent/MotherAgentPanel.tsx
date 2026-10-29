@@ -349,21 +349,12 @@ export function MotherAgentPanel() {
             {/* Local server — always first */}
             <div
               onClick={() => !isProcessing && selectServer('local')}
-              className={`p-3 rounded transition-colors select-none flex items-center border bg-cyber-surface/60 ${isProcessing && selectedServerId !== 'local' ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'} ${
+              className={`p-[11px] rounded transition-colors select-none flex items-center border-2 ${isProcessing && selectedServerId !== 'local' ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'} ${
                 selectedServerId === 'local'
-                  ? 'border-cyber-accent'
-                  : 'border-transparent hover:bg-cyber-elevated/70'
+                  ? 'border-cyber-accent/70 bg-cyber-accent/10'
+                  : 'border-transparent bg-cyber-surface/60 hover:bg-cyber-elevated/70'
               }`}
             >
-              <div className="mr-3">
-                <div
-                  className={`w-4 h-4 rounded-full border-2 relative ${selectedServerId === 'local' ? 'border-cyber-accent' : 'border-cyber-border'}`}
-                >
-                  {selectedServerId === 'local' && (
-                    <div className="w-2 h-2 rounded-full bg-cyber-accent absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                  )}
-                </div>
-              </div>
               <div className="flex-1 min-w-0">
                 <div className="text-xs text-cyber-text-secondary mb-0.5 tracking-widest uppercase font-mono">
                   {t('mother.local')}
@@ -378,21 +369,12 @@ export function MotherAgentPanel() {
               <div
                 key={server.id}
                 onClick={() => !isProcessing && selectServer(server.id)}
-                className={`p-3 rounded transition-colors select-none flex items-center border bg-cyber-surface/60 ${isProcessing && selectedServerId !== server.id ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'} ${
+                className={`p-[11px] rounded transition-colors select-none flex items-center border-2 ${isProcessing && selectedServerId !== server.id ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'} ${
                   selectedServerId === server.id
-                    ? 'border-cyber-accent'
-                    : 'border-transparent hover:bg-cyber-elevated/70'
+                    ? 'border-cyber-accent/70 bg-cyber-accent/10'
+                    : 'border-transparent bg-cyber-surface/60 hover:bg-cyber-elevated/70'
                 }`}
               >
-                <div className="mr-3">
-                  <div
-                    className={`w-4 h-4 rounded-full border-2 relative ${selectedServerId === server.id ? 'border-cyber-accent' : 'border-cyber-border'}`}
-                  >
-                    {selectedServerId === server.id && (
-                      <div className="w-2 h-2 rounded-full bg-cyber-accent absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                    )}
-                  </div>
-                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1 mb-0.5">
                     <span className="text-xs text-cyber-text-secondary tracking-widest uppercase font-mono truncate flex-1 min-w-0">

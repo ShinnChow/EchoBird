@@ -7,7 +7,7 @@ import { voiceSnapshot } from '../pages/VoiceInput/testFixtures';
 import * as voiceApi from '../api/voiceInput';
 import { useSidebarStore } from '../stores/sidebarStore';
 import { useNavigationStore } from '../stores/navigationStore';
-import { Mic, Waypoints } from 'lucide-react';
+import { Mic, RefreshCw, Sparkles, Waypoints } from 'lucide-react';
 
 vi.mock('./BirdEasterEgg', () => ({ BirdEasterEgg: () => null }));
 const showToast = vi.hoisted(() => vi.fn());
@@ -51,6 +51,37 @@ const sourceConfig = {
 const routerGroups = [{ candidateIds: ['one'], groupEnabled: true }];
 
 describe('Sidebar', () => {
+  it('keeps the collapsed assistant spinning while working without marking another page active', () => {
+    useSidebarStore.setState({ collapsed: true });
+    act(() => {
+      renderer = create(<Sidebar {...baseProps} smartRouterGroups={[]} agentRunning />);
+    });
+    const assistant = () => renderer.root.findByProps({ 'aria-label': 'nav.motherAgent' });
+    expect(assistant().props['aria-current']).toBeUndefined();
+    expect(assistant().findByType(RefreshCw).props).toMatchObject({
+      size: 20,
+      className: 'animate-spin',
+    });
+    expect(
+      assistant()
+        .findAllByType('span')
+        .some((node) => node.props.className?.includes('bg-cyber-accent/15'))
+    ).toBe(true);
+    expect(baseProps.onPageChange).not.toHaveBeenCalled();
+    act(() => useSidebarStore.getState().setCollapsed(false));
+    expect(assistant().findByType(RefreshCw).props).toMatchObject({ size: 14 });
+    expect(assistant().findByType(Sparkles)).toBeDefined();
+    act(() => useSidebarStore.getState().setCollapsed(true));
+    expect(assistant().findByType(RefreshCw).props).toMatchObject({
+      size: 20,
+      className: 'animate-spin',
+    });
+    act(() =>
+      renderer.update(<Sidebar {...baseProps} smartRouterGroups={[]} agentRunning={false} />)
+    );
+    expect(assistant().findAllByType(RefreshCw)).toHaveLength(0);
+    expect(assistant().findByType(Sparkles)).toBeDefined();
+  });
   it('shows the developer entry only when enabled and removes the separate projects entry', () => {
     act(() => {
       renderer = create(<Sidebar {...baseProps} smartRouterGroups={[]} />);

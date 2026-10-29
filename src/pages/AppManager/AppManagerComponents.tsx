@@ -675,15 +675,7 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
         selected={isSelected}
         subtitle={isSmartRouterId(model.internalId) ? apiPath : undefined}
         onSelect={() => selectedTool && handleSelectModel(selectedTool, model.internalId)}
-        selection={
-          <div
-            className={`w-[16px] h-[16px] rounded-full border-2 flex items-center justify-center ${
-              isSelected ? 'border-cyber-accent' : 'border-cyber-border'
-            }`}
-          >
-            {isSelected && <div className="w-[8px] h-[8px] rounded-full bg-cyber-accent" />}
-          </div>
-        }
+        selection={null}
         badge={
           badge && (
             <span
@@ -753,21 +745,14 @@ export const ModelListSection: React.FC<ModelListSectionProps> = ({
 
     return (
       <div
-        className={`relative overflow-hidden p-3 rounded-card cursor-pointer transition-colors flex items-center gap-3 border ${
+        className={`relative overflow-hidden p-[11px] rounded-card cursor-pointer transition-colors flex items-center gap-3 border-2 ${
           isOfficialPending
-            ? 'bg-cyber-elevated border-transparent'
+            ? 'border-cyber-accent/70 bg-cyber-accent/10'
             : 'bg-cyber-surface border-transparent hover:bg-cyber-elevated'
         }`}
         onClick={() => selectedTool && handleSelectModel(selectedTool, officialSentinel)}
       >
         <div className="relative z-10 flex items-center gap-3 flex-shrink-0">
-          <div
-            className={`w-[16px] h-[16px] rounded-full border-2 flex items-center justify-center ${
-              isOfficialPending ? 'border-cyber-accent' : 'border-cyber-border'
-            }`}
-          >
-            {isOfficialPending && <div className="w-[8px] h-[8px] rounded-full bg-cyber-accent" />}
-          </div>
           {iconSrc ? (
             <img
               src={iconSrc}
@@ -1355,6 +1340,7 @@ export const AppManagerBottom: React.FC = () => {
       !!workBuddyAccounts.selectedId) ||
     ((selectedTool === 'trae' || selectedTool === 'traecn') && !!traeAccounts.selectedId) ||
     ((selectedTool === 'kirocrew' || selectedTool === 'kirocli') && !!kiroAccounts.selectedId);
+  const launchOptionsDisabled = noModelConfig || hasAccountSelected;
   // What will a click actually do?
   //  - "Apply" runs only when the user picked a model AND agreed to the config-write policy.
   //  - "Launch" runs whenever launchAfterApply is on, or unconditionally for desktop/no-config apps.
@@ -1453,12 +1439,12 @@ export const AppManagerBottom: React.FC = () => {
             )}
         </div>
         {/* Reserve the controls' space while installing so the action stays aligned.
-            Apps without model configuration keep the controls visible but disabled. */}
+            Account selections and apps without model configuration disable the controls. */}
         <div
           className={`flex flex-col gap-2 ${
             isCatalogOnly || isInstallAction || isPlugin
               ? 'invisible pointer-events-none'
-              : noModelConfig
+              : launchOptionsDisabled
                 ? 'opacity-40 pointer-events-none'
                 : ''
           }`}
@@ -1467,7 +1453,7 @@ export const AppManagerBottom: React.FC = () => {
           <label
             className="flex items-center gap-2 select-none"
             onClick={() => {
-              if (!noModelConfig) setLaunchAfterApply(!launchAfterApply);
+              if (!launchOptionsDisabled) setLaunchAfterApply(!launchAfterApply);
             }}
           >
             <div
@@ -1505,7 +1491,7 @@ export const AppManagerBottom: React.FC = () => {
           <label
             className="flex items-center gap-2 select-none"
             onClick={() => {
-              if (!noModelConfig) setAgreedConfigPolicy(!agreedConfigPolicy);
+              if (!launchOptionsDisabled) setAgreedConfigPolicy(!agreedConfigPolicy);
             }}
           >
             <div

@@ -130,9 +130,9 @@
   align-items: center;
   gap: 10px 0.25rem;
   min-height: 40px;
-  padding: 5px 10px 5px 8px;
+  padding: 4px 9px 4px 7px;
   background: rgb(var(--bg-surface-rgb) / 0.6);
-  border: 1px solid transparent;
+  border: 2px solid transparent;
   transition: border-color 180ms ease;
 }
 
@@ -202,7 +202,7 @@
   .free-model-route-row {
     grid-template-columns: minmax(0, 1fr) auto;
     row-gap: 2px;
-    padding-block: 4px;
+    padding-block: 3px;
   }
 
   .free-model-route-row-details {
@@ -284,7 +284,8 @@
 
 .free-model-route-node {
   background: rgb(var(--bg-surface-rgb) / 0.6);
-  border: 1px solid transparent;
+  border: 2px solid transparent;
+  padding: 11px;
   transition:
     background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
     border-color 180ms ease;

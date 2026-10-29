@@ -422,6 +422,121 @@ describe('VS Code model panel', () => {
   });
 });
 
+describe('account launch options', () => {
+  const accountTools = [
+    ['chatgptdesktop', 'selectedCodexAccountId'],
+    ['codex', 'selectedCodexAccountId'],
+    ['antigravity', 'antigravityAccounts'],
+    ['antigravitydesktop', 'antigravityAccounts'],
+    ['codearts', 'codeArtsAccounts'],
+    ['minimaxcode', 'minimaxAccounts'],
+    ['minimaxdesktop', 'minimaxAccounts'],
+    ['qoder', 'qoderAccounts'],
+    ['qodercn', 'qoderAccounts'],
+    ['dumate', 'dumateAccounts'],
+    ['doubaowork', 'doubaoAccounts'],
+    ['dola', 'doubaoAccounts'],
+    ['qwenwork', 'qwenWorkAccounts'],
+    ['qwenworkcn', 'qwenWorkAccounts'],
+    ['zcode', 'zcodeAccounts'],
+    ['kimicode', 'kimiAccounts'],
+    ['kimidesktop', 'kimiAccounts'],
+    ['devin', 'devinAccounts'],
+    ['devincli', 'devinAccounts'],
+    ['opendesign', 'openDesignAccounts'],
+    ['claudecode', 'claudeCodeAccounts'],
+    ['claudedesktop', 'claudeDesktopAccounts'],
+    ['dsh', 'deepSeekAccounts'],
+    ['grok', 'grokAccounts'],
+    ['cline', 'clineAccounts'],
+    ['clinedesktop', 'clineAccounts'],
+    ['kilo', 'kiloAccounts'],
+    ['kilodesktop', 'kiloAccounts'],
+    ['copilot', 'copilotAccounts'],
+    ['copilotdesktop', 'copilotAccounts'],
+    ['manus', 'manusAccounts'],
+    ['cue', 'cueAccounts'],
+    ['grokbot', 'grokBotAccounts'],
+    ['cursor', 'cursorAccounts'],
+    ['cursorcli', 'cursorAccounts'],
+    ['workbuddy', 'workBuddyAccounts'],
+    ['workbuddyai', 'workBuddyAccounts'],
+    ['trae', 'traeAccounts'],
+    ['traecn', 'traeAccounts'],
+    ['kirocrew', 'kiroAccounts'],
+    ['kirocli', 'kiroAccounts'],
+  ] as const;
+
+  it.each(accountTools)(
+    '%s disables both options only for the selected account',
+    async (client, field) => {
+      const { AppManagerBottom } = await import('./AppManagerComponents');
+      const context = {
+        selectedTool: client,
+        selectedToolData: { ...tool, id: client },
+        toolModelConfig: {},
+        [field]: field === 'selectedCodexAccountId' ? 'saved' : { selectedId: 'saved' },
+        viewMode: 'desktop',
+        launchAfterApply: true,
+        agreedConfigPolicy: false,
+        setLaunchAfterApply: vi.fn(),
+        setAgreedConfigPolicy: vi.fn(),
+        handleLaunch: vi.fn(),
+      } as unknown as AppManagerContextType;
+      let renderer: ReactTestRenderer | undefined;
+      const draw = () => (
+        <AppManagerContext.Provider value={{ ...context }}>
+          <AppManagerBottom />
+        </AppManagerContext.Provider>
+      );
+      try {
+        act(() => {
+          renderer = create(draw());
+        });
+        const options = () => renderer!.root.findAllByType('label');
+        expect(options()).toHaveLength(2);
+        expect(options()[0].parent!.props.className).toContain('opacity-40 pointer-events-none');
+        act(() => options().forEach((option) => option.props.onClick()));
+        expect(context.setLaunchAfterApply).not.toHaveBeenCalled();
+        expect(context.setAgreedConfigPolicy).not.toHaveBeenCalled();
+
+        Object.assign(context, {
+          [field]: field === 'selectedCodexAccountId' ? null : { selectedId: null },
+          toolModelConfig: { [client]: 'cloud-model' },
+        });
+        act(() => renderer!.update(draw()));
+        expect(options()[0].parent!.props.className).not.toContain('opacity-40');
+
+        // A tool without model configuration stays disabled even without an account.
+        context.selectedToolData = { ...tool, id: client, noModelConfig: true };
+        act(() => renderer!.update(draw()));
+        expect(options()[0].parent!.props.className).toContain('opacity-40 pointer-events-none');
+        act(() => options().forEach((option) => option.props.onClick()));
+        expect(context.setLaunchAfterApply).not.toHaveBeenCalled();
+        expect(context.setAgreedConfigPolicy).not.toHaveBeenCalled();
+
+        // Leaving the account tool must not lock an unrelated API model or write preferences.
+        Object.assign(context, {
+          [field]: field === 'selectedCodexAccountId' ? 'saved' : { selectedId: 'saved' },
+        });
+        context.selectedTool = 'test-tool';
+        context.selectedToolData = tool;
+        context.toolModelConfig = { 'test-tool': 'cloud-model' };
+        act(() => renderer!.update(draw()));
+        expect(options()[0].parent!.props.className).not.toContain('opacity-40');
+        expect(context.handleLaunch).not.toHaveBeenCalled();
+        expect(context.setLaunchAfterApply).not.toHaveBeenCalled();
+        expect(context.setAgreedConfigPolicy).not.toHaveBeenCalled();
+        act(() => options().forEach((option) => option.props.onClick()));
+        expect(context.setLaunchAfterApply).toHaveBeenCalledWith(false);
+        expect(context.setAgreedConfigPolicy).toHaveBeenCalledWith(true);
+      } finally {
+        act(() => renderer?.unmount());
+      }
+    }
+  );
+});
+
 describe('CodexAccountSection', () => {
   it('renders saved accounts with pending selection and current-state metadata', async () => {
     vi.stubGlobal('__APP_EDITION__', 'full');

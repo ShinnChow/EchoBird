@@ -206,11 +206,23 @@ export const Sidebar = ({
         />
         <NavItem
           collapsed={collapsed}
-          icon={<Sparkles size={20} />}
+          icon={
+            collapsed && agentRunning ? (
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 flex items-center justify-center rounded-lg bg-cyber-accent/15 text-cyber-accent"
+              >
+                <RefreshCw size={20} className="animate-spin" />
+              </span>
+            ) : (
+              <Sparkles size={20} />
+            )
+          }
           label={t('nav.motherAgent')}
           active={activePage === 'mother'}
           onClick={() => onPageChange('mother')}
           trailing={
+            !collapsed &&
             agentRunning && (
               <RefreshCw size={14} aria-hidden="true" className="animate-spin text-cyber-accent" />
             )
