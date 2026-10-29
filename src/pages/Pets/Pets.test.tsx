@@ -1,3 +1,4 @@
+import { Profiler } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { PetsMain, PetsPanel } from './Pets';
@@ -68,13 +69,22 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
-async function mount() {
+async function mount(onRender?: () => void) {
   await act(async () => {
-    view = create(
+    const content = (
       <>
         <PetsMain />
         <PetsPanel />
-      </>,
+      </>
+    );
+    view = create(
+      onRender ? (
+        <Profiler id="pets" onRender={onRender}>
+          {content}
+        </Profiler>
+      ) : (
+        content
+      ),
       {
         createNodeMock: (element) =>
           element.type === 'canvas'
@@ -128,6 +138,33 @@ it('advances experience and spends a small balance without a level-up or level-u
   ).toBeUndefined();
   expect(view.root.findByProps({ className: 'pets-upgrade' }).props.children).toBe('pets.upgrade');
   expect(view.root.findByProps({ className: 'pets-upgrade' }).props.disabled).toBe(true);
+});
+
+it.each([
+  [0, 40_000_000],
+  [90_000_000, 5_000_000],
+])('never overshoots partial experience %i + %i during completion', async (experience, balance) => {
+  pets.setState({ items: [{ id: 1, kind: 'mecha', level: 0, color: 0, experience }], balance });
+  let recording = false;
+  const frames: number[] = [];
+  await mount(() => {
+    if (recording)
+      frames.push(view.root.findByProps({ role: 'progressbar' }).props['aria-valuenow']);
+  });
+  recording = true;
+  upgrade();
+  act(() => mock.progress!(0.5));
+  act(() => mock.progress!(1));
+  // Observe the store notification before the local animation state is cleared.
+  mock.done!();
+  const target = ((experience + balance) / 100_000_000) * 100;
+  expect(frames[frames.length - 1]).toBe(target);
+  expect(frames.every((progress) => progress <= target)).toBe(true);
+  expect(frames.every((progress, index) => !index || progress >= frames[index - 1])).toBe(true);
+  expect(pets.getState().items[0]).toMatchObject({ level: 0, experience: experience + balance });
+  expect(pets.getState().balance).toBe(0);
+  expect(mock.sound.play).not.toHaveBeenCalled();
+  expect(view.root.findByProps({ role: 'progressbar' }).props['data-completing']).toBeUndefined();
 });
 
 it('finishes only the current level and resets the bar while keeping the remaining balance', async () => {

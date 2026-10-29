@@ -85,7 +85,10 @@ export function PetsMain() {
   const [completing, setCompleting] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
   const completionTimer = useRef<ReturnType<typeof setTimeout>>();
-  const progress = maxed ? 100 : Math.min(100, (((pet.experience ?? 0) + spending) / cost) * 100);
+  const pendingSpending = busy ? spending : 0;
+  const progress = maxed
+    ? 100
+    : Math.min(100, (((pet.experience ?? 0) + pendingSpending) / cost) * 100);
   const canvas = useRef<HTMLCanvasElement>(null);
   const scene = useRef<PetScene | null>(null);
   const audio = useRef<ReturnType<typeof createPetAudio> | null>(null);
