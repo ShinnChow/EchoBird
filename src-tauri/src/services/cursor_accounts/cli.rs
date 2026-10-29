@@ -274,6 +274,89 @@ pub async fn switch(id: &str) -> Result<Account, String> {
     summary(&login, Some(id))
 }
 
+#[cfg(target_os = "macos")]
+fn keychain_read(service: &str) -> Result<Option<String>, String> {
+    let output = crate::utils::process::command("/usr/bin/security")
+        .args([
+            "find-generic-password",
+            "-a",
+            "cursor-user",
+            "-s",
+            service,
+            "-w",
+        ])
+        .output()
+        .map_err(|_| "accountError.keychain")?;
+    if output.status.code() == Some(44) {
+        return Ok(None);
+    }
+    if !output.status.success() {
+        return Err("accountError.keychain".into());
+    }
+    String::from_utf8(output.stdout)
+        .map(|s| Some(s.trim_end_matches(['\r', '\n']).into()))
+        .map_err(|_| "accountError.keychain".into())
+}
+
+#[cfg(target_os = "macos")]
+fn keychain_write(service: &str, value: Option<&str>) -> Result<(), String> {
+    let mut command = crate::utils::process::command("/usr/bin/security");
+    if let Some(value) = value {
+        command.args([
+            "add-generic-password",
+            "-U",
+            "-a",
+            "cursor-user",
+            "-s",
+            service,
+            "-w",
+            value,
+        ]);
+    } else {
+        command.args([
+            "delete-generic-password",
+            "-a",
+            "cursor-user",
+            "-s",
+            service,
+        ]);
+    }
+    let output = command.output().map_err(|_| "accountError.keychain")?;
+    if output.status.success() || (value.is_none() && output.status.code() == Some(44)) {
+        Ok(())
+    } else {
+        Err("accountError.keychain".into())
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn keychain_apply(login: &Credentials) -> Result<(), String> {
+    let services = [
+        "cursor-access-token",
+        "cursor-refresh-token",
+        "cursor-api-key",
+    ];
+    let old = services
+        .iter()
+        .map(|s| keychain_read(s))
+        .collect::<Result<Vec<_>, _>>()?;
+    for (service, value) in services.iter().zip([
+        Some(login.access_token.as_str()),
+        Some(login.refresh_token.as_str()),
+        None,
+    ]) {
+        if let Err(error) = keychain_write(service, value) {
+            for (service, previous) in services.iter().zip(&old) {
+                if keychain_write(service, previous.as_deref()).is_err() {
+                    log::error!("Failed to restore Cursor CLI keychain entry");
+                }
+            }
+            return Err(error);
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -472,87 +555,4 @@ mod tests {
         assert!(recovered.refresh_token == login.refresh_token);
         assert!(std::fs::read(key_file).unwrap() == before);
     }
-}
-
-#[cfg(target_os = "macos")]
-fn keychain_read(service: &str) -> Result<Option<String>, String> {
-    let output = crate::utils::process::command("/usr/bin/security")
-        .args([
-            "find-generic-password",
-            "-a",
-            "cursor-user",
-            "-s",
-            service,
-            "-w",
-        ])
-        .output()
-        .map_err(|_| "accountError.keychain")?;
-    if output.status.code() == Some(44) {
-        return Ok(None);
-    }
-    if !output.status.success() {
-        return Err("accountError.keychain".into());
-    }
-    String::from_utf8(output.stdout)
-        .map(|s| Some(s.trim_end_matches(['\r', '\n']).into()))
-        .map_err(|_| "accountError.keychain".into())
-}
-
-#[cfg(target_os = "macos")]
-fn keychain_write(service: &str, value: Option<&str>) -> Result<(), String> {
-    let mut command = crate::utils::process::command("/usr/bin/security");
-    if let Some(value) = value {
-        command.args([
-            "add-generic-password",
-            "-U",
-            "-a",
-            "cursor-user",
-            "-s",
-            service,
-            "-w",
-            value,
-        ]);
-    } else {
-        command.args([
-            "delete-generic-password",
-            "-a",
-            "cursor-user",
-            "-s",
-            service,
-        ]);
-    }
-    let output = command.output().map_err(|_| "accountError.keychain")?;
-    if output.status.success() || (value.is_none() && output.status.code() == Some(44)) {
-        Ok(())
-    } else {
-        Err("accountError.keychain".into())
-    }
-}
-
-#[cfg(target_os = "macos")]
-fn keychain_apply(login: &Credentials) -> Result<(), String> {
-    let services = [
-        "cursor-access-token",
-        "cursor-refresh-token",
-        "cursor-api-key",
-    ];
-    let old = services
-        .iter()
-        .map(|s| keychain_read(s))
-        .collect::<Result<Vec<_>, _>>()?;
-    for (service, value) in services.iter().zip([
-        Some(login.access_token.as_str()),
-        Some(login.refresh_token.as_str()),
-        None,
-    ]) {
-        if let Err(error) = keychain_write(service, value) {
-            for (service, previous) in services.iter().zip(&old) {
-                if keychain_write(service, previous.as_deref()).is_err() {
-                    log::error!("Failed to restore Cursor CLI keychain entry");
-                }
-            }
-            return Err(error);
-        }
-    }
-    Ok(())
 }
