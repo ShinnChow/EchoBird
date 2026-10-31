@@ -694,7 +694,6 @@ export function MotherAgentProvider({ children }: { children: React.ReactNode })
       const conversation = conversations.find((c) => c.id === id);
       if (!conversation) return;
       resettingRef.current = true;
-      setIsResetting(true);
       try {
         const ok = await confirm({
           title: t('mother.deleteConversationTitle'),
@@ -707,6 +706,7 @@ export function MotherAgentProvider({ children }: { children: React.ReactNode })
           type: 'danger',
         });
         if (!ok) return;
+        setIsResetting(true);
         await deleteStoredConversation(id, async () => {
           const legacy = conversation.id.startsWith('legacy-');
           await api.resetConversationContext(

@@ -741,7 +741,8 @@ describe('Mother Agent saved conversation workflow', () => {
       callbacks.sendMessage('Blocked');
     });
     expect(confirm).toHaveBeenCalledOnce();
-    expect(state.isProcessing).toBe(true);
+    expect(state.isProcessing).toBe(false);
+    expect(state.isResetting).toBe(false);
     expect(state.activeConversationId).toBe(current);
     await act(async () => {
       decision.resolve(false);
