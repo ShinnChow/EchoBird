@@ -125,9 +125,22 @@ fn profile_meta(path: &Path, apply: bool) -> Result<serde_json::Value, String> {
     Ok(meta)
 }
 
-fn desktop_model_id(real_id: &str) -> &str {
+fn is_deepseek_official(url: &str) -> bool {
+    let authority = url.trim().split("://").last().unwrap_or_default();
+    let authority = authority.split(['/', '?', '#']).next().unwrap_or_default();
+    authority
+        .split(':')
+        .next()
+        .is_some_and(|host| host.eq_ignore_ascii_case("api.deepseek.com"))
+}
+
+fn desktop_model_id<'a>(real_id: &'a str, anthropic_url: &str) -> &'a str {
     let id = real_id.trim();
     let model = id.rsplit('/').next().unwrap_or(id).to_ascii_lowercase();
+    // DeepSeek resolves Claude aliases itself: opus selects its pro model, sonnet selects flash.
+    if model == "deepseek-flash" && is_deepseek_official(anthropic_url) {
+        return "claude-sonnet";
+    }
     if ["claude", "opus", "sonnet", "fable", "haiku"]
         .iter()
         .any(|prefix| {
@@ -306,7 +319,7 @@ fn apply_claudedesktop_at(
     // implement Desktop's `/v1/models` discovery probe.
     // `name` is sent directly upstream: retain Claude-like IDs, otherwise use
     // the provider's Claude alias. Save the actual model independently.
-    let base_model_id = desktop_model_id(real_model_id);
+    let base_model_id = desktop_model_id(real_model_id, &anthropic_url);
     let display_name = model_info
         .name
         .as_deref()
@@ -654,6 +667,28 @@ mod tests {
             }
         }
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn deepseek_official_flash_uses_the_sonnet_alias_only_on_its_own_host() {
+        let official = "https://api.deepseek.com/anthropic";
+        assert_eq!(
+            desktop_model_id("deepseek-flash", official),
+            "claude-sonnet"
+        );
+        assert_eq!(
+            desktop_model_id(" DeepSeek-Flash ", "HTTPS://API.DEEPSEEK.COM:443/anthropic"),
+            "claude-sonnet"
+        );
+        assert_eq!(desktop_model_id("deepseek-v4-pro", official), "claude-opus");
+        for url in [
+            "https://relay.example/anthropic",
+            "http://127.0.0.1:53683/anthropic",
+            "https://api.deepseek.com.evil.example/anthropic",
+            "https://relay.example/api.deepseek.com",
+        ] {
+            assert_eq!(desktop_model_id("deepseek-flash", url), "claude-opus");
+        }
     }
 
     #[test]
