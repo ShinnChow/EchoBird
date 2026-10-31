@@ -1,5 +1,6 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { DirectoryRow } from '../../components/DirectoryRow';
 import * as api from '../../api/tauri';
 import { ModelNexusPanel } from './ModelNexus';
@@ -14,7 +15,7 @@ vi.mock('./context', async (original) => ({
   useModelNexus: () => ({ setNewModelForm, setEditingModelId, setShowAddModelModal }),
 }));
 vi.mock('../../api/tauri', () => ({ getModelDirectory: vi.fn() }));
-vi.mock('../../components/DirectoryRow', () => ({ DirectoryRow: () => null }));
+vi.mock('@tauri-apps/plugin-shell', () => ({ open: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../components', () => ({
   getModelIcon: () => null,
   ModelCard: () => null,
@@ -27,6 +28,8 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 vi.mock('@tauri-apps/plugin-clipboard-manager', () => ({ readText: vi.fn() }));
 
 let renderer: ReactTestRenderer | undefined;
+const button = (label: string) =>
+  renderer!.root.find((node) => node.type === 'button' && node.props['aria-label'] === label);
 beforeEach(() => {
   vi.clearAllMocks();
   renderer = undefined;
@@ -57,10 +60,7 @@ it.each([
   await act(async () => {
     renderer = create(<ModelNexusPanel />);
   });
-  const row = renderer!.root
-    .findAllByType(DirectoryRow)
-    .find((row) => row.props.name === entry.name)!;
-  act(() => row.props.add.onClick());
+  act(() => button(`Add model: ${entry.name}`).props.onClick());
   expect(setNewModelForm).toHaveBeenCalledOnce();
   expect(setNewModelForm.mock.calls[0][0]).toMatchObject({
     name: entry.name,
@@ -88,9 +88,97 @@ it('keeps necessary unsupported-plan suggestions with a remote default, leaving 
   await act(async () => {
     renderer = create(<ModelNexusPanel />);
   });
-  act(() => renderer!.root.findByType(DirectoryRow).props.add.onClick());
+  act(() => button('Add model: BytePlus').props.onClick());
   expect(setNewModelForm.mock.calls[0][0]).toMatchObject({
     modelId: '',
     modelIdOptions: ['updated-preset', 'other-preset'],
   });
+});
+
+it('merges the MiniMax editions into one provider with switchable variants', async () => {
+  const edition = (name: string, host: string, region: 'cn' | 'global') => ({
+    name,
+    url: `https://www.${host}`,
+    baseUrl: `https://api.${host}/v1`,
+    anthropicUrl: `https://api.${host}/anthropic`,
+    region,
+  });
+  vi.mocked(api.getModelDirectory).mockResolvedValue({
+    providers: [
+      edition('MiniMax EN', 'minimax.io', 'global'),
+      edition('Other', 'other.test', 'global'),
+      edition('MiniMax CN', 'minimax.cn', 'cn'),
+    ],
+    relays: [],
+  });
+  await act(async () => {
+    renderer = create(<ModelNexusPanel />);
+  });
+  const labels = renderer!.root
+    .findAll((node) => node.type === 'button')
+    .map((node) => node.props['aria-label']);
+  expect(labels).toEqual(['Add model: MiniMax', 'Add model: Other']);
+  expect(shellOpen).not.toHaveBeenCalled();
+  act(() => button('Add model: MiniMax').props.onClick());
+  const form = setNewModelForm.mock.calls[0][0];
+  // File order, not the UI language, decides the default edition.
+  expect(form).toMatchObject({ name: 'MiniMax EN', baseUrl: 'https://api.minimax.io/v1' });
+  expect(form.directoryVariants.map((v: { name: string }) => v.name)).toEqual([
+    'MiniMax EN',
+    'MiniMax CN',
+  ]);
+});
+
+it('keeps sponsored relays as full cards and lists providers compactly', async () => {
+  const entry = (name: string) => ({
+    name,
+    url: 'https://fixture.test',
+    baseUrl: 'https://fixture.test/v1',
+    anthropicUrl: '',
+    region: 'global' as const,
+  });
+  vi.mocked(api.getModelDirectory).mockResolvedValue({
+    providers: [entry('Provider')],
+    relays: [entry('Relay')],
+  });
+  await act(async () => {
+    renderer = create(<ModelNexusPanel />);
+  });
+  expect(renderer!.root.findAllByType(DirectoryRow).map((row) => row.props.name)).toEqual([
+    'Relay',
+  ]);
+  act(() => button('Add model: Provider').props.onClick());
+  expect(setNewModelForm.mock.calls[0][0]).toMatchObject({ name: 'Provider' });
+});
+
+it('groups editions by the directory field and labels tabs by edition', async () => {
+  const edition = (name: string, host: string, label: string, region: 'cn' | 'global') => ({
+    name,
+    url: `https://${host}`,
+    baseUrl: `https://${host}/v1`,
+    anthropicUrl: '',
+    region,
+    group: 'Fixture Group',
+    edition: label,
+  });
+  vi.mocked(api.getModelDirectory).mockResolvedValue({
+    providers: [
+      edition('Fixture Intl', 'intl.fixture.test', 'Intl', 'global'),
+      edition('Fixture Home', 'home.fixture.test', 'Home', 'cn'),
+    ],
+    relays: [],
+  });
+  await act(async () => {
+    renderer = create(<ModelNexusPanel />);
+  });
+  act(() => button('Add model: Fixture Group').props.onClick());
+  expect(
+    setNewModelForm.mock.calls[0][0].directoryVariants.map((v: { name: string; label: string }) => [
+      v.name,
+      v.label,
+    ])
+  ).toEqual([
+    ['Fixture Intl', 'Intl'],
+    ['Fixture Home', 'Home'],
+  ]);
 });

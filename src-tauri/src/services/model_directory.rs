@@ -28,6 +28,12 @@ use serde_json::Value;
 /// directory" — the frontend's `getModelDirectory()` wrapper translates
 /// that into "keep using the bundled JSON."
 pub async fn fetch_model_directory() -> Value {
+    // Previewing unpublished directory edits: skip remote and cache so the
+    // frontend keeps the bundled JSON from this build.
+    if std::env::var_os("ECHOBIRD_BUNDLED_MODEL_DIRECTORY").is_some() {
+        log::info!("[ModelDirectory] Using bundled directory (ECHOBIRD_BUNDLED_MODEL_DIRECTORY)");
+        return Value::Null;
+    }
     let remote_url = "https://echobird.ai/api/model-directory/index.json";
     let cache_dir = dirs::home_dir()
         .unwrap_or_default()

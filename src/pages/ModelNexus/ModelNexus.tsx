@@ -28,7 +28,7 @@ import {
   sortableKeyboardCoordinates,
   arrayMove,
 } from '@dnd-kit/sortable';
-import { X, Lock, Unlock, RefreshCw, GripVertical } from 'lucide-react';
+import { X, Lock, Unlock, RefreshCw, GripVertical, Box, ExternalLink } from 'lucide-react';
 import { DirectoryRow } from '../../components/DirectoryRow';
 import { SortableCard } from '../../components/SortableCard';
 import { ModelCard, ModelCardSkeleton, getModelIcon } from '../../components';
@@ -38,7 +38,7 @@ import { useToast } from '../../components/Toast';
 import { useI18n } from '../../hooks/useI18n';
 import * as api from '../../api/tauri';
 import { normalizeAnthropicUrl, normalizeOpenaiUrl } from '../../utils/normalizeUrl';
-import { useModelNexus } from './context';
+import { useModelNexus, type DirectoryVariant } from './context';
 import modelDirectory from '../../data/modelDirectory.json';
 import { useFreeModels } from '../FreeModels/provider';
 import { AccountModelFields } from './AccountModelFields';
@@ -320,9 +320,8 @@ export function ModelNexusMain() {
 //   (offline, first install + firewall, etc.), and as the immediate
 //   first paint before the network round-trip lands.
 //
-// Per-entry fields (name / url / baseUrl / anthropicUrl / modelId /
-// region) and ordering rules (zh locale → 'cn' first, others → 'global'
-// first) are unchanged. Edit either the remote JSON or the bundled
+// Entries render in file order in every language; `region` stays in the
+// data only for older clients. Edit either the remote JSON or the bundled
 // JSON; remote wins when both are present.
 type DirectoryEntry = {
   name: string;
@@ -333,30 +332,41 @@ type DirectoryEntry = {
   modelId?: string;
   modelIds?: string[];
   region: 'cn' | 'global';
+  group?: string;
+  edition?: string;
 };
 
 const BUNDLED_PROVIDERS: DirectoryEntry[] = modelDirectory.providers as DirectoryEntry[];
 
 const BUNDLED_RELAYS: DirectoryEntry[] = modelDirectory.relays as DirectoryEntry[];
 
-// Locale-aware reorder: zh* surfaces 'cn' entries first; everything else
-// surfaces 'global' first. Within each region we keep the curated JSON order
-// (Array.prototype.sort is stable in modern engines).
-function sortByLocale(list: DirectoryEntry[], locale: string): DirectoryEntry[] {
-  const cnFirst = locale.toLowerCase().startsWith('zh');
-  const weight = (e: DirectoryEntry) =>
-    cnFirst ? (e.region === 'cn' ? 0 : 1) : e.region === 'global' ? 0 : 1;
-  return [...list].sort((a, b) => weight(a) - weight(b));
+// Older remote/cache payloads can still contain obsolete model IDs.
+function directoryVariant(entry: DirectoryEntry): DirectoryVariant {
+  const preset = [...BUNDLED_PROVIDERS, ...BUNDLED_RELAYS].find(
+    (preset) => preset.baseUrl === entry.baseUrl && preset.anthropicUrl === entry.anthropicUrl
+  );
+  const hasPreset = !!(preset?.modelId || preset?.modelIds?.length);
+  const candidates = hasPreset ? (entry.modelIds ?? preset?.modelIds ?? []) : [];
+  const defaultId = hasPreset ? entry.modelId || preset?.modelId : undefined;
+  return {
+    name: entry.name,
+    label: editionInfo(entry).edition ?? entry.name,
+    url: entry.url,
+    baseUrl: entry.baseUrl,
+    anthropicUrl: entry.anthropicUrl,
+    modelIdOptions: defaultId
+      ? [defaultId, ...candidates.filter((id) => id !== defaultId)]
+      : candidates,
+  };
 }
 
-function ProviderRow({ entry, onAdd }: { entry: DirectoryEntry; onAdd: () => void }) {
-  const iconSrc = getModelIcon(entry.name, '');
+function RelayRow({ entry, onAdd }: { entry: DirectoryEntry; onAdd: () => void }) {
   const openSite = () => shellOpen(entry.url).catch(() => window.open(entry.url, '_blank'));
   return (
     <DirectoryRow
       name={entry.name}
       url={entry.url}
-      iconSrc={iconSrc}
+      iconSrc={getModelIcon(entry.name, '')}
       onOpen={openSite}
       openLabel={`Open ${entry.name} website`}
       add={{ onClick: onAdd, label: `Add model: ${entry.name}` }}
@@ -364,8 +374,81 @@ function ProviderRow({ entry, onAdd }: { entry: DirectoryEntry; onAdd: () => voi
   );
 }
 
+// Editions of one company (regions or plans) share a `group`. A remote or
+// cached directory without the field falls back to the bundled entry with
+// the same endpoints, so grouping does not wait for the remote update.
+function editionInfo(entry: DirectoryEntry): Pick<DirectoryEntry, 'group' | 'edition'> {
+  if (entry.group) return entry;
+  const bundled = BUNDLED_PROVIDERS.find(
+    (b) => b.baseUrl === entry.baseUrl && b.anthropicUrl === entry.anthropicUrl
+  );
+  return { group: bundled?.group, edition: bundled?.edition };
+}
+
+type ProviderItem = { name: string; entries: DirectoryEntry[] };
+
+function groupProviders(entries: DirectoryEntry[]): ProviderItem[] {
+  const items: ProviderItem[] = [];
+  const grouped = new Map<string, ProviderItem>();
+  for (const entry of entries) {
+    const group = editionInfo(entry).group;
+    if (!group) {
+      items.push({ name: entry.name, entries: [entry] });
+      continue;
+    }
+    const existing = grouped.get(group);
+    if (existing) {
+      existing.entries.push(entry);
+    } else {
+      const item = { name: group, entries: [entry] };
+      grouped.set(group, item);
+      items.push(item);
+    }
+  }
+  // A group with only one edition present keeps that edition's own name.
+  return items.map((item) =>
+    item.entries.length === 1 ? { ...item, name: item.entries[0].name } : item
+  );
+}
+
+function ProviderTile({
+  name,
+  iconName,
+  onAdd,
+}: {
+  name: string;
+  iconName: string;
+  onAdd: () => void;
+}) {
+  const iconSrc = getModelIcon(iconName, '');
+  return (
+    <button
+      type="button"
+      onClick={onAdd}
+      aria-label={`Add model: ${name}`}
+      className="group flex min-w-0 items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-cyber-elevated/50"
+    >
+      {iconSrc ? (
+        <img
+          src={iconSrc}
+          alt=""
+          className="h-5 w-5 flex-shrink-0"
+          onError={(event) => {
+            event.currentTarget.style.display = 'none';
+          }}
+        />
+      ) : (
+        <Box size={18} className="flex-shrink-0 text-cyber-text" aria-hidden="true" />
+      )}
+      <span className="min-w-0 truncate text-sm text-cyber-text-secondary transition-colors group-hover:text-cyber-text">
+        {name}
+      </span>
+    </button>
+  );
+}
+
 export function ModelNexusPanel() {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
 
   // Bundled JSON paints immediately, remote swaps in if newer content
   // is available. Failure modes (remote down + cache miss): backend
@@ -391,47 +474,31 @@ export function ModelNexusPanel() {
     };
   }, []);
 
-  // One scrolling list under two headed sections (no tab switcher). Group order
-  // flips with the UI language: zh locales put the 中转站 (cn) section on top;
-  // other locales surface the providers (global) section first, 中转站 below.
+  // One scrolling list under two headed sections: sponsored relays on top,
+  // providers below. Both keep the directory file order in every language.
   const sections = useMemo(() => {
-    const relaysSorted = sortByLocale(relays, locale);
-    const providersSorted = sortByLocale(providers, locale);
-    const cnFirst = locale.toLowerCase().startsWith('zh');
-    const ordered: { key: string; title: string; entries: DirectoryEntry[] }[] = cnFirst
-      ? [
-          { key: 'relays', title: t('model.relays'), entries: relaysSorted },
-          { key: 'providers', title: t('model.providers'), entries: providersSorted },
-        ]
-      : [
-          { key: 'providers', title: t('model.providers'), entries: providersSorted },
-          { key: 'relays', title: t('model.relays'), entries: relaysSorted },
-        ];
+    const ordered: { key: string; title: string; entries: DirectoryEntry[] }[] = [
+      { key: 'relays', title: t('model.relays'), entries: relays },
+      { key: 'providers', title: t('model.providers'), entries: providers },
+    ];
     // Hide a group the directory doesn't currently provide.
     return ordered.filter((s) => s.entries.length > 0);
-  }, [locale, providers, relays, t]);
+  }, [providers, relays, t]);
   const { setNewModelForm, setEditingModelId, setShowAddModelModal } = useModelNexus();
 
-  const handleAddFromEntry = useCallback(
-    (entry: DirectoryEntry) => {
-      // Older remote/cache payloads can still contain obsolete model IDs.
-      const preset = [...BUNDLED_PROVIDERS, ...BUNDLED_RELAYS].find(
-        (preset) => preset.baseUrl === entry.baseUrl && preset.anthropicUrl === entry.anthropicUrl
-      );
-      const hasPreset = !!(preset?.modelId || preset?.modelIds?.length);
-      const candidates = hasPreset ? (entry.modelIds ?? preset?.modelIds ?? []) : [];
-      const defaultId = hasPreset ? entry.modelId || preset?.modelId : undefined;
-      const options = defaultId
-        ? [defaultId, ...candidates.filter((id) => id !== defaultId)]
-        : candidates;
+  const openAddModel = useCallback(
+    (entries: DirectoryEntry[]) => {
+      const variants = entries.map(directoryVariant);
+      const first = variants[0];
       setNewModelForm({
-        name: entry.name,
-        baseUrl: entry.baseUrl,
-        anthropicUrl: entry.anthropicUrl,
+        name: first.name,
+        baseUrl: first.baseUrl,
+        anthropicUrl: first.anthropicUrl,
         apiKey: '',
         // Discovery chooses the default; presets apply only when it is unsupported.
         modelId: '',
-        modelIdOptions: options,
+        modelIdOptions: first.modelIdOptions,
+        directoryVariants: variants.length > 1 ? variants : undefined,
       });
       setEditingModelId(null);
       setShowAddModelModal(true);
@@ -450,11 +517,25 @@ export function ModelNexusPanel() {
             </span>
             <span className="flex-1 h-px bg-cyber-border/60" />
           </div>
-          <div className="space-y-2">
-            {section.entries.map((entry) => (
-              <ProviderRow key={entry.name} entry={entry} onAdd={() => handleAddFromEntry(entry)} />
-            ))}
-          </div>
+          {section.key === 'relays' ? (
+            // Sponsored relays keep their full cards.
+            <div className="space-y-2">
+              {section.entries.map((entry) => (
+                <RelayRow key={entry.name} entry={entry} onAdd={() => openAddModel([entry])} />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+              {groupProviders(section.entries).map((item) => (
+                <ProviderTile
+                  key={item.name}
+                  name={item.name}
+                  iconName={item.entries[0].name}
+                  onAdd={() => openAddModel(item.entries)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -462,6 +543,43 @@ export function ModelNexusPanel() {
 }
 
 // ===== Add/Edit Model Modal =====
+
+function DirectoryVariantTabs({
+  variants,
+  baseUrl,
+  anthropicUrl,
+  onSelect,
+}: {
+  variants: DirectoryVariant[];
+  baseUrl: string;
+  anthropicUrl: string;
+  onSelect: (variant: DirectoryVariant) => void;
+}) {
+  const active = variants.find((v) => v.baseUrl === baseUrl && v.anthropicUrl === anthropicUrl);
+  const site = active?.url;
+  return (
+    <div className="flex items-stretch gap-2">
+      <ViewModeTabs
+        value={active?.name ?? ''}
+        options={variants.map((v) => ({ value: v.name, label: v.label }))}
+        onChange={(name) => {
+          const variant = variants.find((v) => v.name === name);
+          if (variant) onSelect(variant);
+        }}
+      />
+      {site && (
+        <button
+          type="button"
+          onClick={() => shellOpen(site).catch(() => window.open(site, '_blank'))}
+          aria-label={`Open ${active?.name} website`}
+          className="flex items-center justify-center px-1 text-cyber-text-secondary transition-colors hover:text-cyber-text"
+        >
+          <ExternalLink size={20} strokeWidth={2} aria-hidden="true" />
+        </button>
+      )}
+    </div>
+  );
+}
 
 export function AddModelModal() {
   const { t } = useI18n();
@@ -600,6 +718,29 @@ export function AddModelModal() {
                   className="w-full bg-cyber-input border border-cyber-border px-2 py-1.5 text-xs text-cyber-text font-mono focus:border-cyber-border focus:outline-none rounded-button"
                 />
               </div>
+            )}
+            {!newModelForm.accountSource && newModelForm.directoryVariants && (
+              <DirectoryVariantTabs
+                variants={newModelForm.directoryVariants}
+                baseUrl={newModelForm.baseUrl}
+                anthropicUrl={newModelForm.anthropicUrl}
+                onSelect={(variant) =>
+                  setNewModelForm((prev) => {
+                    const current = prev.directoryVariants?.find(
+                      (v) => v.baseUrl === prev.baseUrl && v.anthropicUrl === prev.anthropicUrl
+                    );
+                    return {
+                      ...prev,
+                      // Keep a name the user typed; replace only the edition's own name.
+                      name: !prev.name || prev.name === current?.name ? variant.name : prev.name,
+                      baseUrl: variant.baseUrl,
+                      anthropicUrl: variant.anthropicUrl,
+                      modelId: '',
+                      modelIdOptions: variant.modelIdOptions,
+                    };
+                  })
+                }
+              />
             )}
             {newModelForm.accountSource ? (
               <AccountModelFields

@@ -414,3 +414,58 @@ it('deactivates model fetching immediately on Cancel and ignores success during 
   expect(context.showAddModelModal).toBe(false);
   expect(catalogApi.fetchUpstreamModelCatalog).toHaveBeenCalledOnce();
 });
+
+it('switches regional editions in place, keeping a typed name and key', async () => {
+  const variants = [
+    {
+      name: 'MiniMax CN',
+      label: 'MiniMax CN',
+      url: 'https://www.minimax.cn',
+      baseUrl: 'https://api.minimax.cn/v1',
+      anthropicUrl: 'https://api.minimax.cn/anthropic',
+      modelIdOptions: [],
+    },
+    {
+      name: 'MiniMax EN',
+      label: 'MiniMax EN',
+      url: 'https://www.minimax.io',
+      baseUrl: 'https://api.minimax.io/v1',
+      anthropicUrl: 'https://api.minimax.io/anthropic',
+      modelIdOptions: ['preset-model'],
+    },
+  ];
+  await mount();
+  await openAdd({
+    name: 'MiniMax CN',
+    baseUrl: variants[0].baseUrl,
+    anthropicUrl: variants[0].anthropicUrl,
+    modelId: '',
+    modelIdOptions: [],
+    directoryVariants: variants,
+  });
+  const tab = (name: string) =>
+    renderer!.root
+      .findAll((node) => node.type === 'button' && node.props['aria-pressed'] !== undefined)
+      .find((node) => node.children.includes(name))!;
+  expect(tab('MiniMax CN').props['aria-pressed']).toBe(true);
+  const site = () =>
+    renderer!.root.findAll(
+      (node) => node.type === 'button' && /website$/.test(node.props['aria-label'] ?? '')
+    )[0]?.props['aria-label'];
+  expect(site()).toBe('Open MiniMax CN website');
+  await act(async () => tab('MiniMax EN').props.onClick());
+  expect(context.newModelForm).toMatchObject({
+    name: 'MiniMax EN',
+    baseUrl: variants[1].baseUrl,
+    anthropicUrl: variants[1].anthropicUrl,
+    apiKey: 'fixture-key',
+    modelId: '',
+    modelIdOptions: ['preset-model'],
+  });
+  expect(tab('MiniMax EN').props['aria-pressed']).toBe(true);
+  expect(site()).toBe('Open MiniMax EN website');
+  await act(async () => context.setNewModelForm((prev) => ({ ...prev, name: 'My MiniMax' })));
+  await act(async () => tab('MiniMax CN').props.onClick());
+  expect(context.newModelForm).toMatchObject({ name: 'My MiniMax', baseUrl: variants[0].baseUrl });
+  expectNoModelActions();
+});

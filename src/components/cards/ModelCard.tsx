@@ -60,8 +60,8 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
     [['kimi', 'moonshot'], 'kimi'],
     [['longcat', '美团', 'meituan', '龙猫'], 'longcat'],
     [['glm', 'zhipu', '智谱', 'z.ai', 'bigmodel'], 'glm'],
-    [['ernie', 'wenxin', '文心'], 'ernie'],
-    [['hunyuan', '混元', 'hy'], 'hunyuan'],
+    [['ernie', 'wenxin', '文心', 'qianfan', '千帆', 'baidu'], 'ernie'],
+    [['hunyuan', '混元', 'hy', 'tencent', '腾讯'], 'hunyuan'],
     [['cohere', 'command'], 'cohere'],
     [['perplexity', 'pplx'], 'perplexity'],
     [['together'], 'together'],
@@ -87,6 +87,13 @@ export const getModelIcon = (name: string, modelId?: string): string | null => {
     // brand — such as provider rows, which pass modelId=''. Model ID and vendor
     // are separate concerns; do not move resellers above model brands.
     [['siliconflow', 'siliconcloud', '硅基流动'], 'siliconcloud'],
+    [['huawei', 'modelarts'], 'huaweicloud'],
+    [['iflytek', 'xf-yun', 'astron', '讯飞'], 'iflytek'],
+    [['ant ling', 'ant-ling', '百灵'], 'antling'],
+    [['novita'], 'novita'],
+    [['fireworks'], 'fireworks'],
+    [['baseten'], 'baseten'],
+    [['nous'], 'nousresearch'],
     [['ccvibe', 'cc vibe', 'cc-vibe'], 'ccvibe'],
     // 88API — token aggregation relay hosting many model brands; matches on
     // its own name only, so it never outranks a recognized model brand above.

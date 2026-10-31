@@ -20,6 +20,18 @@ export interface NewModelForm {
   modelIdOptions?: string[];
   freeModelIds?: string[];
   accountSource?: AccountSource;
+  // Regional editions of one directory provider (e.g. CN / EN). Two or more
+  // → the Add-Model modal shows a tab switcher that fills the fields below.
+  directoryVariants?: DirectoryVariant[];
+}
+
+export interface DirectoryVariant {
+  name: string;
+  label: string;
+  url: string;
+  baseUrl: string;
+  anthropicUrl: string;
+  modelIdOptions: string[];
 }
 
 export type ModelModalDestination = 'modelNexus' | 'freeRouter' | 'voiceInput';

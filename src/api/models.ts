@@ -174,6 +174,10 @@ export interface ModelDirectoryEntry {
   modelId?: string;
   modelIds?: string[];
   region: 'cn' | 'global';
+  // Editions of one company share a group and appear as one list item.
+  group?: string;
+  // Short tab label for an edition; defaults to the entry name.
+  edition?: string;
 }
 
 /** Full directory payload — what `getModelDirectory` resolves to on success. */

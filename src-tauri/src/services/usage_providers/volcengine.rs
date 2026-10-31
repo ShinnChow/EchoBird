@@ -556,7 +556,7 @@ mod tests {
             let providers = directory["providers"].as_array().unwrap();
             let cn = providers
                 .iter()
-                .find(|entry| entry["name"] == "火山引擎")
+                .find(|entry| entry["name"] == "Volcengine Coding Plan")
                 .unwrap();
             for key in ["baseUrl", "anthropicUrl"] {
                 assert!(VolcengineProvider.can_handle(cn[key].as_str().unwrap()));
