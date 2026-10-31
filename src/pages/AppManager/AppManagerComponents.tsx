@@ -14,6 +14,7 @@ import { WorkBuddyAccountSection } from './WorkBuddyAccountSection';
 import { TraeAccountSection } from './TraeAccountSection';
 import { KiroAccountSection } from './KiroAccountSection';
 import { ZCodeAccountSection } from './ZCodeAccountSection';
+import { PluginToolAccountSection } from './PluginToolAccountSection';
 import { KimiAccountSection } from './KimiAccountSection';
 import { CodeArtsAccountSection } from './CodeArtsAccountSection';
 import { MinimaxAccountSection } from './MinimaxAccountSection';
@@ -957,6 +958,7 @@ export const AppManagerPanel: React.FC = () => {
     dsh1mMode,
     setDshCapability,
     isLaunching,
+    pluginAccounts,
   } = useAppManager();
 
   const isClaudeDesktopApp = selectedTool === 'claudedesktop';
@@ -1192,6 +1194,9 @@ export const AppManagerPanel: React.FC = () => {
               {['kimicode', 'kimidesktop'].includes(selectedTool ?? '') && (
                 <KimiAccountSection showDivider={hasVisibleModels} />
               )}
+              {selectedTool === pluginAccounts?.provider?.application && (
+                <PluginToolAccountSection showDivider={hasVisibleModels} />
+              )}
               {(selectedTool === 'minimaxcode' || selectedTool === 'minimaxdesktop') && (
                 <MinimaxAccountSection showDivider={hasVisibleModels} />
               )}
@@ -1269,6 +1274,7 @@ export const AppManagerBottom: React.FC = () => {
     kiroAccounts,
     zcodeAccounts,
     kimiAccounts,
+    pluginAccounts,
     codeArtsAccounts,
     devinAccounts,
     openDesignAccounts,
@@ -1319,6 +1325,7 @@ export const AppManagerBottom: React.FC = () => {
     (['qwenwork', 'qwenworkcn'].includes(selectedTool ?? '') && !!qwenWorkAccounts.selectedId) ||
     (selectedTool === 'zcode' && !!zcodeAccounts.selectedId) ||
     (['kimicode', 'kimidesktop'].includes(selectedTool ?? '') && !!kimiAccounts.selectedId) ||
+    (selectedTool === pluginAccounts?.provider?.application && !!pluginAccounts.selectedId) ||
     (['devin', 'devincli'].includes(selectedTool ?? '') && !!devinAccounts.selectedId) ||
     (selectedTool === 'opendesign' && !!openDesignAccounts.selectedId) ||
     ((selectedTool === 'codex' || selectedTool === 'chatgptdesktop') && !!selectedCodexAccountId) ||
@@ -1360,6 +1367,7 @@ export const AppManagerBottom: React.FC = () => {
     (selectedTool === 'codearts' && codeArtsAccounts.busy) ||
     (selectedTool === 'zcode' && zcodeAccounts.busy) ||
     (['kimicode', 'kimidesktop'].includes(selectedTool ?? '') && kimiAccounts.busy) ||
+    (selectedTool === pluginAccounts?.provider?.application && pluginAccounts.busy) ||
     (['devin', 'devincli'].includes(selectedTool ?? '') && devinAccounts.busy) ||
     (selectedTool === 'opendesign' && openDesignAccounts.busy) ||
     (['minimaxcode', 'minimaxdesktop'].includes(selectedTool ?? '') && minimaxAccounts.busy) ||

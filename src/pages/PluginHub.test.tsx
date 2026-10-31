@@ -4,6 +4,7 @@ import * as api from '../api/plugins';
 import type { InstalledPlugin, PluginCandidate, PluginRegistry } from '../api/plugins';
 import { usePluginsStore as store } from '../stores/pluginsStore';
 import { PluginHubMain, PluginHubPanel } from './PluginHub';
+import { pluginCategories } from './PluginHub';
 import { ConfirmDialogProvider } from '../components/ConfirmDialog';
 import { useNavigationStore } from '../stores/navigationStore';
 import bundledIndex from '../data/pluginIndex.json';
@@ -248,17 +249,25 @@ it('places page plugins in Apps and the native modules in Account login without 
     view.root.findAllByType('article').map((node) => node.findByType('strong').props.children)
   ).toEqual(
     bundledRegistry.plugins
-      .filter((plugin) => plugin.releases[0].manifest.echobird.contributes.pages.length)
+      .filter(
+        (plugin) =>
+          plugin.releases[0].manifest.echobird.contributes.pages.length ||
+          plugin.releases[0].manifest.category === 'application'
+      )
       .map((plugin) => plugin.releases[0].manifest.displayName)
   );
-  expect(view.root.findAllByType('article')).toHaveLength(2);
+  expect(view.root.findAllByType('article')).toHaveLength(3);
   act(() => button('plugins.category.account').props.onClick());
-  expect(view.root.findAllByType('article')).toHaveLength(8);
+  expect(view.root.findAllByType('article')).toHaveLength(9);
   expect(
     view.root.findAllByType('article').map((node) => node.findByType('strong').props.children)
   ).toEqual(
     bundledRegistry.plugins
-      .filter((plugin) => plugin.releases[0].manifest.category === 'account')
+      .filter((plugin) =>
+        (plugin.releases[0].manifest.categories ?? [plugin.releases[0].manifest.category]).includes(
+          'account'
+        )
+      )
       .map((plugin) => plugin.releases[0].manifest.displayName)
   );
   act(() => button('plugins.category.appearance').props.onClick());
@@ -663,4 +672,14 @@ it('a failed install preserves the existing plugin and displays the explicit err
   );
   expect(store.getState().installed).toEqual([installed]);
   expect(JSON.stringify(view.toJSON())).toContain('disk unavailable');
+});
+
+it('lists one plugin under every category it declares', () => {
+  const manifest = {
+    category: 'application',
+    categories: ['application', 'account'],
+    echobird: { contributes: { pages: [] } },
+  } as unknown as Parameters<typeof pluginCategories>[0];
+  expect(pluginCategories(manifest)).toEqual(['application', 'account']);
+  expect(pluginCategories({ ...manifest, categories: undefined })).toEqual(['application']);
 });

@@ -542,3 +542,30 @@ fn zip_expansion_counts_implicit_directories_and_rejects_deep_paths() {
         b"b"
     );
 }
+
+#[test]
+fn application_tools_require_a_service_for_the_same_application() {
+    let mut value = serde_json::json!({
+        "name":"tool","publisher":"fixture","version":"1.0.0","displayName":"Tool",
+        "description":"Tool","license":"MIT","repository":"https://example.com/tool",
+        "tools":[{"id":"fixture-tool","directory":"tools/fixture"}],
+        "echobird":{"manifestVersion":1,"apiVersion":"0.1-draft",
+            "platforms":["windows","macos","linux"],"permissions":["account.code"],
+            "worker":{"runtime":"node","entry":"service.mjs"},
+            "contributes":{"pages":[],"providers":[{"id":"fixture","title":"Fixture",
+                "applications":["fixture-tool"],"operations":["accounts"]}]}}
+    });
+    let parse =
+        |value: &serde_json::Value| serde_json::from_value::<Manifest>(value.clone()).unwrap();
+    assert!(parse(&value).validate().is_ok());
+    assert_eq!(parse(&value).tools()[0].id, "fixture-tool");
+
+    value["echobird"]["contributes"]["providers"][0]["applications"][0] = "other".into();
+    assert!(parse(&value).validate().is_err());
+    value["echobird"]["contributes"]["providers"][0]["applications"][0] = "fixture-tool".into();
+    value["tools"][0]["directory"] = "../outside".into();
+    assert!(parse(&value).validate().is_err());
+    value["tools"][0]["directory"] = "tools/fixture".into();
+    value["echobird"]["worker"]["runtime"] = "native".into();
+    assert!(parse(&value).validate().is_err());
+}

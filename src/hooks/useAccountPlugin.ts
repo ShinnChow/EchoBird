@@ -1,6 +1,7 @@
 import { usePluginsStore } from '../stores/pluginsStore';
 import { useNavigationStore } from '../stores/navigationStore';
 import type { InstalledPlugin } from '../api/plugins';
+import { accountProxyProviders } from '../api/accountProxy';
 import { useCallback } from 'react';
 
 export const communityAccountApplications = [
@@ -14,6 +15,44 @@ export const communityAccountApplications = [
   'traecn',
 ];
 
+export interface PluginToolProvider {
+  application: string;
+  applications: string[];
+  pluginId: string;
+  providerId: string;
+  name: string;
+  icon: string;
+}
+
+/** Applications contributed by enabled plugins, with their account provider. */
+export function pluginToolProviders(
+  plugins: InstalledPlugin[],
+  active: boolean
+): PluginToolProvider[] {
+  if (!active) return [];
+  return plugins
+    .filter((plugin) => plugin.enabled)
+    .flatMap((plugin) =>
+      (plugin.manifest.tools ?? []).flatMap((tool) => {
+        const provider = plugin.manifest.echobird.contributes.providers?.find((entry) =>
+          entry.applications.includes(tool.id)
+        );
+        return provider
+          ? [
+              {
+                application: tool.id,
+                applications: provider.applications,
+                pluginId: plugin.id,
+                providerId: provider.id,
+                name: provider.title,
+                icon: plugin.icon ?? '',
+              },
+            ]
+          : [];
+      })
+    );
+}
+
 export function hasAccountPlugin(
   application: string,
   plugins: InstalledPlugin[],
@@ -24,12 +63,30 @@ export function hasAccountPlugin(
     plugins.some(
       (plugin) =>
         plugin.enabled &&
-        plugin.manifest.echobird.worker?.runtime === 'native' &&
+        (plugin.manifest.echobird.worker?.runtime === 'native' ||
+          !!plugin.manifest.tools?.length) &&
         plugin.manifest.echobird.contributes.providers?.some((provider) =>
           provider.applications.includes(application)
         )
     )
   );
+}
+
+/** Built-in account sources plus those contributed by plugin applications. */
+export function accountProxySources(): typeof accountProxyProviders {
+  return [
+    ...accountProxyProviders,
+    ...pluginToolProviders(
+      usePluginsStore.getState().installed,
+      useNavigationStore.getState().developerMode
+    )
+      .filter((provider) => provider.application === provider.applications[0])
+      .map((provider) => ({
+        id: `plugin:${provider.application}` as const,
+        name: provider.name,
+        icon: provider.icon,
+      })),
+  ];
 }
 
 export function accountPluginAvailable(application: string): boolean {
@@ -51,6 +108,8 @@ export function useAccountProviderFilter() {
   const active = useNavigationStore((state) => state.developerMode);
   return useCallback(
     (provider: { id: string }) => {
+      if (provider.id.startsWith('plugin:'))
+        return hasAccountPlugin(provider.id.slice('plugin:'.length), plugins, active);
       const application = (
         {
           claudeCode: 'claudecode',

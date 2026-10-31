@@ -387,6 +387,99 @@ fn load_tool_definitions() -> Vec<ToolDefinition> {
     load_tool_definitions_with_overrides(true)
 }
 
+/// Parse one catalog directory, shared by built-in and plugin applications.
+fn load_tool_directory(
+    tool_id: String,
+    path: &Path,
+    user_overrides: &HashMap<String, Vec<String>>,
+) -> Option<ToolDefinition> {
+    let paths_file = path.join("paths.json");
+    // Prefer models.json (canonical name for the model-field mapping file).
+    // Fall back to config.json so legacy bundled or user-installed tools
+    // that haven't migrated still load.
+    let models_file = path.join("models.json");
+    let config_file = if models_file.exists() {
+        models_file
+    } else {
+        path.join("config.json")
+    };
+
+    if !paths_file.exists() || !config_file.exists() {
+        return None;
+    }
+
+    // Parse paths.json
+    let mut paths_config: PathsConfig = match fs::read_to_string(&paths_file) {
+        Ok(content) => match serde_json::from_str(&content) {
+            Ok(pc) => pc,
+            Err(e) => {
+                log::warn!(
+                    "[ToolManager] Failed to parse {}/paths.json: {}",
+                    tool_id,
+                    e
+                );
+                return None;
+            }
+        },
+        Err(e) => {
+            log::warn!("[ToolManager] Failed to read {}/paths.json: {}", tool_id, e);
+            return None;
+        }
+    };
+
+    // Merge any user-supplied custom paths for this tool (current OS) on
+    // top of the bundled defaults, so an install at a non-default location
+    // is still detected. See load_user_path_overrides.
+    if let Some(extra) = user_overrides.get(&tool_id) {
+        apply_user_path_overrides(&mut paths_config, extra);
+    }
+
+    // Parse models.json (or config.json fallback — `config_file` already
+    // points at whichever one we found above).
+    let mut config_mapping: ConfigMapping = match fs::read_to_string(&config_file) {
+        Ok(content) => match serde_json::from_str(&content) {
+            Ok(cm) => cm,
+            Err(e) => {
+                let fname = config_file
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("models.json");
+                log::warn!("[ToolManager] Failed to parse {}/{}: {}", tool_id, fname, e);
+                return None;
+            }
+        },
+        Err(e) => {
+            let fname = config_file
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("models.json");
+            log::warn!("[ToolManager] Failed to read {}/{}: {}", tool_id, fname, e);
+            return None;
+        }
+    };
+
+    // Auto-fill the parts of models.json a Vibe-Coding user shouldn't have
+    // to type. The loader lets them author just the `write` block (5
+    // lines for the canonical OpenAI / Anthropic shape); we infer
+    // everything else from paths.json + the write map itself.
+    backfill_config_mapping(&mut config_mapping, &paths_config);
+
+    log::info!(
+        "[ToolManager] Loaded tool: {} ({}) | start_command={:?}, command={}",
+        tool_id,
+        paths_config.name,
+        paths_config.start_command,
+        paths_config.command
+    );
+
+    Some(ToolDefinition {
+        id: tool_id,
+        paths_config,
+        config_mapping,
+        tool_dir: path.to_string_lossy().to_string(),
+    })
+}
+
 /// Core loader. `apply_overrides` gates the user `~/.echobird/tool-paths.json`
 /// merge: scanning and launching want it ON (via the cached `get_definitions`),
 /// while `default_override_seed` wants it OFF — the seed must reflect PURE
@@ -420,97 +513,25 @@ fn load_tool_definitions_with_overrides(apply_overrides: bool) -> Vec<ToolDefini
         if !path.is_dir() {
             continue;
         }
-
-        let tool_id = match path.file_name().and_then(|n| n.to_str()) {
-            Some(name) => name.to_string(),
-            None => continue,
-        };
-
-        let paths_file = path.join("paths.json");
-        // Prefer models.json (canonical name for the model-field mapping file).
-        // Fall back to config.json so legacy bundled or user-installed tools
-        // that haven't migrated still load.
-        let models_file = path.join("models.json");
-        let config_file = if models_file.exists() {
-            models_file
-        } else {
-            path.join("config.json")
-        };
-
-        if !paths_file.exists() || !config_file.exists() {
+        let Some(tool_id) = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(str::to_string)
+        else {
             continue;
-        }
-
-        // Parse paths.json
-        let mut paths_config: PathsConfig = match fs::read_to_string(&paths_file) {
-            Ok(content) => match serde_json::from_str(&content) {
-                Ok(pc) => pc,
-                Err(e) => {
-                    log::warn!(
-                        "[ToolManager] Failed to parse {}/paths.json: {}",
-                        tool_id,
-                        e
-                    );
-                    continue;
-                }
-            },
-            Err(e) => {
-                log::warn!("[ToolManager] Failed to read {}/paths.json: {}", tool_id, e);
-                continue;
-            }
         };
+        definitions.extend(load_tool_directory(tool_id, &path, &user_overrides));
+    }
 
-        // Merge any user-supplied custom paths for this tool (current OS) on
-        // top of the bundled defaults, so an install at a non-default location
-        // is still detected. See load_user_path_overrides.
-        if let Some(extra) = user_overrides.get(&tool_id) {
-            apply_user_path_overrides(&mut paths_config, extra);
-        }
-
-        // Parse models.json (or config.json fallback — `config_file` already
-        // points at whichever one we found above).
-        let mut config_mapping: ConfigMapping = match fs::read_to_string(&config_file) {
-            Ok(content) => match serde_json::from_str(&content) {
-                Ok(cm) => cm,
-                Err(e) => {
-                    let fname = config_file
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("models.json");
-                    log::warn!("[ToolManager] Failed to parse {}/{}: {}", tool_id, fname, e);
-                    continue;
-                }
-            },
-            Err(e) => {
-                let fname = config_file
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("models.json");
-                log::warn!("[ToolManager] Failed to read {}/{}: {}", tool_id, fname, e);
-                continue;
+    if apply_overrides {
+        for (tool_id, path) in super::plugin_accounts::tool_directories() {
+            if !definitions
+                .iter()
+                .any(|definition| definition.id == tool_id)
+            {
+                definitions.extend(load_tool_directory(tool_id, &path, &user_overrides));
             }
-        };
-
-        // Auto-fill the parts of models.json a Vibe-Coding user shouldn't have
-        // to type. The loader lets them author just the `write` block (5
-        // lines for the canonical OpenAI / Anthropic shape); we infer
-        // everything else from paths.json + the write map itself.
-        backfill_config_mapping(&mut config_mapping, &paths_config);
-
-        log::info!(
-            "[ToolManager] Loaded tool: {} ({}) | start_command={:?}, command={}",
-            tool_id,
-            paths_config.name,
-            paths_config.start_command,
-            paths_config.command
-        );
-
-        definitions.push(ToolDefinition {
-            id: tool_id,
-            paths_config,
-            config_mapping,
-            tool_dir: path.to_string_lossy().to_string(),
-        });
+        }
     }
 
     log::info!(

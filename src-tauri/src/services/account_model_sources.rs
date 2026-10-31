@@ -14,9 +14,9 @@ pub struct SavedAccountOption {
     pub plan: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub region: Option<minimax_accounts::Region>,
-    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub model_labels: std::collections::BTreeMap<String, String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub free_model_ids: Vec<String>,
 }
 
@@ -136,7 +136,7 @@ pub async fn list_accounts(provider: AccountProvider) -> Result<Vec<SavedAccount
             .into_iter()
             .map(|a| option(provider, a.id, a.login, a.plan))
             .collect(),
-        Trae | Traecn => unreachable!("Account capability is supplied by a plugin"),
+        Trae | Traecn | Plugin(_) => unreachable!("Account capability is supplied by a plugin"),
         Minimax => minimax_accounts::list_saved_accounts()
             .await?
             .into_iter()
@@ -308,7 +308,7 @@ pub(crate) async fn connection_endpoint(source: &AccountSource) -> Result<String
             serde_json::json!({"baseUrl": account.region.base()})
         }
         Kiro => super::kiro_accounts::connection_metadata(&source.account_id)?,
-        Trae | Traecn => unreachable!("Account capability is supplied by a plugin"),
+        Trae | Traecn | Plugin(_) => unreachable!("Account capability is supplied by a plugin"),
         Copilot => super::copilot_accounts::proxy_credentials(&source.account_id, false).await?,
         Devin => super::devin_accounts::proxy_credentials(&source.account_id).await?,
         _ => Value::Null,
@@ -365,7 +365,7 @@ pub(crate) async fn credentials(
         Copilot => {
             super::copilot_accounts::proxy_credentials(&source.account_id, force_refresh).await
         }
-        Trae | Traecn => unreachable!("Account capability is supplied by a plugin"),
+        Trae | Traecn | Plugin(_) => unreachable!("Account capability is supplied by a plugin"),
         Minimax => minimax_accounts::proxy_credentials(&source.account_id, force_refresh).await,
         Qoder | QoderCn => {
             qoder_accounts::proxy_credentials(
@@ -505,7 +505,7 @@ pub(crate) async fn credentials_after_rejection(
             )
             .await
         }
-        Trae | Traecn => unreachable!("Account capability is supplied by a plugin"),
+        Trae | Traecn | Plugin(_) => unreachable!("Account capability is supplied by a plugin"),
     }
     .map(|credentials| preparation_credentials(credentials, source))
 }

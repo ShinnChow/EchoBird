@@ -59,6 +59,10 @@ function pluginDescription(
   );
 }
 
+export function pluginCategories(manifest: PluginManifest): PluginCategory[] {
+  return manifest.categories?.length ? manifest.categories : [pluginCategory(manifest)];
+}
+
 function pluginCategory(manifest: PluginManifest): PluginCategory {
   if (manifest.category)
     return categories.includes(manifest.category) ? manifest.category : 'other';
@@ -491,7 +495,7 @@ export function PluginHubMain({ active }: { active: boolean }) {
         .join(' ')}`
         .toLowerCase()
         .includes(query.toLowerCase());
-    return (category === 'all' || pluginCategory(manifest) === category) && matchesText;
+    return (category === 'all' || pluginCategories(manifest).includes(category)) && matchesText;
   });
   const skeleton =
     store.loading &&

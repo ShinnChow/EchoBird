@@ -1,7 +1,6 @@
-import { useAccountProviderFilter } from '../../hooks/useAccountPlugin';
+import { accountProxySources, useAccountProviderFilter } from '../../hooks/useAccountPlugin';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  accountProxyProviders,
   accountSpeechProviders,
   accountModelPickerOptions,
   cacheAccountProxyModels,
@@ -206,7 +205,7 @@ export function AccountModelFields({
       ...form,
       name:
         (account ? accountProxyIdentityLabel(account, t) : undefined) ??
-        (voice ? accountSpeechProviders : accountProxyProviders).find(
+        (voice ? accountSpeechProviders : accountProxySources()).find(
           (entry) => entry.id === next.provider
         )?.name ??
         '',
@@ -218,7 +217,7 @@ export function AccountModelFields({
   const savedAccounts = accounts.filter((account) => account.source.provider === provider);
   const selectedAccount = savedAccounts.find((account) => account.source.accountId === accountId);
   const modelLabels = selectedAccount?.modelLabels;
-  const providers = (voice ? accountSpeechProviders : accountProxyProviders).filter(available);
+  const providers = (voice ? accountSpeechProviders : accountProxySources()).filter(available);
   return (
     <>
       <div>

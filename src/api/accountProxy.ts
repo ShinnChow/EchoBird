@@ -40,6 +40,9 @@ export const accountSpeechProviders: typeof accountProxyProviders = [
   { id: 'qwenwork', name: 'QwenWork', icon: 'qwenwork.svg', speechPrefix: 'qwenwork' },
 ];
 
+export const accountProviderIconSrc = (icon: string) =>
+  icon.includes(':') ? icon : `/icons/tools/${icon}`;
+
 export function speechSourceFromSelector(selector: string): AccountSource | undefined {
   if (selector.length > 512) return undefined;
   const [prefix, accountId, ...model] = selector.split(':');

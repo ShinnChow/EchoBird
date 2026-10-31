@@ -1,4 +1,9 @@
-import { communityAccountApplications, hasAccountPlugin } from '../../hooks/useAccountPlugin';
+import {
+  communityAccountApplications,
+  hasAccountPlugin,
+  pluginToolProviders,
+} from '../../hooks/useAccountPlugin';
+import { usePluginToolAccounts } from './usePluginToolAccounts';
 import { useCursorAccounts } from './useCursorAccounts';
 import { useAntigravityAccounts } from './useAntigravityAccounts';
 import { useDeepSeekAccounts } from './useDeepSeekAccounts';
@@ -75,10 +80,27 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const installedPlugins = usePluginsStore((state) => state.installed);
   const loadPlugins = usePluginsStore((state) => state.load);
   const developerMode = useNavigationStore((state) => state.developerMode);
-  const detectedTools = useMemo(
-    () => [...scannedTools, ...(developerMode ? pluginTools(installedPlugins) : [])],
-    [scannedTools, installedPlugins, developerMode]
+  const pluginProviders = useMemo(
+    () => pluginToolProviders(installedPlugins, developerMode),
+    [installedPlugins, developerMode]
   );
+  const detectedTools = useMemo(
+    () => [
+      ...scannedTools.map((tool) => {
+        const icon = pluginProviders.find((entry) => entry.application === tool.id)?.icon;
+        return icon ? { ...tool, icon } : tool;
+      }),
+      ...(developerMode ? pluginTools(installedPlugins) : []),
+    ],
+    [scannedTools, installedPlugins, developerMode, pluginProviders]
+  );
+  const pluginToolIds = pluginProviders.map((entry) => entry.application).join();
+  const scannedPluginTools = useRef(pluginToolIds);
+  useEffect(() => {
+    if (scannedPluginTools.current === pluginToolIds) return;
+    scannedPluginTools.current = pluginToolIds;
+    void scanTools();
+  }, [pluginToolIds, scanTools]);
   useEffect(() => {
     if (developerMode) void loadPlugins();
   }, [developerMode, loadPlugins]);
@@ -637,6 +659,22 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const kimiTool = selectedTool === 'kimicode' ? 'kimicode' : 'kimidesktop';
   const kimiModel = toolModelConfig[kimiTool];
   const kimiSelectionRevision = useRef(0);
+  const pluginAccountProvider =
+    pluginProviders.find((entry) => entry.application === selectedTool) ?? pluginProviders[0];
+  const pluginAccountTool = pluginAccountProvider?.application ?? '';
+  const pluginAccounts = usePluginToolAccounts(
+    pluginAccountProvider,
+    !!pluginAccountTool &&
+      !usingCachedTools &&
+      detectedTools.some(
+        (tool) => pluginAccountProvider?.applications.includes(tool.id) && tool.installed
+      ) &&
+      (activePage === 'accounts' || (accountsEnabled && selectedTool === pluginAccountTool)),
+    !!toolModelConfig[pluginAccountTool],
+    () => setToolModelConfig((prev) => ({ ...prev, [pluginAccountTool]: null })),
+    setApplyError,
+    activePage === 'accounts' ? 'plugin' : pluginAccountTool
+  );
   const kimiAccounts = useKimiAccounts(
     accountGroupEnabled('kimicode', 'kimidesktop'),
     !!kimiModel,
@@ -706,6 +744,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     if (toolId === 'qoder' || toolId === 'qodercn') qoderAccounts.select(null);
     if (toolId === 'zcode') zcodeAccounts.select(null);
     if (toolId === 'kimicode' || toolId === 'kimidesktop') kimiAccounts.select(null);
+    if (toolId === pluginAccounts.provider?.application) pluginAccounts.select(null);
     if (toolId === 'opendesign') openDesignAccounts.select(null);
     if (toolId === 'cursor' || toolId === 'cursorcli') cursorAccounts.select(null);
     if (toolId === 'grokbot') grokBotAccounts.select(null);
@@ -1084,6 +1123,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     if (selectedTool === 'codearts' && codeArtsAccounts.busy) return;
     if (selectedTool === 'zcode' && zcodeAccounts.busy) return;
     if (['kimicode', 'kimidesktop'].includes(selectedTool) && kimiAccounts.busy) return;
+    if (selectedTool === pluginAccountTool && pluginAccounts.busy) return;
     if (['devin', 'devincli'].includes(selectedTool ?? '') && devinAccounts.busy) return;
     if (selectedTool === 'opendesign' && openDesignAccounts.busy) return;
     if (selectedTool === 'claudedesktop' && claudeDesktopAccounts.busy) return;
@@ -1128,6 +1168,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
       !(selectedTool === 'zcode' && zcodeAccounts.selectedId) &&
       !(selectedTool === 'codearts' && codeArtsAccounts.selectedId) &&
       !(['kimicode', 'kimidesktop'].includes(selectedTool) && kimiAccounts.selectedId) &&
+      !(selectedTool === pluginAccountTool && pluginAccounts.selectedId) &&
       !(['devin', 'devincli'].includes(selectedTool ?? '') && devinAccounts.selectedId) &&
       !(selectedTool === 'opendesign' && openDesignAccounts.selectedId) &&
       !(selectedTool === 'dsh' && deepSeekAccounts.selectedId) &&
@@ -1490,6 +1531,38 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         finishLaunch();
       }
       return;
+    } else if (selectedTool === pluginAccountTool && pluginAccounts.selectedId) {
+      const current = () =>
+        accountNavigation.current.tool === selectedTool &&
+        accountNavigation.current.page === activePage;
+      try {
+        const cwd = launchAfterApply ? await pickWorkingDirectory() : undefined;
+        if (cwd === null || !current()) return;
+        await pluginAccounts.apply(pluginAccounts.selectedId);
+        setDetectedTools((prev) =>
+          prev.map((tool) =>
+            pluginAccountProvider?.applications.includes(tool.id)
+              ? { ...tool, activeModel: '' }
+              : tool
+          )
+        );
+        if (current()) {
+          setToolModelConfig((prev) => ({
+            ...prev,
+            ...Object.fromEntries(
+              (pluginAccountProvider?.applications ?? []).map((id) => [id, null])
+            ),
+          }));
+          await pluginAccounts.reload();
+        }
+        if (launchAfterApply && current())
+          await api.startTool(selectedTool, toolData?.startCommand, cwd);
+      } catch (error) {
+        if (current()) setApplyError(accountError(error, t));
+      } finally {
+        finishLaunch();
+      }
+      return;
     } else if (['kimicode', 'kimidesktop'].includes(selectedTool) && kimiAccounts.selectedId) {
       const selectionRevision = kimiSelectionRevision.current;
       const current = () =>
@@ -1715,6 +1788,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
           ...zcodeAccounts,
           accounts: orderedAccounts('zcode', zcodeAccounts.accounts),
         },
+        pluginAccounts,
         kimiAccounts: {
           ...kimiAccounts,
           accounts: orderedAccounts('kimi', kimiAccounts.accounts),
@@ -1872,7 +1946,10 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         setClaude1mMode,
         handleLaunch,
         onGoToMother: handleGoToMother,
-        aiInstallableIds,
+        aiInstallableIds: [
+          ...aiInstallableIds,
+          ...pluginProviders.map((entry) => entry.application),
+        ],
         viewMode,
         setViewMode,
       }}

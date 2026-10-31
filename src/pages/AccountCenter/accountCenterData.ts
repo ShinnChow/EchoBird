@@ -791,6 +791,28 @@ export function accountCenterProviders(
         metrics: [quota(account.usage?.remainingPercent, account.usage?.resetAt)],
       })
     ),
+    ...(context.pluginAccounts?.provider
+      ? [
+          provider(
+            `plugin:${context.pluginAccounts.provider.application}`,
+            context.pluginAccounts.provider.name,
+            context.pluginAccounts.provider.icon,
+            context.pluginAccounts.provider.applications,
+            context.pluginAccounts,
+            (account) => ({
+              identity: account.email,
+              plan: account.plan,
+              metrics: [
+                credits(
+                  t('model.balance'),
+                  account.remaining ?? undefined,
+                  account.total ?? undefined
+                ),
+              ],
+            })
+          ),
+        ]
+      : []),
     ...(['manus', 'cue'] as const).map((tool) =>
       provider(
         tool,

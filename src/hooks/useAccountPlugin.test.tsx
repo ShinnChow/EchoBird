@@ -1,6 +1,12 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, expect, it } from 'vitest';
-import { hasAccountPlugin, useAccountProviderFilter } from './useAccountPlugin';
+import type { InstalledPlugin } from '../api/plugins';
+import {
+  accountProxySources,
+  hasAccountPlugin,
+  pluginToolProviders,
+  useAccountProviderFilter,
+} from './useAccountPlugin';
 import { installedAccountPlugins } from '../test/accountPlugins';
 import { usePluginsStore } from '../stores/pluginsStore';
 import { useNavigationStore } from '../stores/navigationStore';
@@ -104,4 +110,59 @@ it.each(['trae', 'traecn'])('%s appears only for its own installed and enabled m
     })
   );
   expect(visible).not.toContain(id);
+});
+
+it('application plugins provide accounts through their service worker', () => {
+  const plugin = {
+    id: 'fixture.tool',
+    enabled: true,
+    icon: 'data:image/png;base64,AA==',
+    manifest: {
+      tools: [{ id: 'fixture-tool', directory: 'tools/fixture' }],
+      echobird: {
+        worker: { runtime: 'node', entry: 'service.mjs' },
+        contributes: {
+          pages: [],
+          providers: [{ id: 'fixture', title: 'Fixture', applications: ['fixture-tool'] }],
+        },
+      },
+    },
+  } as unknown as InstalledPlugin;
+  expect(hasAccountPlugin('fixture-tool', [plugin], true)).toBe(true);
+  expect(hasAccountPlugin('fixture-tool', [plugin], false)).toBe(false);
+  expect(pluginToolProviders([plugin], true)).toEqual([
+    expect.objectContaining({ application: 'fixture-tool', providerId: 'fixture' }),
+  ]);
+  expect(pluginToolProviders([{ ...plugin, enabled: false }], true)).toEqual([]);
+  usePluginsStore.setState({
+    installed: [
+      {
+        ...plugin,
+        manifest: {
+          ...plugin.manifest,
+          tools: [
+            { id: 'fixture-tool', directory: 'tools/fixture' },
+            { id: 'fixture-cli', directory: 'tools/cli' },
+          ],
+          echobird: {
+            ...plugin.manifest.echobird,
+            contributes: {
+              pages: [],
+              providers: [
+                {
+                  id: 'fixture',
+                  title: 'Fixture',
+                  applications: ['fixture-tool', 'fixture-cli'],
+                },
+              ],
+            },
+          },
+        },
+      },
+    ],
+  });
+  useNavigationStore.setState({ developerMode: true });
+  expect(accountProxySources().filter((source) => source.id.startsWith('plugin:'))).toEqual([
+    expect.objectContaining({ id: 'plugin:fixture-tool' }),
+  ]);
 });

@@ -22,6 +22,8 @@ export interface PluginManifest {
   repository: string;
   icon?: string;
   category?: PluginCategory;
+  categories?: PluginCategory[];
+  tools?: { id: string; directory: string }[];
   echobird: {
     manifestVersion: number;
     apiVersion: string;

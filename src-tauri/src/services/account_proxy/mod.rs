@@ -46,7 +46,7 @@ pub(crate) fn connection_base(
     require_text_provider(provider)?;
     use AccountProvider::*;
     match provider {
-        ClaudeCode | WorkBuddy | WorkBuddyAi | DoubaoWork | Dola | Trae | Traecn => {
+        ClaudeCode | WorkBuddy | WorkBuddyAi | DoubaoWork | Dola | Trae | Traecn | Plugin(_) => {
             Err(ProxyError::new(
                 StatusCode::BAD_REQUEST,
                 "Account capability is supplied by a plugin",

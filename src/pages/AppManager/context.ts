@@ -20,6 +20,7 @@ import type { useClaudeCodeAccounts } from './useClaudeCodeAccounts';
 import type { useClaudeDesktopAccounts } from './useClaudeDesktopAccounts';
 import type { useCodexAccounts } from './useCodexAccounts';
 import type { useKiloAccounts, useCopilotAccounts } from './useClientAccounts';
+import type { usePluginToolAccounts } from './usePluginToolAccounts';
 import { createContext, useContext } from 'react';
 import type { ModelConfig, LocalTool } from '../../api/types';
 import type { CodexAccount } from '../../api/tauri';
@@ -54,6 +55,7 @@ export interface AppManagerContextType {
   >;
   zcodeAccounts: ReturnType<typeof useZCodeAccounts>;
   kimiAccounts: ReturnType<typeof useKimiAccounts>;
+  pluginAccounts: ReturnType<typeof usePluginToolAccounts>;
   codeArtsAccounts: ReturnType<typeof useCodeArtsAccounts>;
   devinAccounts: ReturnType<typeof useDevinAccounts>;
   openDesignAccounts: ReturnType<typeof useOpenDesignAccounts>;

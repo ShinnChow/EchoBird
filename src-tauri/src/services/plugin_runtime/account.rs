@@ -59,7 +59,7 @@ impl PluginRuntime {
             .worker
             .as_ref()
             .ok_or("Account plugin has no code module")?;
-        if worker.runtime.as_deref() == Some("native") {
+        if worker.runtime.as_deref() == Some("native") || !manifest.tools().is_empty() {
             let application = provider
                 .applications
                 .first()

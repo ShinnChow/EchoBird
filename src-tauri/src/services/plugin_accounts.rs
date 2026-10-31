@@ -121,18 +121,72 @@ async fn handshake(
     serde_json::from_str(&line).map_err(|_| "Invalid account extension handshake".into())
 }
 
+/// Native modules and application packages use the persistent account protocol.
+fn runs_service(manifest: &super::plugin_manager::manifest::Manifest) -> bool {
+    manifest.echobird.worker.as_ref().is_some_and(|worker| {
+        worker.runtime.as_deref() == Some("native") || !manifest.tools().is_empty()
+    })
+}
+
+/// Node cannot start a script from a Windows verbatim path, which canonicalize returns.
+fn node_entry(path: &std::path::Path) -> std::path::PathBuf {
+    let text = path.to_string_lossy();
+    match text.strip_prefix(r"\\?\") {
+        Some(plain) if !plain.starts_with("UNC\\") => plain.into(),
+        _ => path.into(),
+    }
+}
+
+/// Catalog directories of enabled plugin applications, as `(id, directory)`.
+pub fn tool_directories() -> Vec<(String, std::path::PathBuf)> {
+    if super::developer_preview::token().is_err() {
+        return Vec::new();
+    }
+    let manager = PluginManager::default();
+    manager
+        .list()
+        .unwrap_or_default()
+        .iter()
+        .filter(|plugin| plugin.enabled)
+        .flat_map(|plugin| {
+            let package = manager
+                .package_root(plugin)
+                .and_then(|root| root.canonicalize().map_err(|e| e.to_string()))
+                .ok();
+            plugin.manifest.tools().into_iter().filter_map(move |tool| {
+                let package = package.clone()?;
+                let directory = package.join(&tool.directory).canonicalize().ok()?;
+                directory
+                    .starts_with(&package)
+                    .then_some((tool.id, directory))
+            })
+        })
+        .collect()
+}
+
+pub fn provides_tool(application: &str) -> bool {
+    tool_directories().iter().any(|(id, _)| id == application)
+}
+
+/// Install references of enabled plugin applications, as `(id, json)`.
+pub fn tool_install_references() -> Vec<(String, String)> {
+    tool_directories()
+        .into_iter()
+        .filter_map(|(id, directory)| {
+            let reference = std::fs::read_to_string(directory.join("install.json")).ok()?;
+            serde_json::from_str::<Value>(&reference).ok()?;
+            Some((id, reference))
+        })
+        .collect()
+}
+
 fn contribution(application: &str) -> Result<Option<InstalledPlugin>, String> {
     let mut installed = PluginManager::default()
         .list()?
         .into_iter()
         .filter(|plugin| {
             plugin.enabled
-                && plugin
-                    .manifest
-                    .echobird
-                    .worker
-                    .as_ref()
-                    .is_some_and(|worker| worker.runtime.as_deref() == Some("native"))
+                && runs_service(&plugin.manifest)
                 && plugin
                     .manifest
                     .echobird
@@ -159,6 +213,9 @@ fn allows(plugin: &InstalledPlugin, application: &str, operation: &str) -> bool 
         "connection" | "metadata" => "models",
         operation => operation,
     };
+    if matches!(operation, "model.read" | "model.apply" | "model.restore") {
+        return plugin.manifest.tools().iter().any(|t| t.id == application);
+    }
     plugin
         .manifest
         .echobird
@@ -184,6 +241,7 @@ pub fn application(provider: crate::models::model::AccountProvider) -> Option<&'
         Dola => Some("dola"),
         Trae => Some("trae"),
         Traecn => Some("traecn"),
+        Plugin(application) => Some(application.0),
         _ => None,
     }
 }
@@ -200,7 +258,8 @@ async fn worker(plugin: &InstalledPlugin, application: &str) -> Result<Arc<Worke
         .unwrap()
         .get(&plugin.id)
         .filter(|worker| {
-            worker.application == application
+            // An application package serves all its tools from one process.
+            (worker.application == application || !plugin.manifest.tools().is_empty())
                 && worker.directory == plugin.directory
                 && worker.manifest == plugin.manifest
                 && !worker.cancelled.is_cancelled()
@@ -234,8 +293,13 @@ async fn worker(plugin: &InstalledPlugin, application: &str) -> Result<Arc<Worke
     if !executable.starts_with(root.canonicalize().map_err(|e| e.to_string())?) {
         return Err("Account module escapes its package".into());
     }
+    let native = manifest
+        .echobird
+        .worker
+        .as_ref()
+        .is_some_and(|worker| worker.runtime.as_deref() == Some("native"));
     #[cfg(unix)]
-    {
+    if native {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o700))
             .map_err(|e| e.to_string())?;
@@ -262,7 +326,15 @@ async fn worker(plugin: &InstalledPlugin, application: &str) -> Result<Arc<Worke
         uuid::Uuid::new_v4().simple(),
         uuid::Uuid::new_v4().simple()
     );
-    let mut command = crate::utils::process::async_command(executable);
+    let mut command = if native {
+        crate::utils::process::async_command(executable)
+    } else {
+        let node =
+            which::which("node").map_err(|_| "Node.js is required for this application plugin")?;
+        let mut command = crate::utils::process::async_command(node);
+        command.arg(node_entry(&executable));
+        command
+    };
     command.current_dir(&root).env_clear();
     for key in [
         "SystemRoot",
@@ -512,8 +584,25 @@ pub async fn proxy(
 
 #[cfg(test)]
 mod provider_tests {
-    use super::application;
+    use super::{application, node_entry};
     use crate::models::model::AccountProvider;
+    use std::path::Path;
+
+    #[test]
+    fn node_entries_drop_only_the_drive_verbatim_prefix() {
+        assert_eq!(
+            node_entry(Path::new(r"\\?\C:\plugin\service.mjs")),
+            Path::new(r"C:\plugin\service.mjs")
+        );
+        assert_eq!(
+            node_entry(Path::new(r"\\?\UNC\host\share\service.mjs")),
+            Path::new(r"\\?\UNC\host\share\service.mjs")
+        );
+        assert_eq!(
+            node_entry(Path::new("/plugin/service.mjs")),
+            Path::new("/plugin/service.mjs")
+        );
+    }
 
     #[test]
     fn regional_account_modules_keep_distinct_application_ids() {

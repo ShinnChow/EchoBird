@@ -77,5 +77,7 @@ export function accountProxyStatus(
       return context.codeArtsAccounts;
     case 'devin':
       return context.devinAccounts;
+    default:
+      return context.pluginAccounts;
   }
 }

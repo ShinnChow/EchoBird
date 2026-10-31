@@ -301,7 +301,7 @@ pub(super) fn base(provider: AccountProvider, credentials: &Value) -> &str {
             | AccountProvider::WorkBuddyAi => {
                 unreachable!("Account capability is supplied by a plugin")
             }
-            AccountProvider::Trae | AccountProvider::Traecn => {
+            AccountProvider::Trae | AccountProvider::Traecn | AccountProvider::Plugin(_) => {
                 unreachable!("Trae uses its own gateway")
             }
             AccountProvider::Grok
@@ -387,7 +387,7 @@ fn signed(
         AccountProvider::ClaudeCode | AccountProvider::WorkBuddy | AccountProvider::WorkBuddyAi => {
             unreachable!("Account capability is supplied by a plugin")
         }
-        AccountProvider::Trae | AccountProvider::Traecn => {
+        AccountProvider::Trae | AccountProvider::Traecn | AccountProvider::Plugin(_) => {
             unreachable!("Trae uses its own gateway")
         }
         AccountProvider::Grok
@@ -903,7 +903,7 @@ async fn fetch_models(
         AccountProvider::ClaudeCode | AccountProvider::WorkBuddy | AccountProvider::WorkBuddyAi => {
             unreachable!("Account capability is supplied by a plugin")
         }
-        AccountProvider::Trae | AccountProvider::Traecn => {
+        AccountProvider::Trae | AccountProvider::Traecn | AccountProvider::Plugin(_) => {
             unreachable!("Trae uses its own gateway")
         }
         AccountProvider::Grok

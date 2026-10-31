@@ -1,7 +1,7 @@
-import { useAccountProviderFilter } from '../../hooks/useAccountPlugin';
+import { accountProxySources, useAccountProviderFilter } from '../../hooks/useAccountPlugin';
 import { useEffect, useState } from 'react';
 import {
-  accountProxyProviders,
+  accountProviderIconSrc,
   accountSpeechProviders,
   listProxyAccounts,
   type ProxyAccount,
@@ -20,7 +20,7 @@ export function openAccountModelForm(
 ) {
   context.setNewModelForm({
     name:
-      (destination === 'voiceInput' ? accountSpeechProviders : accountProxyProviders).find(
+      (destination === 'voiceInput' ? accountSpeechProviders : accountProxySources()).find(
         (p) => p.id === provider
       )?.name ?? '',
     baseUrl: '',
@@ -59,7 +59,7 @@ export function AccountProxyPanel({
     let ignore = false;
     void Promise.resolve().then(async () => {
       if (ignore) return;
-      const availableProviders = accountProxyProviders.filter(available);
+      const availableProviders = accountProxySources().filter(available);
       const results = await Promise.allSettled(
         availableProviders.map((provider) => listProxyAccounts(provider.id))
       );
@@ -78,7 +78,7 @@ export function AccountProxyPanel({
     };
   }, [activePage, voice, available]);
 
-  const providers = (voice ? accountSpeechProviders : accountProxyProviders).filter(available);
+  const providers = (voice ? accountSpeechProviders : accountProxySources()).filter(available);
   const counts: Partial<Record<AccountProvider, number>> = voice
     ? (suppliedCounts ?? {})
     : accountCounts;
@@ -106,7 +106,7 @@ export function AccountProxyPanel({
           className="w-full min-h-[64px] flex items-center gap-3 px-3 bg-cyber-surface/60 rounded text-left enabled:hover:bg-cyber-elevated/70 disabled:opacity-40 disabled:grayscale transition-colors"
         >
           <img
-            src={`/icons/tools/${provider.icon}`}
+            src={accountProviderIconSrc(provider.icon)}
             alt=""
             className="w-8 h-8 shrink-0 object-contain"
           />

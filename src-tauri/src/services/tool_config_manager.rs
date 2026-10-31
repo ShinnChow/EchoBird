@@ -308,6 +308,24 @@ fn model_input_modalities_for(model_id: &str) -> &'static [&'static str] {
 //  APPLY MODEL �?main entry point
 // ════════════════════════════════════════════════════════════════
 
+/// Plugin applications own their native model configuration.
+async fn plugin_model_operation(
+    tool_id: &str,
+    operation: &str,
+    input: serde_json::Value,
+) -> ApplyResult {
+    match crate::services::plugin_accounts::call(tool_id, operation, input).await {
+        Ok(_) => ApplyResult {
+            success: true,
+            message: String::new(),
+        },
+        Err(message) => ApplyResult {
+            success: false,
+            message,
+        },
+    }
+}
+
 pub async fn apply_model_to_tool(tool_id: &str, model_info: ModelInfo) -> ApplyResult {
     log::info!("[ToolConfigManager] Applying model to {}", tool_id);
     let model_info = normalize_model_info_for_tool(tool_id, model_info);
@@ -316,6 +334,10 @@ pub async fn apply_model_to_tool(tool_id: &str, model_info: ModelInfo) -> ApplyR
             success: false,
             message,
         };
+    }
+    if crate::services::plugin_accounts::provides_tool(tool_id) {
+        let input = serde_json::to_value(&model_info).unwrap_or_default();
+        return plugin_model_operation(tool_id, "model.apply", input).await;
     }
 
     // Dispatch custom tools to their own handlers
@@ -426,6 +448,9 @@ pub async fn apply_model_to_tool(tool_id: &str, model_info: ModelInfo) -> ApplyR
 /// the tool itself regenerates a fresh, vendor-default config on next launch.
 /// Used by the App Desktop "restore to official" flow.
 pub async fn restore_tool_to_official(tool_id: &str) -> ApplyResult {
+    if crate::services::plugin_accounts::provides_tool(tool_id) {
+        return plugin_model_operation(tool_id, "model.restore", serde_json::json!({})).await;
+    }
     if tool_id == "hermes" {
         return ApplyResult {
             success: false,
@@ -577,6 +602,13 @@ pub async fn restore_tool_to_official(tool_id: &str) -> ApplyResult {
 // ════════════════════════════════════════════════════════════════
 
 pub async fn get_tool_model_info(tool_id: &str) -> Option<ModelInfo> {
+    if crate::services::plugin_accounts::provides_tool(tool_id) {
+        let value =
+            crate::services::plugin_accounts::call(tool_id, "model.read", serde_json::json!({}))
+                .await
+                .ok()?;
+        return serde_json::from_value(value).ok();
+    }
     match tool_id {
         "hermes" => return hermes::read(),
         "codearts" => return codearts::read(tool_id),

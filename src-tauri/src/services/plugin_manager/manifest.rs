@@ -74,6 +74,16 @@ pub struct ProviderContribution {
     pub operations: Vec<String>,
 }
 
+/// An application a plugin adds to the catalog. The directory holds the same
+/// `paths.json` and `config.json` as a built-in tool, plus `install.json`.
+/// Declared at the manifest root so hosts without this contract ignore it.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ToolContribution {
+    pub id: String,
+    pub directory: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Page {
@@ -145,6 +155,44 @@ pub fn platform() -> &'static str {
 impl Manifest {
     pub fn id(&self) -> String {
         format!("{}.{}", self.publisher, self.name)
+    }
+
+    pub fn tools(&self) -> Vec<ToolContribution> {
+        self.metadata
+            .get("tools")
+            .and_then(|tools| serde_json::from_value(tools.clone()).ok())
+            .unwrap_or_default()
+    }
+
+    fn validate_tools(&self) -> Result<(), String> {
+        let Some(declared) = self.metadata.get("tools") else {
+            return Ok(());
+        };
+        let tools: Vec<ToolContribution> =
+            serde_json::from_value(declared.clone()).map_err(|_| "Invalid tool contribution")?;
+        let extension = &self.echobird;
+        let mut ids = std::collections::HashSet::new();
+        let service = extension
+            .worker
+            .as_ref()
+            .is_some_and(|worker| worker.runtime.as_deref() == Some("node"));
+        if tools.is_empty()
+            || tools.len() > 4
+            || !service
+            || tools.iter().any(|tool| {
+                !identifier(&tool.id)
+                    || !ids.insert(&tool.id)
+                    || !relative_path(&tool.directory)
+                    || !extension
+                        .contributes
+                        .providers
+                        .iter()
+                        .any(|provider| provider.applications.contains(&tool.id))
+            })
+        {
+            return Err("Invalid tool contribution".into());
+        }
+        Ok(())
     }
 
     pub fn validate(&self) -> Result<(), String> {
@@ -269,7 +317,7 @@ impl Manifest {
                 return Err("Invalid account code module".into());
             }
         }
-        Ok(())
+        self.validate_tools()
     }
 
     pub fn read(root: &Path) -> Result<Self, String> {
@@ -299,6 +347,13 @@ impl Manifest {
             let package = root.canonicalize().map_err(|e| e.to_string())?;
             if !entry.starts_with(package) || !entry.is_file() {
                 return Err("Account code module escapes its package".into());
+            }
+        }
+        for tool in manifest.tools() {
+            for file in ["paths.json", "config.json", "install.json"] {
+                if !root.join(&tool.directory).join(file).is_file() {
+                    return Err(format!("Missing tool file: {}/{file}", tool.directory));
+                }
             }
         }
         for page in &manifest.echobird.contributes.pages {

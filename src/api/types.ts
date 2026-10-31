@@ -61,7 +61,8 @@ export type AccountProvider =
   | 'kimi'
   | 'openDesign'
   | 'codeArts'
-  | 'devin';
+  | 'devin'
+  | `plugin:${string}`;
 
 export interface AccountSource {
   provider: AccountProvider;

@@ -11,6 +11,7 @@ import {
   type PointerEventHandler,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { accountProxySources } from '../../hooks/useAccountPlugin';
 import {
   DndContext,
   DragOverlay,
@@ -56,7 +57,7 @@ import {
 import * as api from '../../api/tauri';
 import * as modelApi from '../../api/models';
 import {
-  accountProxyProviders,
+  accountProviderIconSrc,
   accountModelPickerOptions,
   cacheAccountProxyModels,
   getAccountProxyModels,
@@ -341,7 +342,7 @@ function RouteModelCard({
   const cardRef = useRef<HTMLDivElement>(null);
   const dragPointerDown: PointerEventHandler<HTMLElement> | undefined =
     dragHandleProps?.onPointerDown;
-  const accountProvider = accountProxyProviders.find((p) => p.id === model.accountSource?.provider);
+  const accountProvider = accountProxySources().find((p) => p.id === model.accountSource?.provider);
   const accountProviderName = accountProvider?.name ?? model.provider;
   const displayName = model.accountSource
     ? hideAccountNames
@@ -352,7 +353,7 @@ function RouteModelCard({
     : model.provider;
   const displayPlan = account ? accountProxyPlanLabel(account, t).trim() : '';
   const iconSrc = accountProvider
-    ? `/icons/tools/${accountProvider.icon}`
+    ? accountProviderIconSrc(accountProvider.icon)
     : providerIconSrc !== undefined
       ? providerIconSrc
       : getModelIcon(model.provider, model.modelId);
