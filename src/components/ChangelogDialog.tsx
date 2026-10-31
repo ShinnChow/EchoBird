@@ -218,7 +218,7 @@ export const ChangelogDialog: React.FC<ChangelogDialogProps> = ({
           </div>
           <button
             onClick={handleClose}
-            className="text-cyber-text-secondary hover:text-cyber-text transition-colors flex-shrink-0"
+            className="text-cyber-text-secondary close-button transition-colors flex-shrink-0"
           >
             <X size={18} />
           </button>

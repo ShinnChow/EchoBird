@@ -191,7 +191,7 @@ export function VoiceInputGuide({ onClose }: { onClose: () => void }) {
           <button
             ref={close}
             type="button"
-            className="voice-guide-close"
+            className="voice-guide-close close-button"
             onClick={onClose}
             aria-label={t('btn.close')}
           >

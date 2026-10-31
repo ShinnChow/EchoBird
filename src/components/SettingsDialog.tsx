@@ -433,7 +433,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             <button
               type="button"
               onClick={handleClose}
-              className="text-cyber-text-secondary transition-colors hover:text-cyber-text"
+              className="text-cyber-text-secondary transition-colors close-button"
             >
               <X size={18} />
             </button>

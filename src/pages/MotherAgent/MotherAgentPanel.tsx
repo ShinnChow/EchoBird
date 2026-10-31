@@ -111,7 +111,7 @@ export function MotherAgentPanel() {
               </div>
               <button
                 onClick={() => setShowSSHModal(false)}
-                className="text-cyber-text-secondary hover:text-cyber-text transition-colors"
+                className="text-cyber-text-secondary close-button transition-colors"
               >
                 <X size={18} />
               </button>

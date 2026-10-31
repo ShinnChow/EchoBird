@@ -696,7 +696,7 @@ export function AddModelModal() {
           <button
             onClick={closeModelModal}
             aria-label={t('btn.close')}
-            className="text-cyber-text-secondary hover:text-cyber-text transition-colors"
+            className="text-cyber-text-secondary close-button transition-colors"
           >
             <X size={18} />
           </button>

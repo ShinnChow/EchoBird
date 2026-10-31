@@ -154,7 +154,7 @@ function RouterSettingsModal({
             disabled={saving}
             onClick={close}
             aria-label={t('btn.close')}
-            className="text-cyber-text-secondary transition-colors hover:text-cyber-text"
+            className="text-cyber-text-secondary transition-colors close-button"
           >
             <X size={18} />
           </button>

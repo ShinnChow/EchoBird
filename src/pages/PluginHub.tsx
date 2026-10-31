@@ -269,7 +269,12 @@ function PluginImportDialog({
                 : 'plugins.repository'
           )}
         </h2>
-        <button disabled={installing} aria-label={t('plugins.close')} onClick={onClose}>
+        <button
+          className="close-button"
+          disabled={installing}
+          aria-label={t('plugins.close')}
+          onClick={onClose}
+        >
           <X size={18} />
         </button>
       </div>

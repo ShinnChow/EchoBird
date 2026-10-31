@@ -186,7 +186,7 @@ export function SelectionTranslation() {
         <span className="voice-translation-title">{t('voice.selectionSource')}</span>
         <button
           type="button"
-          className="voice-translation-icon"
+          className="voice-translation-icon close-button"
           aria-label={t('voice.selectionClose')}
           onClick={() => void closeSelectionTranslation()}
         >

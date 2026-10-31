@@ -220,7 +220,7 @@ export function FreeModelsTitleActions() {
               type="button"
               onClick={() => setShowHelp(false)}
               aria-label={t('btn.close')}
-              className="absolute right-5 top-5 text-cyber-text-secondary hover:text-cyber-text transition-colors"
+              className="absolute right-5 top-5 text-cyber-text-secondary close-button transition-colors"
             >
               <X size={18} />
             </button>

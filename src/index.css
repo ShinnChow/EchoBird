@@ -1354,3 +1354,18 @@ textarea:-webkit-autofill:focus {
   caret-color: rgb(var(--text-primary-rgb));
   transition: background-color 5000s ease-in-out 0s;
 }
+
+/* Dialog close buttons share one red hover; the shadow grows the highlight without moving layout. */
+.close-button {
+  border-radius: 2px;
+  transition:
+    color 150ms,
+    background-color 150ms,
+    box-shadow 150ms;
+}
+
+.close-button:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.12);
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
