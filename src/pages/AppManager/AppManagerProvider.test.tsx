@@ -530,12 +530,8 @@ describe('Devin application account apply', () => {
         await context.handleLaunch();
       });
       expect(api.switchDevinAccount).toHaveBeenCalledExactlyOnceWith(account.id, tool);
-      expect(api.startTool).toHaveBeenCalledWith(
-        tool,
-        tool === 'devincli' ? 'devin' : undefined,
-        tool === 'devincli' ? '/fixture' : undefined
-      );
-      if (tool === 'devin') expect(openDialog).not.toHaveBeenCalled();
+      expect(api.startTool).not.toHaveBeenCalled();
+      expect(openDialog).not.toHaveBeenCalled();
       act(() => context.setLaunchAfterApply(true));
       await act(async () => {
         await context.handleLaunch();

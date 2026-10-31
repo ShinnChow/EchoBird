@@ -1172,6 +1172,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
       return typeof picked === 'string' && picked ? picked : null;
     };
 
+    // An account switch honors "launch directly"; only model flows force-launch.
+    let accountApplied = false;
     // An OpenAI account and a third-party API model are one exclusive choice.
     // Selecting an account restores the official provider before writing that
     // account's auth snapshot; selecting a model clears the account choice.
@@ -1182,6 +1184,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
       try {
         await api.switchAntigravityAccount(antigravityAccounts.selectedId);
         await antigravityAccounts.reload();
+        accountApplied = true;
       } catch (error) {
         setApplyError(accountError(error, t));
         finishLaunch();
@@ -1200,6 +1203,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
       try {
         await api.switchCodexAccount(selectedCodexAccountId);
         await loadCodexAccounts();
+        accountApplied = true;
       } catch (error) {
         setApplyError(accountError(error, t));
         finishLaunch();
@@ -1257,7 +1261,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
       try {
         await api.switchGrokBotAccount(grokBotAccounts.selectedId);
         await grokBotAccounts.reload();
-        await api.startTool('grokbot');
+        if (launchAfterApply) await api.startTool('grokbot');
       } catch (error) {
         setApplyError(accountError(error, t));
       } finally {
@@ -1271,13 +1275,13 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         accountNavigation.current.tool === selectedTool &&
         accountNavigation.current.page === activePage;
       try {
-        const cwd = await pickWorkingDirectory();
+        const cwd = launchAfterApply ? await pickWorkingDirectory() : undefined;
         if (cwd === null || !current()) return;
         if (selectedTool === 'cursorcli')
           await api.switchCursorAccount(cursorAccounts.selectedId, 'cursorcli');
         else await api.switchCursorAccount(cursorAccounts.selectedId);
         if (current()) await cursorAccounts.reload();
-        if (current()) {
+        if (launchAfterApply && current()) {
           if (selectedTool === 'cursorcli')
             await api.startTool(selectedTool, toolData?.startCommand, cwd);
           else await api.startTool('cursor');
@@ -1294,7 +1298,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     ) {
       try {
         await (selectedTool === 'cue' ? cueAccounts : manusAccounts).switchAccount();
-        await api.startTool(selectedTool);
+        if (launchAfterApply) await api.startTool(selectedTool);
       } catch (error) {
         setApplyError(accountError(error, t));
       } finally {
@@ -1307,6 +1311,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         if (restored !== true)
           throw new Error(typeof restored === 'string' ? restored : t('key.destroyed'));
         await grokAccounts.switchAccount();
+        accountApplied = true;
         startCooldown();
       } catch (error) {
         setApplyError(accountError(error, t));
@@ -1372,7 +1377,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         await api.switchDoubaoAccount(doubaoEdition, doubaoAccounts.selectedId);
         if (current()) {
           await doubaoAccounts.reload();
-          if (current()) await api.startTool(selectedTool, toolData?.startCommand);
+          if (launchAfterApply && current())
+            await api.startTool(selectedTool, toolData?.startCommand);
         }
       } catch (error) {
         if (current()) setApplyError(accountError(error, t));
@@ -1387,7 +1393,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         await api.switchDuMateAccount(dumateAccounts.selectedId);
         if (current()) {
           await dumateAccounts.reload();
-          if (current()) await api.startTool(selectedTool, toolData?.startCommand);
+          if (launchAfterApply && current())
+            await api.startTool(selectedTool, toolData?.startCommand);
         }
       } catch (error) {
         if (current()) setApplyError(accountError(error, t));
@@ -1402,7 +1409,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         await api.switchQwenWorkAccount(qwenWorkEdition, qwenWorkAccounts.selectedId);
         if (current()) {
           await qwenWorkAccounts.reload();
-          if (current()) await api.startTool(selectedTool, toolData?.startCommand);
+          if (launchAfterApply && current())
+            await api.startTool(selectedTool, toolData?.startCommand);
         }
       } catch (error) {
         if (current()) setApplyError(accountError(error, t));
@@ -1418,7 +1426,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
           selectedTool as api.QoderTool
         );
         await qoderAccounts.reload();
-        await api.startTool(selectedTool, toolData?.startCommand);
+        if (launchAfterApply) await api.startTool(selectedTool, toolData?.startCommand);
       } catch (error) {
         setApplyError(accountError(error, t));
       } finally {
@@ -1456,11 +1464,11 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         accountNavigation.current.tool === selectedTool &&
         accountNavigation.current.page === activePage;
       try {
-        const cwd = launchAfterApply || noModelConfig ? await pickWorkingDirectory() : undefined;
+        const cwd = launchAfterApply ? await pickWorkingDirectory() : undefined;
         if (cwd === null || !current()) return;
         await api.switchDevinAccount(devinAccounts.selectedId, selectedTool);
         if (current()) await devinAccounts.reload();
-        if ((launchAfterApply || noModelConfig) && current())
+        if (launchAfterApply && current())
           await api.startTool(selectedTool, toolData?.startCommand, cwd);
       } catch (error) {
         if (current()) setApplyError(accountError(error, t));
@@ -1541,6 +1549,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
       try {
         await api.switchKiroAccount(selectedTool, kiroAccounts.selectedId);
         await kiroAccounts.reload();
+        accountApplied = true;
       } catch (error) {
         setApplyError(accountError(error, t));
         finishLaunch();
@@ -1550,8 +1559,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
       try {
         await api.switchTraeAccount(selectedTool, traeAccounts.selectedId);
         await traeAccounts.reload();
-        if (launchAfterApply || noModelConfig)
-          await api.startTool(selectedTool, toolData?.startCommand);
+        if (launchAfterApply) await api.startTool(selectedTool, toolData?.startCommand);
       } catch (error) {
         setApplyError(accountError(error, t));
       } finally {
@@ -1579,6 +1587,7 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
           throw new Error(typeof restored === 'string' ? restored : t('key.destroyed'));
         await api.switchClaudeCodeAccount(claudeCodeAccounts.selectedId);
         await claudeCodeAccounts.reload();
+        accountApplied = true;
         startCooldown();
       } catch (error) {
         setApplyError(accountError(error, t));
@@ -1599,8 +1608,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
     // Launch tool when "launch directly" is checked, or unconditionally for desktop apps
     if (
       launchAfterApply ||
-      noModelConfig ||
-      ['qoder', 'qodercn', 'claudescience'].includes(selectedTool)
+      (!accountApplied &&
+        (noModelConfig || ['qoder', 'qodercn', 'claudescience'].includes(selectedTool)))
     ) {
       // CLI clients may request a working directory before launch.
       let cwd: string | undefined;
@@ -1626,6 +1635,8 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
         if ((selectedTool === 'kirocrew' || selectedTool === 'kirocli') && kiroAccounts.selectedId)
           finishLaunch();
       }
+    } else if ((selectedTool === 'kirocrew' || selectedTool === 'kirocli') && accountApplied) {
+      finishLaunch();
     }
     if (selectedTool === 'vscode' || selectedTool === 'copilotdesktop' || workBuddyEdition)
       startCooldown();

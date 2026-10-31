@@ -429,7 +429,7 @@ it.each(tools)(
     const applied = calls(minimax ? 'switch_minimax_account' : 'switch_qoder_account');
     expect(applied).toHaveLength(1);
     expect(applied[0][1].toolId).toBe(tool);
-    expect(calls('start_tool')).toHaveLength(minimax ? 0 : 1);
+    expect(calls('start_tool')).toHaveLength(0);
     expect(calls('apply_model_to_tool')).toHaveLength(0);
     expect(state.isLaunching).toBe(false);
   }

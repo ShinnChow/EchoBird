@@ -1340,7 +1340,8 @@ export const AppManagerBottom: React.FC = () => {
       !!workBuddyAccounts.selectedId) ||
     ((selectedTool === 'trae' || selectedTool === 'traecn') && !!traeAccounts.selectedId) ||
     ((selectedTool === 'kirocrew' || selectedTool === 'kirocli') && !!kiroAccounts.selectedId);
-  const launchOptionsDisabled = noModelConfig || hasAccountSelected;
+  const launchOptionDisabled = noModelConfig && !hasAccountSelected;
+  const configOptionDisabled = noModelConfig || hasAccountSelected;
   // What will a click actually do?
   //  - "Apply" runs only when the user picked a model AND agreed to the config-write policy.
   //  - "Launch" runs whenever launchAfterApply is on, or unconditionally for desktop/no-config apps.
@@ -1351,8 +1352,8 @@ export const AppManagerBottom: React.FC = () => {
   const willLaunch =
     isPlugin ||
     launchAfterApply ||
-    noModelConfig ||
-    ['qoder', 'qodercn', 'claudescience'].includes(selectedTool ?? '');
+    (!hasAccountSelected &&
+      (noModelConfig || ['qoder', 'qodercn', 'claudescience'].includes(selectedTool ?? '')));
   const buttonDisabled =
     !selectedToolData ||
     isLaunching ||
@@ -1439,21 +1440,20 @@ export const AppManagerBottom: React.FC = () => {
             )}
         </div>
         {/* Reserve the controls' space while installing so the action stays aligned.
-            Account selections and apps without model configuration disable the controls. */}
+            Account selections only need the launch choice; apps without model
+            configuration disable both controls. */}
         <div
           className={`flex flex-col gap-2 ${
-            isCatalogOnly || isInstallAction || isPlugin
-              ? 'invisible pointer-events-none'
-              : launchOptionsDisabled
-                ? 'opacity-40 pointer-events-none'
-                : ''
+            isCatalogOnly || isInstallAction || isPlugin ? 'invisible pointer-events-none' : ''
           }`}
         >
           {/* Apply & Launch checkbox */}
           <label
-            className="flex items-center gap-2 select-none"
+            className={`flex items-center gap-2 select-none ${
+              launchOptionDisabled ? 'opacity-40 pointer-events-none' : ''
+            }`}
             onClick={() => {
-              if (!launchOptionsDisabled) setLaunchAfterApply(!launchAfterApply);
+              if (!launchOptionDisabled) setLaunchAfterApply(!launchAfterApply);
             }}
           >
             <div
@@ -1489,9 +1489,11 @@ export const AppManagerBottom: React.FC = () => {
           </label>
           {/* Config policy agreement */}
           <label
-            className="flex items-center gap-2 select-none"
+            className={`flex items-center gap-2 select-none ${
+              configOptionDisabled ? 'opacity-40 pointer-events-none' : ''
+            }`}
             onClick={() => {
-              if (!launchOptionsDisabled) setAgreedConfigPolicy(!agreedConfigPolicy);
+              if (!configOptionDisabled) setAgreedConfigPolicy(!agreedConfigPolicy);
             }}
           >
             <div

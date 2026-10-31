@@ -468,7 +468,7 @@ describe('account launch options', () => {
   ] as const;
 
   it.each(accountTools)(
-    '%s disables both options only for the selected account',
+    '%s keeps the launch option available for the selected account',
     async (client, field) => {
       const { AppManagerBottom } = await import('./AppManagerComponents');
       const context = {
@@ -495,22 +495,34 @@ describe('account launch options', () => {
         });
         const options = () => renderer!.root.findAllByType('label');
         expect(options()).toHaveLength(2);
-        expect(options()[0].parent!.props.className).toContain('opacity-40 pointer-events-none');
+        expect(options()[0].props.className).not.toContain('opacity-40');
+        expect(options()[1].props.className).toContain('opacity-40 pointer-events-none');
         act(() => options().forEach((option) => option.props.onClick()));
-        expect(context.setLaunchAfterApply).not.toHaveBeenCalled();
+        expect(context.setLaunchAfterApply).toHaveBeenCalledWith(false);
         expect(context.setAgreedConfigPolicy).not.toHaveBeenCalled();
+        vi.mocked(context.setLaunchAfterApply).mockClear();
+
+        // With launching off the primary action reads as modify-only and stays enabled.
+        context.launchAfterApply = false;
+        act(() => renderer!.update(draw()));
+        const primary = renderer!.root.findAllByType('button')[0];
+        expect(primary.props.disabled).toBe(false);
+        expect(primary.props.children).toBe('btn.modifyOnly');
+        context.launchAfterApply = true;
 
         Object.assign(context, {
           [field]: field === 'selectedCodexAccountId' ? null : { selectedId: null },
           toolModelConfig: { [client]: 'cloud-model' },
         });
         act(() => renderer!.update(draw()));
-        expect(options()[0].parent!.props.className).not.toContain('opacity-40');
+        expect(options()[0].props.className).not.toContain('opacity-40');
+        expect(options()[1].props.className).not.toContain('opacity-40');
 
         // A tool without model configuration stays disabled even without an account.
         context.selectedToolData = { ...tool, id: client, noModelConfig: true };
         act(() => renderer!.update(draw()));
-        expect(options()[0].parent!.props.className).toContain('opacity-40 pointer-events-none');
+        expect(options()[0].props.className).toContain('opacity-40 pointer-events-none');
+        expect(options()[1].props.className).toContain('opacity-40 pointer-events-none');
         act(() => options().forEach((option) => option.props.onClick()));
         expect(context.setLaunchAfterApply).not.toHaveBeenCalled();
         expect(context.setAgreedConfigPolicy).not.toHaveBeenCalled();
@@ -523,7 +535,7 @@ describe('account launch options', () => {
         context.selectedToolData = tool;
         context.toolModelConfig = { 'test-tool': 'cloud-model' };
         act(() => renderer!.update(draw()));
-        expect(options()[0].parent!.props.className).not.toContain('opacity-40');
+        expect(options()[0].props.className).not.toContain('opacity-40');
         expect(context.handleLaunch).not.toHaveBeenCalled();
         expect(context.setLaunchAfterApply).not.toHaveBeenCalled();
         expect(context.setAgreedConfigPolicy).not.toHaveBeenCalled();
@@ -1111,7 +1123,7 @@ describe.each(['grokbot', 'cursor', 'manus', 'cue'] as const)('%s account-only p
     expect(markup).not.toContain('Cloud Model');
     expect(markup).not.toContain('Auto Router');
     expect(markup).not.toContain('agent.noModelConfig');
-    expect(markup).toContain('btn.launchApp');
+    expect(markup).toContain('btn.modifyOnly');
     expect(markup.match(/<button[^>]*disabled=""/g)).toHaveLength(1);
     expect(markup).toContain('aria-label="btn.cancel"');
   });
