@@ -527,7 +527,7 @@ export function RouterGroups({
           </span>
           {!list && toggle}
         </div>
-        <div className="free-model-router-endpoints grid grid-cols-2 gap-3">
+        <div className={`free-model-router-endpoints gap-3 ${list ? 'grid grid-cols-2' : 'flex'}`}>
           {[
             ['OpenAI', router.baseUrl],
             ['Anthropic', router.baseUrl.replace(/\/v1\/?$/, '')],

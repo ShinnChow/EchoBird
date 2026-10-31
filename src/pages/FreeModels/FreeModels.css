@@ -90,7 +90,10 @@
   min-height: 32px;
 }
 
+/* Each address box starts at its own width and shares the rest, so the longer
+   OpenAI address gets the room instead of wrapping beside a half-empty box. */
 .free-model-router-card-endpoint {
+  flex: 1 1 auto;
   padding: 8px 12px;
 }
 
@@ -102,6 +105,9 @@
 
 .free-model-router-card-endpoint > span:last-child {
   margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .free-model-router-card-actions {
