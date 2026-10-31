@@ -258,8 +258,11 @@ const OPENCODE_INJECT: &str = r#"
   var _eb_p = path.join(os.homedir(), ".echobird", "opencode.json");
   if (fs.existsSync(_eb_p)) {
     var _eb_c = JSON.parse(fs.readFileSync(_eb_p, "utf-8"));
-    if (_eb_c.apiKey) process.env.OPENAI_API_KEY = _eb_c.apiKey;
-    if (_eb_c.baseUrl) process.env.OPENAI_BASE_URL = _eb_c.baseUrl;
+    var _eb_npm = _eb_c.npm || "@ai-sdk/openai-compatible";
+    if (_eb_npm === "@ai-sdk/openai-compatible") {
+      if (_eb_c.apiKey) process.env.OPENAI_API_KEY = _eb_c.apiKey;
+      if (_eb_c.baseUrl) process.env.OPENAI_BASE_URL = _eb_c.baseUrl;
+    }
     // Write provider + model config for OpenCode to pick up
     var _eb_cfgDir = path.join(os.homedir(), ".config", "opencode");
     if (!fs.existsSync(_eb_cfgDir)) fs.mkdirSync(_eb_cfgDir, {recursive:true});
@@ -269,7 +272,7 @@ const OPENCODE_INJECT: &str = r#"
     try { if (fs.existsSync(_eb_cfgPath)) _eb_cfg = JSON.parse(fs.readFileSync(_eb_cfgPath,"utf-8")); } catch {}
     if (!_eb_cfg.provider) _eb_cfg.provider = {};
     _eb_cfg.provider[_eb_provId] = {
-      npm: "@ai-sdk/openai-compatible",
+      npm: _eb_npm,
       name: _eb_c.providerName || "Echobird",
       options: { baseURL: _eb_c.baseUrl || "", apiKey: _eb_c.apiKey || "" },
       models: {}

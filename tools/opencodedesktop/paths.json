@@ -5,7 +5,8 @@
     },
     "category": "Desktop",
     "apiProtocol": [
-        "openai"
+        "openai",
+        "anthropic"
     ],
     "docs": "https://opencode.ai/docs",
     "website": "https://opencode.ai/download",

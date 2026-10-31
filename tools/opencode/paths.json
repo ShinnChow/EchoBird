@@ -2,7 +2,8 @@
     "name": "OpenCode",
     "category": "CLI Code",
     "apiProtocol": [
-        "openai"
+        "openai",
+        "anthropic"
     ],
     "docs": "https://opencode.ai/docs#install",
     "command": "opencode",
