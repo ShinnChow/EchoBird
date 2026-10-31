@@ -2155,6 +2155,33 @@ pub fn get_tool_exe_path(tool_id: &str) -> Option<String> {
     find_tool_executable(&def.paths_config, true)
 }
 
+/// Whether any of the clients is installed, by executable or Store package.
+/// Account reads use it so an uninstalled client's leftover files stay unread.
+pub(crate) fn any_tool_installed(tool_ids: &[&str]) -> bool {
+    tool_ids
+        .iter()
+        .any(|id| get_tool_exe_path(id).is_some() || store_package_installed(id))
+}
+
+/// A configured launch URI alone is not an installation; the Store package must
+/// resolve. (`get_tool_launch_uri` falls back to the configured value.)
+fn store_package_installed(tool_id: &str) -> bool {
+    #[cfg(windows)]
+    {
+        get_definitions()
+            .iter()
+            .find(|d| d.id == tool_id)
+            .and_then(|d| d.paths_config.launch_uri.as_deref())
+            .and_then(super::msix::resolve_launch_uri)
+            .is_some()
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = tool_id;
+        false
+    }
+}
+
 pub(crate) struct QoderCampaignRuntime {
     pub path: PathBuf,
     pub version: Option<String>,

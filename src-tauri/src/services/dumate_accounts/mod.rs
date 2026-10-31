@@ -242,7 +242,7 @@ pub async fn refresh(id: &str) -> Result<Account, String> {
     let request = request_lock(id)?;
     let _request = request.lock().await;
     let c = credentials(id).await?;
-    let client = api::Client::installed(&c)?;
+    let client = api::Client::authenticated(&c)?;
     let quota = client.quota(&c).await?;
     let daily = if c.enterprise() {
         None
@@ -255,7 +255,7 @@ pub async fn claim(id: &str) -> Result<Account, String> {
     let request = request_lock(id)?;
     let _request = request.lock().await;
     let c = credentials(id).await?;
-    let client = api::Client::installed(&c)?;
+    let client = api::Client::authenticated(&c)?;
     let daily = client.claim(&c).await?;
     // A successful claim stays visible even if the subsequent balance read fails.
     update(id, client.quota(&c).await.ok(), Some(daily)).await

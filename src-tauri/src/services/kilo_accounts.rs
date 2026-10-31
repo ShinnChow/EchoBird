@@ -425,7 +425,11 @@ pub async fn list_saved_accounts() -> Result<Vec<Account>, String> {
 pub async fn list_accounts() -> Result<Vec<Account>, String> {
     let _guard = ACCOUNT_LOCK.lock().await;
     let accounts = load()?;
-    let native = native_auth(&native_auth_path()?)?;
+    let native = if super::tool_manager::any_tool_installed(&["kilo", "kilodesktop"]) {
+        native_auth(&native_auth_path()?)?
+    } else {
+        Value::Null
+    };
     let active_token = native["kilo"]["access"]
         .as_str()
         .or_else(|| native["kilo"]["key"].as_str());

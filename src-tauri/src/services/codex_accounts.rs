@@ -968,6 +968,9 @@ fn list_saved_accounts_at(
 }
 
 pub fn list_accounts() -> Result<Vec<CodexAccountSummary>, String> {
+    if !super::tool_manager::any_tool_installed(&["codex", "chatgptdesktop"]) {
+        return list_saved_accounts_at(&account_store_dir()?, None);
+    }
     let codex_dir = codex_home()?;
     list_accounts_at(&codex_dir.join("auth.json"), &account_store_dir()?)
 }

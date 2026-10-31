@@ -341,7 +341,7 @@ pub(crate) fn list_saved_accounts() -> Result<Vec<Account>, String> {
 
 pub async fn list() -> Result<Vec<Account>, String> {
     let mut rows = list_saved_accounts()?;
-    if !rows.is_empty() {
+    if !rows.is_empty() && super::tool_manager::any_tool_installed(&["kimicode", "kimidesktop"]) {
         let active = native::active_id(&super::tool_config_manager::kimicode::kimicode_dir());
         for row in &mut rows {
             row.active = active.as_deref() == Some(&row.id);

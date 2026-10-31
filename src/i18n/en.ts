@@ -268,6 +268,7 @@ const en: Translations = {
   'accountCenter.empty': 'No saved accounts',
   'accountCenter.loading': 'Loading accounts',
   'accountCenter.website': 'Open {name} website',
+  'accountCenter.installClientFirst': 'Install {name} first, then add an account.',
   'accountCenter.subscriptionProviders': 'Special Thanks: Accounts & Top-ups',
   'accountCenter.noSubscriptionProviders': 'No providers listed yet',
   'accountCenter.claimAll': 'Claim all rewards',

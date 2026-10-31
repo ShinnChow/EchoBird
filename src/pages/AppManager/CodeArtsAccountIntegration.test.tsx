@@ -380,11 +380,22 @@ it('does not treat an installed IDE or CLI as an installed CodeArts desktop', as
   );
   act(() => useNavigationStore.setState({ activePage: 'accounts' }));
   await tick();
-  expect(calls('list_codearts_accounts')).toHaveLength(0);
+  // Saved accounts still list; the backend reads desktop files only when it is installed.
+  expect(calls('list_codearts_accounts')).toHaveLength(1);
   const provider = accountCenterProviders(state, (key) => key, 'en').find(
     (item) => item.id === 'codearts'
   )!;
   expect(provider.installed).toBe(false);
+  // Its login runs in EchoBird's browser flow, so an uninstalled client can still add.
+  handlers.set('start_codearts_login', () => ({
+    loginId: 'pending',
+    verificationUri: 'https://example.test/authorize',
+    expiresAt: Date.now() / 1000 + 60,
+  }));
+  await act(async () => provider.add());
+  await tick();
+  expect(calls('start_codearts_login')).toHaveLength(1);
+  expect(state.applyError).toBeNull();
 });
 
 it('refreshes and claims credits only on explicit actions without applying an account', async () => {

@@ -130,7 +130,11 @@ fn sync_current(
 
 pub async fn list() -> Result<Vec<Account>, String> {
     let _guard = ACCOUNT_LOCK.lock().await;
-    let current = native_credentials(&config_file()?)?;
+    let current = if super::super::tool_manager::any_tool_installed(&["cursorcli"]) {
+        native_credentials(&config_file()?)?
+    } else {
+        None
+    };
     let key = desktop_key()?;
     let initialize = !store_path()?.exists();
     let mut store = store()?;

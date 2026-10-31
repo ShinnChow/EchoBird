@@ -103,6 +103,20 @@ interface AccountGroup<A> {
   remove: (account: A) => Promise<void>;
 }
 
+// Accounts are managed in EchoBird, so refresh, claim and delete work without the
+// client. These providers sign in through the client itself, so adding an
+// account still needs it installed.
+const LOGIN_NEEDS_CLIENT = [
+  'grok',
+  'copilot',
+  'devin',
+  'dumate',
+  'qwenworkcn',
+  'qwenwork',
+  'doubaowork',
+  'dola',
+];
+
 export function accountCenterProviders(
   context: AppManagerContextType,
   t: (key: TKey) => string,
@@ -193,13 +207,16 @@ export function accountCenterProviders(
       | 'showUnclaimed'
     >
   ): AccountProvider => {
+    const installed = context.detectedTools.some(
+      (tool) => toolIds.includes(tool.id) && tool.installed
+    );
     return {
       id,
       name,
       icon,
       website: context.detectedTools.find((tool) => toolIds.includes(tool.id) && tool.website)
         ?.website,
-      installed: context.detectedTools.some((tool) => toolIds.includes(tool.id) && tool.installed),
+      installed,
       busy: group.busy,
       loading: group.loading,
       loaded: group.loaded,
@@ -210,6 +227,8 @@ export function accountCenterProviders(
       add: () => {
         if (communityAccountApplications.includes(id) && !accountPluginAvailable(id)) {
           void openAccountPlugins().catch((error) => context.setApplyError(String(error)));
+        } else if (!installed && LOGIN_NEEDS_CLIENT.includes(id)) {
+          context.setApplyError(t('accountCenter.installClientFirst').replace('{name}', name));
         } else {
           void group.add();
         }

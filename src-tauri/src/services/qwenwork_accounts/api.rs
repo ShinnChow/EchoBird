@@ -44,6 +44,10 @@ pub(super) struct Client {
 }
 
 impl Client {
+    /// Saved accounts keep working without the client; its version is sent when present.
+    pub(super) fn for_account(edition: Edition) -> Result<Self, String> {
+        Self::installed(edition).or_else(|_| Self::new(edition, edition.base(), "unknown"))
+    }
     pub(super) fn installed(edition: Edition) -> Result<Self, String> {
         let exe = crate::services::tool_manager::get_tool_exe_path(edition.tool())
             .ok_or("accountError.unavailable")?;

@@ -251,6 +251,7 @@ const zhHant: Partial<Translations> = {
   'accountCenter.empty': '暫無已儲存帳號',
   'accountCenter.loading': '正在載入帳號',
   'accountCenter.website': '開啟 {name} 官網',
+  'accountCenter.installClientFirst': '請先安裝 {name} 用戶端，再新增帳號。',
   'accountCenter.subscriptionProviders': '特別鳴謝：帳號及代儲值',
   'accountCenter.noSubscriptionProviders': '暫未收錄',
   'accountCenter.claimAll': '一鍵領取獎勵',

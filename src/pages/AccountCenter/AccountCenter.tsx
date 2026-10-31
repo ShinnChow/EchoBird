@@ -106,7 +106,6 @@ export function AccountCard({
               email={identity}
               claimed={claimed}
               disabled={
-                !provider.installed ||
                 account.pending ||
                 provider.busy ||
                 account.refreshing ||
@@ -118,7 +117,7 @@ export function AccountCard({
           <AccountSectionActions
             email={identity}
             refreshing={account.refreshing}
-            disabled={!provider.installed || account.pending}
+            disabled={account.pending}
             onRefresh={account.refresh}
             onDelete={account.remove}
           />
@@ -165,7 +164,7 @@ export function AccountCard({
               <button
                 type="button"
                 aria-label={`${t('accountCenter.reauthorize')} ${provider.name}`}
-                disabled={!provider.installed || provider.busy || account.pending}
+                disabled={provider.busy || account.pending}
                 onClick={provider.add}
                 className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-button border border-cyber-border px-3 text-xs font-normal text-cyber-text transition-colors enabled:hover:bg-cyber-text/10 disabled:text-cyber-text-muted disabled:opacity-50"
               >
@@ -440,11 +439,9 @@ export function AccountCenterTitleActions() {
       batch.current = null;
     };
   }, []);
-  const accounts = providers
-    .filter((provider) => provider.installed)
-    .flatMap((provider) =>
-      provider.accounts.map((account) => ({ providerId: provider.id, account }))
-    );
+  const accounts = providers.flatMap((provider) =>
+    provider.accounts.map((account) => ({ providerId: provider.id, account }))
+  );
   const blocked =
     rewardBatchRunning ||
     !toolsReady ||
@@ -473,10 +470,11 @@ export function AccountCenterTitleActions() {
         const provider = latest.current.find((provider) => provider.id === target.providerId);
         const account = provider?.accounts.find((account) => account.id === target.account.id);
         if (
-          !provider?.installed ||
+          !provider ||
           (provider.loading && !provider.loaded) ||
           provider.busy ||
           !account ||
+          account.pending ||
           account.refreshing
         )
           continue;
@@ -592,8 +590,7 @@ export function AccountCenterPanel() {
         </h3>
         <div className="space-y-2">
           {providers.map((provider) => {
-            const disabled =
-              !provider.installed || context.isLaunching || (pending && !provider.busy);
+            const disabled = context.isLaunching || (pending && !provider.busy);
             const hostname = provider.website ? new URL(provider.website).hostname : '—';
             return (
               <section key={provider.id} aria-label={provider.name}>

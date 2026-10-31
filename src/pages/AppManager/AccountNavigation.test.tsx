@@ -1043,13 +1043,20 @@ it('Copilot CLI and Desktop load their own saved selection during passive tool s
   expect(api.startTool).not.toHaveBeenCalled();
 });
 
-it.each(clientCases)('$tool: an uninstalled tool never loads account data', async (client) => {
-  await mount(client.tool, false);
-  expect(api[client.list]).not.toHaveBeenCalled();
-  act(() => useNavigationStore.getState().setActivePage('accounts'));
-  await tick();
-  expect(api[client.list]).not.toHaveBeenCalled();
-});
+it.each(clientCases)(
+  '$tool: an uninstalled tool loads saved accounts only on Account Management',
+  async (client) => {
+    await mount(client.tool, false);
+    expect(api[client.list]).not.toHaveBeenCalled();
+    act(() => useNavigationStore.getState().setActivePage('accounts'));
+    await tick();
+    // Saved EchoBird accounts stay manageable; nothing logs in, refreshes or applies.
+    expect(api[client.list]).toHaveBeenCalled();
+    expect(api[client.apply]).not.toHaveBeenCalled();
+    expect(api[client.refresh]).not.toHaveBeenCalled();
+    expect(api.startTool).not.toHaveBeenCalled();
+  }
+);
 
 it.each(clientCases)(
   '$tool: positive control applies the account before native launch',
@@ -1247,7 +1254,7 @@ function expectPassiveAccountNavigation() {
   expect(applyErrorEvents.filter(Boolean)).toEqual([]);
 }
 
-it('Account Center: cached apps do not load native accounts before current detection confirms installation', async () => {
+it('Account Center: cached apps wait for current detection before loading accounts', async () => {
   useToolsStore.setState({
     detectedTools: ['codex', 'workbuddy'].map((id) => ({
       id,
@@ -1276,8 +1283,9 @@ it('Account Center: cached apps do not load native accounts before current detec
     ])
   );
   await tick();
-  expect(api.listCodexAccounts).not.toHaveBeenCalled();
-  expect(api.listWorkBuddyAccounts).toHaveBeenCalledTimes(1);
+  // Saved accounts load for an uninstalled client too; its backend skips client files.
+  expect(api.listCodexAccounts).toHaveBeenCalledTimes(1);
+  expect(api.listWorkBuddyAccounts).toHaveBeenCalledWith('workbuddy');
   expectPassiveAccountNavigation();
 });
 
@@ -1321,7 +1329,9 @@ it('Account Center: first load keeps the skeleton until all installed providers 
   const codex = pendingAccountList<api.CodexAccount>();
   const workBuddy = pendingAccountList<api.WorkBuddyAccount>();
   vi.mocked(api.listCodexAccounts).mockReturnValueOnce(codex.promise);
-  vi.mocked(api.listWorkBuddyAccounts).mockReturnValueOnce(workBuddy.promise);
+  vi.mocked(api.listWorkBuddyAccounts).mockImplementation((edition) =>
+    edition === 'workbuddy' ? workBuddy.promise : Promise.resolve([])
+  );
   await mountAccountCenter(['codex', 'workbuddy']);
   expect(accountCardIds()).toEqual([]);
   expect(renderer.root.findByProps({ 'aria-label': 'accountCenter.loading' })).toBeDefined();
@@ -1329,7 +1339,7 @@ it('Account Center: first load keeps the skeleton until all installed providers 
   expect(api.listWorkBuddyAccounts).not.toHaveBeenCalled();
   await tick();
   expect(api.listCodexAccounts).toHaveBeenCalledTimes(1);
-  expect(api.listWorkBuddyAccounts).toHaveBeenCalledTimes(1);
+  expect(api.listWorkBuddyAccounts).toHaveBeenCalledWith('workbuddy');
   await act(async () => workBuddy.resolve([rewardAccount]));
   expect(accountCardIds()).toEqual([]);
   expect(renderer.root.findByProps({ 'aria-label': 'accountCenter.loading' })).toBeDefined();
@@ -1936,9 +1946,16 @@ it.each(Object.keys(listFor) as Tool[])(
       );
     });
     await tick();
-    const centerCard = renderer.root
-      .findAllByType(AccountCard)
-      .find((card) => card.props.account.id === 'saved')!;
+    const centerCard = renderer.root.findAllByType(AccountCard).find(
+      (card) =>
+        card.props.provider.id ===
+          ({
+            chatgptdesktop: 'codex',
+            kirocrew: 'kiro',
+            kirocli: 'kiro',
+            antigravitydesktop: 'antigravity',
+          }[tool as string] ?? tool) && card.props.account.id === 'saved'
+    )!;
     expect(centerCard.findByProps({ role: 'status' }).children).toEqual([
       'accountCenter.authFailed',
     ]);
@@ -1999,7 +2016,9 @@ it('Account Center: a batch marks only authorization failures, preserves them on
     balances: [{ currency: 'CNY', amount: 12.5 }],
   };
   vi.mocked(api.listCodexAccounts).mockResolvedValue([failed, healthy]);
-  vi.mocked(api.listWorkBuddyAccounts).mockResolvedValue([buddy]);
+  vi.mocked(api.listWorkBuddyAccounts).mockImplementation(async (edition) =>
+    edition === 'workbuddy' ? [buddy] : []
+  );
   vi.mocked(api.listDeepSeekAccounts).mockResolvedValue([balance]);
   vi.mocked(api.refreshCodexAccountQuota).mockImplementation(async (id) => {
     if (id === 'same') throw new Error('accountError.loginRequired');
@@ -2261,7 +2280,9 @@ it.each(['refresh', 'claim'] as const)(
       ...rewardAccount,
       dailyClaimedAt: action === 'claim' ? Date.now() / 1000 : null,
     };
-    vi.mocked(api.listWorkBuddyAccounts).mockResolvedValue([row]);
+    vi.mocked(api.listWorkBuddyAccounts).mockImplementation(async (edition) =>
+      edition === 'workbuddy' ? [row] : []
+    );
     await showAccountCenter(['workbuddy']);
     const claimAll = renderer.root.findByProps({ 'aria-label': 'accountCenter.claimAll' });
     const refreshAll = renderer.root.findByProps({ 'aria-label': 'accountCenter.refreshAll' });
@@ -2392,7 +2413,7 @@ it('Account Center: individual/batch rewards share locks, retry claimed accounts
   expect(api.openExternal).not.toHaveBeenCalled();
 });
 
-it('Account Center: refreshes all installed account groups sequentially once and keeps failed rows', async () => {
+it('Account Center: refreshes all account groups sequentially once and keeps failed rows', async () => {
   const first: api.CodexAccount = {
     id: 'first',
     email: 'first@example.test',
@@ -2492,7 +2513,8 @@ it('Account Center: refreshes all installed account groups sequentially once and
     ['workbuddyai', rewardAccount.id],
   ]);
   expect(api.refreshDeepSeekAccountQuota).toHaveBeenCalledWith('saved', 'en');
-  expect(api.refreshCursorAccount).not.toHaveBeenCalled();
+  // An uninstalled client's saved account is refreshed too.
+  expect(api.refreshCursorAccount).toHaveBeenCalledTimes(1);
   expect(api.claimWorkBuddyDailyCredits).not.toHaveBeenCalled();
   expect(api.startTool).not.toHaveBeenCalled();
   expect(api.openExternal).not.toHaveBeenCalled();
@@ -3165,12 +3187,23 @@ it('Account Center: loads installed groups once, shared stores once, and WorkBud
   expect(state.applyError).toBeNull();
 });
 
-it('Account Center: uninstalled clients never load native accounts', async () => {
+it('Account Center: uninstalled clients list saved accounts without other actions', async () => {
   await mount('dsh', false);
   act(() => useNavigationStore.getState().setActivePage('accounts'));
   await tick();
-  for (const list of listNames) expect(api[list]).not.toHaveBeenCalled();
-  expect(state.applyError).toBeNull();
+  // Built-in backends skip client files when uninstalled; plugin-provided
+  // accounts list outside that guard, so they still wait for the client.
+  const pluginLists: string[] = [
+    'listClaudeCodeAccounts',
+    'listClaudeDesktopAccounts',
+    'listWorkBuddyAccounts',
+    'listDoubaoAccounts',
+    'listTraeAccounts',
+  ];
+  for (const list of listNames)
+    if (pluginLists.includes(list)) expect(api[list]).not.toHaveBeenCalled();
+    else expect(api[list]).toHaveBeenCalled();
+  expectPassiveAccountNavigation();
 });
 
 it('Account Center: returning after a passive failure preserves both WorkBuddy editions', async () => {

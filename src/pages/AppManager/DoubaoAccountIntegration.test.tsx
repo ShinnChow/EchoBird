@@ -14,6 +14,7 @@ import { DoubaoAccountSection } from './DoubaoAccountSection';
 import { AccountSectionRow } from './AccountSectionPrimitives';
 import { accountProxyStatus } from './accountProxyStatus';
 import { AccountCenterTitleActions } from '../AccountCenter/AccountCenter';
+import { accountCenterProviders } from '../AccountCenter/accountCenterData';
 
 const { invoke, openExternal } = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -241,9 +242,14 @@ it.each([
       creditBuckets: [],
       dailyReward: null,
     };
-    handlers.set('list_doubao_accounts', () => [doubao]);
+    // Uninstalled editions now list too; give each fixture to one installed edition.
+    handlers.set('list_doubao_accounts', (args?: Record<string, string>) =>
+      args?.edition === 'doubaowork' ? [doubao] : []
+    );
     handlers.set('list_dumate_accounts', () => [dumate]);
-    handlers.set('list_qwenwork_accounts', () => [qwen]);
+    handlers.set('list_qwenwork_accounts', (args?: Record<string, string>) =>
+      args?.edition === 'qwenworkcn' ? [qwen] : []
+    );
     const commands =
       action === 'claim'
         ? ['claim_doubao_daily_credits', 'claim_dumate_daily_credits']
@@ -346,9 +352,17 @@ it.each(editions)(
 it.each(editions)('uninstalled %s never reads accounts or starts login', async (edition) => {
   await mount(edition, false);
   await act(async () => state.doubaoAccounts.add());
+  expect(calls('list_doubao_accounts')).toHaveLength(0);
   act(() => useNavigationStore.getState().setActivePage('accounts'));
   await tick();
+  // Plugin-provided accounts keep the install requirement; login says so.
   expect(calls('list_doubao_accounts')).toHaveLength(0);
+  const provider = accountCenterProviders(state, (key) => key, 'en').find(
+    (item) => item.id === edition
+  )!;
+  act(() => provider.add());
+  await tick();
+  expect(state.applyError).toBe('accountCenter.installClientFirst');
   expect(calls('start_doubao_login')).toHaveLength(0);
 });
 

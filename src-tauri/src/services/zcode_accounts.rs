@@ -372,7 +372,11 @@ pub async fn list() -> Result<Vec<Account>, String> {
     if accounts.is_empty() {
         return Ok(Vec::new());
     }
-    let active = native_account().ok().flatten().as_ref().map(id);
+    let active = if super::tool_manager::any_tool_installed(&["zcode"]) {
+        native_account().ok().flatten().as_ref().map(id)
+    } else {
+        None
+    };
     Ok(accounts
         .values()
         .map(|saved| row(saved, active.as_deref()))
@@ -627,7 +631,11 @@ pub async fn poll_login(login_id: &str) -> Result<Option<Account>, String> {
         reset_at: None,
     };
     let account_id = id(&saved);
-    let active = native_account().ok().flatten().as_ref().map(id);
+    let active = if super::tool_manager::any_tool_installed(&["zcode"]) {
+        native_account().ok().flatten().as_ref().map(id)
+    } else {
+        None
+    };
     let result = row(&saved, active.as_deref());
     accounts.insert(account_id, saved);
     save(&accounts)?;

@@ -176,11 +176,16 @@ export const AppManagerProvider: React.FC<AppManagerProviderProps> = ({ children
   const accountsEnabled =
     isActive && detectedTools.some((tool) => tool.id === selectedTool && tool.installed);
   const pluginAvailable = (id: string) => hasAccountPlugin(id, installedPlugins, developerMode);
+  // Account Management lists EchoBird's saved accounts whether or not the
+  // client is installed; the built-in account backends read client files only
+  // when it is. Plugin-provided accounts keep the install requirement because
+  // their list runs in the plugin, outside that guard.
   const accountGroupEnabled = (...ids: string[]) =>
     ids.every((id) => !communityAccountApplications.includes(id) || pluginAvailable(id)) &&
     !usingCachedTools &&
     (activePage === 'accounts'
-      ? detectedTools.some((tool) => ids.includes(tool.id) && tool.installed)
+      ? !ids.some((id) => communityAccountApplications.includes(id)) ||
+        detectedTools.some((tool) => ids.includes(tool.id) && tool.installed)
       : accountsEnabled && ids.includes(selectedTool ?? ''));
   const [isLaunching, setIsLaunching] = useState(false);
   const launchGeneration = useRef(0);

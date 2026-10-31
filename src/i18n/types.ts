@@ -248,6 +248,7 @@ export type TKey =
   | 'accountCenter.empty'
   | 'accountCenter.loading'
   | 'accountCenter.website'
+  | 'accountCenter.installClientFirst'
   | 'accountCenter.subscriptionProviders'
   | 'accountCenter.noSubscriptionProviders'
   | 'accountCenter.claimAll'

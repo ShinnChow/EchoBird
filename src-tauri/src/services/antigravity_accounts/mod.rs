@@ -150,7 +150,12 @@ fn capture(
 pub async fn list() -> Result<Vec<Account>, String> {
     let _guard = ACCOUNT_LOCK.lock().await;
     let accounts = load()?;
-    let current = native::read()?;
+    let current = if super::tool_manager::any_tool_installed(&["antigravitydesktop", "antigravity"])
+    {
+        native::read()?
+    } else {
+        None
+    };
     let active = current.as_deref().map(identity).transpose()?.map(|v| v.0);
     let rows = accounts
         .iter()

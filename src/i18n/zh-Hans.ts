@@ -250,6 +250,7 @@ const zhHans: Partial<Translations> = {
   'accountCenter.empty': '暂无已保存账号',
   'accountCenter.loading': '正在加载账号',
   'accountCenter.website': '打开 {name} 官网',
+  'accountCenter.installClientFirst': '请先安装 {name} 客户端，再添加账号。',
   'accountCenter.subscriptionProviders': '特别鸣谢：账号及代充值',
   'accountCenter.noSubscriptionProviders': '暂未收录',
   'accountCenter.claimAll': '一键领取奖励',

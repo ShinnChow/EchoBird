@@ -269,6 +269,8 @@ const ja: Partial<Translations> = {
   'accountCenter.empty': '保存済みアカウントはありません',
   'accountCenter.loading': 'アカウントを読み込み中',
   'accountCenter.website': '{name} の公式サイトを開く',
+  'accountCenter.installClientFirst':
+    '先に {name} をインストールしてから、アカウントを追加してください。',
   'accountCenter.subscriptionProviders': '特別謝辞：アカウント・チャージ代行',
   'accountCenter.noSubscriptionProviders': '未掲載',
   'accountCenter.claimAll': '報酬を一括受取',

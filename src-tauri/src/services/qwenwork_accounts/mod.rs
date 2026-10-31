@@ -382,7 +382,7 @@ pub(crate) async fn speech_credentials(
         id,
         rejected,
         &path(edition)?,
-        &api::Client::installed(edition)?,
+        &api::Client::for_account(edition)?,
         credential,
         protect,
     )
@@ -447,7 +447,7 @@ async fn speech_credentials_at(
 pub async fn refresh(edition: Edition, id: &str) -> Result<Account, String> {
     let request = request_lock(edition, id)?;
     let _request = request.lock().await;
-    let client = api::Client::installed(edition)?;
+    let client = api::Client::for_account(edition)?;
     let c = rotate(&credentials(edition, id).await?, false, &client).await?;
     let result = client.quota(&c).await;
     let quota = if matches!(&result, Err(e) if e == "accountError.loginRequired") {

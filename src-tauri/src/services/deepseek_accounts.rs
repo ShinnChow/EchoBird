@@ -220,7 +220,9 @@ pub fn list() -> Result<Vec<Account>, String> {
         return Ok(vec![]);
     }
     let _guard = dsh::CONFIG_LOCK.lock().map_err(|_| "accountError.busy")?;
-    let active = dsh::active_account_token(&dsh::dsh_config_dir());
+    let active = super::tool_manager::any_tool_installed(&["dsh"])
+        .then(|| dsh::active_account_token(&dsh::dsh_config_dir()))
+        .flatten();
     let mut accounts = Vec::new();
     for entry in fs::read_dir(&dir).map_err(|_| "accountError.read")? {
         let path = entry.map_err(|_| "accountError.read")?.path();

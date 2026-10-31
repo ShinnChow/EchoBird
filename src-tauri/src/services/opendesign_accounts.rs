@@ -198,7 +198,11 @@ pub async fn list() -> Result<Vec<Account>, String> {
     let _guard = ACCOUNTS.lock().await;
     let path = store_path()?;
     let mut rows = load_at(&path)?;
-    let active = native_at(&native_path()?)?;
+    let active = if super::tool_manager::any_tool_installed(&["opendesign"]) {
+        native_at(&native_path()?)?
+    } else {
+        None
+    };
     let active_id = active.as_ref().map(|a| a.account.id.clone());
     if let Some(saved) = active {
         remember(&mut rows, saved);

@@ -295,7 +295,8 @@ fn import_snapshot(store: &mut Store, c: Credentials, account: Account) -> Resul
     Ok(true)
 }
 pub async fn list(tool_id: &str) -> Result<Vec<Account>, String> {
-    check_tool(tool_id)?;
+    // Saved accounts list without the client; its own files are read only when installed.
+    check_tool_id(tool_id)?;
     let _guard = LOCK.lock().await;
     let mut store = load()?;
     let mut changed = false;
@@ -309,7 +310,7 @@ pub async fn list(tool_id: &str) -> Result<Vec<Account>, String> {
             changed = import_snapshot(&mut store, c, a)?;
         }
     }
-    if tool_id == "devincli" {
+    if tool_id == "devincli" && super::tool_manager::any_tool_installed(&["devincli"]) {
         if let Ok(Some((token, server))) = native::cli_token() {
             active = store.accounts.iter().find_map(|(id, s)| {
                 let c = decode(s).ok()?;
@@ -330,10 +331,14 @@ pub async fn list(tool_id: &str) -> Result<Vec<Account>, String> {
         })
         .collect())
 }
-fn check_tool(tool: &str) -> Result<(), String> {
+fn check_tool_id(tool: &str) -> Result<(), String> {
     if !matches!(tool, "devin" | "devincli") {
         return Err("accountError.invalidAccount".into());
     }
+    Ok(())
+}
+fn check_tool(tool: &str) -> Result<(), String> {
+    check_tool_id(tool)?;
     if super::tool_manager::get_tool_exe_path(tool).is_none() {
         return Err("accountError.initializeClient".into());
     }
