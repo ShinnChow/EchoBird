@@ -1086,28 +1086,35 @@ img[src$='/icons/tools/opendesign.png'] {
   animation: spinnerShimmer 2.4s linear infinite;
 }
 
-/* Six-dot braille spinner, matching Coffee-CLI's conversation view */
-@keyframes spinnerBraille {
+/* Four-dot working mark: a 75-frame sheet stepped inside a fixed box, so the
+   animation never moves the row */
+@keyframes spinnerMark {
+  from {
+    transform: translateY(0);
+  }
   to {
-    transform: translateX(-10ch);
+    transform: translateY(-98.66666667%);
   }
 }
 
-.spinner-glyph {
-  display: inline-block;
-  width: 1ch;
+.spinner-mark {
+  position: relative;
+  display: block;
+  flex: none;
+  width: 20px;
+  height: 20px;
   overflow: hidden;
-  white-space: nowrap;
 }
 
-.spinner-glyph::after {
-  display: inline-block;
-  content: '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';
-  animation: spinnerBraille 0.9s steps(10, end) infinite;
+.spinner-mark img {
+  display: block;
+  width: 100%;
+  height: auto;
+  animation: spinnerMark 2.5s steps(75, jump-none) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .spinner-glyph::after {
+  .spinner-mark img {
     animation: none;
   }
 }

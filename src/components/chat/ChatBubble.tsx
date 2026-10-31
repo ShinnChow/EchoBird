@@ -10,6 +10,7 @@ import { useI18n } from '../../hooks/useI18n';
 import { getSpinnerVerbs, formatSpinnerVerb } from '../../i18n/spinnerVerbs';
 import { mdComponents } from '../../pages/MotherAgent/mdComponents';
 import { IS_LINUX } from '../../utils/platform';
+import workingMark from '../../assets/working-mark.webp';
 
 export type BubbleRole = 'user' | 'assistant' | 'system' | 'error' | 'working' | 'skeleton';
 
@@ -160,12 +161,9 @@ function InputDotsAnimated() {
   }, [phase, shown, target]);
 
   return (
-    <span className="inline-flex items-center gap-2">
-      <span
-        className="inline-block w-3 translate-y-[2px] text-center font-mono text-base leading-none text-cyber-accent"
-        aria-hidden="true"
-      >
-        <span className="spinner-glyph" />
+    <span className="inline-flex h-5 items-center gap-2 overflow-hidden">
+      <span className="spinner-mark" aria-hidden="true">
+        <img src={workingMark} alt="" />
       </span>
       <span className="inline-flex items-baseline font-mono text-sm">
         {/* Preserve the verb's height while the visible text is erased. */}
