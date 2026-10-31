@@ -139,10 +139,12 @@ fn decode_jwt_payload(token: &str) -> Option<Value> {
     serde_json::from_slice(&decoded).ok()
 }
 
+fn jwt_expiry(token: &str) -> Option<i64> {
+    decode_jwt_payload(token).and_then(|payload| payload.get("exp").and_then(Value::as_i64))
+}
+
 fn jwt_is_expired(token: &str) -> bool {
-    decode_jwt_payload(token)
-        .and_then(|payload| payload.get("exp").and_then(Value::as_i64))
-        .is_some_and(|expiry| expiry <= chrono::Utc::now().timestamp())
+    jwt_expiry(token).is_some_and(|expiry| expiry <= chrono::Utc::now().timestamp())
 }
 
 async fn refresh_auth_tokens_at(auth: &mut Value, token_url: &str) -> Result<(), String> {
@@ -508,6 +510,25 @@ fn persist_active_snapshot(codex_dir: &Path, account_id: &str, raw: &[u8]) -> Re
     } else {
         write_private_file(&auth_path, raw)
     }
+}
+
+// The client rotates single-use tokens too; never spend the older saved copy.
+fn adopt_active_snapshot(codex_dir: &Path, path: &Path, account_id: &str) -> Result<(), String> {
+    let Some((native_raw, native)) = read_current_oauth_snapshot(&codex_dir.join("auth.json"))?
+    else {
+        return Ok(());
+    };
+    if metadata_from_auth(&native, &native_raw)?.id != account_id {
+        return Ok(());
+    }
+    let (_, saved) = read_oauth_snapshot(path).ok_or("accountError.invalidAccount")?;
+    let expiry = |auth: &Value| {
+        non_empty_string(auth["tokens"].get("access_token")).and_then(|token| jwt_expiry(&token))
+    };
+    if expiry(&native) > expiry(&saved) {
+        write_private_file(path, &native_raw)?;
+    }
+    Ok(())
 }
 
 fn build_summary(
@@ -983,11 +1004,13 @@ pub(crate) async fn proxy_credentials(
     account_id: &str,
     force_refresh: bool,
 ) -> Result<Value, String> {
-    proxy_credentials_at(
+    proxy_credentials_with_rejection_at(
         &account_store_dir()?,
         account_id,
         force_refresh,
         OAUTH_TOKEN_URL,
+        None,
+        Some(codex_home()?),
     )
     .await
 }
@@ -1006,17 +1029,20 @@ pub(crate) async fn proxy_credentials_after_rejection(
         true,
         OAUTH_TOKEN_URL,
         Some(rejected_token),
+        Some(codex_home()?),
     )
     .await
 }
 
+#[cfg(test)]
 async fn proxy_credentials_at(
     store_dir: &Path,
     account_id: &str,
     force_refresh: bool,
     token_url: &str,
 ) -> Result<Value, String> {
-    proxy_credentials_with_rejection_at(store_dir, account_id, force_refresh, token_url, None).await
+    proxy_credentials_with_rejection_at(store_dir, account_id, force_refresh, token_url, None, None)
+        .await
 }
 
 async fn proxy_credentials_with_rejection_at(
@@ -1025,12 +1051,16 @@ async fn proxy_credentials_with_rejection_at(
     force_refresh: bool,
     token_url: &str,
     rejected_token: Option<&str>,
+    native_dir: Option<PathBuf>,
 ) -> Result<Value, String> {
     let guard = TOKEN_LOCK.lock().await;
     if !valid_account_id(account_id) {
         return Err("accountError.invalidAccount".into());
     }
     let path = store_dir.join(format!("{account_id}.json"));
+    if let Some(native_dir) = &native_dir {
+        adopt_active_snapshot(native_dir, &path, account_id)?;
+    }
     let (raw, auth) = read_oauth_snapshot(&path).ok_or("accountError.invalidAccount")?;
     if metadata_from_auth(&auth, &raw)?.id != account_id {
         return Err("accountError.invalidAccount".into());
@@ -1047,7 +1077,7 @@ async fn proxy_credentials_with_rejection_at(
             raw,
             auth,
             token_url.to_owned(),
-            None,
+            native_dir,
             guard,
         )
         .await?
@@ -1577,6 +1607,78 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn proxy_shares_rotations_with_the_signed_in_client() {
+        use axum::{routing::post, Json, Router};
+        let dir = temp_dir("shared-rotation");
+        let native_dir = dir.join("native");
+        let token = |rotation: i64, exp: i64| {
+            jwt(json!({
+                "rotation":rotation,"exp":chrono::Utc::now().timestamp()+exp,
+                "https://api.openai.com/auth":{"chatgpt_account_id":"fixture-account"}
+            }))
+        };
+        let mut auth: Value = serde_json::from_slice(&oauth(
+            "fixture@example.test",
+            "fixture-account",
+            "saved-refresh",
+        ))
+        .unwrap();
+        auth["tokens"]["access_token"] = json!(token(0, 600));
+        let raw = serde_json::to_vec(&auth).unwrap();
+        let metadata = save_snapshot(&raw, &auth, &dir).unwrap();
+        let mut client = auth.clone();
+        client["tokens"]["access_token"] = json!(token(1, 3600));
+        client["tokens"]["refresh_token"] = json!("client-refresh");
+        let client_token = client["tokens"]["access_token"].clone();
+        write_private_file(
+            &native_dir.join("auth.json"),
+            &serde_json::to_vec(&client).unwrap(),
+        )
+        .unwrap();
+
+        let next = token(2, 7200);
+        let body = next.clone();
+        let app = Router::new().route(
+            "/token",
+            post(move || {
+                let next = body.clone();
+                async move { Json(json!({"access_token":next,"refresh_token":"next-refresh"})) }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/token", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+        let adopted = proxy_credentials_with_rejection_at(
+            &dir,
+            &metadata.id,
+            false,
+            &url,
+            None,
+            Some(native_dir.clone()),
+        )
+        .await
+        .unwrap();
+        assert_eq!(adopted["accessToken"], client_token);
+
+        let rotated = proxy_credentials_with_rejection_at(
+            &dir,
+            &metadata.id,
+            true,
+            &url,
+            None,
+            Some(native_dir.clone()),
+        )
+        .await
+        .unwrap();
+        assert_eq!(rotated["accessToken"], json!(next));
+        let native: Value =
+            serde_json::from_slice(&fs::read(native_dir.join("auth.json")).unwrap()).unwrap();
+        assert_eq!(native["tokens"]["refresh_token"], "next-refresh");
+        server.abort();
+    }
+
+    #[tokio::test]
     async fn proxy_token_rotation_survives_caller_cancellation() {
         use axum::{
             http::{HeaderMap, StatusCode},
@@ -1673,6 +1775,7 @@ mod tests {
                         true,
                         &url,
                         Some(&token),
+                        None,
                     );
                     tokio::pin!(credentials);
                     if mode == "prepared" {
@@ -1711,6 +1814,7 @@ mod tests {
                             true,
                             &args.2,
                             Some(&args.3),
+                            None,
                         )
                         .await
                     }
@@ -1751,6 +1855,7 @@ mod tests {
                         true,
                         &args.2,
                         Some(&args.3),
+                        None,
                     )
                     .await
                 }))
@@ -1988,6 +2093,7 @@ mod tests {
                 true,
                 &url,
                 Some(rejected_token),
+                None,
             )
             .await
             .unwrap();
@@ -2016,17 +2122,22 @@ mod tests {
         save_snapshot(&serde_json::to_vec(&auth).unwrap(), &auth, &dir).unwrap();
         let before_failure = fs::read(&own_path).unwrap();
         failed_refresh.store(true, Ordering::SeqCst);
-        assert!(
-            proxy_credentials_with_rejection_at(&dir, &metadata.id, true, &url, Some(&token))
-                .await
-                .is_err()
-        );
+        assert!(proxy_credentials_with_rejection_at(
+            &dir,
+            &metadata.id,
+            true,
+            &url,
+            Some(&token),
+            None
+        )
+        .await
+        .is_err());
         assert_eq!(calls.load(Ordering::SeqCst), 3);
         assert_eq!(fs::read(&own_path).unwrap(), before_failure);
         failed_refresh.store(false, Ordering::SeqCst);
         replaced_during_refresh.store(true, Ordering::SeqCst);
         let latest =
-            proxy_credentials_with_rejection_at(&dir, &metadata.id, true, &url, Some(&token))
+            proxy_credentials_with_rejection_at(&dir, &metadata.id, true, &url, Some(&token), None)
                 .await
                 .unwrap();
         assert_eq!(latest["accessToken"], replacement_token);

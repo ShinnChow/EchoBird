@@ -372,12 +372,49 @@ async fn rotate_at(
     Ok(next)
 }
 
+// The signed-in client holds the same single-use refresh token: use its newer
+// copy, and give it ours after a rotation.
+async fn adopt_client(edition: Edition, id: &str) -> Result<Option<String>, String> {
+    let Some(live) = native::read_active(edition).filter(|live| live.id() == id) else {
+        return Ok(None);
+    };
+    let path = path(edition)?;
+    let _guard = STORE_LOCK.lock().await;
+    let mut store = load(&path)?;
+    let saved = credential(&store, edition, id)?;
+    if live.auth["refreshToken"] != saved.auth["refreshToken"]
+        && api::timestamp(&live.auth["expiresAt"]) > api::timestamp(&saved.auth["expiresAt"])
+    {
+        store
+            .get_mut(id)
+            .ok_or("accountError.invalidAccount")?
+            .credential = protect(&live)?;
+        super::cursor_auth::write(&path, &store)?;
+    }
+    Ok(live.auth["refreshToken"].as_str().map(str::to_owned))
+}
+
+async fn share_with_client(edition: Edition, id: &str, client_refresh: Option<String>) {
+    let Some(client_refresh) = client_refresh else {
+        return;
+    };
+    let Ok(saved) = credentials(edition, id).await else {
+        return;
+    };
+    if saved.auth["refreshToken"].as_str() != Some(client_refresh.as_str()) {
+        if let Err(error) = native::store_rotation(&saved) {
+            log::warn!("[QwenWork] Could not update the client login: {error}");
+        }
+    }
+}
+
 pub(crate) async fn speech_credentials(
     edition: Edition,
     id: &str,
     rejected: Option<&Value>,
 ) -> Result<Value, String> {
-    speech_credentials_at(
+    let client_refresh = adopt_client(edition, id).await.unwrap_or(None);
+    let result = speech_credentials_at(
         edition,
         id,
         rejected,
@@ -386,7 +423,9 @@ pub(crate) async fn speech_credentials(
         credential,
         protect,
     )
-    .await
+    .await;
+    share_with_client(edition, id, client_refresh).await;
+    result
 }
 
 pub(crate) async fn proxy_credentials(

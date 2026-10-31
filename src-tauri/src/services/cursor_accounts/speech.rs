@@ -1,5 +1,8 @@
 //! Saved Cursor accounts only. No native catalog sync, usage lookup or account switch.
-use super::{claims, cli, identity, read, store_path, write, Account, Store, ACCOUNT_LOCK};
+use super::{
+    claims, cli, data_dir, database, identity, native, put, read, store_path, sync_native, write,
+    Account, Store, ACCESS, ACCOUNT_LOCK, REFRESH,
+};
 use serde_json::{json, Value};
 use std::{path::Path, time::Duration};
 
@@ -49,7 +52,26 @@ async fn selected_credentials(
     let path = store_path()?;
     let mut store: Store = read(&path)?;
     let key = cli::desktop_key()?;
+    // The signed-in editor owns the newest token of its account.
+    let editor = key
+        .as_ref()
+        .and_then(|_| data_dir().ok())
+        .and_then(|dir| database(&dir, false).ok())
+        .and_then(|db| native(&db).ok().flatten());
+    if let (Some(key), Some(login)) = (&key, &editor) {
+        if identity(&login.access_token)? == id {
+            sync_native(&mut store, Some(login), key)?;
+        }
+    }
+    let cli_holds_token = cli::adopt(&mut store, id, key.as_ref()).unwrap_or(false);
+    if cli_holds_token {
+        write(&path, &store)?;
+    }
     let entry = store.get_mut(id).ok_or("accountError.invalidAccount")?;
+    let client_holds_token = entry.applied
+        && editor
+            .as_ref()
+            .is_some_and(|login| identity(&login.access_token).is_ok_and(|active| active == id));
     let mut current = cli::restored(id, entry, key.as_ref())?;
     if should_rotate(&current.access_token, rejected, force)? {
         let rotated = refresh_pair(&current.refresh_token).await?;
@@ -62,6 +84,14 @@ async fn selected_credentials(
         entry.session = replacement.session;
         entry.email = replacement.email;
         write(&path, &store)?;
+        if client_holds_token {
+            let db = database(&data_dir()?, true)?;
+            put(&db, ACCESS, &current.access_token)?;
+            put(&db, REFRESH, &current.refresh_token)?;
+        }
+        if cli_holds_token {
+            cli::store_rotation(&current)?;
+        }
     }
     Ok(json!({"accessToken":current.access_token,"teamId":current.team_id}))
 }

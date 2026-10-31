@@ -92,6 +92,32 @@ pub(super) fn restored(
     }
 }
 
+/// Keeps the CLI's newer login and says whether the CLI holds account `id`.
+pub(super) fn adopt(store: &mut Store, id: &str, key: Option<&Cipher>) -> Result<bool, String> {
+    let current = native_credentials(&config_file()?)?;
+    let active = sync_current(store, current.as_ref(), key, false)?;
+    Ok(active.as_deref() == Some(id) && store.get(id).is_some_and(|entry| entry.cli_applied))
+}
+
+/// Gives the CLI the token EchoBird rotated, so its own copy stays valid.
+pub(super) fn store_rotation(login: &Credentials) -> Result<(), String> {
+    let config = config_file()?;
+    let _guard = files::DirectoryLock::acquire(&config)?;
+    #[cfg(not(target_os = "macos"))]
+    {
+        let path = auth_file()?;
+        let mut transaction = Transaction::new();
+        transaction.replace_private_file(
+            &path,
+            &files::json(&authenticated(files::object(&path)?, login)?)?,
+        )?;
+        transaction.commit();
+    }
+    #[cfg(target_os = "macos")]
+    keychain_apply(login)?;
+    Ok(())
+}
+
 fn store() -> Result<Store, String> {
     let path = store_path()?;
     if path.exists() {

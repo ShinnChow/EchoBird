@@ -24,6 +24,18 @@ pub(super) fn token_for(dir: &Path, account: &Account) -> Option<Token> {
     (token_id(&token, account.region).as_deref() == Some(account.id.as_str())).then_some(token)
 }
 
+/// Keeps the client's copy valid after EchoBird spends a single-use refresh token.
+pub(super) fn store_token(dir: &Path, region: Region, token: &Token) -> Result<(), String> {
+    let name = region.key().trim_start_matches("oauth/").to_string();
+    let mut transaction = Transaction::new();
+    transaction.replace(
+        &dir.join("credentials").join(format!("{name}.json")),
+        &serde_json::to_vec_pretty(token).map_err(|_| "accountError.format")?,
+    )?;
+    transaction.commit();
+    Ok(())
+}
+
 pub(super) fn active_id(dir: &Path) -> Option<String> {
     let document = fs::read_to_string(dir.join("config.toml"))
         .ok()?

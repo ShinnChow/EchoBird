@@ -527,11 +527,53 @@ async fn voice_credentials_at(
     )
 }
 
+/// A running client signed in to this account rotates the device token pair
+/// itself; spending it here would sign the client out. Returns the error to
+/// report when the current token cannot be used, or None to go on.
+fn client_owns_rotation(
+    c: &Credentials,
+    active: bool,
+    running: bool,
+    rejected: Option<&str>,
+    now_ms: i64,
+) -> Option<&'static str> {
+    if !(c.device_chat && active && running) {
+        return None;
+    }
+    let expired = c.device_expires_at <= now_ms + 300_000;
+    let refused = rejected.is_some_and(|token| token == c.access_token);
+    (expired || refused).then_some("accountError.clientOwnsLogin")
+}
+
 async fn proxy_credentials_inner(
     edition: Edition,
     id: &str,
     rejected: Option<&str>,
 ) -> Result<Value, String> {
+    let path = store_path(edition)?;
+    let (current, active) = {
+        let _guard = ACCOUNT_LOCK.lock().await;
+        let store = load_at(&path)?;
+        let active = store.get(id).is_some_and(|saved| saved.account.active);
+        (selected(&store, edition, id)?, active)
+    };
+    let running = current.device_chat
+        && active
+        && super::process_manager::desktop_tool_is_running(edition.tool())
+            .await
+            .unwrap_or(false);
+    if running {
+        if let Some(error) = client_owns_rotation(
+            &current,
+            active,
+            running,
+            rejected,
+            chrono::Utc::now().timestamp_millis(),
+        ) {
+            return Err(error.into());
+        }
+        return proxy_credentials_at(&path, edition, id, None, edition.openapi()).await;
+    }
     proxy_credentials_at(
         &store_path(edition)?,
         edition,
@@ -733,6 +775,43 @@ pub(super) fn client() -> Result<reqwest::Client, String> {
 
 #[cfg(test)]
 mod daily_tests;
+
+#[cfg(test)]
+mod client_rotation_tests {
+    use super::*;
+
+    #[test]
+    fn a_running_client_keeps_its_device_tokens() {
+        let now = 1_000_000_000;
+        let mut c: Credentials = serde_json::from_value(serde_json::json!({
+            "edition": "qodercn", "accessToken": "device", "refreshToken": "r",
+            "expiresAt": 0, "userId": "u", "name": "n", "email": "e", "machineId": "m",
+            "deviceToken": "device", "deviceRefresh": "dr",
+            "deviceExpiresAt": now + 3_600_000, "deviceChat": true
+        }))
+        .unwrap();
+        assert_eq!(client_owns_rotation(&c, true, true, None, now), None);
+        assert_eq!(
+            client_owns_rotation(&c, true, true, Some("device"), now),
+            Some("accountError.clientOwnsLogin")
+        );
+        assert_eq!(
+            client_owns_rotation(&c, true, false, Some("device"), now),
+            None
+        );
+        assert_eq!(
+            client_owns_rotation(&c, false, true, Some("device"), now),
+            None
+        );
+        c.device_expires_at = now;
+        assert_eq!(
+            client_owns_rotation(&c, true, true, None, now),
+            Some("accountError.clientOwnsLogin")
+        );
+        c.device_chat = false;
+        assert_eq!(client_owns_rotation(&c, true, true, None, now), None);
+    }
+}
 
 #[cfg(test)]
 mod tests {

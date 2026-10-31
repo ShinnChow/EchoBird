@@ -214,6 +214,8 @@ const en: Translations = {
     'Allow keyboard monitoring in system privacy settings, then enable the shortcut again.',
   'voice.error.portal':
     'The desktop GlobalShortcuts portal is unavailable or permission was denied.',
+  'accountError.clientOwnsLogin':
+    'This account is signed in to the running client and its login has expired. Close the client and try again.',
   'accountError.closeClient': 'Save your work and close the client, then try switching again.',
   'accountError.stopClient': 'Could not stop the client. Please try again.',
   'accountError.stopClaudeDesktop': 'Could not stop Claude. Please try again.',

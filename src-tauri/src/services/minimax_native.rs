@@ -7,7 +7,7 @@ use super::{
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 fn native_region(region: Region) -> &'static str {
     match region {
@@ -56,12 +56,125 @@ pub(crate) async fn apply(account_id: &str, tool_id: &str) -> Result<Account, St
     Ok(account)
 }
 
-fn write_cli(home: &Path, credentials: &Credentials) -> Result<Transaction, String> {
-    let region = native_region(credentials.region);
+struct Record {
+    namespace: PathBuf,
+    credential: PathBuf,
+    state: PathBuf,
+    key: String,
+}
+
+fn record(home: &Path, region: Region) -> Record {
+    let region = native_region(region);
     let auth_home = home.join("auth");
     let namespace = auth_home.join("prod").join(region).join("mcode-public");
-    let credential_path = namespace.join("auth.json");
-    let state_path = namespace.join("auth-state.json");
+    let account_key = URL_SAFE_NO_PAD.encode(Sha256::digest(
+        format!("{}\0mcode-public", auth_home.display()).as_bytes(),
+    ));
+    Record {
+        credential: namespace.join("auth.json"),
+        state: namespace.join("auth-state.json"),
+        key: format!("com.minimax.mcode.oauth.prod.{region}\0{account_key}"),
+        namespace,
+    }
+}
+
+fn client_homes(region: Region) -> Vec<PathBuf> {
+    let mut homes = vec![];
+    if let Ok(home) = files::absolute_path(&super::tool_config_manager::minimaxcode::data_dir()) {
+        homes.push(home);
+    }
+    if let Some(executable) = super::tool_manager::get_tool_exe_path("minimaxdesktop") {
+        if let Ok(home) = desktop::data_dir(Path::new(&executable), region) {
+            if !homes.contains(&home) {
+                homes.push(home);
+            }
+        }
+    }
+    homes
+}
+
+fn subject(token: &str) -> Option<String> {
+    super::cursor_auth::claims(token).ok()?["sub"]
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
+}
+
+/// The newest login a client holds for this account: access, refresh, expiry.
+pub(crate) fn client_tokens(c: &Credentials) -> Option<(String, String, i64)> {
+    client_tokens_in(c, &client_homes(c.region))
+}
+
+fn client_tokens_in(c: &Credentials, homes: &[PathBuf]) -> Option<(String, String, i64)> {
+    let account = subject(&c.access_token)?;
+    homes
+        .iter()
+        .filter_map(|home| {
+            let location = record(home, c.region);
+            let value = files::object(&location.credential).ok()?;
+            let entry = &value["records"][&location.key];
+            let access = entry["accessToken"].as_str()?;
+            (subject(access)? == account).then_some((
+                access.to_owned(),
+                entry["refreshToken"].as_str()?.to_owned(),
+                entry["expiresAtMs"].as_i64()? / 1000,
+            ))
+        })
+        .max_by_key(|(_, _, expires)| *expires)
+}
+
+/// Gives every client signed in to this account the token EchoBird rotated.
+pub(crate) fn store_rotation(next: &Credentials) -> Result<(), String> {
+    store_rotation_in(next, &client_homes(next.region))
+}
+
+fn store_rotation_in(next: &Credentials, homes: &[PathBuf]) -> Result<(), String> {
+    let Some(account) = subject(&next.access_token) else {
+        return Ok(());
+    };
+    for home in homes {
+        let location = record(home, next.region);
+        let Ok(mut credential) = files::object(&location.credential) else {
+            continue;
+        };
+        let held = credential["records"][&location.key]["accessToken"]
+            .as_str()
+            .and_then(subject);
+        if held.as_deref() != Some(account.as_str()) {
+            continue;
+        }
+        let _lock = DirectoryLock::acquire(&location.namespace.join("auth.lock"))?;
+        let mut state = files::object(&location.state)?;
+        let entry = &mut credential["records"][&location.key];
+        let generation = entry["generation"]
+            .as_u64()
+            .unwrap_or(0)
+            .max(state["generation"].as_u64().unwrap_or(0))
+            + 1;
+        let expires = next.expires_at.saturating_mul(1000);
+        entry["accessToken"] = json!(next.access_token);
+        entry["refreshToken"] = json!(next.refresh_token);
+        entry["expiresAtMs"] = json!(expires);
+        entry["generation"] = json!(generation);
+        if state.is_object() {
+            state["expiresAtMs"] = json!(expires);
+            state["generation"] = json!(generation);
+        }
+        let mut transaction = Transaction::new();
+        transaction.replace_private_file(&location.credential, &files::json(&credential)?)?;
+        if location.state.exists() {
+            transaction.replace_private_file(&location.state, &files::json(&state)?)?;
+        }
+        transaction.commit();
+    }
+    Ok(())
+}
+
+fn write_cli(home: &Path, credentials: &Credentials) -> Result<Transaction, String> {
+    let region = native_region(credentials.region);
+    let location = record(home, credentials.region);
+    let credential_path = location.credential;
+    let state_path = location.state;
     let config_path = home.join("config.yaml");
     let preference_path = home.join("preferences/mcode-region.json");
     let mut credential = files::object(&credential_path)?;
@@ -69,10 +182,7 @@ fn write_cli(home: &Path, credentials: &Credentials) -> Result<Transaction, Stri
     if credential.get("records").is_some_and(|v| !v.is_object()) {
         return Err("accountError.format".into());
     }
-    let account_key = URL_SAFE_NO_PAD.encode(Sha256::digest(
-        format!("{}\0mcode-public", auth_home.display()).as_bytes(),
-    ));
-    let key = format!("com.minimax.mcode.oauth.prod.{region}\0{account_key}");
+    let key = location.key;
     let generation = credential["records"][&key]["generation"]
         .as_u64()
         .unwrap_or(0)
@@ -150,6 +260,50 @@ fn write_cli(home: &Path, credentials: &Credentials) -> Result<Transaction, Stri
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn rotations_reach_only_clients_signed_in_to_the_same_account() {
+        let token = |sub: &str| {
+            format!(
+                "h.{}.s",
+                URL_SAFE_NO_PAD.encode(json!({ "sub": sub }).to_string())
+            )
+        };
+        let credentials = |sub: &str, refresh: &str, expires: i64| Credentials {
+            region: Region::Global,
+            access_token: token(sub),
+            refresh_token: refresh.into(),
+            expires_at: expires,
+            user_id: sub.into(),
+            email: format!("{sub}@example.test"),
+            name: None,
+        };
+        let root =
+            std::env::temp_dir().join(format!("echobird-minimax-share-{}", uuid::Uuid::new_v4()));
+        let (mine, other) = (root.join("mine"), root.join("other"));
+        for (home, sub) in [(&mine, "user-a"), (&other, "user-b")] {
+            write_cli(home, &credentials(sub, &format!("{sub}-old"), 1_000))
+                .unwrap()
+                .commit();
+        }
+        let homes = vec![mine.clone(), other.clone()];
+        let (_, refresh, expires) =
+            client_tokens_in(&credentials("user-a", "x", 0), &homes).unwrap();
+        assert_eq!((refresh.as_str(), expires), ("user-a-old", 1_000));
+
+        store_rotation_in(&credentials("user-a", "user-a-new", 2_000), &homes).unwrap();
+        let read = |home: &Path| {
+            let location = record(home, Region::Global);
+            files::object(&location.credential).unwrap()["records"][&location.key]["refreshToken"]
+                .clone()
+        };
+        assert_eq!(read(&mine), "user-a-new");
+        assert_eq!(read(&other), "user-b-old");
+        let (_, refresh, expires) =
+            client_tokens_in(&credentials("user-a", "x", 0), &homes).unwrap();
+        assert_eq!((refresh.as_str(), expires), ("user-a-new", 2_000));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     use super::*;
     use std::path::PathBuf;
     fn fixture(region: Region) -> Credentials {

@@ -66,6 +66,26 @@ fn write_at(
     transaction.remove(&directory.join("auth-v2.dat.json"))?;
     Ok((transaction, lock))
 }
+/// The account the installed client is signed in to, read without writing.
+pub(super) fn read_active(edition: Edition) -> Option<Credentials> {
+    let directory = data_dir(edition).ok()?;
+    let cipher = cipher(&directory, edition).ok()?;
+    let bytes = std::fs::read(directory.join("auth-v2.dat")).ok()?;
+    let plain = electron_storage::decrypt_bytes(&cipher, &bytes).ok()?;
+    let auth = serde_json::from_slice(&plain).ok()?;
+    let c = Credentials { edition, auth };
+    c.validate().ok().map(|_| c)
+}
+
+/// Gives the client the token EchoBird rotated, so its own copy stays valid.
+pub(super) fn store_rotation(c: &Credentials) -> Result<(), String> {
+    let directory = data_dir(c.edition)?;
+    let cipher = cipher(&directory, c.edition)?;
+    let (transaction, _lock) = write_at(c, &directory, &cipher)?;
+    transaction.commit();
+    Ok(())
+}
+
 pub(super) async fn apply(c: &Credentials) -> Result<Update, String> {
     // Keep the native transaction exclusive through the saved-account commit.
     static LOCK: std::sync::OnceLock<std::sync::Arc<tokio::sync::Mutex<()>>> =

@@ -204,6 +204,7 @@ const zhHant: Partial<Translations> = {
   'voice.error.allChannels': '所選通道皆辨識失敗，請檢查帳號與語音 API 設定。',
   'voice.error.shortcutPermission': '請在系統隱私設定允許鍵盤監聽，再重新啟用快捷鍵。',
   'voice.error.portal': '桌面全域快捷鍵服務無法使用或尚未授權。',
+  'accountError.clientOwnsLogin': '該帳號正在用戶端中使用，登入已過期。請關閉用戶端後重試。',
   'accountError.closeClient': '請儲存工作並關閉用戶端，然後重新切換帳號。',
   'accountError.stopClient': '關閉用戶端失敗，請重試。',
   'accountError.stopClaudeDesktop': '關閉 Claude 失敗，請重試。',

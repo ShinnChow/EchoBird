@@ -255,3 +255,13 @@ fn account_ipc_never_contains_credentials() {
     assert!(!wire.contains("access_token"));
     assert!(!wire.contains("fixture-refresh"));
 }
+
+#[test]
+fn stored_client_token_replaces_only_that_region_file() {
+    let fixture = Fixture::new();
+    let row = saved(Region::Cn);
+    native::store_token(&fixture.0, Region::Cn, &row.token).unwrap();
+    let stored = native::token_for(&fixture.0, &row.account).unwrap();
+    assert_eq!(stored.refresh_token, "fixture-refresh");
+    assert!(native::token_for(&fixture.0, &saved(Region::Global).account).is_none());
+}

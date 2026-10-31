@@ -214,6 +214,8 @@ const ja: Partial<Translations> = {
     'システムのプライバシー設定でキーボード監視を許可してから有効にしてください。',
   'voice.error.portal':
     'デスクトップのグローバルキーサービスが利用できないか許可されませんでした。',
+  'accountError.clientOwnsLogin':
+    'このアカウントは実行中のクライアントで使用中で、ログインの有効期限が切れています。クライアントを閉じてから再試行してください。',
   'accountError.closeClient':
     '作業を保存してクライアントを閉じてから、アカウントを再度切り替えてください。',
   'accountError.stopClient': 'クライアントを終了できませんでした。再試行してください。',

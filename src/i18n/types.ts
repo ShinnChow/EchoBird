@@ -200,6 +200,7 @@ export type TKey =
   | 'voice.error.allChannels'
   | 'voice.error.shortcutPermission'
   | 'voice.error.portal'
+  | 'accountError.clientOwnsLogin'
   | 'accountError.closeClient'
   | 'accountError.stopClient'
   | 'accountError.stopClaudeDesktop'

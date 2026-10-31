@@ -551,21 +551,24 @@ pub(crate) async fn proxy_credentials(id: &str, force: bool) -> Result<Value, St
     let _guard = ACCOUNTS.lock().await;
     let mut saved = load()?;
     let row = saved.get_mut(id).ok_or("accountError.invalidAccount")?;
+    let dir = super::tool_config_manager::kimicode::kimicode_dir();
+    let native = native::token_for(&dir, &row.account);
+    let client_holds_token = native.is_some();
+    let client_rotated = native.filter(|native| {
+        native.access_token != row.token.access_token && native.expires_at > now() as f64 + 60.0
+    });
     if force || row.token.expires_at <= now() as f64 + 60.0 {
-        if let Some(native) = native::token_for(
-            &super::tool_config_manager::kimicode::kimicode_dir(),
-            &row.account,
-        ) {
-            if native.access_token != row.token.access_token
-                && native.expires_at > now() as f64 + 60.0
-            {
-                row.token = native;
-            } else {
-                refresh_token(row).await?;
-            }
+        if let Some(native) = client_rotated {
+            row.token = native;
         } else {
             refresh_token(row).await?;
+            if client_holds_token {
+                native::store_token(&dir, row.account.region, &row.token)?;
+            }
         }
+        save(&saved)?;
+    } else if let Some(native) = client_rotated.filter(|n| n.expires_at > row.token.expires_at) {
+        row.token = native;
         save(&saved)?;
     }
     let row = saved.get(id).ok_or("accountError.invalidAccount")?;

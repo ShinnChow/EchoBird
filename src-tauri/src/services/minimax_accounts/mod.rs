@@ -532,8 +532,45 @@ fn proxy_value(credential: &Credentials, account_id: &str) -> Value {
         "region":credential.region,"baseUrl":credential.region.llm_host()})
 }
 
+// A signed-in client holds the same single-use refresh token: use its newer
+// copy, and give it ours after a rotation.
+async fn adopt_client(path: &Path, account_id: &str) -> Result<Option<String>, String> {
+    let saved = current(path, account_id)?;
+    let Some((access, refresh, expires)) = super::minimax_native::client_tokens(&saved) else {
+        return Ok(None);
+    };
+    if refresh != saved.refresh_token && expires > saved.expires_at {
+        let _guard = STORE_LOCK.lock().await;
+        let mut accounts = load(path)?;
+        let entry = accounts
+            .get_mut(account_id)
+            .ok_or("accountError.invalidAccount")?;
+        let mut latest = unprotect(entry)?;
+        if latest.refresh_token == saved.refresh_token {
+            latest.access_token = access;
+            latest.refresh_token = refresh.clone();
+            latest.expires_at = expires;
+            entry.credential = protect(&latest)?;
+            entry.account.expires_at = Some(expires);
+            super::cursor_auth::write(path, &accounts)?;
+        }
+    }
+    Ok(Some(refresh))
+}
+
+fn share_with_client(client_refresh: Option<String>, credential: &Credentials) {
+    if client_refresh.is_some_and(|refresh| refresh != credential.refresh_token) {
+        if let Err(error) = super::minimax_native::store_rotation(credential) {
+            log::warn!("[MiniMax] Could not update the client login: {error}");
+        }
+    }
+}
+
 pub(crate) async fn proxy_credentials(account_id: &str, force: bool) -> Result<Value, String> {
-    let credential = credentials_at(&store_path()?, account_id, force, None, None).await?;
+    let path = store_path()?;
+    let client_refresh = adopt_client(&path, account_id).await.unwrap_or(None);
+    let credential = credentials_at(&path, account_id, force, None, None).await?;
+    share_with_client(client_refresh, &credential);
     Ok(proxy_value(&credential, account_id))
 }
 pub(crate) async fn credentials_after_rejection(
@@ -541,7 +578,10 @@ pub(crate) async fn credentials_after_rejection(
     rejected: &Value,
 ) -> Result<Value, String> {
     let rejected = text(rejected, "accessToken").ok_or("accountError.loginRequired")?;
-    let credential = credentials_at(&store_path()?, account_id, true, Some(rejected), None).await?;
+    let path = store_path()?;
+    let client_refresh = adopt_client(&path, account_id).await.unwrap_or(None);
+    let credential = credentials_at(&path, account_id, true, Some(rejected), None).await?;
+    share_with_client(client_refresh, &credential);
     Ok(proxy_value(&credential, account_id))
 }
 

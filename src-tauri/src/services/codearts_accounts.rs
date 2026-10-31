@@ -641,6 +641,12 @@ pub async fn proxy_credentials(account_id: &str, force_refresh: bool) -> Result<
             <= chrono::Utc::now().timestamp_millis() + 60000
     {
         renew(saved).await?;
+        // The renewal spent the client's refresh token too when it holds this account.
+        if let Ok(Some(live)) = native::read() {
+            if account(&live)?.id == account_id {
+                native::apply(saved)?.commit();
+            }
+        }
         save(&rows)?;
     }
     credentials(rows.get(account_id).ok_or("accountError.notFound")?)
